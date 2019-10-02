@@ -438,7 +438,7 @@ public:
    * config. Returned object will be stored in the loaded route configuration.
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
+  createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&) {
     return nullptr;
   }
 

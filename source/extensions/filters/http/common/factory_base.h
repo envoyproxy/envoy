@@ -40,7 +40,7 @@ public:
 
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
-                                  Server::Configuration::FactoryContext& context) override {
+                                  Server::Configuration::ServerFactoryContext& context) override {
     return createRouteSpecificFilterConfigTyped(
         MessageUtil::downcastAndValidate<const RouteConfigProto&>(
             proto_config, context.messageValidationVisitor()),
@@ -60,7 +60,7 @@ private:
 
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
-                                       Server::Configuration::FactoryContext&) {
+                                       Server::Configuration::ServerFactoryContext&) {
     return nullptr;
   }
 

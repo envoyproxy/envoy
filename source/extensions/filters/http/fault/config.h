@@ -30,7 +30,7 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::config::filter::http::fault::v2::HTTPFault& proto_config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace Fault

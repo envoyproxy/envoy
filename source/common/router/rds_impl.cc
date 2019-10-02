@@ -41,7 +41,7 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::api::v2::RouteConfiguration& config,
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config},
+    : config_(new ConfigImpl(config, Server::Configuration::ServerFactoryCxtUtil::generateServerFactoryContext(factory_context), true)), route_config_proto_{config},
       last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
   route_config_provider_manager_.static_route_config_providers_.insert(this);
@@ -178,7 +178,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
-                                                  factory_context_, false);
+                                                  Server::Configuration::ServerFactoryCxtUtil::generateServerFactoryContext(factory_context), false);
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }
@@ -198,7 +198,7 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(
-      new ConfigImpl(config_update_info_->routeConfiguration(), factory_context_, false));
+      new ConfigImpl(config_update_info_->routeConfiguration(), Server::Configuration::ServerFactoryCxtUtil::generateServerFactoryContext(factory_context_), false));
   tls_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
                             -> ThreadLocal::ThreadLocalObjectSharedPtr {
     auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
@@ -210,7 +210,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
 void RdsRouteConfigProviderImpl::validateConfig(
     const envoy::api::v2::RouteConfiguration& config) const {
   // TODO(lizan): consider cache the config here until onConfigUpdate.
-  ConfigImpl validation_config(config, factory_context_, false);
+  ConfigImpl validation_config(config, Server::Configuration::ServerFactoryCxtUtil::generateServerFactoryContext(factory_context_), false);
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

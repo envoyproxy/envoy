@@ -28,7 +28,7 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute& proto_config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace ExtAuthz
