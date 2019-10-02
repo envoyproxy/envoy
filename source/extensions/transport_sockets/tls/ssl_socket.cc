@@ -307,7 +307,7 @@ bool SslSocketInfo::peerCertificatePresented() const {
 }
 
 bool SslSocketInfo::localCertificatePresented() const {
-  bssl::UniquePtr<X509> cert(SSL_get_certificate(ssl_.get()));
+  X509* cert = SSL_get_certificate(ssl_.get());
   return cert != nullptr;
 }
 
