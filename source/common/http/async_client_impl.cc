@@ -93,6 +93,9 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!remote_closed_);
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
+  // At present, the router cleans up stream state as soon as the remote is closed, making a
+  // half-open local stream unsupported and dangerous. Close here to keep things consistent.
+  closeLocal(end_stream);
 }
 
 void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -101,6 +104,9 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!remote_closed_);
   stream_callbacks_.onData(data, end_stream);
   closeRemote(end_stream);
+  // At present, the router cleans up stream state as soon as the remote is closed, making a
+  // half-open local stream unsupported and dangerous. Close here to keep things consistent.
+  closeLocal(end_stream);
 }
 
 void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
@@ -108,6 +114,9 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
   ASSERT(!remote_closed_);
   stream_callbacks_.onTrailers(std::move(trailers));
   closeRemote(true);
+  // At present, the router cleans up stream state as soon as the remote is closed, making a
+  // half-open local stream unsupported and dangerous. Close here to keep things consistent.
+  closeLocal(true);
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
@@ -126,6 +135,12 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
+  // This guard parallels behavior in the router that maps send calls after closure to no-ops,
+  // because stream state may have synchronously been dropped.
+  if (local_closed_) {
+    return;
+  }
+
   // TODO(mattklein123): We trust callers currently to not do anything insane here if they set up
   // buffering on an async client call. We should potentially think about limiting the size of
   // buffering that we allow here.
@@ -138,16 +153,17 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
+  // This guard parallels behavior in the router that maps send calls after closure to no-ops,
+  // because stream state may have synchronously been dropped.
+  if (local_closed_) {
+    return;
+  }
+
   router_.decodeTrailers(trailers);
   closeLocal(true);
 }
 
 void AsyncStreamImpl::closeLocal(bool end_stream) {
-  // TODO(goaway): This assert maybe merits reconsideration. It seems to be saying that we shouldn't
-  // get here when trying to send the final frame of a stream that has already been closed locally,
-  // but it's fine for us to get here if we're trying to send a non-final frame. There's not an
-  // obvious reason why the first case would be not okay but the second case okay.
-  ASSERT(!(local_closed_ && end_stream));
   // This guard ensures that we don't attempt to clean up a stream or fire a completion callback
   // for a stream that has already been closed. Both send* calls and resets can result in stream
   // closure, and this state may be updated synchronously during stream interaction and callbacks.
@@ -216,23 +232,10 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
 
 void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());
-  // AsyncRequestImpl has historically been implemented to fire onComplete immediately upon
-  // receiving a complete response, regardless of whether the underlying stream was fully closed (in
-  // other words, regardless of whether the complete request had been sent). This had the potential
-  // to leak half-closed streams, which is now covered by manually firing closeLocal below. (See
-  // test PoolFailureWithBody for an example execution path.)
-  // TODO(goaway): Consider deeper cleanup of assumptions here.
   if (request_->body()) {
-    // sendHeaders can result in synchronous stream closure in certain cases (e.g. connection pool
-    // failure).
-    if (remoteClosed()) {
-      // In the case that we had a locally-generated response, we manually close the stream locally
-      // to fire the completion callback. This is a no-op if we had a locally-generated reset
-      // instead.
-      closeLocal(true);
-    } else {
-      sendData(*request_->body(), true);
-    }
+    // It's possible this will be a no-op due to a local response synchronously generated in
+    // sendHeaders; guards handle this within AsyncStreamImpl.
+    sendData(*request_->body(), true);
   }
   // TODO(mattklein123): Support request trailers.
 }
