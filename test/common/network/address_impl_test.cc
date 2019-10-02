@@ -323,7 +323,7 @@ TEST(PipeInstanceTest, Basic) {
 TEST(PipeInstanceTest, BasicPermission) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
-  const mode_t mode = 777;
+  const mode_t mode = 0777;
   PipeInstance address(path, mode);
 
   IoHandlePtr io_handle = address.socket(SocketType::Stream);
