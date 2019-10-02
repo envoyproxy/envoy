@@ -10,6 +10,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/type/http_status.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -34,13 +35,32 @@ namespace ExtAuthz {
 enum class FilterRequestType { Internal, External, Both };
 
 /**
+ * All stats for the Ext Authz filter. @see stats_macros.h
+ */
+
+#define ALL_EXT_AUTHZ_FILTER_STATS(COUNTER)                                                        \
+  COUNTER(ok)                                                                                 \
+  COUNTER(denied)                                                                                 \
+  COUNTER(error)																																								 \
+  COUNTER(failure_mode_allowed)
+
+
+/**
+ * Wrapper struct for jwt_authn filter stats. @see stats_macros.h
+ */
+		struct ExtAuthzFilterStats {
+			ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+		};
+
+
+/**
  * Configuration for the External Authorization (ext_authz) filter.
  */
 class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context)
+               Runtime::Loader& runtime, Http::Context& http_context, const std::string& stats_prefix)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
@@ -49,9 +69,11 @@ public:
         scope_(scope), runtime_(runtime), http_context_(http_context), pool_(scope.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
+				stats_(generateStats(stats_prefix, scope)),
         ext_authz_ok_(pool_.add("ext_authz.ok")), ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
-        ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
+        ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed"))
+        {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -90,6 +112,11 @@ private:
     return Http::Code::Forbidden;
   }
 
+	ExtAuthzFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+		const std::string final_prefix = prefix + "ext_authz.";
+		return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+	}
+
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const bool clear_route_cache_;
@@ -104,11 +131,16 @@ private:
 
   const std::vector<std::string> metadata_context_namespaces_;
 
+	// The stats for the filter.
+	ExtAuthzFilterStats stats_;
+
 public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
+
+	ExtAuthzFilterStats& stats() { return stats_; }
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
