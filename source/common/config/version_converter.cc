@@ -24,7 +24,7 @@
 namespace Envoy {
 namespace Config {
 
-const int DeprecatedMessageFieldNumber = 100000;
+constexpr uint32_t DeprecatedMessageFieldNumber = 100000;
 
 void VersionConverter::upgrade(const Protobuf::Message& prev_message,
                                Protobuf::Message& next_message) {
@@ -110,9 +110,6 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
 
 void VersionConverter::unpackDeprecated(const Protobuf::Message& upgraded_message,
                                         Protobuf::Message& deprecated_message) {
-  // We are effectively copying the deprecated fields here. We could do better by
-  // embedding the v(N-1) message directly in vN in the _api_internal_do_not_use
-  // field, but that creates a bunch of build complexity and misuse potential.
   const Protobuf::Reflection* reflection = upgraded_message.GetReflection();
   const auto& unknown_field_set = reflection->GetUnknownFields(upgraded_message);
   ASSERT(unknown_field_set.field_count() == 1);
