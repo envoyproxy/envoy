@@ -402,7 +402,13 @@ void InstanceImpl::initialize(const Options& options,
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config()) {
-    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
+    const bool is_delta =
+        bootstrap_.dynamic_resources().lds_config().api_config_source().api_type() ==
+            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
+        (bootstrap_.dynamic_resources().has_ads_config() &&
+         bootstrap_.dynamic_resources().ads_config().api_type() ==
+             envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(), is_delta);
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
@@ -516,14 +522,18 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
-    cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
+    if (cm.adsMux()) {
+      cm.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+    }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
-    cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
+    if (cm.adsMux()) {
+      cm.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration);
+    }
   });
 }
 

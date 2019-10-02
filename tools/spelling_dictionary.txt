@@ -330,6 +330,7 @@ abcd
 absl
 accessor
 accessors
+acks
 acls
 addr
 agg
@@ -644,6 +645,7 @@ paren
 parentid
 parsers
 passthroughs
+pausable
 pcall
 pcap
 pclose
@@ -818,6 +820,7 @@ unordered
 unowned
 unparented
 unpause
+unpaused
 unpopulated
 unprotect
 unref

@@ -71,8 +71,8 @@ envoy_cc_library(
     srcs = ["delta_subscription_impl.cc"],
     hdrs = ["delta_subscription_impl.h"],
     deps = [
-        ":delta_subscription_state_lib",
         ":grpc_stream_lib",
+        ":new_grpc_mux_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -90,6 +90,7 @@ envoy_cc_library(
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
     deps = [
+        ":pausable_ack_queue_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
@@ -125,7 +126,6 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/config:xds_grpc_context_interface",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
@@ -218,6 +218,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "new_grpc_mux_lib",
+    srcs = ["new_grpc_mux_impl.cc"],
+    hdrs = ["new_grpc_mux_impl.h"],
+    deps = [
+        ":delta_subscription_state_lib",
+        ":grpc_stream_lib",
+        ":pausable_ack_queue_lib",
+        ":watch_map_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/grpc:async_client_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "http_subscription_lib",
     srcs = ["http_subscription_impl.cc"],
     hdrs = ["http_subscription_impl.h"],
@@ -262,6 +276,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "pausable_ack_queue_lib",
+    srcs = ["pausable_ack_queue.cc"],
+    hdrs = ["pausable_ack_queue.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "protobuf_link_hacks",
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
@@ -301,12 +325,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "resources_lib",
-    hdrs = ["resources.h"],
-    deps = ["//source/common/singleton:const_singleton"],
-)
-
-envoy_cc_library(
     name = "remote_data_fetcher_lib",
     srcs = ["remote_data_fetcher.cc"],
     hdrs = ["remote_data_fetcher.h"],
@@ -318,6 +336,12 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "@envoy_api//envoy/api/v2/core:http_uri_cc",
     ],
+)
+
+envoy_cc_library(
+    name = "resources_lib",
+    hdrs = ["resources.h"],
+    deps = ["//source/common/singleton:const_singleton"],
 )
 
 envoy_cc_library(
