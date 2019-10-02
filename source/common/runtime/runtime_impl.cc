@@ -568,7 +568,7 @@ void RtdsSubscription::start() {
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_,
       Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
-      store_, *this);
+      store_, *this, /*is_delta=*/false);
   subscription_->start({resource_name_});
 }
 
