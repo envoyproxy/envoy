@@ -49,7 +49,6 @@ message ServerInfo {
 message CommandLineOptions {
   enum IpVersion {
     v4 = 0;
-
     v6 = 1;
   }
 

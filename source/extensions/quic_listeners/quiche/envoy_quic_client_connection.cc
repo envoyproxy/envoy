@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Quic {
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
-    quic::QuicConnectionId server_connection_id,
+    const quic::QuicConnectionId& server_connection_id,
     Network::Address::InstanceConstSharedPtr& initial_peer_address,
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     const quic::ParsedQuicVersionVector& supported_versions,
@@ -23,7 +23,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
 }
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
-    quic::QuicConnectionId server_connection_id, quic::QuicConnectionHelperInterface& helper,
+    const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
     Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket)
     : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory,
@@ -31,7 +31,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
                                 supported_versions, dispatcher, std::move(connection_socket)) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
-    quic::QuicConnectionId server_connection_id, quic::QuicConnectionHelperInterface& helper,
+    const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
     Network::ConnectionSocketPtr&& connection_socket)
@@ -104,7 +104,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
       // TODO(danzh): limit read times here.
       MonotonicTime receive_time = dispatcher_.timeSource().monotonicTime();
       Api::IoCallUint64Result result = Network::Utility::readFromSocket(
-          *connectionSocket(), *this, &packets_dropped_, receive_time);
+          *connectionSocket(), *this, receive_time, &packets_dropped_);
       if (!result.ok()) {
         if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
           ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this,

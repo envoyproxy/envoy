@@ -42,7 +42,7 @@ public:
 
 private:
   Stats::SymbolTable& symbol_table_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName prefix_;
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName latency_;

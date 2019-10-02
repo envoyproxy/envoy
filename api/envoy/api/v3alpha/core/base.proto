@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 
 import "envoy/api/v3alpha/core/http_uri.proto";
+import "envoy/type/percent.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -14,9 +15,45 @@ import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 
-import "envoy/type/percent.proto";
-
 // [#protodoc-title: Common types]
+
+// Envoy supports :ref:`upstream priority routing
+// <arch_overview_http_routing_priority>` both at the route and the virtual
+// cluster level. The current priority implementation uses different connection
+// pool and circuit breaking settings for each priority level. This means that
+// even for HTTP/2 requests, two physical connections will be used to an
+// upstream host. In the future Envoy will likely support true HTTP/2 priority
+// over a single upstream connection.
+enum RoutingPriority {
+  DEFAULT = 0;
+  HIGH = 1;
+}
+
+// HTTP request method.
+enum RequestMethod {
+  METHOD_UNSPECIFIED = 0;
+  GET = 1;
+  HEAD = 2;
+  POST = 3;
+  PUT = 4;
+  DELETE = 5;
+  CONNECT = 6;
+  OPTIONS = 7;
+  TRACE = 8;
+  PATCH = 9;
+}
+
+// Identifies the direction of the traffic relative to the local Envoy.
+enum TrafficDirection {
+  // Default option is unspecified.
+  UNSPECIFIED = 0;
+
+  // The transport is used for incoming traffic.
+  INBOUND = 1;
+
+  // The transport is used for outgoing traffic.
+  OUTBOUND = 2;
+}
 
 // Identifies location of where either Envoy runs or where upstream hosts run.
 message Locality {
@@ -110,52 +147,26 @@ message RuntimeUInt32 {
   uint32 default_value = 2;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 3 [(validate.rules).string.min_bytes = 1];
-}
-
-// Envoy supports :ref:`upstream priority routing
-// <arch_overview_http_routing_priority>` both at the route and the virtual
-// cluster level. The current priority implementation uses different connection
-// pool and circuit breaking settings for each priority level. This means that
-// even for HTTP/2 requests, two physical connections will be used to an
-// upstream host. In the future Envoy will likely support true HTTP/2 priority
-// over a single upstream connection.
-enum RoutingPriority {
-  DEFAULT = 0;
-  HIGH = 1;
-}
-
-// HTTP request method.
-enum RequestMethod {
-  METHOD_UNSPECIFIED = 0;
-  GET = 1;
-  HEAD = 2;
-  POST = 3;
-  PUT = 4;
-  DELETE = 5;
-  CONNECT = 6;
-  OPTIONS = 7;
-  TRACE = 8;
-  PATCH = 9;
+  string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
 }
 
 // Header name/value pair.
 message HeaderValue {
   // Header name.
-  string key = 1 [(validate.rules).string = {min_bytes: 1, max_bytes: 16384}];
+  string key = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 16384}];
 
   // Header value.
   //
   // The same :ref:`format specifier <config_access_log_format>` as used for
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of `-`.
-  string value = 2 [(validate.rules).string.max_bytes = 16384];
+  string value = 2 [(validate.rules).string = {max_bytes: 16384}];
 }
 
 // Header name/value pair plus option to control append behavior.
 message HeaderValueOption {
   // Header name/value pair that this option applies to.
-  HeaderValue header = 1 [(validate.rules).message.required = true];
+  HeaderValue header = 1 [(validate.rules).message = {required: true}];
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values.
@@ -173,23 +184,23 @@ message DataSource {
     option (validate.required) = true;
 
     // Local filesystem data source.
-    string filename = 1 [(validate.rules).string.min_bytes = 1];
+    string filename = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // Bytes inlined in the configuration.
-    bytes inline_bytes = 2 [(validate.rules).bytes.min_len = 1];
+    bytes inline_bytes = 2 [(validate.rules).bytes = {min_len: 1}];
 
     // String inlined in the configuration.
-    string inline_string = 3 [(validate.rules).string.min_bytes = 1];
+    string inline_string = 3 [(validate.rules).string = {min_bytes: 1}];
   }
 }
 
 // The message specifies how to fetch data from remote and how to verify it.
 message RemoteDataSource {
   // The HTTP URI to fetch the remote data.
-  HttpUri http_uri = 1 [(validate.rules).message.required = true];
+  HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
 
   // SHA256 string for verifying data.
-  string sha256 = 2 [(validate.rules).string.min_bytes = 1];
+  string sha256 = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
 // Async data source which support async data fetch.
@@ -212,7 +223,7 @@ message AsyncDataSource {
 message TransportSocket {
   // The name of the transport socket to instantiate. The name must match a supported transport
   // socket implementation.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.
@@ -226,39 +237,47 @@ message TransportSocket {
 // Generic socket option message. This would be used to set socket options that
 // might not exist in upstream kernels or precompiled Envoy binaries.
 message SocketOption {
+  enum SocketState {
+    // Socket options are applied after socket creation but before binding the socket to a port
+    STATE_PREBIND = 0;
+
+    // Socket options are applied after binding the socket to a port but before calling listen()
+    STATE_BOUND = 1;
+
+    // Socket options are applied after calling listen()
+    STATE_LISTENING = 2;
+  }
+
   // An optional name to give this socket option for debugging, etc.
   // Uniqueness is not required and no special meaning is assumed.
   string description = 1;
+
   // Corresponding to the level value passed to setsockopt, such as IPPROTO_TCP
   int64 level = 2;
+
   // The numeric name as passed to setsockopt
   int64 name = 3;
+
   oneof value {
     option (validate.required) = true;
 
     // Because many sockopts take an int value.
     int64 int_value = 4;
+
     // Otherwise it's a byte buffer.
     bytes buf_value = 5;
   }
-  enum SocketState {
-    // Socket options are applied after socket creation but before binding the socket to a port
-    STATE_PREBIND = 0;
-    // Socket options are applied after binding the socket to a port but before calling listen()
-    STATE_BOUND = 1;
-    // Socket options are applied after calling listen()
-    STATE_LISTENING = 2;
-  }
+
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
-  SocketState state = 6 [(validate.rules).enum.defined_only = true];
+  SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
 // specified via a runtime key.
 message RuntimeFractionalPercent {
   // Default value if the runtime value's for the numerator/denominator keys are not available.
-  envoy.type.FractionalPercent default_value = 1 [(validate.rules).message.required = true];
+  type.FractionalPercent default_value = 1 [(validate.rules).message = {required: true}];
 
   // Runtime key for a YAML representation of a FractionalPercent.
   string runtime_key = 2;
@@ -270,16 +289,4 @@ message ControlPlane {
   // of control plane. This can be used to identify which control plane instance,
   // the Envoy is connected to.
   string identifier = 1;
-}
-
-// Identifies the direction of the traffic relative to the local Envoy.
-enum TrafficDirection {
-  // Default option is unspecified.
-  UNSPECIFIED = 0;
-
-  // The transport is used for incoming traffic.
-  INBOUND = 1;
-
-  // The transport is used for outgoing traffic.
-  OUTBOUND = 2;
 }

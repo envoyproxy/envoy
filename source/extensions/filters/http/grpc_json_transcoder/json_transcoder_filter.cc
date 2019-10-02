@@ -400,9 +400,17 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
   response_headers_ = &headers;
 
   if (end_stream) {
+
+    if (method_->server_streaming()) {
+      // When there is no body in a streaming response, a empty JSON array is
+      // returned by default. Set the content type correctly.
+      headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
+    }
+
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
     // The return value from encodeTrailers is ignored since it is always continue.
     encodeTrailers(headers);
+
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -552,12 +560,6 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
 bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
                                                   Http::HeaderMap& trailers) {
   if (!config_.convertGrpcStatus()) {
-    return false;
-  }
-
-  // We do not support responses with a separate trailer frame.
-  // TODO(ascheglov): remove this if after HCM can buffer data added from |encodeTrailers|.
-  if (response_headers_ != &trailers) {
     return false;
   }
 

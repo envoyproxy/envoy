@@ -20,8 +20,8 @@ namespace Envoy {
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
-class EnvoyQuicServerSession : public QuicFilterManagerConnectionImpl,
-                               public quic::QuicServerSessionBase {
+class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
+                               public QuicFilterManagerConnectionImpl {
 public:
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,

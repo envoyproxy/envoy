@@ -17,19 +17,14 @@ import "validate/validate.proto";
 
 enum HealthCheckFailureType {
   ACTIVE = 0;
-
   PASSIVE = 1;
-
   NETWORK = 2;
 }
 
 enum HealthCheckerType {
   HTTP = 0;
-
   TCP = 1;
-
   GRPC = 2;
-
   REDIS = 3;
 }
 

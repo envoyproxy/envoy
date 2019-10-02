@@ -191,8 +191,14 @@ private:
 
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(const std::string& cluster_name,
-                   const absl::optional<std::chrono::milliseconds>& timeout)
-        : cluster_name_(cluster_name), timeout_(timeout) {}
+                   const absl::optional<std::chrono::milliseconds>& timeout,
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                       hash_policy)
+        : cluster_name_(cluster_name), timeout_(timeout) {
+      if (!hash_policy.empty()) {
+        hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
+      }
+    }
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -203,7 +209,7 @@ private:
     void finalizeRequestHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
     void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}
-    const Router::HashPolicy* hashPolicy() const override { return nullptr; }
+    const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
     const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
@@ -251,6 +257,7 @@ private:
       return Router::InternalRedirectAction::PassThrough;
     }
     const std::string& routeName() const override { return route_name_; }
+    std::unique_ptr<const HashPolicyImpl> hash_policy_;
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -270,8 +277,10 @@ private:
 
   struct RouteImpl : public Router::Route {
     RouteImpl(const std::string& cluster_name,
-              const absl::optional<std::chrono::milliseconds>& timeout)
-        : route_entry_(cluster_name, timeout) {}
+              const absl::optional<std::chrono::milliseconds>& timeout,
+              const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                  hash_policy)
+        : route_entry_(cluster_name, timeout, hash_policy) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }

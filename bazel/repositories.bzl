@@ -157,6 +157,8 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
+    _repository_impl("bazel_compdb")
+    _repository_impl("envoy_build_tools")
 
     _python_deps()
     _cc_deps()
@@ -505,7 +507,7 @@ def _com_google_protobuf():
         # The patch includes
         # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
         # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
+        # TODO(asraa): remove this when protobuf 3.10 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -519,7 +521,7 @@ def _com_google_protobuf():
         # The patch includes
         # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
         # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
+        # TODO(asraa): remove this when protobuf 3.10 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
