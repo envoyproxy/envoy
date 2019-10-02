@@ -71,7 +71,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    auto shared_mux = subscription_->getContextForTest();
+    auto shared_mux = subscription_->getGrpcMuxForTest();
     static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
   }
   // The server gives us our first version of resource name2.
@@ -85,7 +85,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    auto shared_mux = subscription_->getContextForTest();
+    auto shared_mux = subscription_->getGrpcMuxForTest();
     static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
   }
   // The server gives us an updated version of resource name1.
@@ -99,7 +99,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    auto shared_mux = subscription_->getContextForTest();
+    auto shared_mux = subscription_->getGrpcMuxForTest();
     static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().

@@ -42,7 +42,7 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
 void GrpcSubscriptionImpl::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
   watch_ = grpc_mux_->addOrUpdateWatch(type_url_, watch_, update_to_these_names, *this,
-                                      init_fetch_timeout_);
+                                       init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
 

@@ -96,8 +96,7 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    auto response = std::make_unique<envoy::api::v2::DiscoveryResponse>();
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
@@ -122,7 +121,7 @@ public:
       expectSendMessage(last_cluster_names_, version_, false, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
-    auto shared_mux = subscription_->getContextForTest();
+    auto shared_mux = subscription_->getGrpcMuxForTest();
     static_cast<GrpcMuxSotw*>(shared_mux.get())->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }

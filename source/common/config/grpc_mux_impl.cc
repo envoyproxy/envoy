@@ -97,13 +97,17 @@ void GrpcMuxImpl::addSubscription(const std::string& type_url,
 
 SubscriptionState* GrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
   auto sub = subscriptions_.find(type_url);
-  RELEASE_ASSERT(sub != subscriptions_.end(), fmt::format("Tried to look up SubscriptionState for non-existent subscription {}.", type_url));
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Tried to look up SubscriptionState for non-existent subscription {}.",
+                             type_url));
   return sub->second.get();
 }
 
 WatchMap& GrpcMuxImpl::watchMapFor(const std::string& type_url) {
   auto watch_map = watch_maps_.find(type_url);
-  RELEASE_ASSERT(watch_map != watch_maps_.end(), fmt::format("Tried to look up WatchMap for non-existent subscription {}.", type_url));
+  RELEASE_ASSERT(
+      watch_map != watch_maps_.end(),
+      fmt::format("Tried to look up WatchMap for non-existent subscription {}.", type_url));
   return *watch_map->second;
 }
 

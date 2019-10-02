@@ -46,7 +46,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
       .Times(0);
   EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(random_, random());
-  auto shared_mux = subscription_->getContextForTest();
+  auto shared_mux = subscription_->getGrpcMuxForTest();
   static_cast<GrpcMuxSotw*>(shared_mux.get())
       ->grpcStreamForTest()
       .onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
