@@ -30,17 +30,19 @@ versioning guidelines:
 
 * Features may be marked as deprecated in a given versioned API at any point in time, but this may
   only be done when a replacement implementation and configuration path is available in Envoy on
-  master. The litmus test is to imagine that a stateless translation tool exists that
-  could convert from the earlier API to the new API. A field may be deprecated
-  if this tool would be able to perform the conversion. For example, removing a
-  field to describe HTTP/2 window settings is valid if a more comprehensive
-  HTTP/2 protocol options field is being introduced to replace it. The PR author
-  deprecating the old configuration is responsible for updating all tests and
-  canonical configuration, or guarding them with the `DEPRECATED_FEATURE_TEST()` macro.
-  This will be validated by the `bazel.compile_time_options` target, which will hard-fail when
-  deprecated configuration is used.
-* We reserve the right to delete deprecated configuration across major API versions. E.g. a field
-  marked deprecated in v2 may be removed in v3.
+  master. Deprecators must implement a conversion from the deprecated configuration to the latest
+  `vNalpha` (with the deprecated field) that Envoy uses internally. A field may be deprecated if
+  this tool would be able to perform the conversion. For example, removing a field to describe
+  HTTP/2 window settings is valid if a more comprehensive HTTP/2 protocol options field is being
+  introduced to replace it. The PR author deprecating the old configuration is responsible for
+  updating all tests and canonical configuration, or guarding them with the
+  `DEPRECATED_FEATURE_TEST()` macro. This will be validated by the `bazel.compile_time_options`
+  target, which will hard-fail when deprecated configuration is used. The majority of tests and
+  configuration for a feature should be expressed in terms of the latest Envoy internal
+  configuration (i.e. `vNalpha`), only a minimal number of tests necessary to validate configuration
+  translation should be guarded via the `DEPRECATED_FEATURE_TEST()` macro.
+* We will delete deprecated configuration across major API versions. E.g. a field marked deprecated
+  in v2 will be removed in v3.
 * Unless the community and Envoy maintainer team agrees on an exception, during the
   first release cycle after a feature has been deprecated, use of that feature
   will cause a logged warning, and incrementing the
