@@ -212,10 +212,6 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
       read_callbacks_->connection().readDisable(false);
     }
   }
-
-  if (connection_idle_timer_ && streams_.empty()) {
-    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
-  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -238,6 +234,10 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
+
+  if (connection_idle_timer_ && streams_.empty()) {
+    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
+  }
 }
 
 StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
