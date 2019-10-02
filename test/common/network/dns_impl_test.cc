@@ -49,13 +49,13 @@ using HostMap = std::unordered_map<std::string, IpList>;
 using CNameMap = std::unordered_map<std::string, std::string>;
 // Represents a single TestDnsServer query state and lifecycle. This implements
 // just enough of RFC 1035 to handle queries we generate in the tests below.
-enum record_type { A, AAAA };
+enum class RecordType { A, AAAA };
 
 class TestDnsServerQuery {
 public:
-  TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_A, const HostMap& hosts_AAAA,
+  TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
                      const CNameMap& cnames, const std::chrono::seconds& record_ttl)
-      : connection_(std::move(connection)), hosts_A_(hosts_A), hosts_AAAA_(hosts_AAAA),
+      : connection_(std::move(connection)), hosts_A_(hosts_a), hosts_AAAA_(hosts_aaaa),
         cnames_(cnames), record_ttl_(record_ttl) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
@@ -270,10 +270,10 @@ public:
     queries_.emplace_back(query);
   }
 
-  void addHosts(const std::string& hostname, const IpList& ip, const record_type& type) {
-    if (type == A) {
+  void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
+    if (type == RecordType::A) {
       hosts_A_[hostname] = ip;
-    } else if (type == AAAA) {
+    } else if (type == RecordType::AAAA) {
       hosts_AAAA_[hostname] = ip;
     }
   }
@@ -529,7 +529,7 @@ TEST_P(DnsImplTest, LocalLookup) {
 
 TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
   std::list<Address::InstanceConstSharedPtr> address_list;
-  server_->addHosts("some.good.domain", {"1::2"}, AAAA);
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
   EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::Auto,
                                         [&](std::list<DnsResponse>&& results) -> void {
                                           address_list = getAddressList(results);
@@ -583,7 +583,7 @@ TEST_P(DnsImplTest, CallbackException) {
 
 TEST_P(DnsImplTest, DnsIpAddressVersion) {
   std::list<Address::InstanceConstSharedPtr> address_list;
-  server_->addHosts("some.good.domain", {"1.2.3.4"}, A);
+  server_->addHosts("some.good.domain", {"1.2.3.4"}, RecordType::A);
   EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::Auto,
                                         [&](std::list<DnsResponse>&& results) -> void {
                                           address_list = getAddressList(results);
@@ -615,7 +615,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersion) {
 // Validate success/fail lookup behavior via TestDnsServer. This exercises the
 // network event handling in DnsResolverImpl.
 TEST_P(DnsImplTest, RemoteAsyncLookup) {
-  server_->addHosts("some.good.domain", {"201.134.56.7"}, A);
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr, resolver_->resolve("some.bad.domain", DnsLookupFamily::Auto,
                                         [&](std::list<DnsResponse>&& results) -> void {
@@ -638,7 +638,7 @@ TEST_P(DnsImplTest, RemoteAsyncLookup) {
 
 // Validate that multiple A records are correctly passed to the callback.
 TEST_P(DnsImplTest, MultiARecordLookup) {
-  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, A);
+  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
                                         [&](std::list<DnsResponse>&& results) -> void {
@@ -654,7 +654,7 @@ TEST_P(DnsImplTest, MultiARecordLookup) {
 
 TEST_P(DnsImplTest, CNameARecordLookupV4) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
-  server_->addHosts("result.cname.domain", {"201.134.56.7"}, A);
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::V4Only,
                                         [&](std::list<DnsResponse>&& results) -> void {
@@ -668,7 +668,7 @@ TEST_P(DnsImplTest, CNameARecordLookupV4) {
 
 TEST_P(DnsImplTest, CNameARecordLookupWithV6) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
-  server_->addHosts("result.cname.domain", {"201.134.56.7"}, A);
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::Auto,
                                         [&](std::list<DnsResponse>&& results) -> void {
@@ -681,8 +681,8 @@ TEST_P(DnsImplTest, CNameARecordLookupWithV6) {
 }
 
 TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
-  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, A);
-  server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, AAAA);
+  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, RecordType::AAAA);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
                                         [&](std::list<DnsResponse>&& results) -> void {
@@ -720,7 +720,7 @@ TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
 
 // Validate working of cancellation provided by ActiveDnsQuery return.
 TEST_P(DnsImplTest, Cancel) {
-  server_->addHosts("some.good.domain", {"201.134.56.7"}, A);
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
 
   ActiveDnsQuery* query = resolver_->resolve("some.domain", DnsLookupFamily::Auto,
                                              [](std::list<DnsResponse> &&) -> void { FAIL(); });
@@ -766,8 +766,8 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
                                           }));
   }
 
-  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, A);
-  server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, AAAA);
+  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, RecordType::AAAA);
   server_->setRecordTtl(std::chrono::seconds(300));
 
   EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
@@ -803,8 +803,8 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 
   std::list<Address::InstanceConstSharedPtr> address_list;
 
-  server_->addHosts("domain.onion", {"1.2.3.4"}, A);
-  server_->addHosts("domain.onion.", {"2.3.4.5"}, A);
+  server_->addHosts("domain.onion", {"1.2.3.4"}, RecordType::A);
+  server_->addHosts("domain.onion.", {"2.3.4.5"}, RecordType::A);
 
   // test onion domain
   EXPECT_EQ(nullptr, resolver_->resolve("domain.onion", DnsLookupFamily::V4Only,
@@ -834,7 +834,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplZeroTimeoutTest,
 
 // Validate that timeouts result in an empty callback.
 TEST_P(DnsImplZeroTimeoutTest, Timeout) {
-  server_->addHosts("some.good.domain", {"201.134.56.7"}, A);
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
                                         [&](std::list<DnsResponse>&& results) -> void {

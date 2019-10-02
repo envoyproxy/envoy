@@ -20,7 +20,10 @@ envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
     tags = ["backtrace"],
-    deps = ["//source/server:backtrace_lib"],
+    deps = [
+        "//source/server:backtrace_lib",
+        "//test/test_common:logging_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -162,11 +165,26 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "listener_manager_impl_test_lib",
+    hdrs = ["listener_manager_impl_test.h"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    deps = [
+        "//source/server:listener_manager_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        ":listener_manager_impl_test_lib",
         ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -183,13 +201,21 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:active_raw_udp_listener_config",
-        "//source/server:listener_manager_lib",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_time_lib",
+    ],
+)
+
+# Stand-alone quic test because of FIPS.
+envoy_cc_test(
+    name = "listener_manager_impl_quic_only_test",
+    srcs = ["listener_manager_impl_quic_only_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":listener_manager_impl_test_lib",
+        ":utility_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -268,6 +294,7 @@ envoy_cc_test(
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_with_admin_socket_options.yaml",
         ":node_bootstrap_without_access_log.yaml",
+        ":proxy_version_bootstrap.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
         ":static_validation_test_data",

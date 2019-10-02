@@ -54,12 +54,12 @@ import "validate/validate.proto";
 message RateLimitDescriptor {
   message Entry {
     // Descriptor key.
-    string key = 1 [(validate.rules).string.min_bytes = 1];
+    string key = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // Descriptor value.
-    string value = 2 [(validate.rules).string.min_bytes = 1];
+    string value = 2 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // Descriptor entries.
-  repeated Entry entries = 1 [(validate.rules).repeated .min_items = 1];
+  repeated Entry entries = 1 [(validate.rules).repeated = {min_items: 1}];
 }

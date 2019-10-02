@@ -511,11 +511,11 @@ uint32_t Primes::findPrimeLargerThan(uint32_t x) {
 }
 
 // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
-void WelfordStandardDeviation::update(double newValue) {
+void WelfordStandardDeviation::update(double new_value) {
   ++count_;
-  const double delta = newValue - mean_;
+  const double delta = new_value - mean_;
   mean_ += delta / count_;
-  const double delta2 = newValue - mean_;
+  const double delta2 = new_value - mean_;
   m2_ += delta * delta2;
 }
 

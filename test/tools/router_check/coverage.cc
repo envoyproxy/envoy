@@ -53,7 +53,25 @@ double Coverage::report() {
   return 100 * static_cast<double>(covered_routes_.size()) / num_routes;
 }
 
+void Coverage::printMissingTests(const std::set<std::string>& all_route_names,
+                                 const std::set<std::string>& covered_route_names) {
+  std::set<std::string> missing_route_names;
+  std::set_difference(all_route_names.begin(), all_route_names.end(), covered_route_names.begin(),
+                      covered_route_names.end(),
+                      std::inserter(missing_route_names, missing_route_names.end()));
+  for (const auto& host : route_config_.virtual_hosts()) {
+    for (const auto& route : host.routes()) {
+      if (missing_route_names.find(route.name()) != missing_route_names.end()) {
+        std::cout << "Missing test for host: " << host.name()
+                  << ", route: " << route.match().DebugString() << std::endl;
+      }
+    }
+  }
+}
+
 double Coverage::detailedReport() {
+  std::set<std::string> all_route_names;
+  std::set<std::string> covered_route_names;
   uint64_t num_routes = 0;
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
@@ -62,12 +80,15 @@ double Coverage::detailedReport() {
       } else {
         num_routes += 1;
       }
+      all_route_names.emplace(route.name());
     }
   }
   double cumulative_coverage = 0;
   for (auto& covered_route : covered_routes_) {
     cumulative_coverage += covered_route->report();
+    covered_route_names.emplace(covered_route->route().routeName());
   }
+  printMissingTests(all_route_names, covered_route_names);
   return 100 * cumulative_coverage / num_routes;
 }
 

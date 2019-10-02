@@ -19,8 +19,8 @@ class Http2Frame {
 public:
   Http2Frame() = default;
 
-  using iterator = DataContainer::iterator;
-  using const_iterator = DataContainer::const_iterator;
+  using Iterator = DataContainer::iterator;
+  using ConstIterator = DataContainer::const_iterator;
 
   static constexpr size_t HeaderSize = 9;
   static const char Preamble[25];
@@ -110,10 +110,10 @@ public:
   size_t size() const { return data_.size(); }
   // Access to the raw frame bytes
   const uint8_t* data() const { return data_.data(); }
-  iterator begin() { return data_.begin(); }
-  iterator end() { return data_.end(); }
-  const_iterator begin() const { return data_.begin(); }
-  const_iterator end() const { return data_.end(); }
+  Iterator begin() { return data_.begin(); }
+  Iterator end() { return data_.end(); }
+  ConstIterator begin() const { return data_.begin(); }
+  ConstIterator end() const { return data_.end(); }
   bool empty() const { return data_.empty(); }
 
 private:

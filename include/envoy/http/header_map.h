@@ -300,6 +300,7 @@ private:
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
+  HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
@@ -554,6 +555,21 @@ using HeaderMapPtr = std::unique_ptr<HeaderMap>;
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
  */
 using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;
+
+/**
+ * An interface to be implemented by header matchers.
+ */
+class HeaderMatcher {
+public:
+  virtual ~HeaderMatcher() = default;
+
+  /*
+   * Check whether header matcher matches any headers in a given HeaderMap.
+   */
+  virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
+};
+
+using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
 
 } // namespace Http
 } // namespace Envoy

@@ -77,6 +77,36 @@ class SourceCodeInfo(object):
           annotations.ExtractAnnotations(location.leading_comments, self.file_level_annotations))
     return Comment('', {})
 
+  def LeadingDetachedCommentsPathLookup(self, path):
+    """Lookup leading detached comments by path in SourceCodeInfo.
+
+    Args:
+      path: a list of path indexes as per
+        https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
+
+    Returns:
+      List of detached comment strings.
+    """
+    location = self.LocationPathLookup(path)
+    if location is not None and location.leading_detached_comments != self.file_level_comments:
+      return location.leading_detached_comments
+    return []
+
+  def TrailingCommentPathLookup(self, path):
+    """Lookup trailing comment by path in SourceCodeInfo.
+
+    Args:
+      path: a list of path indexes as per
+        https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
+
+    Returns:
+      Raw detached comment string
+    """
+    location = self.LocationPathLookup(path)
+    if location is not None:
+      return location.trailing_comments
+    return ''
+
 
 class TypeContext(object):
   """Contextual information for a message/field.
@@ -157,6 +187,15 @@ class TypeContext(object):
     """
     return self._Extend([5, index], 'enum', name)
 
+  def ExtendService(self, index, name):
+    """Extend type context with a service.
+
+    Args:
+      index: service index in file.
+      name: service name.
+    """
+    return self._Extend([6, index], 'service', name)
+
   def ExtendNestedEnum(self, index, name):
     """Extend type context with a nested enum.
 
@@ -184,6 +223,15 @@ class TypeContext(object):
     """
     return self._Extend([8, index], 'oneof', name)
 
+  def ExtendMethod(self, index, name):
+    """Extend type context with a service method declaration.
+
+    Args:
+      index: method index in service.
+      name: method name.
+    """
+    return self._Extend([2, index], 'method', name)
+
   @property
   def location(self):
     """SourceCodeInfo.Location for type context."""
@@ -193,3 +241,13 @@ class TypeContext(object):
   def leading_comment(self):
     """Leading comment for type context."""
     return self.source_code_info.LeadingCommentPathLookup(self.path)
+
+  @property
+  def leading_detached_comments(self):
+    """Leading detached comments for type context."""
+    return self.source_code_info.LeadingDetachedCommentsPathLookup(self.path)
+
+  @property
+  def trailing_comment(self):
+    """Trailing comment for type context."""
+    return self.source_code_info.TrailingCommentPathLookup(self.path)

@@ -14,7 +14,6 @@ import "validate/validate.proto";
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
 
 message IPTagging {
-
   // The type of requests the filter should apply to. The supported types
   // are internal, external or both. The
   // :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for_internal_origin>` header is
@@ -32,9 +31,6 @@ message IPTagging {
     EXTERNAL = 2;
   }
 
-  // The type of request the filter should apply to.
-  RequestType request_type = 1 [(validate.rules).enum.defined_only = true];
-
   // Supplies the IP tag name and the IP address subnets.
   message IPTag {
     // Specifies the IP tag name to apply.
@@ -42,11 +38,14 @@ message IPTagging {
 
     // A list of IP address subnets that will be tagged with
     // ip_tag_name. Both IPv4 and IPv6 are supported.
-    repeated envoy.api.v3alpha.core.CidrRange ip_list = 2;
+    repeated api.v3alpha.core.CidrRange ip_list = 2;
   }
+
+  // The type of request the filter should apply to.
+  RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
 
   // [#comment:TODO(ccaraman): Extend functionality to load IP tags from file system.
   // Tracked by issue https://github.com/envoyproxy/envoy/issues/2695]
   // The set of IP tags for the filter.
-  repeated IPTag ip_tags = 4 [(validate.rules).repeated .min_items = 1];
+  repeated IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
 }

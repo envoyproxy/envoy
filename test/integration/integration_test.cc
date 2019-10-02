@@ -33,11 +33,9 @@ std::string normalizeDate(const std::string& s) {
   return std::regex_replace(s, date_regex, "date: Mon, 01 Jan 2017 00:00:00 GMT");
 }
 
-void setAllowAbsoluteUrl(
+void setDisallowAbsoluteUrl(
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-  envoy::api::v2::core::Http1ProtocolOptions options;
-  options.mutable_allow_absolute_url()->set_value(true);
-  hcm.mutable_http_protocol_options()->CopyFrom(options);
+  hcm.mutable_http_protocol_options()->mutable_allow_absolute_url()->set_value(false);
 };
 
 void setAllowHttp10WithDefaultHost(
@@ -51,6 +49,29 @@ void setAllowHttp10WithDefaultHost(
 INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+// Make sure we have correctly specified per-worker performance stats.
+// TODO(mattklein123): We should flesh this test out to a) actually use more than 1 worker and
+// b) do some real requests and verify things work correctly on a per-worker basis. I will do this
+// in my next change when I add optional CX balancing as it well then be easier to write a
+// deterministic test.
+TEST_P(IntegrationTest, PerWorkerStats) {
+  initialize();
+
+  // Per-worker listener stats.
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    EXPECT_NE(nullptr, test_server_->counter("listener.127.0.0.1_0.worker_0.downstream_cx_total"));
+  } else {
+    EXPECT_NE(nullptr, test_server_->counter("listener.[__1]_0.worker_0.downstream_cx_total"));
+  }
+
+  // Main thread admin listener stats.
+  EXPECT_NE(nullptr, test_server_->counter("listener.admin.main_thread.downstream_cx_total"));
+
+  // Per-thread watchdog stats.
+  EXPECT_NE(nullptr, test_server_->counter("server.main_thread.watchdog_miss"));
+  EXPECT_NE(nullptr, test_server_->counter("server.worker_0.watchdog_miss"));
+}
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
@@ -379,6 +400,32 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAlive) {
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
 }
 
+TEST_P(IntegrationTest, Pipeline) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::string response;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n");
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      },
+      version_);
+  // First response should be success.
+  while (response.find("200") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Second response should be 400 (no host)
+  while (response.find("400") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  connection.close();
+}
+
 TEST_P(IntegrationTest, NoHost) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -393,6 +440,7 @@ TEST_P(IntegrationTest, NoHost) {
 }
 
 TEST_P(IntegrationTest, BadPath) {
+  config_helper_.addConfigModifier(&setDisallowAbsoluteUrl);
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -407,7 +455,6 @@ TEST_P(IntegrationTest, AbsolutePath) {
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
-  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
 
   initialize();
   std::string response;
@@ -423,7 +470,6 @@ TEST_P(IntegrationTest, AbsolutePathWithPort) {
   auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
   host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
-  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(
@@ -440,7 +486,6 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
   auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
   host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
-  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -460,8 +505,8 @@ TEST_P(IntegrationTest, Connect) {
     cloned_listener->CopyFrom(*old_listener);
     old_listener->set_name("http_forward");
   });
-  // Set the first listener to allow absolute URLs.
-  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
+  // Set the first listener to disallow absolute URLs.
+  config_helper_.addConfigModifier(&setDisallowAbsoluteUrl);
   initialize();
 
   std::string response1;
