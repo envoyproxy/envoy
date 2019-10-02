@@ -112,6 +112,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (value == MTLS) {
     return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
+                                info_.downstreamSslConnection()->localCertificatePresented() &&
                                 info_.downstreamSslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
     return CelValue::CreateString(info_.requestedServerName());
@@ -144,7 +145,8 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
     }
   } else if (value == MTLS) {
     return CelValue::CreateBool(info_.upstreamSslConnection() != nullptr &&
-                                info_.upstreamSslConnection()->peerCertificatePresented());
+                                info_.upstreamSslConnection()->localCertificatePresented()) &&
+           info_.upstreamSslConnection()->peerCertificatePresented();
   }
 
   return {};

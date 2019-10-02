@@ -47,6 +47,7 @@ public:
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
+  bool localCertificatePresented() const override;
   std::vector<std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   const std::string& serialNumberPeerCertificate() const override;

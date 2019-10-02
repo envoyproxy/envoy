@@ -343,6 +343,7 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->subjectPeerCertificate());
       }
       if (!options.expectedLocalSubject().empty()) {
+        EXPECT_TRUE(server_connection->ssl()->localCertificatePresented());
         EXPECT_EQ(options.expectedLocalSubject(),
                   server_connection->ssl()->subjectLocalCertificate());
       }

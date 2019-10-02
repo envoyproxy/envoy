@@ -277,7 +277,9 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
   EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*downstream_ssl_info, localCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*upstream_ssl_info, localCertificatePresented()).WillRepeatedly(Return(true));
   const std::string tls_version = "TLSv1";
   EXPECT_CALL(*downstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));

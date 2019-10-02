@@ -306,6 +306,11 @@ bool SslSocketInfo::peerCertificatePresented() const {
   return cert != nullptr;
 }
 
+bool SslSocketInfo::localCertificatePresented() const {
+  bssl::UniquePtr<X509> cert(SSL_get_certificate(ssl_.get()));
+  return cert != nullptr;
+}
+
 std::vector<std::string> SslSocketInfo::uriSanLocalCertificate() const {
   if (!cached_uri_san_local_certificate_.empty()) {
     return cached_uri_san_local_certificate_;
