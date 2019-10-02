@@ -17,13 +17,13 @@ namespace Envoy {
 namespace Config {
 
 // Tracks the protocol state of an individual ongoing xDS-over-gRPC session, for a single type_url.
-// There can be multiple DeltaSubscriptionStates active, one per type_url. They will all be
+// There can be multiple SubscriptionStates active, one per type_url. They will all be
 // blissfully unaware of each other's existence, even when their messages are being multiplexed
 // together by ADS.
 // This is the abstract parent class for both the delta and state-of-the-world xDS variants.
 class SubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
-  SubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+  SubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
                     std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher);
   virtual ~SubscriptionState() = default;
 

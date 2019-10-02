@@ -56,8 +56,8 @@ private:
 
   Stats::SymbolTable& symbol_table_;
   mutable Thread::MutexBasicLockable mutex_;
-  Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
-  StringMap<Stats::StatName> stat_name_map_ GUARDED_BY(mutex_);
+  Stats::StatNamePool stat_name_pool_ ABSL_GUARDED_BY(mutex_);
+  StringMap<Stats::StatName> stat_name_map_ ABSL_GUARDED_BY(mutex_);
   const Stats::StatName grpc_;
   const Stats::StatName grpc_web_;
   const Stats::StatName success_;

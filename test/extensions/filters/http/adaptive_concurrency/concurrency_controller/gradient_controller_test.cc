@@ -47,12 +47,12 @@ public:
   }
 
 protected:
-  GradientControllerConfigSharedPtr makeConfig(const std::string& yaml_config) {
+  GradientControllerConfig makeConfig(const std::string& yaml_config) {
     envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
         TestUtility::parseYaml<
             envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
             yaml_config);
-    return std::make_shared<GradientControllerConfig>(proto);
+    return proto;
   }
 
   // Helper function that will attempt to pull forwarding decisions.
@@ -68,7 +68,7 @@ protected:
                               const std::string& yaml_config,
                               std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
     const auto config = makeConfig(yaml_config);
-    for (uint32_t i = 0; i <= config->minRTTAggregateRequestCount(); ++i) {
+    for (uint32_t i = 0; i <= config.minRTTAggregateRequestCount(); ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(latency);
     }

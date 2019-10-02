@@ -685,6 +685,45 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
+
+// Test that we simply ignore a message for an unknown type_url, with no ill effects.
+TEST_F(GrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  grpc_mux_->addOrUpdateWatch(type_url, nullptr, {}, callbacks_, std::chrono::milliseconds(0));
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  {
+    auto unexpected_response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    unexpected_response->set_type_url(type_url);
+    unexpected_response->set_system_version_info("0");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
+    grpc_mux_->onDiscoveryResponse(std::move(unexpected_response));
+  }
+  {
+    auto response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("1");
+    envoy::api::v2::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    response->add_resources()->mutable_resource()->PackFrom(load_assignment);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(
+            Invoke([&load_assignment](
+                       const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+              EXPECT_EQ(1, added_resources.size());
+              envoy::api::v2::ClusterLoadAssignment expected_assignment;
+              added_resources[0].resource().UnpackTo(&expected_assignment);
+              EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
+            }));
+    grpc_mux_->onDiscoveryResponse(std::move(response));
+  }
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

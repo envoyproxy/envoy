@@ -18,7 +18,7 @@ namespace Config {
 // are "watching" for.
 //
 // GrpcSubscriptionImpl and GrpcMuxImpl are both built to provide both regular xDS and ADS,
-// distinguished by whether multiple GrpcSubscriptionImpls are sharing a single NewGrpcMuxImpl.
+// distinguished by whether multiple GrpcSubscriptionImpls are sharing a single GrpcMuxImpl.
 // (Also distinguished by the gRPC method string, but that's taken care of in SubscriptionFactory).
 //
 // Why does GrpcSubscriptionImpl itself implement the SubscriptionCallbacks interface? So that it
@@ -30,7 +30,7 @@ public:
   // is_aggregated: whether our GrpcMux is also providing ADS to other Subscriptions, or whether
   // it's all ours. The practical difference is that we ourselves must call start() on it only if
   // we are the sole owner.
-  GrpcSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
+  GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, absl::string_view type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                        std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
   ~GrpcSubscriptionImpl() override;
@@ -51,10 +51,10 @@ public:
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 
-  GrpcMuxSharedPtr getContextForTest() { return context_; }
+  GrpcMuxSharedPtr getGrpcMuxForTest() { return grpc_mux_; }
 
 private:
-  GrpcMuxSharedPtr const context_;
+  GrpcMuxSharedPtr const grpc_mux_;
   const std::string type_url_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;

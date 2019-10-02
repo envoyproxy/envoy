@@ -26,7 +26,7 @@ const UpdateAck& PausableAckQueue::front() {
       return entry;
     }
   }
-  RELEASE_ASSERT(!storage_.empty(), "front() on an empty queue is undefined behavior!");
+  RELEASE_ASSERT(false, "front() on an empty queue is undefined behavior!");
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
@@ -37,7 +37,7 @@ void PausableAckQueue::pop() {
       return;
     }
   }
-  RELEASE_ASSERT(!storage_.empty(), "pop() on an empty queue is undefined behavior!");
+  RELEASE_ASSERT(false, "pop() on an empty queue is undefined behavior!");
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 

@@ -17,12 +17,10 @@ namespace Envoy {
 namespace Config {
 
 // Manages subscriptions to one or more type of resource. The logical protocol
-// state of those subscription(s) is handled by DeltaSubscriptionState.
+// state of those subscription(s) is handled by SubscriptionState.
 // This class owns the GrpcStream used to talk to the server, maintains queuing
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
-// TODO(fredlas) name left as "GrpcMuxImpl" for easier reviewing in comparison to the
-//               work done so far. Should be changed.
 class GrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
@@ -37,7 +35,6 @@ public:
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
   void start() override;
-  //  void shutdown() override;
   void disableInitFetchTimeoutTimer() override;
 
 protected:

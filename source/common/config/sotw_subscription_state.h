@@ -15,7 +15,7 @@ namespace Config {
 // Tracks the state of a "state-of-the-world" (i.e. not delta) xDS-over-gRPC protocol session.
 class SotwSubscriptionState : public SubscriptionState {
 public:
-  SotwSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+  SotwSubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
                         std::chrono::milliseconds init_fetch_timeout,
                         Event::Dispatcher& dispatcher);
   ~SotwSubscriptionState() override;

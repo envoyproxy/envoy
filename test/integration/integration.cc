@@ -629,6 +629,22 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
   return AssertionSuccess();
 }
 
+AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
+                            absl::string_view name) {
+  if (set1 == set2) {
+    return AssertionSuccess();
+  }
+  auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
+  for (const auto& x : set1) {
+    failure << x << ", ";
+  }
+  failure << "}\nActual: {";
+  for (const auto& x : set2) {
+    failure << x << ", ";
+  }
+  return failure << "}";
+}
+
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,

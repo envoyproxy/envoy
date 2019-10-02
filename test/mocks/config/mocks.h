@@ -52,10 +52,10 @@ public:
   MockSubscriptionFactory();
   ~MockSubscriptionFactory() override;
 
-  MOCK_METHOD4(subscriptionFromConfigSource,
+  MOCK_METHOD5(subscriptionFromConfigSource,
                SubscriptionPtr(const envoy::api::v2::core::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks));
+                               SubscriptionCallbacks& callbacks, bool is_delta));
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
 
   MockSubscription* subscription_{};
@@ -77,18 +77,6 @@ public:
   MOCK_METHOD1(resume, void(const std::string& type_url));
   MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
   MOCK_METHOD0(disableInitFetchTimeoutTimer, void());
-};
-
-class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
-public:
-  MockGrpcMuxCallbacks();
-  ~MockGrpcMuxCallbacks() override;
-
-  MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                    const std::string& version_info));
-  MOCK_METHOD2(onConfigUpdateFailed,
-               void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
 class MockGrpcStreamCallbacks : public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {

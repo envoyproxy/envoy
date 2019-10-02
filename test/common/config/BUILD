@@ -180,6 +180,22 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "sotw_subscription_state_test",
+    srcs = ["sotw_subscription_state_test.cc"],
+    deps = [
+        "//source/common/config:sotw_subscription_state_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
     deps = [

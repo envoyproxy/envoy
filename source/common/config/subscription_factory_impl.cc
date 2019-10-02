@@ -53,7 +53,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                             ->create(),
                                         dispatcher_, deltaGrpcMethod(type_url), random_, scope,
                                         Utility::parseRateLimitSettings(api_config_source),
-                                        local_info_, /*skip_subsequent_node=*/false),
+                                        local_info_, /*skip_subsequent_node=*/false), // TODO verify it's ok for this to be hardcoded false
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated=*/false);
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC:
@@ -64,7 +64,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                              ->create(),
                                          dispatcher_, deltaGrpcMethod(type_url), random_, scope,
                                          Utility::parseRateLimitSettings(api_config_source),
-                                         local_info_, /*skip_subsequent_node=*/false),
+                                         local_info_, /*skip_subsequent_node=*/false), // TODO verify it's ok for this to be hardcoded false
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated=*/false);
     default:

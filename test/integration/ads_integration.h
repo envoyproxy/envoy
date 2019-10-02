@@ -12,6 +12,8 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
+// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
+//               work restores it here.
 namespace Envoy {
 static std::string AdsIntegrationConfig(const std::string& api_type) {
   // Note: do not use CONSTRUCT_ON_FIRST_USE here!

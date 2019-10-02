@@ -15,7 +15,7 @@ namespace Config {
 // Tracks the state of a delta xDS-over-gRPC protocol session.
 class DeltaSubscriptionState : public SubscriptionState {
 public:
-  DeltaSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+  DeltaSubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
                          std::chrono::milliseconds init_fetch_timeout,
                          Event::Dispatcher& dispatcher);
   ~DeltaSubscriptionState() override;

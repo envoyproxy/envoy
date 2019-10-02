@@ -75,13 +75,13 @@ Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::st
 void GrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                               const std::set<std::string>& resources) {
   ASSERT(watch != nullptr);
-  auto* sub = subscriptionStateFor(type_url);
+  SubscriptionState* sub = subscriptionStateFor(type_url);
   WatchMap& watch_map = watchMapFor(type_url);
 
   auto added_removed = watch_map.updateWatchInterest(watch, resources);
   sub->updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
 
-  // Tell the server about our new interests, if there are any.
+  // Tell the server about our change in interest, if any.
   if (sub->subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
@@ -97,17 +97,13 @@ void GrpcMuxImpl::addSubscription(const std::string& type_url,
 
 SubscriptionState* GrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
   auto sub = subscriptions_.find(type_url);
-  if (sub == subscriptions_.end()) {
-    throw EnvoyException("Tried to look up state for non-existent subscription " + type_url);
-  }
+  RELEASE_ASSERT(sub != subscriptions_.end(), fmt::format("Tried to look up SubscriptionState for non-existent subscription {}.", type_url));
   return sub->second.get();
 }
 
 WatchMap& GrpcMuxImpl::watchMapFor(const std::string& type_url) {
   auto watch_map = watch_maps_.find(type_url);
-  if (watch_map == watch_maps_.end()) {
-    throw EnvoyException("Tried to look up WatchMap for non-existent subscription " + type_url);
-  }
+  RELEASE_ASSERT(watch_map != watch_maps_.end(), fmt::format("Tried to look up WatchMap for non-existent subscription {}.", type_url));
   return *watch_map->second;
 }
 
@@ -163,7 +159,7 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
     // If so, which one (by type_url)?
     std::string next_request_type_url = maybe_request_type.value();
     // If we don't have a subscription object for this request's type_url, drop the request.
-    auto* sub = subscriptionStateFor(next_request_type_url);
+    SubscriptionState* sub = subscriptionStateFor(next_request_type_url);
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
@@ -188,15 +184,13 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
 // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
 // whether we *want* to send a DeltaDiscoveryRequest).
 bool GrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
-  if (pausable_ack_queue_.paused(type_url)) {
-    ASSERT(false,
-           fmt::format("canSendDiscoveryRequest() called on paused type_url {}. Pausedness is "
-                       "supposed to be filtered out by whoWantsToSendDiscoveryRequest(). "
-                       "Returning false, but your xDS might be about to get head-of-line blocked "
-                       "- permanently, if the pause is never undone.",
-                       type_url));
-    return false;
-  } else if (!grpcStreamAvailable()) {
+  RELEASE_ASSERT(
+      !pausable_ack_queue_.paused(type_url),
+      fmt::format("canSendDiscoveryRequest() called on paused type_url {}. Pausedness is "
+                  "supposed to be filtered out by whoWantsToSendDiscoveryRequest(). ",
+                  type_url));
+
+  if (!grpcStreamAvailable()) {
     ENVOY_LOG(trace, "No stream available to send a discovery request for {}.", type_url);
     return false;
   } else if (!rateLimitAllowsDrain()) {
@@ -221,7 +215,7 @@ absl::optional<std::string> GrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   // If we're looking to send multiple non-ACK requests, send them in the order that their
   // subscriptions were initiated.
   for (const auto& sub_type : subscription_ordering_) {
-    auto* sub = subscriptionStateFor(sub_type);
+    SubscriptionState* sub = subscriptionStateFor(sub_type);
     if (sub->subscriptionUpdatePending() && !pausable_ack_queue_.paused(sub_type)) {
       return sub_type;
     }

@@ -6,11 +6,11 @@
 namespace Envoy {
 namespace Config {
 
-SotwSubscriptionState::SotwSubscriptionState(const std::string& type_url,
+SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              SubscriptionCallbacks& callbacks,
                                              std::chrono::milliseconds init_fetch_timeout,
                                              Event::Dispatcher& dispatcher)
-    : SubscriptionState(type_url, callbacks, init_fetch_timeout, dispatcher) {
+    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {
   std::cerr << "hi! constructing SOTW SubscriptionState" << std::endl;
 }
 

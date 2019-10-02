@@ -10,10 +10,10 @@
 namespace Envoy {
 namespace Config {
 
-SubscriptionState::SubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+SubscriptionState::SubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
                                      std::chrono::milliseconds init_fetch_timeout,
                                      Event::Dispatcher& dispatcher)
-    : type_url_(type_url), callbacks_(callbacks) {
+    : type_url_(std::move(type_url)), callbacks_(callbacks) {
   if (init_fetch_timeout.count() > 0 && !init_fetch_timeout_timer_) {
     init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
       ENVOY_LOG(warn, "config: initial fetch timed out for {}", type_url_);
