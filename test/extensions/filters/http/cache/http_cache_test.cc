@@ -10,92 +10,48 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class RawByteRangeTest : public testing::Test {};
-
-
-using RawByteRangeDeathTest = RawByteRangeTest;
-
-
-TEST_F(RawByteRangeTest, isSuffix) {
+TEST(RawByteRangeTest, isSuffix) {
   auto r = RawByteRange(UINT64_MAX, 4);
   ASSERT_TRUE(r.isSuffix());
 }
 
-TEST_F(RawByteRangeTest, IsNotSuffix) {
+TEST(RawByteRangeTest, IsNotSuffix) {
   auto r = RawByteRange(3, 4);
   ASSERT_FALSE(r.isSuffix());
 }
 
-TEST_F(RawByteRangeDeathTest, IllegalByteRange) {
-  ASSERT_DEATH(RawByteRange(5, 4), "Illegal byte range");
-}
-
-TEST_F(RawByteRangeDeathTest, IllegalByteRangeButIsSuffix) {
-  // no death here
-  RawByteRange(UINT64_MAX, 3);
-  ASSERT_TRUE(true);
-}
-
-TEST_F(RawByteRangeTest, FirstBytePos) {
+TEST(RawByteRangeTest, FirstBytePos) {
   auto r = RawByteRange(3, 4);
   ASSERT_EQ(3, r.firstBytePos());
 }
 
-TEST_F(RawByteRangeDeathTest, FirstBytePosIfSuffix) {
-  auto r = RawByteRange(UINT64_MAX, 4);
-  ASSERT_DEATH(r.firstBytePos(), "!isSuffix()");
-}
-
-TEST_F(RawByteRangeTest, LastBytePos) {
+TEST(RawByteRangeTest, LastBytePos) {
   auto r = RawByteRange(3, 4);
   ASSERT_EQ(4, r.lastBytePos());
 }
 
-TEST_F(RawByteRangeDeathTest, LastBytePosIfSuffix) {
-  auto r = RawByteRange(UINT64_MAX, UINT64_MAX);
-  ASSERT_DEATH(r.lastBytePos(), "!isSuffix()");
-}
-
-TEST_F(RawByteRangeDeathTest, SuffixLengthOfNotSuffix) {
-  auto r = RawByteRange(3, 4);
-  ASSERT_DEATH(r.suffixLength(), "isSuffix()");
-}
-
-TEST_F(RawByteRangeTest, suffixLength) {
+TEST(RawByteRangeTest, suffixLength) {
   auto r = RawByteRange(UINT64_MAX, 4);
   ASSERT_EQ(4, r.suffixLength());
 }
 
-class AdjustedByteRangeTest : public testing::Test {};
-
-using AdjustedByteRangeDeathTest = AdjustedByteRangeTest;
-
-TEST_F(AdjustedByteRangeDeathTest, IllegalByteRange) {
-  ASSERT_DEATH(AdjustedByteRange(5, 4), "Illegal byte range.");
-}
-
-TEST_F(AdjustedByteRangeTest, Length) {
+TEST(AdjustedByteRangeTest, Length) {
   auto a = AdjustedByteRange(3, 6);
   ASSERT_EQ(3, a.length());
 }
 
-TEST_F(AdjustedByteRangeTest, TrimFront) {
+TEST(AdjustedByteRangeTest, TrimFront) {
   auto a = AdjustedByteRange(3, 6);
   a.trimFront(2);
   ASSERT_EQ(5, a.firstBytePos());
 }
 
-TEST_F(AdjustedByteRangeDeathTest, TrimFrontTooMuch) {
-  auto a = AdjustedByteRange(3, 6);
-  ASSERT_DEATH(a.trimFront(5), "Attempt to trim too much from range.");
-}
-
-TEST_F(AdjustedByteRangeTest, MaxLength) {
+TEST(AdjustedByteRangeTest, MaxLength) {
   auto a = AdjustedByteRange(0, UINT64_MAX);
   ASSERT_EQ(UINT64_MAX, a.length());
 }
 
-TEST_F(AdjustedByteRangeTest, MaxTrim) {
+TEST(AdjustedByteRangeTest, MaxTrim) {
   auto a = AdjustedByteRange(0, UINT64_MAX);
   a.trimFront(UINT64_MAX);
   ASSERT_EQ(UINT64_MAX, a.firstBytePos());
@@ -111,24 +67,6 @@ protected:
       {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
   const LookupRequest lookup_request_{request_headers_, current_time_};
 };
-
-using LookupRequestDeathTest = LookupRequestTest;
-
-TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoPath) {
-  auto headerMap = Http::TestHeaderMapImpl({{":scheme", "http"}, {":authority", "example.com"}});
-  ASSERT_DEATH(LookupRequest(headerMap, current_time_), "malformed Http::HeaderMap with null Path");
-}
-
-TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoScheme) {
-  auto headerMap = Http::TestHeaderMapImpl({{":path", "/"}, {":authority", "example.com"}});
-  ASSERT_DEATH(LookupRequest(headerMap, current_time_),
-               "malformed Http::HeaderMap with null Scheme");
-}
-
-TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoHost) {
-  auto headerMap = Http::TestHeaderMapImpl({{":path", "/"}, {":scheme", "http"}});
-  ASSERT_DEATH(LookupRequest(headerMap, current_time_), "malformed Http::HeaderMap with null Host");
-}
 
 TEST_F(LookupRequestTest, makeLookupResult) {
   Http::HeaderMapPtr response_headers = Http::makeHeaderMap(
