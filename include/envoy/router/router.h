@@ -430,6 +430,11 @@ public:
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCount() const PURE;
+
+  /**
+   * @return bool whether to reverse the header evalution order.
+   */
+  virtual bool reverseHeaderEvaluationOrder() const PURE;
 };
 
 /**

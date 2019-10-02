@@ -172,6 +172,7 @@ public:
   const absl::optional<envoy::api::v2::route::HedgePolicy>& hedgePolicy() const {
     return hedge_policy_;
   }
+  bool reverseHeaderEvaluationOrder() const override { return reverse_header_evaluation_order_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -216,6 +217,7 @@ private:
   absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
   absl::optional<envoy::api::v2::route::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
+  const bool reverse_header_evaluation_order_;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -667,6 +669,7 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   InternalRedirectAction internal_redirect_action_;
+  const bool reverse_header_evaluation_order_;
 };
 
 /**
