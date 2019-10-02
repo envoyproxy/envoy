@@ -20,10 +20,10 @@
 #include "common/config/metadata.h"
 #include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
+#include "common/router/credentialmatchcriteria_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
-#include "common/router/credentialmatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
 #include "common/stats/symbol_table_impl.h"
 

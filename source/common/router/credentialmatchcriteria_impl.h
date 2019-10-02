@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/router/router.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/router/router.h"
 
 namespace Envoy {
 namespace Router {
@@ -11,15 +11,12 @@ using CredentialMatchCriteriaImplConstPtr = std::unique_ptr<const CredentialMatc
 
 class CredentialMatchCriteriaImpl : public CredentialMatchCriteria {
 public:
-  CredentialMatchCriteriaImpl(const ::envoy::api::v2::route::RouteMatch_CredentialMatchOptions& options);
+  CredentialMatchCriteriaImpl(
+      const ::envoy::api::v2::route::RouteMatch_CredentialMatchOptions& options);
 
-  const absl::optional<bool>& presented() const override {
-    return presented_;
-  }
+  const absl::optional<bool>& presented() const override { return presented_; }
 
-  const absl::optional<bool>& expired() const override {
-    return expired_;
-  }
+  const absl::optional<bool>& expired() const override { return expired_; }
 
 private:
   absl::optional<bool> presented_;

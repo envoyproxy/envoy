@@ -33,10 +33,10 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":config_utility_lib",
+        ":credentialmatchcriteria_lib",
         ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
-        ":credentialmatchcriteria_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         "//include/envoy/config:typed_metadata_interface",
