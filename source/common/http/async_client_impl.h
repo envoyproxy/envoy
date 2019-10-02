@@ -226,6 +226,9 @@ private:
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }
+    const Router::CredentialMatchCriteria* credentialMatchCriteria() const override {
+      return nullptr;
+    }
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
       return opaque_config_;
     }

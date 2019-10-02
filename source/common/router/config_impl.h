@@ -23,6 +23,7 @@
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
+#include "common/router/credentialmatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
 #include "common/stats/symbol_table_impl.h"
 
@@ -421,6 +422,9 @@ public:
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
     return metadata_match_criteria_.get();
   }
+  const CredentialMatchCriteria* credentialMatchCriteria() const override {
+    return credential_match_criteria_.get();
+  }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
@@ -531,6 +535,9 @@ private:
     }
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_->metadataMatchCriteria();
+    }
+    const CredentialMatchCriteria* credentialMatchCriteria() const override {
+      return parent_->credentialMatchCriteria();
     }
 
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
@@ -680,6 +687,7 @@ private:
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
+  CredentialMatchCriteriaConstPtr credential_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;

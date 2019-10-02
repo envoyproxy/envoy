@@ -324,7 +324,11 @@ message WeightedCluster {
 
 message RouteMatch {
   message CredentialMatchOptions {
+    // If specified, the route will match against whether or not a certificate is presented.
     google.protobuf.BoolValue presented = 1;
+
+    // If specified, the route will match against whether or not the client certificate has expired.
+    google.protobuf.BoolValue expired = 2;
   }
 
   oneof path_specifier {

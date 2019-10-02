@@ -457,6 +457,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     hash_policy_ = std::make_unique<HashPolicyImpl>(route.route().hash_policy());
   }
 
+  if (route.match().has_credentials()) {
+    credential_match_criteria_ = std::make_unique<CredentialMatchCriteriaImpl>(route.match().credentials());
+  }
+
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
   // or the route set `include_vh_rate_limits` to true.
   include_vh_rate_limits_ =
@@ -488,7 +492,7 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
 }
 
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
-                                    const StreamInfo::StreamInfo& /*stream_info*/,
+                                    const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const {
   bool matches = true;
 
@@ -507,6 +511,22 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
     Http::Utility::QueryParams query_parameters =
         Http::Utility::parseQueryString(headers.Path()->value().getStringView());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
+  }
+
+  if (matches && credentialMatchCriteria()) {
+    const CredentialMatchCriteria& criteria = *credentialMatchCriteria();
+
+    if (criteria.presented()) {
+      matches &= (*criteria.presented() == stream_info.downstreamSslConnection()->peerCertificatePresented());
+    }
+
+    if (criteria.expired()) {
+      const SystemTime now = time_source_.systemTime();
+      const auto peerExpirationTime = stream_info.downstreamSslConnection()->expirationPeerCertificate();
+      // Treats non-presented credentials as not expired
+      const bool peerExpired = peerExpirationTime ? *peerExpirationTime < now : false;
+      matches &= (*criteria.expired() == peerExpired);
+    }
   }
 
   return matches;

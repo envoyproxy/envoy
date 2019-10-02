@@ -18,6 +18,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "credentialmatchcriteria_lib",
+    srcs = ["credentialmatchcriteria_impl.cc"],
+    hdrs = ["credentialmatchcriteria_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
@@ -27,6 +36,7 @@ envoy_cc_library(
         ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
+        ":credentialmatchcriteria_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         "//include/envoy/config:typed_metadata_interface",

@@ -526,6 +526,18 @@ public:
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
 
+class CredentialMatchCriteria;
+using CredentialMatchCriteriaConstPtr = std::unique_ptr<const CredentialMatchCriteria>;
+
+class CredentialMatchCriteria {
+public:
+  virtual ~CredentialMatchCriteria() = default;
+
+  virtual const absl::optional<bool>& presented() const PURE;
+
+  virtual const absl::optional<bool>& expired() const PURE;
+};
+
 /**
  * Type of path matching that a route entry uses.
  */
@@ -697,6 +709,11 @@ public:
    * this route.
    */
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+
+  /**
+   * @return CredentialMatchCriteria* the credential match criterion for this route.
+   */
+  virtual const CredentialMatchCriteria* credentialMatchCriteria() const PURE;
 
   /**
    * @return const PathMatchCriterion& the match criterion for this route.
