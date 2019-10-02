@@ -80,6 +80,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_server_connection_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_server_session_lib",
         "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",
