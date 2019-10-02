@@ -658,7 +658,6 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
     Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
     setup(request_headers);
     EXPECT_FALSE(state_->enabled());
-    EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(overflow_reset_, callback_));
   }
 
   {

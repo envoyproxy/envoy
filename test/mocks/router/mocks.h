@@ -104,8 +104,7 @@ public:
   const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
     return retriable_headers_;
   }
-  const absl::optional<std::vector<Http::HeaderMatcherSharedPtr>>
-  retriableRequestHeaders() const override {
+  const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
     return retriable_request_headers_;
   }
 

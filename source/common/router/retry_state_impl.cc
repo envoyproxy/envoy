@@ -90,10 +90,10 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
         parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
 
-  if (retriable_request_headers_.has_value() && !retriable_request_headers_.value().empty()) {
+  if (!retriable_request_headers_.empty()) {
     // If this route limits retries by request headers, make sure there is a match.
     bool request_header_match = false;
-    for (const auto& retriable_header : retriable_request_headers_.value()) {
+    for (const auto& retriable_header : retriable_request_headers_) {
       if (retriable_header->matchesHeaders(request_headers)) {
         request_header_match = true;
         break;
