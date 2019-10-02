@@ -491,6 +491,32 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                        random_value);
 }
 
+bool RouteEntryImplBase::evaluateCredentialMatch(const StreamInfo::StreamInfo& stream_info) const {
+  bool matches = true;
+
+  if (!credentialMatchCriteria()) {
+    return matches;
+  }
+
+  const CredentialMatchCriteria& criteria = *credentialMatchCriteria();
+
+  if (criteria.presented()) {
+    const bool peerPresented = stream_info.downstreamSslConnection() &&
+                                stream_info.downstreamSslConnection()->expirationPeerCertificate();
+    matches &= *criteria.presented() == peerPresented;
+  }
+
+  if (matches && criteria.expired()) {
+    const SystemTime now = time_source_.systemTime();
+    const auto peerExpirationTime = stream_info.downstreamSslConnection()->expirationPeerCertificate();
+    // Treats no presented credentials as not expired
+    const bool peerExpired = peerExpirationTime ? now > *peerExpirationTime : false;
+    matches &= (*criteria.expired() == peerExpired);
+  }
+
+  return matches;
+}
+
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const {
@@ -513,21 +539,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 
-  if (matches && credentialMatchCriteria()) {
-    const CredentialMatchCriteria& criteria = *credentialMatchCriteria();
-
-    if (criteria.presented()) {
-      matches &= (*criteria.presented() == stream_info.downstreamSslConnection()->peerCertificatePresented());
-    }
-
-    if (criteria.expired()) {
-      const SystemTime now = time_source_.systemTime();
-      const auto peerExpirationTime = stream_info.downstreamSslConnection()->expirationPeerCertificate();
-      // Treats non-presented credentials as not expired
-      const bool peerExpired = peerExpirationTime ? *peerExpirationTime < now : false;
-      matches &= (*criteria.expired() == peerExpired);
-    }
-  }
+  matches &= evaluateCredentialMatch(stream_info);
 
   return matches;
 }

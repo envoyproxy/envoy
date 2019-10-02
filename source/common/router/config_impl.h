@@ -641,6 +641,8 @@ private:
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
+  bool evaluateCredentialMatch(const StreamInfo::StreamInfo& stream_info) const;
+
   HedgePolicyImpl
   buildHedgePolicy(const absl::optional<envoy::api::v2::route::HedgePolicy>& vhost_hedge_policy,
                    const envoy::api::v2::route::RouteAction& route_config) const;
