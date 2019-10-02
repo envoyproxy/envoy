@@ -23,7 +23,7 @@ namespace Quic {
 class EnvoyQuicConnection : public quic::QuicConnection,
                             protected Logger::Loggable<Logger::Id::connection> {
 public:
-  EnvoyQuicConnection(quic::QuicConnectionId server_connection_id,
+  EnvoyQuicConnection(const quic::QuicConnectionId& server_connection_id,
                       quic::QuicSocketAddress initial_peer_address,
                       quic::QuicConnectionHelperInterface& helper,
                       quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
@@ -57,9 +57,10 @@ protected:
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
-  // Assigned upon construction. Constructed with empty local address if unkown
+  // Assigned upon construction. Constructed with empty local address if unknown
   // by then.
   Network::ConnectionSocketPtr connection_socket_;
+  // Points to an instance of EnvoyQuicServerSession or EnvoyQuicClientSession.
   Network::Connection* envoy_connection_{nullptr};
 };
 

@@ -499,7 +499,6 @@ message RouteAction {
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
   enum InternalRedirectAction {
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
-
     HANDLE_INTERNAL_REDIRECT = 1;
   }
 

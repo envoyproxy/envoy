@@ -1,5 +1,6 @@
 #include <chrono>
 #include <memory>
+#include <string>
 
 #include "common/config/filter_json.h"
 #include "common/config/json_utility.h"
@@ -31,11 +32,10 @@ namespace HttpFilters {
 namespace Squash {
 namespace {
 
-SquashFilterConfig constructSquashFilterConfigFromJson(
-    const Envoy::Json::Object& json,
-    NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
+SquashFilterConfig constructSquashFilterConfigFromYaml(
+    const std::string& yaml, NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
   envoy::config::filter::http::squash::v2::Squash proto_config;
-  Config::FilterJson::translateSquashConfig(json, proto_config);
+  TestUtility::loadFromYaml(yaml, proto_config);
   return SquashFilterConfig(proto_config, context.cluster_manager_);
 }
 
@@ -51,22 +51,20 @@ void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
 
 } // namespace
 
-TEST(SoloFilterConfigTest, V1ApiConversion) {
-  std::string json = R"EOF(
-    {
-      "cluster" : "fake_cluster",
-      "attachment_template" : {"a":"b"},
-      "request_timeout_ms" : 1001,
-      "attachment_poll_period_ms" : 2002,
-      "attachment_timeout_ms" : 3003
-    }
-    )EOF";
+TEST(SoloFilterConfigTest, V2ApiConversion) {
+  const std::string yaml = R"EOF(
+  cluster: fake_cluster
+  attachment_template:
+    a: b
+  request_timeout: 1.001s
+  attachment_poll_period: 2.002s
+  attachment_timeout: 3.003s
+  )EOF";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).Times(1);
 
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_EQ("fake_cluster", config.clusterName());
   EXPECT_JSON_EQ("{\"a\":\"b\"}", config.attachmentJson());
   EXPECT_EQ(std::chrono::milliseconds(1001), config.requestTimeout());
@@ -75,93 +73,85 @@ TEST(SoloFilterConfigTest, V1ApiConversion) {
 }
 
 TEST(SoloFilterConfigTest, NoCluster) {
-  std::string json = R"EOF(
-    {
-      "cluster" : "fake_cluster",
-      "attachment_template" : {}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: fake_cluster
+  attachment_template: {}
+  )EOF";
 
-  Envoy::Json::ObjectSharedPtr config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
-  EXPECT_THROW_WITH_MESSAGE(constructSquashFilterConfigFromJson(*config, factory_context),
+  EXPECT_THROW_WITH_MESSAGE(constructSquashFilterConfigFromYaml(yaml, factory_context),
                             Envoy::EnvoyException,
                             "squash filter: unknown cluster 'fake_cluster' in squash config");
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironment) {
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":"{{ MISSING_ENV }}"}
-    }
-    )EOF";
-  std::string expected_json = "{\"a\":\"\"}";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a: "{{ MISSING_ENV }}"
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
+  )EOF";
+  const std::string expected_json = "{\"a\":\"\"}";
+
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
 
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":"{{ ESCAPE_ENV }}"}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a: "{{ ESCAPE_ENV }}"
+  )EOF";
 
-  std::string expected_json = "{\"a\":\"\\\"\"}";
+  const std::string expected_json = "{\"a\":\"\\\"\"}";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
   TestEnvironment::setEnvVar("ENV1", "1", 1);
   TestEnvironment::setEnvVar("ENV2", "2", 1);
 
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":"{{ ENV1 }}-{{ ENV2 }}"}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a: "{{ ENV1 }}-{{ ENV2 }}"
+  )EOF";
 
-  std::string expected_json = "{\"a\":\"1-2\"}";
+  const std::string expected_json = "{\"a\":\"1-2\"}";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":[{"e": "{{ CONF_ENV }}"},{"c":"d"}]}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a:
+    - e: "{{ CONF_ENV }}"
+    - c: d
+  )EOF";
 
-  std::string expected_json = R"EOF({"a":[{"e": "some-config-value"},{"c":"d"}]})EOF";
+  const std::string expected_json = R"EOF({"a":[{"e": "some-config-value"},{"c":"d"}]})EOF";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
@@ -352,8 +342,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
   expectAsyncClientSend();
   completeCreateRequest();
 
-  NiceMock<Envoy::Event::MockTimer>* retry_timer;
-  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   completeGetStatusRequest("attaching");
@@ -372,8 +361,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
   expectAsyncClientSend();
   completeCreateRequest();
 
-  NiceMock<Envoy::Event::MockTimer>* retry_timer;
-  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   popPendingCallback()->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
 

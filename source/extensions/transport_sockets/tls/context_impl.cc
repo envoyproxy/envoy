@@ -51,15 +51,16 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
                          TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
-      tls_max_version_(config.maxProtocolVersion()), stat_name_set_(scope.symbolTable()),
-      unknown_ssl_cipher_(stat_name_set_.add("unknown_ssl_cipher")),
-      unknown_ssl_curve_(stat_name_set_.add("unknown_ssl_curve")),
-      unknown_ssl_algorithm_(stat_name_set_.add("unknown_ssl_algorithm")),
-      unknown_ssl_version_(stat_name_set_.add("unknown_ssl_version")),
-      ssl_ciphers_(stat_name_set_.add("ssl.ciphers")),
-      ssl_versions_(stat_name_set_.add("ssl.versions")),
-      ssl_curves_(stat_name_set_.add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_.add("ssl.sigalgs")) {
+      tls_max_version_(config.maxProtocolVersion()),
+      stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
+      unknown_ssl_cipher_(stat_name_set_->add("unknown_ssl_cipher")),
+      unknown_ssl_curve_(stat_name_set_->add("unknown_ssl_curve")),
+      unknown_ssl_algorithm_(stat_name_set_->add("unknown_ssl_algorithm")),
+      unknown_ssl_version_(stat_name_set_->add("unknown_ssl_version")),
+      ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
+      ssl_versions_(stat_name_set_->add("ssl.versions")),
+      ssl_curves_(stat_name_set_->add("ssl.curves")),
+      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")) {
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -388,23 +389,23 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   // contention.
 
   // Ciphers
-  stat_name_set_.rememberBuiltin("AEAD-AES128-GCM-SHA256");
-  stat_name_set_.rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
-  stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
-  stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-SHA");
-  stat_name_set_.rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
-  stat_name_set_.rememberBuiltin("TLS_AES_128_GCM_SHA256");
+  stat_name_set_->rememberBuiltin("AEAD-AES128-GCM-SHA256");
+  stat_name_set_->rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
+  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
+  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-SHA");
+  stat_name_set_->rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
+  stat_name_set_->rememberBuiltin("TLS_AES_128_GCM_SHA256");
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
-  stat_name_set_.rememberBuiltins(
+  stat_name_set_->rememberBuiltins(
       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
 
   // Algorithms
-  stat_name_set_.rememberBuiltins({"ecdsa_secp256r1_sha256", "rsa_pss_rsae_sha256"});
+  stat_name_set_->rememberBuiltins({"ecdsa_secp256r1_sha256", "rsa_pss_rsae_sha256"});
 
   // Versions
-  stat_name_set_.rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
+  stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
@@ -517,7 +518,7 @@ void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value
                              const Stats::StatName fallback) const {
   Stats::SymbolTable& symbol_table = scope_.symbolTable();
   Stats::SymbolTable::StoragePtr storage =
-      symbol_table.join({name, stat_name_set_.getBuiltin(value, fallback)});
+      symbol_table.join({name, stat_name_set_->getBuiltin(value, fallback)});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 
 #ifdef LOG_BUILTIN_STAT_NAMES
@@ -579,7 +580,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
       ASN1_STRING* str = san->d.dNSName;
       const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       for (auto& config_san : subject_alt_names) {
-        if (dNSNameMatch(config_san, dns_name)) {
+        if (dnsNameMatch(config_san, dns_name)) {
           return true;
         }
       }
@@ -626,16 +627,16 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
-  if (dNSName == pattern) {
+bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern) {
+  if (dns_name == pattern) {
     return true;
   }
 
   size_t pattern_len = strlen(pattern);
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
-    if (dNSName.length() > pattern_len - 1) {
-      size_t off = dNSName.length() - pattern_len + 1;
-      return dNSName.compare(off, pattern_len - 1, pattern + 1) == 0;
+    if (dns_name.length() > pattern_len - 1) {
+      size_t off = dns_name.length() - pattern_len + 1;
+      return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
     }
   }
 

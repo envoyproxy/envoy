@@ -12,7 +12,7 @@ class EnvoyQuicClientConnection : public EnvoyQuicConnection, public Network::Ud
 public:
   // A connection socket will be created with given |local_addr|. If binding
   // port not provided in |local_addr|, pick up a random port.
-  EnvoyQuicClientConnection(quic::QuicConnectionId server_connection_id,
+  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             Network::Address::InstanceConstSharedPtr& initial_peer_address,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory,
@@ -31,14 +31,14 @@ public:
   uint64_t maxPacketSize() const override;
 
 private:
-  EnvoyQuicClientConnection(quic::QuicConnectionId server_connection_id,
+  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket);
 
-  EnvoyQuicClientConnection(quic::QuicConnectionId server_connection_id,
+  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
                             bool owns_writer,

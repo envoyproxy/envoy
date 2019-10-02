@@ -62,7 +62,7 @@ TEST_F(EnvoyQuicFakeProofSourceTest, TestGetProof) {
 TEST_F(EnvoyQuicFakeProofSourceTest, TestVerifyProof) {
   EXPECT_EQ(quic::QUIC_SUCCESS,
             proof_verifier_.VerifyProof(hostname_, /*port=*/0, server_config_, version_, chlo_hash_,
-                                        expected_certs_, "Fake timestamp", expected_signature_,
+                                        expected_certs_, "", expected_signature_,
                                         nullptr, nullptr, nullptr, nullptr));
   std::vector<std::string> wrong_certs{"wrong cert"};
   EXPECT_EQ(quic::QUIC_FAILURE,

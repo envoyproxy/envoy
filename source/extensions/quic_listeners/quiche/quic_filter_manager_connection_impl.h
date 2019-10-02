@@ -30,28 +30,30 @@ public:
 
   // Network::Connection
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override;
-  void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override;
+  void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
+    // TODO(danzh): implement to support proxy. This interface is only called from
+    // TCP proxy code.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  uint64_t id() const override;
+  uint64_t id() const override { return id_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   std::chrono::milliseconds delayedCloseTimeout() const override;
-  void readDisable(bool disable) override {
-    ASSERT(!disable, "Quic connection should be able to read through out its life time.");
-  }
+  void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
   const Network::Address::InstanceConstSharedPtr& remoteAddress() const override;
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    ASSERT(false, "Unix domain socket is not supported.");
-    return absl::nullopt;
+    // Unix domain socket is not supported.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
@@ -59,20 +61,26 @@ public:
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
-    return quic_connection_->connected() ? Network::Connection::State::Open
-                                         : Network::Connection::State::Closed;
+    if (quic_connection_ != nullptr && quic_connection_->connected()) {
+      return Network::Connection::State::Open;
+    }
+    return Network::Connection::State::Closed;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setBufferLimits(uint32_t limit) override;
-  uint32_t bufferLimit() const override;
+  uint32_t bufferLimit() const override {
+    // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
   bool localAddressRestored() const override {
     // SO_ORIGINAL_DST not supported by QUIC.
-    return false;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool aboveHighWatermark() const override;
+
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
@@ -121,6 +129,7 @@ private:
   std::string transport_failure_reason_;
   uint32_t bytes_to_send_{0};
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
+  const uint64_t id_;
 };
 
 } // namespace Quic

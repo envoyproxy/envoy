@@ -12,7 +12,10 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnec
       stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
-          [this]() { onSendBufferHighWatermark(); }) {
+          [this]() { onSendBufferHighWatermark(); }),
+      // QUIC connection id can be 18 bytes. It's easier to use hash value instead
+      // of trying to map it into a 64-bit space.
+      id_(quic_connection_->connection_id().Hash()) {
   stream_info_.protocol(Http::Protocol::Http3);
 }
 
@@ -36,15 +39,9 @@ void QuicFilterManagerConnectionImpl::addConnectionCallbacks(Network::Connection
   network_connection_callbacks_.push_back(&cb);
 }
 
-void QuicFilterManagerConnectionImpl::addBytesSentCallback(
-    Network::Connection::BytesSentCb /*cb*/) {
-  // TODO(danzh): implement to support proxy. This interface is only called from
-  // TCP proxy code.
-  ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
-}
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
-  ASSERT(!enabled, "Quic connection doesn't support half close.");
+  RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
 
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
@@ -55,11 +52,6 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-uint32_t QuicFilterManagerConnectionImpl::bufferLimit() const {
-  // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
 bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
   return write_buffer_watermark_simulation_.isAboveHighWatermark();
 }
@@ -67,7 +59,6 @@ bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
   if (type != Network::ConnectionCloseType::NoFlush) {
     // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
-    ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
   }
   if (quic_connection_ == nullptr) {
     // Already detached from quic connection.
@@ -78,29 +69,21 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
   quic_connection_ = nullptr;
 }
 
-uint64_t QuicFilterManagerConnectionImpl::id() const {
-  // QUIC connection id can be 18 types. It's easier to use hash value instead
-  // of trying to map it into a 64-bit space.
-  return quic_connection_ == nullptr ? 0 : quic_connection_->connection_id().Hash();
-}
-
 void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
-  ASSERT(timeout == std::chrono::milliseconds::zero(),
-         "Delayed close of connection is not supported");
+  if (timeout != std::chrono::milliseconds::zero()) {
+    // TODO(danzh) support delayed close of connection.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 }
 
 std::chrono::milliseconds QuicFilterManagerConnectionImpl::delayedCloseTimeout() const {
-  // Not called outside of Network::ConnectionImpl. Maybe remove this interface
-  // from Network::Connection.
+  // Not called outside of Network::ConnectionImpl.
+  // TODO(#8419): Try remove this interface from Network::Connection.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 const Network::ConnectionSocket::OptionsSharedPtr&
 QuicFilterManagerConnectionImpl::socketOptions() const {
-  ENVOY_CONN_LOG(
-      error,
-      "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
-      *this);
   return quic_connection_->connectionSocket()->options();
 }
 
@@ -120,7 +103,6 @@ QuicFilterManagerConnectionImpl::localAddress() const {
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  ENVOY_CONN_LOG(error, "Ssl::ConnectionInfo instance is not populated.", *this);
   return nullptr;
 }
 

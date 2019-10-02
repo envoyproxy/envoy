@@ -10,9 +10,9 @@ namespace Envoy {
 namespace Quic {
 
 EnvoyQuicServerConnection::EnvoyQuicServerConnection(
-    quic::QuicConnectionId server_connection_id, quic::QuicSocketAddress initial_peer_address,
-    quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
-    quic::QuicPacketWriter* writer, bool owns_writer,
+    const quic::QuicConnectionId& server_connection_id,
+    quic::QuicSocketAddress initial_peer_address, quic::QuicConnectionHelperInterface& helper,
+    quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats)
     : EnvoyQuicConnection(
@@ -49,6 +49,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   const bool empty_filter_chain = !listener_config_.filterChainFactory().createNetworkFilterChain(
       envoyConnection(), filter_chain_->networkFilterFactories());
   if (empty_filter_chain) {
+    // TODO(danzh) check empty filter chain at config load time instead of here.
     CloseConnection(quic::QUIC_CRYPTO_INTERNAL_ERROR, "closing connection: filter chain is empty",
                     quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
     return false;

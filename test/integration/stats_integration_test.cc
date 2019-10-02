@@ -252,6 +252,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/07/24  7503     43030       44000   add upstream filters to clusters
   // 2019/08/13  7877     42838       44000   skip EdfScheduler creation if all host weights equal
   // 2019/09/02  8118     42830       43000   Share symbol-tables in cluster/host stats.
+  // 2019/09/16  8100     42894       43000   Add transport socket matcher in cluster.
+  // 2019/09/25  8226     43022       44000   dns: enable dns failure refresh rate configuration
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -261,7 +263,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 42830); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 43022); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 
@@ -287,6 +289,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // ----------  -----    -----------------   -----
   // 2019/08/09  7882     35489       36000   Initial version
   // 2019/09/02  8118     34585       34500   Share symbol-tables in cluster/host stats.
+  // 2019/09/16  8100     34585       34500   Add transport socket matcher in cluster.
+  // 2019/09/25  8226     34777       35000   dns: enable dns failure refresh rate configuration
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -296,7 +300,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 34585); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 34777); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
 
@@ -321,13 +325,14 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   //                      exact upper-bound
   // ----------  -----    -----------------   -----
   // 2019/09/09  8189     2739         3100   Initial per-host memory snapshot
+  // 2019/09/10  8216     1283         1315   Use primitive counters for host stats
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
   // will need to find the correct value only after failing CI and looking
   // at the logs.
-  EXPECT_MEMORY_EQ(m_per_host, 2739);
-  EXPECT_MEMORY_LE(m_per_host, 3100);
+  EXPECT_MEMORY_EQ(m_per_host, 1283);
+  EXPECT_MEMORY_LE(m_per_host, 1315);
 }
 
 } // namespace

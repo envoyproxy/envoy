@@ -8,7 +8,7 @@ This HTTP filter can be used to verify JSON Web Token (JWT). It will verify its 
 JWKS is needed to verify JWT signatures. They can be specified in the filter config or can be fetched remotely from a JWKS server.
 
 .. attention::
-   Only ES256 and RS256 are supported for the JWT alg.
+   ES256, HS256, RS256, RS384 and RS512 are supported for the JWT alg.
 
 Configuration
 -------------
