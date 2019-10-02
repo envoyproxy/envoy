@@ -293,7 +293,7 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_P(EnvoyQuicServerStreamTest, PostRequestAndLargeResponse) {
+TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());

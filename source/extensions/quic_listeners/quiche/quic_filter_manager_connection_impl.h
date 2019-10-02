@@ -101,6 +101,7 @@ protected:
   EnvoyQuicConnection* quic_connection_{nullptr};
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> stats_;
+  Event::Dispatcher& dispatcher_;
 
 private:
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
@@ -113,7 +114,6 @@ private:
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
   // and the rest incoming data bypasses these filters.
   Network::FilterManagerImpl filter_manager_;
-  Event::Dispatcher& dispatcher_;
   StreamInfo::StreamInfoImpl stream_info_;
   // These callbacks are owned by network filters and quic session should out live
   // them.

@@ -569,6 +569,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
 }
 
 void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
+  std::cerr << "=============== testRouterUpstreamResponseBeforeRequestComplete\n";
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -576,9 +577,15 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+   std::cerr << "=============== encodeHeaders\n";
+
   upstream_request_->encodeHeaders(default_response_headers_, false);
+   std::cerr << "=============== encodeData\n";
+
   upstream_request_->encodeData(512, true);
+  std::cerr << "=============== waitForEndStream\n";
   response->waitForEndStream();
+  std::cerr << "=============== waitForEndStream\n done";
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());

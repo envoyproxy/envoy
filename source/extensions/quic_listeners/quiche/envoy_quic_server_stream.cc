@@ -85,23 +85,23 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
-  quic::QuicRstStreamErrorCode rst;
-  switch (reason) {
-  case Http::StreamResetReason::LocalRefusedStreamReset:
-    rst = quic::QUIC_REFUSED_STREAM;
-  case Http::StreamResetReason::ConnectionTermination:
-    rst = quic::QUIC_STREAM_NO_ERROR;
-  case Http::StreamResetReason::ConnectionFailure:
-    rst = quic::QUIC_STREAM_CONNECTION_ERROR;
-  default:
-    rst = quic::QUIC_STREAM_NO_ERROR;
+  if (local_end_stream_ && !reading_stopped()) {
+    // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
+    // of propagating original reset reason.
+    StopReading();
+  } else {
+  Reset(envoyResetReasonToQuicRstError(reason));
   }
-  Reset(rst);
 }
 
-void EnvoyQuicServerStream::readDisable(bool /*disable*/) {
-  // TODO(danzh): Disable/Re-enable stream flow control.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+void EnvoyQuicServerStream::switchStreamBlockState(bool should_block) {
+  ASSERT(FinishedReadingHeaders(), "Upperstream buffer limit is reached before request body is delivered.");
+  if (should_block) {
+    sequencer()->SetBlockedUntilFlush();
+  } else {
+      ASSERT(read_disable_counter_ == 0, "readDisable called in btw.");
+    sequencer()->SetUnblocked();
+  }
 }
 
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
@@ -117,9 +117,10 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 }
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
-  if (!FinishedReadingHeaders()) {
-    return;
-  }
+  ASSERT(FinishedReadingHeaders());
+  ASSERT(read_disable_counter_ == 0);
+  ASSERT(!in_encode_data_callstack_);
+  in_encode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
@@ -143,11 +144,21 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   bool empty_payload_with_fin = buffer->length() == 0 && finished_reading;
   if (!empty_payload_with_fin || !end_stream_decoded_) {
     ASSERT(decoder() != nullptr);
+    std::cerr << "============ decodeData with finished_reading " << finished_reading << " empty_payload_with_fin " << empty_payload_with_fin << " end_stream_decoded_ " << end_stream_decoded_ << ".\n";
     decoder()->decodeData(*buffer, finished_reading);
+    std::cerr << "=========== finished decodeData\n";
+    if (finished_reading) {
+       end_stream_decoded_ = true;
+    }
   }
 
   if (!sequencer()->IsClosed()) {
-    sequencer()->SetUnblocked();
+      in_encode_data_callstack_ = false;
+  if (read_disable_counter_ > 0) {
+    // If readDisable() was ever called during decodeData() and it meant to disable
+    // reading from downstream, the call must have been deferred. Call it now.
+    switchStreamBlockState(true);
+  }
     return;
   }
 
@@ -159,6 +170,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
     MarkTrailersConsumed();
   }
   OnFinRead();
+  in_encode_data_callstack_ = false;
 }
 
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,

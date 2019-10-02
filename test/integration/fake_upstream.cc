@@ -193,6 +193,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
 }
 
 AssertionResult FakeStream::waitForReset(milliseconds timeout) {
+    ENVOY_LOG(trace, "============== FakeStream waiting for reset");
   Thread::LockGuard lock(lock_);
   auto start_time = time_system_.monotonicTime();
   while (!saw_reset_) {
@@ -264,7 +265,7 @@ Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder,
 
 AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events,
                                                       milliseconds timeout) {
-  ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
+  ENVOY_LOG(trace, "============== FakeConnectionBase waiting for disconnect");
   auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
   while (shared_connection_.connected()) {

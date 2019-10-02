@@ -31,8 +31,8 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  void readDisable(bool disable) override;
-
+   // EnvoyQuicStream
+  void switchStreamBlockState(bool should_block) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;

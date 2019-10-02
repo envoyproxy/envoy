@@ -82,11 +82,18 @@ void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*meta
   ASSERT(false, "Metadata Frame is not supported in QUIC");
 }
 
-void EnvoyQuicClientStream::resetStream(Http::StreamResetReason /*reason*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
+  Reset(envoyResetReasonToQuicRstError(reason));
 }
 
-void EnvoyQuicClientStream::readDisable(bool /*disable*/) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
+  ASSERT(FinishedReadingHeaders(), "codec buffer limit is reached before response body is delivered.");
+  if (should_block) {
+    sequencer()->SetBlockedUntilFlush();
+  } else {
+    sequencer()->SetUnblocked();
+  }
+}
 
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
@@ -165,13 +172,7 @@ void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
 
 void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   quic::QuicSpdyClientStream::OnStreamReset(frame);
-  Http::StreamResetReason reason;
-  if (frame.error_code == quic::QUIC_REFUSED_STREAM) {
-    reason = Http::StreamResetReason::RemoteRefusedStreamReset;
-  } else {
-    reason = Http::StreamResetReason::RemoteReset;
-  }
-  runResetCallbacks(reason);
+  runResetCallbacks(quicRstErrorToEnvoyResetReason(frame.error_code));
 }
 
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
