@@ -32,6 +32,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "application_protocol_lib",
+    srcs = ["application_protocol.cc"],
+    hdrs = ["application_protocol.h"],
+    deps = [
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],

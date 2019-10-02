@@ -19,6 +19,7 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+#include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
@@ -368,14 +369,29 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (downstreamConnection() &&
-      downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
-          UpstreamServerName::key())) {
-    const auto& original_requested_server_name =
-        downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
-            UpstreamServerName::key());
+  if (downstreamConnection()) {
+    absl::string_view server_name = "";
+    std::vector<std::string> application_protocols;
+    if (downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
+            UpstreamServerName::key())) {
+      const auto& original_requested_server_name =
+          downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
+              UpstreamServerName::key());
+      server_name = original_requested_server_name.value();
+    }
+
+    if (downstreamConnection()->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
+            Network::ApplicationProtocols::key())) {
+      const auto& alpn =
+          downstreamConnection()
+              ->streamInfo()
+              .filterState()
+              .getDataReadOnly<Network::ApplicationProtocols>(Network::ApplicationProtocols::key());
+      application_protocols = alpn.value();
+    }
+
     transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
-        original_requested_server_name.value());
+        server_name, std::vector<std::string>{}, std::vector<std::string>{application_protocols});
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
