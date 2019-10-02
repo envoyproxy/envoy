@@ -37,7 +37,7 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest()) {
+  ListenerManagerImplTest() : api_(Api::createApiForTest()), real_listener_factory_(server_) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     manager_ =
@@ -217,6 +217,7 @@ protected:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
+  ProdListenerComponentFactory real_listener_factory_;
 };
 
 } // namespace Server

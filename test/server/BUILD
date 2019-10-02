@@ -202,6 +202,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:active_raw_udp_listener_config",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
     ],
 )
