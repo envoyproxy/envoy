@@ -70,6 +70,4 @@ message NextVersion {
   // Deprecations.
   reserved 14;
   NextEnum enum_field_with_deprecated_value = 15;
-
-  google.protobuf.Any _api_internal_do_not_use = 16;
 }

@@ -24,7 +24,7 @@
 namespace Envoy {
 namespace Config {
 
-const char* DeprecatedMessageField = "_api_internal_do_not_use";
+const int DeprecatedMessageFieldNumber = 100000;
 
 void VersionConverter::upgrade(const Protobuf::Message& prev_message,
                                Protobuf::Message& next_message) {
@@ -101,13 +101,10 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
 
   if (deprecated_message) {
     const Protobuf::Reflection* next_reflection = next_message.GetReflection();
-    const auto* any_internal_field_descriptor =
-        next_descriptor->FindFieldByName(DeprecatedMessageField);
-    ASSERT(any_internal_field_descriptor != nullptr);
-    ProtobufWkt::Any* any_internal = dynamic_cast<ProtobufWkt::Any*>(
-        next_reflection->MutableMessage(&next_message, any_internal_field_descriptor));
-    ASSERT(any_internal != nullptr);
-    any_internal->PackFrom(*deprecated_message);
+    auto* unknown_field_set = next_reflection->MutableUnknownFields(&next_message);
+    ASSERT(unknown_field_set->empty());
+    std::string* s = unknown_field_set->AddLengthDelimited(DeprecatedMessageFieldNumber);
+    deprecated_message->SerializeToString(s);
   }
 }
 
@@ -116,13 +113,13 @@ void VersionConverter::unpackDeprecated(const Protobuf::Message& upgraded_messag
   // We are effectively copying the deprecated fields here. We could do better by
   // embedding the v(N-1) message directly in vN in the _api_internal_do_not_use
   // field, but that creates a bunch of build complexity and misuse potential.
-  const Protobuf::Descriptor* descriptor = upgraded_message.GetDescriptor();
   const Protobuf::Reflection* reflection = upgraded_message.GetReflection();
-  const auto* any_internal_field_descriptor = descriptor->FindFieldByName(DeprecatedMessageField);
-  ASSERT(any_internal_field_descriptor != nullptr);
-  const ProtobufWkt::Any& any_internal = dynamic_cast<const ProtobufWkt::Any&>(
-      reflection->GetMessage(upgraded_message, any_internal_field_descriptor));
-  any_internal.UnpackTo(&deprecated_message);
+  const auto& unknown_field_set = reflection->GetUnknownFields(upgraded_message);
+  ASSERT(unknown_field_set.field_count() == 1);
+  const auto& unknown_field = unknown_field_set.field(0);
+  ASSERT(unknown_field.number() == DeprecatedMessageFieldNumber);
+  const std::string& s = unknown_field.length_delimited();
+  deprecated_message.ParseFromString(s);
 }
 
 } // namespace Config
