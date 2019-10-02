@@ -8,13 +8,37 @@ option java_package = "io.envoyproxy.envoy.type";
 
 import "google/protobuf/struct.proto";
 
-message StringOrJson {
-  // Allows to define custom format of returned data.
-  oneof format {
-    // Plain text format.
-    string string_format = 2;
+// [#protodoc-title: Format]
 
-    // Json format as dictionary.
-    google.protobuf.Struct json_format = 3;
+// Allows to define custom format of returned data.
+message StringOrJson {
+
+  oneof format {
+    // Plain text format. Allows to specify some custom message to returns.
+    //
+    // .. code-block:: yaml
+    //
+    //   string_format: "My custom message"
+    //
+    string string_format = 1;
+
+    // Json format as dictionary. Allows to specify some custom message to return in json format.
+    //
+    // .. code-block:: yaml
+    //
+    //  json_format:
+    //    protocol: "HTTP/1.1"
+    //    message: "My message"
+    //
+    // The following JSON object would be returned:
+    //
+    // .. code-block:: json
+    //
+    //  {
+    //    "protocol": "HTTP/1.1",
+    //    "message": "My message"
+    //  }
+    //
+    google.protobuf.Struct json_format = 2;
   }
 }
