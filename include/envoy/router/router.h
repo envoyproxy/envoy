@@ -432,7 +432,7 @@ public:
   virtual bool includeAttemptCount() const PURE;
 
   /**
-   * @return bool whether to reverse the header evalution order.
+   * @return bool whether to reverse the header evaluation order.
    */
   virtual bool reverseHeaderEvaluationOrder() const PURE;
 };
