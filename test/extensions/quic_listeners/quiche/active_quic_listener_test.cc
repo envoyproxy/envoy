@@ -158,6 +158,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
         dispatcher_->exit();
         return Network::FilterStatus::StopIteration;
       }));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
