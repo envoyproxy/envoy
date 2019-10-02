@@ -54,7 +54,7 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
+    const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
@@ -114,7 +114,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
-      vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());
+      vhds_subscription_->registerInitTargetWithInitManager(getRdsConfigInitManager());
     } else {
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 config_update_info_->configHash());
@@ -233,8 +233,11 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
+    // TODO(lambdai): provider should own subscription
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
-        rds, manager_identifier, factory_context, stat_prefix, *this));
+        rds, manager_identifier,
+        Server::Configuration::ServerFactoryCxtUtil::generateServerFactoryContext(factory_context),
+        stat_prefix, *this));
     init_manager.add(subscription->init_target_);
     std::shared_ptr<RdsRouteConfigProviderImpl> provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};

@@ -112,6 +112,9 @@ public:
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
+  // TODO(lambdai): return belonged RDSConfigProvider's init manager
+  Init::Manager& getRdsConfigInitManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
 private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -131,7 +134,8 @@ private:
 
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
+      const uint64_t manager_identifier,
+      Server::Configuration::ServerFactoryContext& server_factory_context,
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
@@ -139,7 +143,7 @@ private:
 
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   // Server::Configuration::ServerFactoryContext& get_factory_context_;
   Init::SharedTargetImpl init_target_;
   Stats::ScopePtr scope_;

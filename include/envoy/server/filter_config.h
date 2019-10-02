@@ -102,9 +102,6 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-// Proof of Concept class
-class ServerFactoryContext : public virtual CommonFactoryContext {};
-
 /**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
@@ -188,6 +185,15 @@ public:
    * @return ProcessContext& a reference to the process context.
    */
   virtual ProcessContext& processContext() PURE;
+};
+
+// Proof of Concept class
+class ServerFactoryContext : public virtual CommonFactoryContext {};
+class ServerFactoryCxtUtil {
+public:
+  static ServerFactoryContext& generateServerFactoryContext(FactoryContext&) {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
