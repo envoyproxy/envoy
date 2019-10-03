@@ -30,7 +30,7 @@ public:
   void markStreamFresh() override;
 
   // message is expected to be a envoy::api::v2::DiscoveryResponse.
-  UpdateAck handleResponse(const void* reponse_proto_ptr) override;
+  UpdateAck handleResponse(const void* response_proto_ptr) override;
 
   void handleEstablishmentFailure() override;
 

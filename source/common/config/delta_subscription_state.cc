@@ -56,8 +56,8 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
          !any_request_sent_yet_in_current_stream_;
 }
 
-UpdateAck DeltaSubscriptionState::handleResponse(const void* reponse_proto_ptr) {
-  auto* response = static_cast<const envoy::api::v2::DeltaDiscoveryResponse*>(reponse_proto_ptr);
+UpdateAck DeltaSubscriptionState::handleResponse(const void* response_proto_ptr) {
+  auto* response = static_cast<const envoy::api::v2::DeltaDiscoveryResponse*>(response_proto_ptr);
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(response->nonce(), type_url());

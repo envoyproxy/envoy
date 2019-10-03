@@ -48,7 +48,7 @@ spontaneous updates. ACKs are not shown in this diagram; they are also carried b
 
 What does GrpcMux even do in this diagram? Just own things and pass through function calls?
 Answer: 1) it sequences the requests and ACKs that the various type_urls send, 2) it handles the
-protobuf vs polymorphism impedence mismatch, allowing all delta-vs-SotW-agnostic code
+protobuf vs polymorphism impedance mismatch, allowing all delta-vs-SotW-agnostic code
 to be reused.
 
 Note that there can be multiple active gRPC subscriptions for a single resource

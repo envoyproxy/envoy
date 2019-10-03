@@ -38,7 +38,7 @@ public:
 
   // Implementations expect either a DeltaDiscoveryResponse or DiscoveryResponse. The caller is
   // expected to know which it should be providing.
-  virtual UpdateAck handleResponse(const void* reponse_proto_ptr) PURE;
+  virtual UpdateAck handleResponse(const void* response_proto_ptr) PURE;
 
   virtual void handleEstablishmentFailure() PURE;
 

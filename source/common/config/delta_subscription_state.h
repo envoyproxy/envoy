@@ -30,7 +30,7 @@ public:
   void markStreamFresh() override { any_request_sent_yet_in_current_stream_ = false; }
 
   // message is expected to be a envoy::api::v2::DeltaDiscoveryResponse.
-  UpdateAck handleResponse(const void* reponse_proto_ptr) override;
+  UpdateAck handleResponse(const void* response_proto_ptr) override;
 
   void handleEstablishmentFailure() override;
 
