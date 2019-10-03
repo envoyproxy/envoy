@@ -128,12 +128,14 @@ MATCHER_P2(ProtoBufferEqIgnoringField, expected, ignored_field, "") {
   if (!equal) {
     std::string but_ignoring = absl::StrCat("(but ignoring ", ignored_field, ")");
     *result_listener << "\n"
-                     << TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
-                     << TestUtility::addLeftAndRightPadding(but_ignoring) << "\n"
+                     << ::Envoy::TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
+                     << ::Envoy::TestUtility::addLeftAndRightPadding(but_ignoring) << "\n"
                      << expected.DebugString()
-                     << TestUtility::addLeftAndRightPadding("is not equal to actual proto:") << "\n"
+                     << ::Envoy::TestUtility::addLeftAndRightPadding(
+                            "is not equal to actual proto:")
+                     << "\n"
                      << proto.DebugString()
-                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << ::Envoy::TestUtility::addLeftAndRightPadding("") // line full of padding
                      << "\n";
   }
   return equal;
