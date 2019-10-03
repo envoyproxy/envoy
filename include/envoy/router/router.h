@@ -432,7 +432,9 @@ public:
   virtual bool includeAttemptCount() const PURE;
 
   /**
-   * @return bool whether to reverse the header evaluation order.
+   * @return bool whether to reverse the header evaluation order when adding or
+   * removing headers. The default evaluation order is route level, virtual host
+   * level and global connection manager level.
    */
   virtual bool reverseHeaderEvaluationOrder() const PURE;
 };
