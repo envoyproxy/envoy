@@ -56,7 +56,7 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
 Config::SharedConfig::SharedConfig(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
-    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
+    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     idle_timeout_ =
