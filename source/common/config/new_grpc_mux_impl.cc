@@ -45,12 +45,54 @@ bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
   return pausable_ack_queue_.paused(type_url);
 }
 
+void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
+                                           const void* response_proto_ptr) {
+  auto sub = subscriptions_.find(type_url);
+  if (sub == subscriptions_.end()) {
+    ENVOY_LOG(warn,
+              "The server sent an xDS response proto with type_url {}, which we have "
+              "not subscribed to. Ignoring.",
+              type_url);
+    return;
+  }
+  pausable_ack_queue_.push(sub->second->handleResponse(response_proto_ptr));
+  trySendDiscoveryRequests();
+}
+
 void NewGrpcMuxImpl::start() { establishGrpcStream(); }
+
+void NewGrpcMuxImpl::handleEstablishedStream() {
+  for (auto& sub : subscriptions_) {
+    sub.second->markStreamFresh();
+  }
+  set_any_request_sent_yet_in_current_stream(false);
+  trySendDiscoveryRequests();
+}
 
 void NewGrpcMuxImpl::disableInitFetchTimeoutTimer() {
   for (auto& sub : subscriptions_) {
     sub.second->disableInitFetchTimeoutTimer();
   }
+}
+
+void NewGrpcMuxImpl::handleStreamEstablishmentFailure() {
+  // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
+  // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
+  // crash, the iteration needs to dance around a little: collect pointers to all
+  // SubscriptionStates, call on all those pointers we haven't yet called on, repeat if there are
+  // now more SubscriptionStates.
+  absl::flat_hash_map<std::string, SubscriptionState*> all_subscribed;
+  absl::flat_hash_map<std::string, SubscriptionState*> already_called;
+  do {
+    for (auto& sub : subscriptions_) {
+      all_subscribed[sub.first] = sub.second.get();
+    }
+    for (auto& sub : all_subscribed) {
+      if (already_called.insert(sub).second) { // insert succeeded ==> not already called
+        sub.second->handleEstablishmentFailure();
+      }
+    }
+  } while (all_subscribed.size() != subscriptions_.size());
 }
 
 Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
@@ -109,48 +151,6 @@ WatchMap& NewGrpcMuxImpl::watchMapFor(const std::string& type_url) {
       watch_map != watch_maps_.end(),
       fmt::format("Tried to look up WatchMap for non-existent subscription {}.", type_url));
   return *watch_map->second;
-}
-
-void NewGrpcMuxImpl::handleEstablishedStream() {
-  for (auto& sub : subscriptions_) {
-    sub.second->markStreamFresh();
-  }
-  set_any_request_sent_yet_in_current_stream(false);
-  trySendDiscoveryRequests();
-}
-
-void NewGrpcMuxImpl::handleStreamEstablishmentFailure() {
-  // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
-  // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
-  // crash, the iteration needs to dance around a little: collect pointers to all
-  // SubscriptionStates, call on all those pointers we haven't yet called on, repeat if there are
-  // now more SubscriptionStates.
-  absl::flat_hash_map<std::string, SubscriptionState*> all_subscribed;
-  absl::flat_hash_map<std::string, SubscriptionState*> already_called;
-  do {
-    for (auto& sub : subscriptions_) {
-      all_subscribed[sub.first] = sub.second.get();
-    }
-    for (auto& sub : all_subscribed) {
-      if (already_called.insert(sub).second) { // insert succeeded ==> not already called
-        sub.second->handleEstablishmentFailure();
-      }
-    }
-  } while (all_subscribed.size() != subscriptions_.size());
-}
-
-void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
-                                           const void* response_proto_ptr) {
-  auto sub = subscriptions_.find(type_url);
-  if (sub == subscriptions_.end()) {
-    ENVOY_LOG(warn,
-              "The server sent an xDS response proto with type_url {}, which we have "
-              "not subscribed to. Ignoring.",
-              type_url);
-    return;
-  }
-  pausable_ack_queue_.push(sub->second->handleResponse(response_proto_ptr));
-  trySendDiscoveryRequests();
 }
 
 void NewGrpcMuxImpl::trySendDiscoveryRequests() {
@@ -225,6 +225,82 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   }
   return absl::nullopt;
 }
+
+// Delta- and SotW-specific concrete subclasses:
+// GrpcMuxDelta
+GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
+                           const Protobuf::MethodDescriptor& service_method,
+                           Runtime::RandomGenerator& random, Stats::Scope& scope,
+                           const RateLimitSettings& rate_limit_settings,
+                           const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
+    : NewGrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher),
+                     skip_subsequent_node, local_info),
+      grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+                   rate_limit_settings) {}
+
+// GrpcStreamCallbacks for GrpcMuxDelta
+void GrpcMuxDelta::onStreamEstablished() { handleEstablishedStream(); }
+void GrpcMuxDelta::onEstablishmentFailure() { handleStreamEstablishmentFailure(); }
+void GrpcMuxDelta::onWriteable() { trySendDiscoveryRequests(); }
+void GrpcMuxDelta::onDiscoveryResponse(
+    std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
+  genericHandleResponse(message->type_url(), message.get());
+}
+
+void GrpcMuxDelta::establishGrpcStream() { grpc_stream_.establishNewStream(); }
+void GrpcMuxDelta::sendGrpcMessage(void* msg_proto_ptr) {
+  std::unique_ptr<envoy::api::v2::DeltaDiscoveryRequest> typed_proto(
+      static_cast<envoy::api::v2::DeltaDiscoveryRequest*>(msg_proto_ptr));
+  if (!any_request_sent_yet_in_current_stream() || !skip_subsequent_node()) {
+    typed_proto->mutable_node()->MergeFrom(local_info().node());
+  }
+  grpc_stream_.sendMessage(*typed_proto);
+  set_any_request_sent_yet_in_current_stream(true);
+}
+void GrpcMuxDelta::maybeUpdateQueueSizeStat(uint64_t size) {
+  grpc_stream_.maybeUpdateQueueSizeStat(size);
+}
+bool GrpcMuxDelta::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
+bool GrpcMuxDelta::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
+
+// GrpcMuxSotw
+GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
+                         const Protobuf::MethodDescriptor& service_method,
+                         Runtime::RandomGenerator& random, Stats::Scope& scope,
+                         const RateLimitSettings& rate_limit_settings,
+                         const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
+    : NewGrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
+                     skip_subsequent_node, local_info),
+      grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+                   rate_limit_settings) {}
+
+// GrpcStreamCallbacks for GrpcMuxSotw
+void GrpcMuxSotw::onStreamEstablished() { handleEstablishedStream(); }
+void GrpcMuxSotw::onEstablishmentFailure() { handleStreamEstablishmentFailure(); }
+void GrpcMuxSotw::onWriteable() { trySendDiscoveryRequests(); }
+void GrpcMuxSotw::onDiscoveryResponse(
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
+  genericHandleResponse(message->type_url(), message.get());
+}
+
+void GrpcMuxSotw::establishGrpcStream() { grpc_stream_.establishNewStream(); }
+
+void GrpcMuxSotw::sendGrpcMessage(void* msg_proto_ptr) {
+  std::unique_ptr<envoy::api::v2::DiscoveryRequest> typed_proto(
+      static_cast<envoy::api::v2::DiscoveryRequest*>(msg_proto_ptr));
+  if (!any_request_sent_yet_in_current_stream() || !skip_subsequent_node()) {
+    typed_proto->mutable_node()->MergeFrom(local_info().node());
+  }
+  grpc_stream_.sendMessage(*typed_proto);
+  set_any_request_sent_yet_in_current_stream(true);
+}
+
+void GrpcMuxSotw::maybeUpdateQueueSizeStat(uint64_t size) {
+  grpc_stream_.maybeUpdateQueueSizeStat(size);
+}
+
+bool GrpcMuxSotw::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
+bool GrpcMuxSotw::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
 } // namespace Config
 } // namespace Envoy

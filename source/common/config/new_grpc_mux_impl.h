@@ -128,38 +128,23 @@ public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-      : NewGrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher),
-                       skip_subsequent_node, local_info),
-        grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                     rate_limit_settings) {}
+               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
-  void onStreamEstablished() override { handleEstablishedStream(); }
-  void onEstablishmentFailure() override { handleStreamEstablishmentFailure(); }
-  void onWriteable() override { trySendDiscoveryRequests(); }
+  void onStreamEstablished() override;
+  void onEstablishmentFailure() override;
+  void onWriteable() override;
   void
-  onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
-    genericHandleResponse(message->type_url(), message.get());
-  }
+  onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override;
 
 protected:
-  void establishGrpcStream() override { grpc_stream_.establishNewStream(); }
-  void sendGrpcMessage(void* msg_proto_ptr) override {
-    std::unique_ptr<envoy::api::v2::DeltaDiscoveryRequest> typed_proto(
-        static_cast<envoy::api::v2::DeltaDiscoveryRequest*>(msg_proto_ptr));
-    if (!any_request_sent_yet_in_current_stream() || !skip_subsequent_node()) {
-      typed_proto->mutable_node()->MergeFrom(local_info().node());
-    }
-    grpc_stream_.sendMessage(*typed_proto);
-    set_any_request_sent_yet_in_current_stream(true);
-  }
-  void maybeUpdateQueueSizeStat(uint64_t size) override {
-    grpc_stream_.maybeUpdateQueueSizeStat(size);
-  }
-  bool grpcStreamAvailable() const override { return grpc_stream_.grpcStreamAvailable(); }
-  bool rateLimitAllowsDrain() override { return grpc_stream_.checkRateLimitAllowsDrain(); }
+  void establishGrpcStream() override;
+  void sendGrpcMessage(void* msg_proto_ptr) override;
+  void maybeUpdateQueueSizeStat(uint64_t size) override;
+  bool grpcStreamAvailable() const override;
+  bool rateLimitAllowsDrain() override;
 
+private:
   GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
       grpc_stream_;
 };
@@ -170,41 +155,26 @@ public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
               const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-      : NewGrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
-                       skip_subsequent_node, local_info),
-        grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                     rate_limit_settings) {}
+              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+
   // GrpcStreamCallbacks
-  void onStreamEstablished() override { handleEstablishedStream(); }
-  void onEstablishmentFailure() override { handleStreamEstablishmentFailure(); }
-  void onWriteable() override { trySendDiscoveryRequests(); }
-  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
-    genericHandleResponse(message->type_url(), message.get());
-  }
+  void onStreamEstablished() override;
+  void onEstablishmentFailure() override;
+  void onWriteable() override;
+  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
   grpcStreamForTest() {
     return grpc_stream_;
   }
 
 protected:
-  void establishGrpcStream() override { grpc_stream_.establishNewStream(); }
-  void sendGrpcMessage(void* msg_proto_ptr) override {
-    std::unique_ptr<envoy::api::v2::DiscoveryRequest> typed_proto(
-        static_cast<envoy::api::v2::DiscoveryRequest*>(msg_proto_ptr));
-    if (!any_request_sent_yet_in_current_stream() || !skip_subsequent_node()) {
-      typed_proto->mutable_node()->MergeFrom(local_info().node());
-    }
+  void establishGrpcStream() override;
+  void sendGrpcMessage(void* msg_proto_ptr) override;
+  void maybeUpdateQueueSizeStat(uint64_t size) override;
+  bool grpcStreamAvailable() const override;
+  bool rateLimitAllowsDrain() override;
 
-    grpc_stream_.sendMessage(*typed_proto);
-    set_any_request_sent_yet_in_current_stream(true);
-  }
-  void maybeUpdateQueueSizeStat(uint64_t size) override {
-    grpc_stream_.maybeUpdateQueueSizeStat(size);
-  }
-  bool grpcStreamAvailable() const override { return grpc_stream_.grpcStreamAvailable(); }
-  bool rateLimitAllowsDrain() override { return grpc_stream_.checkRateLimitAllowsDrain(); }
-
+private:
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
 };
 
