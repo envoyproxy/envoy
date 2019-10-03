@@ -30,7 +30,7 @@ public:
   MySQLFilterConfigSharedPtr config_;
   std::unique_ptr<MySQLFilter> filter_;
   Stats::IsolatedStoreImpl scope_;
-  std::string stat_prefix_{"test"};
+  std::string stat_prefix_{"test."};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 };
 
