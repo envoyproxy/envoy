@@ -52,10 +52,10 @@ class CodecFrameInjector {
 public:
   CodecFrameInjector(const std::string& injector_name);
 
-  void write(const Frame& frame);
+  // Writes the data using the Http::Connection's nghttp2 session.
+  void write(const Frame& frame, Http::Connection& connection);
 
   Http2Settings settings_;
-  std::unique_ptr<Http::Connection> connection_;
   Stats::IsolatedStoreImpl stats_store_;
   const std::string injector_name_;
 };
@@ -81,7 +81,6 @@ public:
 
   ::testing::NiceMock<Network::MockConnection> server_connection_;
   MockServerConnectionCallbacks server_callbacks_;
-  std::unique_ptr<TestServerConnectionImpl> server_;
   MockStreamDecoder request_decoder_;
   MockStreamCallbacks server_stream_callbacks_;
 };
