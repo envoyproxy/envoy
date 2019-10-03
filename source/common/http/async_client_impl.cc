@@ -94,7 +94,12 @@ void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
   // At present, the router cleans up stream state as soon as the remote is closed, making a
-  // half-open local stream unsupported and dangerous. Close here to keep things consistent.
+  // half-open local stream unsupported and dangerous. Ensure we close locally to trigger completion
+  // and keep things consistent. Another option would be to issue a stream reset here if local isn't
+  // yet closed, triggering cleanup along a more standardized path. However, this would require
+  // additional logic to handle the response completion and subsequent reset, and run the risk of
+  // being interpreted as a failure, when in fact no error has necessarily occurred. Gracefully
+  // closing seems most in-line with behavior elsewhere in Envoy for now.
   closeLocal(end_stream);
 }
 
@@ -104,8 +109,8 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!remote_closed_);
   stream_callbacks_.onData(data, end_stream);
   closeRemote(end_stream);
-  // At present, the router cleans up stream state as soon as the remote is closed, making a
-  // half-open local stream unsupported and dangerous. Close here to keep things consistent.
+  // Ensure we close locally on receiving a complete response; see comment in encodeHeaders for
+  // rationale.
   closeLocal(end_stream);
 }
 
@@ -114,8 +119,8 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
   ASSERT(!remote_closed_);
   stream_callbacks_.onTrailers(std::move(trailers));
   closeRemote(true);
-  // At present, the router cleans up stream state as soon as the remote is closed, making a
-  // half-open local stream unsupported and dangerous. Close here to keep things consistent.
+  // Ensure we close locally on receiving a complete response; see comment in encodeHeaders for
+  // rationale.
   closeLocal(true);
 }
 
@@ -135,8 +140,10 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
-  // This guard parallels behavior in the router that maps send calls after closure to no-ops,
-  // because stream state may have synchronously been dropped.
+  // Map send calls after local closure to no-ops. The send call could have been queued prior to
+  // remote reset or closure, and/or closure could have occurred synchronously in response to a
+  // previous send. In these cases the router will have already cleaned up stream state. This
+  // parallels handling in the main Http::ConnectionManagerImpl as well.
   if (local_closed_) {
     return;
   }
@@ -153,8 +160,7 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
-  // This guard parallels behavior in the router that maps send calls after closure to no-ops,
-  // because stream state may have synchronously been dropped.
+  // See explanation in sendData.
   if (local_closed_) {
     return;
   }
