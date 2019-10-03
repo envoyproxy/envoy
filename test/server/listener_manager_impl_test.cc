@@ -918,6 +918,7 @@ filter_chains:
 
 TEST_F(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
+  ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
   const std::string listener_foo_yaml = R"EOF(
@@ -936,20 +937,21 @@ filter_chains:
   ASSERT_GE(syscall_result.rc_, 0);
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, false))
-      .WillOnce(
-          Invoke([this, &syscall_result](const Network::Address::InstanceConstSharedPtr& address,
-                                         Network::Address::SocketType socket_type,
-                                         const Network::Socket::OptionsSharedPtr& options,
-                                         bool bind_to_port) -> Network::SocketSharedPtr {
-            // When bind_to_port is equal to false, create socket fd directly, and do not get socket
-            // fd through hot restart.
-            NiceMock<Api::MockOsSysCalls> os_sys_calls;
-            TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-            ON_CALL(os_sys_calls, socket(AF_INET, _, 0))
-                .WillByDefault(Return(Api::SysCallIntResult{syscall_result.rc_, 0}));
-            return real_listener_factory_.createListenSocket(address, socket_type, options,
-                                                             bind_to_port);
-          }));
+      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           Network::Address::SocketType socket_type,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           bool bind_to_port) -> Network::SocketSharedPtr {
+        EXPECT_CALL(server_, hotRestart).Times(0);
+        // When bind_to_port is equal to false, create socket fd directly, and do not get socket
+        // fd through hot restart.
+        NiceMock<Api::MockOsSysCalls> os_sys_calls;
+        TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+        ON_CALL(os_sys_calls, socket(AF_INET, _, 0))
+            .WillByDefault(Return(Api::SysCallIntResult{syscall_result.rc_, 0}));
+        return real_listener_factory.createListenSocket(address, socket_type, options,
+                                                        bind_to_port);
+      }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
