@@ -11,7 +11,7 @@ namespace Network {
  */
 class ApplicationProtocols : public StreamInfo::FilterState::Object {
 public:
-  ApplicationProtocols(const std::vector<std::string>& application_protocols)
+  explicit ApplicationProtocols(const std::vector<std::string>& application_protocols)
       : application_protocols_(application_protocols) {}
   const std::vector<std::string>& value() const { return application_protocols_; }
   static const std::string& key();

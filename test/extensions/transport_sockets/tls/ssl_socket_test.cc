@@ -3808,8 +3808,6 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
       filter_chain->mutable_tls_context()->mutable_common_tls_context();
 
   envoy::api::v2::auth::UpstreamTlsContext client;
-  // envoy::api::v2::auth::CommonTlsContext* client_ctx = client.mutable_common_tls_context();
-
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
 
   // Client connects without ALPN to a server with "test" ALPN, no ALPN is negotiated.

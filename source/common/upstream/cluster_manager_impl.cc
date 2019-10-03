@@ -1337,11 +1337,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::ConnectionPool::InstancePtr{new Http::Http2::ProdConnPoolImpl(
-        dispatcher, host, priority, options, transport_socket_options)};
+    return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           transport_socket_options);
   } else {
-    return Http::ConnectionPool::InstancePtr{new Http::Http1::ProdConnPoolImpl(
-        dispatcher, host, priority, options, transport_socket_options)};
+    return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           transport_socket_options);
   }
 }
 
