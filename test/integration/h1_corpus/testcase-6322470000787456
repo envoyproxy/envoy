@@ -1,0 +1,6 @@
+events {
+  downstream_send_bytes: "POST /test/long/url HTTP/1.1\r\nhost:\r\nx-forwarded-for:nts "
+}
+events {
+  downstream_send_bytes: "\n\n"
+}
