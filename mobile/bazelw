@@ -37,7 +37,8 @@ if [[ ! -x "$bazel_executable" ]]; then
   if echo "$bazel_version_sha  $bazel_executable" | shasum --check --status; then
     chmod +x "$bazel_executable"
   else
-    echo "Bazel installer sha mismatch" >&2
+    echo "Bazel installer sha mismatch:" >&2
+    shasum -a256 $bazel_executable | awk '{print $1;}' >&2
     rm -f "$bazel_executable"
     exit 1
   fi
