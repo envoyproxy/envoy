@@ -743,6 +743,7 @@ smatch
 sockaddr
 sockfd
 SotW
+SotwSubscriptionState
 spanid
 spdlog
 splitter
@@ -763,6 +764,7 @@ struct
 structs
 subexpr
 subdirs
+SubscriptionStateFactory
 symlink
 symlinks
 symlinked
