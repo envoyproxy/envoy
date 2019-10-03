@@ -147,7 +147,6 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
         initializeSecondaryClusters();
       }
     }
-
     return;
   }
 

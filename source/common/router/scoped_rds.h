@@ -160,7 +160,6 @@ private:
   void onRdsConfigUpdate(const std::string& scope_name,
                          RdsRouteConfigSubscription& rds_subscription);
 
-  Stats::ScopePtr scope_;
   // ScopedRouteInfo by scope name.
   ScopedRouteMap scoped_route_map_;
   // RdsRouteConfigProvider by scope name.
@@ -171,14 +170,15 @@ private:
   // For creating RDS subscriptions.
   Server::Configuration::FactoryContext& factory_context_;
   const std::string name_;
+  std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
       scope_key_builder_;
+  Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   const envoy::api::v2::core::ConfigSource rds_config_source_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;
