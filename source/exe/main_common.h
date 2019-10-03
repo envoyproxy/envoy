@@ -67,9 +67,10 @@ public:
 
 protected:
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
-#ifdef ENVOY_GOOGLE_GRPC
+  // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having
+  // an ifdef in a header file exposed in a C++ library. It is too easy to have
+  // the ifdef be inconsistent across build-system boundaries.
   Grpc::GoogleGrpcContext google_grpc_context_;
-#endif
   const Envoy::OptionsImpl& options_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;

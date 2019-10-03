@@ -17,13 +17,13 @@ namespace Server {
 LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
-                       ProtobufMessage::ValidationVisitor& validation_visitor)
+                       ProtobufMessage::ValidationVisitor& validation_visitor, bool is_delta)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
       lds_config, Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
-      *scope_, *this);
+      *scope_, *this, is_delta);
   init_manager.add(init_target_);
 }
 
@@ -31,8 +31,12 @@ void LdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
-  Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  std::unique_ptr<Cleanup> maybe_eds_resume;
+  if (cm_.adsMux()) {
+    cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+    maybe_eds_resume = std::make_unique<Cleanup>(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
+  }
 
   bool any_applied = false;
   // We do all listener removals before adding the new listeners. This allows adding a new listener
