@@ -752,9 +752,9 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   return entry->second->connPool(priority, protocol, context);
 }
 
-Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
-    const std::string& cluster, ResourcePriority priority, LoadBalancerContext* context,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+Tcp::ConnectionPool::Instance*
+ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                                          LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -763,7 +763,7 @@ Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
   }
 
   // Select a host and create a connection pool for it if it does not already exist.
-  return entry->second->tcpConnPool(priority, context, transport_socket_options);
+  return entry->second->tcpConnPool(priority, context);
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
@@ -793,9 +793,8 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
       [this, host] { ThreadLocalClusterManagerImpl::onHostHealthFailure(host, *tls_); });
 }
 
-Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(
-    const std::string& cluster, LoadBalancerContext* context,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::string& cluster,
+                                                                 LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -805,8 +804,9 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    auto conn_info = logical_host->createConnection(cluster_manager.thread_local_dispatcher_,
-                                                    nullptr, transport_socket_options);
+    auto conn_info = logical_host->createConnection(
+        cluster_manager.thread_local_dispatcher_, nullptr,
+        context == nullptr ? nullptr : context->upstreamTransportSocketOptions());
     if ((entry->second->cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
@@ -1240,8 +1240,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+    ResourcePriority priority, LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1256,7 +1255,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
   bool have_options = false;
-  if (context && context->downstreamConnection()) {
+  if (context != nullptr && context->downstreamConnection()) {
     const Network::ConnectionSocket::OptionsSharedPtr& options =
         context->downstreamConnection()->socketOptions();
     if (options) {
@@ -1267,8 +1266,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     }
   }
 
-  if (transport_socket_options != nullptr) {
-    transport_socket_options->hashKey(hash_key);
+  bool have_transport_socket_options = false;
+  if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
+    have_transport_socket_options = true;
+    context->upstreamTransportSocketOptions()->hashKey(hash_key);
   }
 
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
@@ -1276,7 +1277,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
         parent_.thread_local_dispatcher_, host, priority,
         have_options ? context->downstreamConnection()->socketOptions() : nullptr,
-        transport_socket_options);
+        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
   }
 
   return container.pools_[hash_key].get();

@@ -84,7 +84,6 @@ class IsolatedStoreImpl : public StoreImpl {
 public:
   IsolatedStoreImpl();
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
-  ~IsolatedStoreImpl() { std::cerr << "~IsolatedStoreImpl " << this << std::endl; } // TODO remove
 
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override { return counters_.get(name); }

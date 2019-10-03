@@ -181,7 +181,6 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
       sendGrpcMessage(sub->getNextRequestAckless());
     }
   }
-  std::cerr << ++vinny_the_variable_ << std::endl;
   maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
 }
 

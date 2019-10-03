@@ -37,9 +37,7 @@ public:
     }
     backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
                                                                   RETRY_MAX_DELAY_MS, random_);
-    std::cerr << "created GrpcStream " << this << " with scope " << &scope << std::endl;
   }
-  ~GrpcStream() { std::cerr << "destroying GrpcStream " << this << std::endl; } // TODO REMOVE
 
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
@@ -105,7 +103,6 @@ public:
     if (size > 0 || control_plane_stats_.pending_requests_.used()) {
       control_plane_stats_.pending_requests_.set(size);
     }
-    std::cerr << ++vinny_the_variable_ << std::endl;
   }
 
   bool checkRateLimitAllowsDrain() {
@@ -151,10 +148,6 @@ private:
   TokenBucketPtr limit_request_;
   const bool rate_limiting_enabled_;
   Event::TimerPtr drain_request_timer_;
-
-  // Demonstrates that when the maybeUpdateQueueSizeStat() segfault (would) happen, this object is
-  // still valid.
-  int vinny_the_variable_{};
 };
 
 } // namespace Config

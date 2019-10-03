@@ -134,7 +134,6 @@ TEST_F(SotwSubscriptionStateTest, AckGenerated) {
     UpdateAck ack = deliverDiscoveryResponse({"name1", "name2"}, "version1", "nonce1");
     EXPECT_EQ("nonce1", ack.nonce_);
     EXPECT_EQ(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
-    std::cerr << "the error is: " << ack.error_detail_.message() << std::endl;
   }
   // The next response updates 1 and 2, and adds 3.
   {

@@ -150,21 +150,11 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
   if (GetParam() == SubscriptionType::Filesystem) {
     return; // initial_fetch_timeout not implemented for filesystem.
   }
-  // TODO BEGIN HEAD
-  //  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
-  //  startSubscription({"cluster0", "cluster1"});
-  //  statsAre(1, 0, 0, 0, 0, 0);
-  // TODO BEGIN upstream master
-  InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
-  if (GetParam() == SubscriptionType::Http) {
-    expectDisableInitFetchTimeoutTimer();
-  }
-  // TODO END upstream master
+  statsAre(1, 0, 0, 0, 0, 0);
   expectConfigUpdateFailed();
-  // TODO THIS LINE WAS IN HEAD  expectDisableInitFetchTimeoutTimer();
+  expectDisableInitFetchTimeoutTimer();
   callInitFetchTimeoutCb();
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 1, 0));
 }
