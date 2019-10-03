@@ -81,6 +81,12 @@ public:
   virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
 
   /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
    * @return Server::Admin& the server's global admin HTTP endpoint.
    */
   virtual Server::Admin& admin() PURE;
@@ -89,12 +95,6 @@ public:
    * @return TimeSource& a reference to the time source.
    */
   virtual TimeSource& timeSource() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return Api::Api& a reference to the api object.
@@ -188,7 +188,22 @@ public:
 };
 
 // Proof of Concept class
-class ServerFactoryContext : public virtual CommonFactoryContext {};
+class ServerFactoryContext : public virtual CommonFactoryContext {
+  // Hide and export only serverMessageValidationVisitor
+  // Will decide later
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  };
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  };
+
+public:
+  virtual ProtobufMessage::ValidationVisitor& serverMessageValidationVisitor() {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+};
+
 class ServerFactoryCxtUtil {
 public:
   static ServerFactoryContext& generateServerFactoryContext(FactoryContext&) {

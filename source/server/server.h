@@ -200,11 +200,8 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
 
-  // TODO(lambdai): implement it
-  Stats::Scope& scope() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  Stats::Scope& scope() override { return stats(); }
+
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }

@@ -43,7 +43,7 @@ public:
                                   Server::Configuration::ServerFactoryContext& context) override {
     return createRouteSpecificFilterConfigTyped(
         MessageUtil::downcastAndValidate<const RouteConfigProto&>(
-            proto_config, context.messageValidationVisitor()),
+            proto_config, context.serverMessageValidationVisitor()),
         context);
   }
 

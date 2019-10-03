@@ -149,7 +149,8 @@ class VirtualHostImpl : public VirtualHost {
 public:
   VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtual_host,
                   const ConfigImpl& global_route_config,
-                  Server::Configuration::ServerFactoryContext& factory_context, bool validate_clusters);
+                  Server::Configuration::ServerFactoryContext& factory_context,
+                  bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
@@ -773,7 +774,8 @@ class RouteMatcher {
 public:
   RouteMatcher(const envoy::api::v2::RouteConfiguration& config,
                const ConfigImpl& global_http_config,
-               Server::Configuration::ServerFactoryContext& factory_context, bool validate_clusters);
+               Server::Configuration::ServerFactoryContext& factory_context,
+               bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
 

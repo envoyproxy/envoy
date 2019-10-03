@@ -396,7 +396,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(),
-                                     factory_context.messageValidationVisitor())),
+                                     factory_context.serverMessageValidationVisitor())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
@@ -840,9 +840,9 @@ RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& nam
   return cfg != nullptr ? cfg : DynamicRouteEntry::perFilterConfig(name);
 }
 
-PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
-                                           const envoy::api::v2::route::Route& route,
-                                           Server::Configuration::ServerFactoryContext& factory_context)
+PrefixRouteEntryImpl::PrefixRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
+    Server::Configuration::ServerFactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context), prefix_(route.match().prefix()) {}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
@@ -900,9 +900,9 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
   return nullptr;
 }
 
-RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
-                                         const envoy::api::v2::route::Route& route,
-                                         Server::Configuration::ServerFactoryContext& factory_context)
+RegexRouteEntryImpl::RegexRouteEntryImpl(
+    const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
+    Server::Configuration::ServerFactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context) {
   if (route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kRegex) {
     regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(route.match().regex());
@@ -1224,7 +1224,7 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
+      typed_config, config, factory_context.serverMessageValidationVisitor(), *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context);
 }
 
