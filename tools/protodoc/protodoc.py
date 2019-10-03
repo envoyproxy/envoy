@@ -78,8 +78,9 @@ def FormatCommentWithAnnotations(comment, type_name=''):
       if status not in ['frozen', 'draft', 'experimental']:
         raise ProtodocError('Unknown proto status: %s' % status)
       if status == 'draft' or status == 'experimental':
-        s += ('\n.. WARNING::\n This %s type has :ref:`%s '
-              '<config_overview_v2_status>` status.\n' % (type_name, status))
+        s += (
+            '\n.. WARNING::\n This %s type has %s status and is subject to potential future breaking changes.\n'
+            % (type_name, status))
   return s
 
 
