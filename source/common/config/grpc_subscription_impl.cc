@@ -45,7 +45,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const std::string& version_info) {
   stats_.update_attempt_.inc();
   callbacks_.onConfigUpdate(resources, version_info);
-  grpc_mux_->disableInitFetchTimeoutTimer(); // TODO keep this here?
+  grpc_mux_->disableInitFetchTimeoutTimer();
   stats_.update_success_.inc();
   stats_.version_.set(HashUtil::xxHash64(version_info));
 }
@@ -56,7 +56,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const std::string& system_version_info) {
   stats_.update_attempt_.inc();
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
-  grpc_mux_->disableInitFetchTimeoutTimer(); // TODO keep this here?
+  grpc_mux_->disableInitFetchTimeoutTimer();
   stats_.update_success_.inc();
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
@@ -75,7 +75,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     break;
   case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
     stats_.init_fetch_timeout_.inc();
-    grpc_mux_->disableInitFetchTimeoutTimer(); // TODO keep this here?
+    grpc_mux_->disableInitFetchTimeoutTimer();
     callbacks_.onConfigUpdateFailed(reason, e);
     // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
     // as attempts.
@@ -84,7 +84,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
   case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
     // We expect Envoy exception to be thrown when update is rejected.
     ASSERT(e != nullptr);
-    grpc_mux_->disableInitFetchTimeoutTimer(); // TODO keep this here?
+    grpc_mux_->disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
     callbacks_.onConfigUpdateFailed(reason, e);
     break;

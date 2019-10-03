@@ -366,9 +366,7 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
   // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
   // ACK goes out, they're both acknowledging version 3.
-  // TODO ONLY ON UPSTREAM if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
-  // TODO ONLY ON UPSTREAM }
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"warming_cluster_2", "warming_cluster_1"}, {}, {}));

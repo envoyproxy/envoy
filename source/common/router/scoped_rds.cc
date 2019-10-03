@@ -99,7 +99,6 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           Grpc::Common::typeUrl(
               envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
           *scope_, *this);
-  std::cerr << "made SRDS with scope " << scope_.get() << std::endl;
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(

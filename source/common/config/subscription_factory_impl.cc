@@ -46,27 +46,25 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url),
           callbacks, stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::api::v2::core::ApiConfigSource::GRPC:
-      std::cerr << "subscriptionFromConfigSource single SOTW" << std::endl;
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::make_shared<GrpcMuxSotw>(
-              Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                     api_config_source, scope)
-                  ->create(),
-              dispatcher_, deltaGrpcMethod(type_url), random_, scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_,
-              /*skip_subsequent_node=*/false), // TODO verify it's ok for this to be hardcoded false
+          std::make_shared<GrpcMuxSotw>(Utility::factoryForGrpcApiConfigSource(
+                                            cm_.grpcAsyncClientManager(), api_config_source, scope)
+                                            ->create(),
+                                        dispatcher_, deltaGrpcMethod(type_url), random_, scope,
+                                        Utility::parseRateLimitSettings(api_config_source),
+                                        local_info_,
+                                        api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated=*/false);
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC:
-      std::cerr << "subscriptionFromConfigSource single DELTA" << std::endl;
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::make_shared<GrpcMuxDelta>(
-              Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                     api_config_source, scope)
-                  ->create(),
-              dispatcher_, deltaGrpcMethod(type_url), random_, scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_,
-              /*skip_subsequent_node=*/false), // TODO verify it's ok for this to be hardcoded false
+          std::make_shared<GrpcMuxDelta>(Utility::factoryForGrpcApiConfigSource(
+                                             cm_.grpcAsyncClientManager(), api_config_source, scope)
+                                             ->create(),
+                                         dispatcher_, deltaGrpcMethod(type_url), random_, scope,
+                                         Utility::parseRateLimitSettings(api_config_source),
+                                         local_info_,
+                                         api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated=*/false);
     default:
@@ -74,7 +72,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
   }
   case envoy::api::v2::core::ConfigSource::kAds: {
-    std::cerr << "subscriptionFromConfigSource ADS" << std::endl;
     return std::make_unique<GrpcSubscriptionImpl>(cm_.adsMux(), type_url, callbacks, stats,
                                                   Utility::configSourceInitialFetchTimeout(config),
                                                   /*is_aggregated=*/true);

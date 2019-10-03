@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <iostream> // TODO REMOVE
 #include <string>
 
 #include "envoy/stats/stats.h"

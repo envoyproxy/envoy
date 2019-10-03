@@ -98,9 +98,7 @@ public:
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
-  ~ScopedRdsConfigSubscription() override {
-    std::cerr << "destroying SRDS with scope " << scope_.get() << std::endl;
-  } // = default;
+  ~ScopedRdsConfigSubscription() override = default;
 
   const std::string& name() const { return name_; }
 
