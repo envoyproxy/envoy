@@ -113,6 +113,7 @@ public:
   virtual void enableHalfClose(bool enabled) PURE;
 
   /**
+   * Returns true if the underlying transport is secure.
    */
   virtual bool isSecureTransport() const PURE;
 
