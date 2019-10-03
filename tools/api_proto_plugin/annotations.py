@@ -31,7 +31,7 @@ VALID_ANNOTATIONS = set([
 # These can propagate from file scope to message/enum scope (and be overridden).
 INHERITED_ANNOTATIONS = set([
     # Nothing here right now, this used to be PROTO_STATUS_ANNOTATION. Retaining
-    # this capabilitiy for potential future use.
+    # this capability for potential future use.
 ])
 
 
