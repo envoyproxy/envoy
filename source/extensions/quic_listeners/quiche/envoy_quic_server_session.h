@@ -47,6 +47,7 @@ public:
   bool initializeReadFilters() override;
 
   // Network::Connection
+  bool isSecureTransport() const override { return true; }
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override;
   void enableHalfClose(bool enabled) override;
