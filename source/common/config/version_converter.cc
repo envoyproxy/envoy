@@ -42,7 +42,7 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
   //    DeprecatedMessageFieldNumber, so that the static/dynamic proto
   //    validators that look at unknown fields are capable of knowing the
   //    difference between deprecated fields smuggled in from previous versions
-  //    and fields in the new verion that are genuinely unknown by the Envoy.
+  //    and fields in the new version that are genuinely unknown by the Envoy.
   // 2. We can do proto wire breaking changes between major versions. An example
   //    of this is promotion/demotion between wrapped (e.g.
   //    google.protobuf.UInt32) and unwrapped types (e.g. uint32). This isn't
