@@ -644,6 +644,9 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
+std::chrono::milliseconds ConnectionImpl::delayedCloseTimeout() const { 
+  return delayed_close_timeout_; 
+}
 void ConnectionImpl::onDelayedCloseTimeout() {
   delayed_close_timer_.reset();
   ENVOY_CONN_LOG(debug, "triggered delayed close", *this);

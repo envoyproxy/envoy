@@ -130,7 +130,6 @@ public:
     ASSERT(delayed_close_timer_ == nullptr && ioHandle().isOpen());
     delayed_close_timeout_ = timeout;
   }
-  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 protected:
   void closeSocket(ConnectionEvent close_type);
@@ -175,6 +174,7 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
+  std::chrono::milliseconds delayedCloseTimeout() const;
   // Callback issued when a delayed close timeout triggers.
   void onDelayedCloseTimeout();
 
