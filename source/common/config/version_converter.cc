@@ -24,10 +24,30 @@
 namespace Envoy {
 namespace Config {
 
+// TODO(htuch): make the unknown field validators aware of this distinguished
+// field, and don't reject if present.
 constexpr uint32_t DeprecatedMessageFieldNumber = 100000;
 
 void VersionConverter::upgrade(const Protobuf::Message& prev_message,
                                Protobuf::Message& next_message) {
+  // Wow, why so complicated? Could we just do this conversion with:
+  //
+  //   next_message = MergeFromString(prev_message.SerializeAsString())
+  //
+  // and then some clever mangling of the UnknownFieldSet?
+  //
+  // Hold your horses! There's a few reasons that the approach below has been
+  // adopted:
+  // 1. We can ensure all unknown fields are placed in a distinguished
+  //    DeprecatedMessageFieldNumber, so that the static/dynamic proto
+  //    validators that look at unknown fields are capable of knowing the
+  //    difference between deprecated fields smuggled in from previous versions
+  //    and fields in the new verion that are genuinely unknown by the Envoy.
+  // 2. We can do proto wire breaking changes between major versions. An example
+  //    of this is promotion/demotion between wrapped (e.g.
+  //    google.protobuf.UInt32) and unwrapped types (e.g. uint32). This isn't
+  //    done below yet, but should be possible to automate via "next version"
+  //    annotations on fields.
   const Protobuf::Descriptor* next_descriptor = next_message.GetDescriptor();
   const Protobuf::Reflection* prev_reflection = prev_message.GetReflection();
   std::vector<const Protobuf::FieldDescriptor*> prev_field_descriptors;
