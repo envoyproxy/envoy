@@ -5,6 +5,7 @@
 #include "common/config/grpc_mux_subscription_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -21,7 +22,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::api::v2::core::ConfigSource& config, absl::string_view type_url,
-    Stats::Scope& scope, SubscriptionCallbacks& callbacks) {
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks, bool is_delta) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
@@ -62,13 +63,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
       result = std::make_unique<DeltaSubscriptionImpl>(
-          local_info_,
-          Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                         api_config_source, scope)
-              ->create(),
-          dispatcher_, deltaGrpcMethod(type_url), type_url, random_, scope,
-          Utility::parseRateLimitSettings(api_config_source), callbacks, stats,
-          Utility::configSourceInitialFetchTimeout(config));
+          std::make_shared<Config::NewGrpcMuxImpl>(
+              Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                             api_config_source, scope)
+                  ->create(),
+              dispatcher_, deltaGrpcMethod(type_url), random_, scope,
+              Utility::parseRateLimitSettings(api_config_source), local_info_),
+          type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config), false);
       break;
     }
     default:
@@ -77,9 +78,15 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     break;
   }
   case envoy::api::v2::core::ConfigSource::kAds: {
-    result = std::make_unique<GrpcMuxSubscriptionImpl>(
-        cm_.adsMux(), callbacks, stats, type_url, dispatcher_,
-        Utility::configSourceInitialFetchTimeout(config));
+    if (is_delta) {
+      result = std::make_unique<DeltaSubscriptionImpl>(
+          cm_.adsMux(), type_url, callbacks, stats,
+          Utility::configSourceInitialFetchTimeout(config), true);
+    } else {
+      result = std::make_unique<GrpcMuxSubscriptionImpl>(
+          cm_.adsMux(), callbacks, stats, type_url, dispatcher_,
+          Utility::configSourceInitialFetchTimeout(config));
+    }
     break;
   }
   default:

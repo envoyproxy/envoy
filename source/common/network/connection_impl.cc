@@ -54,7 +54,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       dispatcher_(dispatcher), id_(next_global_id_++), read_enabled_(true),
       above_high_watermark_(false), detect_early_close_(true), enable_half_close_(false),
       read_end_stream_raised_(false), read_end_stream_(false), write_end_stream_(false),
-      current_write_end_stream_(false) {
+      current_write_end_stream_(false), dispatch_buffered_data_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(ioHandle().fd() != -1, "");

@@ -7,48 +7,11 @@ particular for proto3 as described at:
 * https://cloud.google.com/apis/design/naming_convention
 * https://developers.google.com/protocol-buffers/docs/style
 
+A key aspect of our API style is maintaining stability by following the [API versioning
+guidelines](API_VERSIONING.md). All developers must familiarize themselves with these guidelines,
+any PR which makes breaking changes to the API will not be merged.
+
 In addition, the following conventions should be followed:
-
-* For protos that are [frozen](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#status),
-  the following guidelines are followed:
-
-  * Fields should not be renumbered or have their types changed. This is standard proto development
-    procedure.
-  * If fields are deleted, the following syntax should be put in their place:
-
-  ```proto
-  reserved <field index>;
-  ```
-
-  E.g.,
-
-  ```proto
-  reserved 15;
-  ```
-
-  * Renaming of fields or package namespaces for a proto must not occur. This is inherently dangerous, since:
-    * Fields renames break wire compatibility. This is stricter than standard proto development procedure
-      in the sense that it does not break binary wire format. However, it **does** break loading
-      of YAML/JSON into protos as well as text protos. Since we consider YAML/JSON to be first class
-      inputs, we must not change field names.
-
-    * For service definitions, the gRPC endpoint URL is inferred from package
-      namespace, so this will break client/server communication.
-
-    * For a message embedded in an `Any` object, the type URL, which the package
-      namespace is a part of, may be used by Envoy or other API consuming code.
-      Currently, this applies to the top-level resources embedded in
-      `DiscoveryResponse` objects, e.g. `Cluster`, `Listener`, etc.
-
-    * Consuming code will break and require source change to match the changes.
-
-* Non-frozen fields should be tagged with `[#not-implemented-hide:]`, `[#not-implemented-warn:]`,
-  `[#proto-status: draft]` or `[#proto-status: experimental]`.
-
-* Protos for configs and services that are not implemented immediately in
-  Envoy, or are under active design and development should be versioned
-  "vNalpha". See the [stable API versioning
-  policy](https://github.com/envoyproxy/envoy/issues/6271).
 
 * Every proto directory should have a `README.md` describing its content. See
   for example [envoy.service](envoy/service/README.md).
@@ -67,6 +30,10 @@ In addition, the following conventions should be followed:
   where the proto3 defaults make sense. All things being equal, pick appropriate
   logic, e.g. enable vs. disable for a `bool` field, such that the proto3
   defaults work, but only where this doesn't result in API gymnastics.
+
+* Use a `[#not-implemented-hide:]` `protodoc` annotation in comments for fields that lack Envoy
+  implementation. These indicate that the entity is not implemented in Envoy and the entity
+  should be hidden from the Envoy documentation.
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 
@@ -120,10 +87,6 @@ In addition, the following conventions should be followed:
   ```
   // [#comment:next free field: 28]
   ```
-
-* The [Breaking Change
-  Policy](https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md#breaking-change-policy) describes
-  API versioning, deprecation and compatibility.
 
 ## Package organization
 
