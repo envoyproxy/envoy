@@ -113,11 +113,6 @@ public:
   virtual void enableHalfClose(bool enabled) PURE;
 
   /**
-   * Returns true if the underlying transport is secure.
-   */
-  virtual bool isSecureTransport() const PURE;
-
-  /**
    * Close the connection.
    */
   virtual void close(ConnectionCloseType type) PURE;
@@ -318,6 +313,11 @@ public:
    * registered via addConnectionCallbacks().
    */
   virtual void connect() PURE;
+
+  /**
+   * Returns true if the underlying transport is secure.
+   */
+  virtual bool isSecureTransport() const PURE;
 };
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;

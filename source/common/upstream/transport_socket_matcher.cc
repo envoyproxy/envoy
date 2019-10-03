@@ -35,8 +35,9 @@ Network::TransportSocketFactory&
 TransportSocketMatcher::resolve(const std::string& endpoint_addr,
                                 const envoy::api::v2::core::Metadata& metadata) {
   for (const auto& socket_factory_match : matches_) {
-    if (Config::Metadata::metadataLabelMatch(socket_factory_match.label_set, metadata,
-                                             "envoy.transport_socket", false)) {
+    if (Config::Metadata::metadataLabelMatch(
+            socket_factory_match.label_set, metadata,
+            Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, false)) {
       socket_factory_match.stats.total_match_count_.inc();
       ENVOY_LOG(debug, "transport socket match found: name {}, metadata {}, address {}",
                 socket_factory_match.name, metadata.DebugString(), endpoint_addr);

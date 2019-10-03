@@ -62,8 +62,9 @@ transport_socket:
         Envoy::Config::Metadata::mutableMetadataValue(*metadata, "envoy.lb", type_key_)
             .set_string_value((i % 2 == 0) ? "a" : "b");
         if (isTLSUpstream(i)) {
-          Envoy::Config::Metadata::mutableMetadataValue(*metadata, "envoy.transport_socket",
-                                                        "mtlsReady")
+          Envoy::Config::Metadata::mutableMetadataValue(
+              *metadata, Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH,
+              "mtlsReady")
               .set_string_value("true");
         }
       }

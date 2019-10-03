@@ -143,14 +143,14 @@ transport_socket:
   envoy::api::v2::core::Metadata metadata;
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket: { sidecar: "true" } 
+  envoy.transport_socket_match: { sidecar: "true" } 
 )EOF",
                             metadata);
 
   validate(metadata, "sidecar");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket: { protocol: "http" } 
+  envoy.transport_socket_match: { protocol: "http" } 
 )EOF",
                             metadata);
   validate(metadata, "http");
@@ -179,7 +179,7 @@ transport_socket:
   envoy::api::v2::core::Metadata metadata;
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket: { sidecar: "true", protocol: "http" }
+  envoy.transport_socket_match: { sidecar: "true", protocol: "http" }
 )EOF",
                             metadata);
   validate(metadata, "sidecar_http");

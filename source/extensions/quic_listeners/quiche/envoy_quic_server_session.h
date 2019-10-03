@@ -33,7 +33,6 @@ public:
                          Event::Dispatcher& dispatcher);
 
   // Network::Connection
-  bool isSecureTransport() const override { return true; }
   absl::string_view requestedServerName() const override;
 
   // Called by QuicHttpServerConnectionImpl before creating data streams.

@@ -51,7 +51,6 @@ public:
   ~MockConnection() override;
 
   // Network::Connection
-  MOCK_CONST_METHOD0(isSecureTransport, bool());
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
   MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));
   MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
@@ -98,7 +97,6 @@ public:
   ~MockClientConnection() override;
 
   // Network::Connection
-  MOCK_CONST_METHOD0(isSecureTransport, bool());
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
   MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));
   MOCK_METHOD1(addWriteFilter, void(WriteFilterSharedPtr filter));
@@ -136,6 +134,7 @@ public:
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
+  MOCK_CONST_METHOD0(isSecureTransport, bool());
 };
 
 /**

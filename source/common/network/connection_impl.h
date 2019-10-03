@@ -65,7 +65,6 @@ public:
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
-  bool isSecureTransport() const override;
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
@@ -236,6 +235,7 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+  bool isSecureTransport() const override;
 };
 
 } // namespace Network

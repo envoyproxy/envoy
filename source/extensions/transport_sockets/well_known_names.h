@@ -21,8 +21,6 @@ public:
   const std::string Quic = "quic";
 };
 
-// TODO: move envoy.transport_socket_matcher definition here.
-
 using TransportSocketNames = ConstSingleton<TransportSocketNameValues>;
 
 } // namespace TransportSockets
