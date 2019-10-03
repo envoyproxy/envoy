@@ -115,7 +115,7 @@ public:
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
-                Http::HeaderMapPtr&& headers) override;
+                Http::HeaderMapPtr&& headers, Http::HeaderMapPtr&& upstream_headers) override;
 
 private:
   void initiateCall(const Http::HeaderMap& headers);
@@ -124,6 +124,7 @@ private:
                                     const Router::RouteEntry* route_entry,
                                     const Http::HeaderMap& headers) const;
   void addHeaders(Http::HeaderMap& headers);
+  void addUpstreamHeaders();
   Http::Context& httpContext() { return config_->httpContext(); }
 
   enum class State { NotStarted, Calling, Complete, Responded };
@@ -135,6 +136,9 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
   Http::HeaderMapPtr headers_to_add_;
+  Http::HeaderMapPtr upstream_headers_to_add_;
+  Http::HeaderMap* request_headers_;
+
 };
 
 } // namespace RateLimitFilter

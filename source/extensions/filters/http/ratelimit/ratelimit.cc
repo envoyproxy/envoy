@@ -70,6 +70,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
     return Http::FilterHeadersStatus::Continue;
   }
 
+  request_headers_ = &headers;
   initiateCall(headers);
   return (state_ == State::Calling || state_ == State::Responded)
              ? Http::FilterHeadersStatus::StopIteration
@@ -126,9 +127,10 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& headers) {
+                      Http::HeaderMapPtr&& headers, Http::HeaderMapPtr&& upstream_headers) {
   state_ = State::Complete;
   headers_to_add_ = std::move(headers);
+  upstream_headers_to_add_ = std::move(upstream_headers);
   Stats::StatName empty_stat_name;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
@@ -177,6 +179,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
+    addUpstreamHeaders();
     callbacks_->continueDecoding();
   }
 }
@@ -202,6 +205,13 @@ void Filter::addHeaders(Http::HeaderMap& headers) {
   if (headers_to_add_) {
     Http::HeaderUtility::addHeaders(headers, *headers_to_add_);
     headers_to_add_ = nullptr;
+  }
+}
+
+void Filter::addUpstreamHeaders() {
+  if (upstream_headers_to_add_) {
+    Http::HeaderUtility::addHeaders(*request_headers_, *upstream_headers_to_add_);
+    upstream_headers_to_add_ = nullptr;
   }
 }
 

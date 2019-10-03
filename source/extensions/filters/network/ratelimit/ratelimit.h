@@ -92,7 +92,7 @@ public:
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
-                Http::HeaderMapPtr&& headers) override;
+                Http::HeaderMapPtr&& headers, Http::HeaderMapPtr&& upstream_headers) override;
 
 private:
   enum class Status { NotStarted, Calling, Complete };
