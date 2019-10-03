@@ -34,7 +34,7 @@ protected:
   }
 
   UpdateAck deliverDiscoveryResponse(const std::vector<std::string>& resource_names,
-                                     const std::string& version_info, std::string nonce) {
+                                     const std::string& version_info, const std::string& nonce) {
     envoy::api::v2::DiscoveryResponse response;
     response.set_version_info(version_info);
     response.set_nonce(nonce);
@@ -48,7 +48,7 @@ protected:
     return state_.handleResponse(&response);
   }
 
-  UpdateAck deliverBadDiscoveryResponse(const std::string& version_info, std::string nonce) {
+  UpdateAck deliverBadDiscoveryResponse(const std::string& version_info, const std::string& nonce) {
     envoy::api::v2::DiscoveryResponse message;
     message.set_version_info(version_info);
     message.set_nonce(nonce);

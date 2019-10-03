@@ -12,12 +12,12 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                Event::Dispatcher& dispatcher)
     : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {}
 
-DeltaSubscriptionState::~DeltaSubscriptionState() {}
+DeltaSubscriptionState::~DeltaSubscriptionState() = default;
 
 DeltaSubscriptionStateFactory::DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
-DeltaSubscriptionStateFactory::~DeltaSubscriptionStateFactory() {}
+DeltaSubscriptionStateFactory::~DeltaSubscriptionStateFactory() = default;
 
 std::unique_ptr<SubscriptionState>
 DeltaSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,

@@ -96,8 +96,8 @@ public:
   // is the destructor, which is identical to the real one).
   class FakeGrpcSubscription {
   public:
-    FakeGrpcSubscription(GrpcMux* grpc_mux, const std::string& type_url, Watch* watch)
-        : grpc_mux_(grpc_mux), type_url_(type_url), watch_(watch) {}
+    FakeGrpcSubscription(GrpcMux* grpc_mux, std::string type_url, Watch* watch)
+        : grpc_mux_(grpc_mux), type_url_(std::move(type_url)), watch_(watch) {}
     ~FakeGrpcSubscription() { grpc_mux_->removeWatch(type_url_, watch_); }
 
   private:

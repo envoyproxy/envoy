@@ -42,6 +42,9 @@ public:
   // Returns a new'd pointer, meant to be owned by the caller.
   void* getNextRequestWithAck(const UpdateAck& ack) override;
 
+  SotwSubscriptionState(const SotwSubscriptionState&) = delete;
+  SotwSubscriptionState& operator=(const SotwSubscriptionState&) = delete;
+
 private:
   // Returns a new'd pointer, meant to be owned by the caller.
   envoy::api::v2::DiscoveryRequest* getNextRequestInternal();
@@ -61,9 +64,6 @@ private:
   bool update_pending_{true};
 
   absl::flat_hash_set<std::string> names_tracked_;
-
-  SotwSubscriptionState(const SotwSubscriptionState&) = delete;
-  SotwSubscriptionState& operator=(const SotwSubscriptionState&) = delete;
 };
 
 class SotwSubscriptionStateFactory : public SubscriptionStateFactory {

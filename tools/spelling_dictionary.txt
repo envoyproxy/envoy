@@ -517,6 +517,7 @@ goog
 google
 goto
 gregs
+GrpcMuxSotw
 gzip
 hacky
 handshaker
@@ -652,6 +653,7 @@ pclose
 pfctl
 pkey
 pointee
+polymorphism
 popen
 pos
 posix
@@ -740,6 +742,7 @@ sizeof
 smatch
 sockaddr
 sockfd
+SotW
 spanid
 spdlog
 splitter

@@ -11,12 +11,12 @@ SotwSubscriptionState::SotwSubscriptionState(std::string type_url, SubscriptionC
                                              Event::Dispatcher& dispatcher)
     : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {}
 
-SotwSubscriptionState::~SotwSubscriptionState() {}
+SotwSubscriptionState::~SotwSubscriptionState() = default;
 
 SotwSubscriptionStateFactory::SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
-SotwSubscriptionStateFactory::~SotwSubscriptionStateFactory() {}
+SotwSubscriptionStateFactory::~SotwSubscriptionStateFactory() = default;
 
 std::unique_ptr<SubscriptionState>
 SotwSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,
