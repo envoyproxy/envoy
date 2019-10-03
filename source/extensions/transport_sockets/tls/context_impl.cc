@@ -806,8 +806,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     std::vector<uint8_t> parsed_override_alpn =
         parseAlpnProtocols(absl::StrJoin(options->applicationProtocolListOverride(), ","));
     if (!parsed_override_alpn.empty()) {
-      int rc =
-          SSL_set_alpn_protos(ssl_con.get(), &parsed_override_alpn[0], parsed_override_alpn.size());
+      int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
+                                   parsed_override_alpn.size());
       RELEASE_ASSERT(rc == 0, "");
     }
   }
