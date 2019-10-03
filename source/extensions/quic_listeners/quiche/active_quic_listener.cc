@@ -67,7 +67,7 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
       envoyAddressInstanceToQuicSocketAddress(data.local_address_));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
-      quic::QuicTime::Delta::FromMilliseconds(std::chrono::duration_cast<std::chrono::milliseconds>(
+      quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(
                                                   data.receive_time_.time_since_epoch())
                                                   .count());
   uint64_t num_slice = data.buffer_->getRawSlices(nullptr, 0);

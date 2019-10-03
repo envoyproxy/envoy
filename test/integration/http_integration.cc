@@ -63,7 +63,12 @@ IntegrationCodecClient::IntegrationCodecClient(
       callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  if (type != CodecClient::Type::HTTP3) {
+    // Only expect to have IO event if it's not QUIC. Because call to connect() in CodecClientProd
+    // for QUIC doesn't send anything to server, but just register file event. QUIC connection won't
+    // have any IO event till cryptoConnect() is called later.
+    dispatcher.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationCodecClient::flushWrite() {
@@ -193,6 +198,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
+  std::cerr << "============ HttpIntegrationTest::makeRawHttpConnection\n";
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->http2_settings_.allow_connect_ = true;
   cluster->http2_settings_.allow_metadata_ = true;
@@ -371,16 +377,12 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
 void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_size,
                                                     uint64_t expected_response_size,
                                                     IntegrationStreamDecoder* response) {
-  std::cerr << "========= checkSimpleRequestSuccess upstream_request_" << upstream_request_.get()
-            << "\n";
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(expected_request_size, upstream_request_->bodyLength());
 
   ASSERT_TRUE(response->complete());
-  std::cerr << "========= response complete \n";
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(expected_response_size, response->body().size());
-  std::cerr << "======== exit\n";
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
@@ -569,7 +571,6 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
 }
 
 void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
-  std::cerr << "=============== testRouterUpstreamResponseBeforeRequestComplete\n";
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -577,15 +578,11 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  std::cerr << "=============== encodeHeaders\n";
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  std::cerr << "=============== encodeData\n";
 
   upstream_request_->encodeData(512, true);
-  std::cerr << "=============== waitForEndStream\n";
   response->waitForEndStream();
-  std::cerr << "=============== waitForEndStream\n done";
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());

@@ -21,8 +21,6 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
-#include "server/backtrace.h"
-
 namespace Envoy {
 namespace Network {
 
@@ -452,10 +450,6 @@ void ConnectionImpl::onLowWatermark() {
 }
 
 void ConnectionImpl::onHighWatermark() {
-  Envoy::BackwardsTrace t;
-  t.capture();
-  std::ostringstream os;
-  t.printTrace(os);
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
   ASSERT(!above_high_watermark_);
   above_high_watermark_ = true;

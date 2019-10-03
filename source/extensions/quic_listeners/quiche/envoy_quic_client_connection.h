@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/network/utility.h"
@@ -29,6 +31,9 @@ public:
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
 
   uint64_t maxPacketSize() const override;
+
+  // Register file event and apply socket options.
+  void setUpConnectionSocket();
 
 private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,

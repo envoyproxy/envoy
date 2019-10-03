@@ -84,6 +84,8 @@ public:
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
     EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
+    EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
+        .WillRepeatedly(Return(1024 * 1024));
   }
 
   void TearDown() override {
@@ -146,7 +148,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EnvoyQuicDispatcherTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
-  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes()).WillOnce(Return(1024 * 1024));
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
@@ -212,12 +213,10 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
-  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes()).WillOnce(Return(1024 * 1024));
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
                                     54321);
-  Network::MockFilterChain filter_chain;
   Network::MockFilterChainManager filter_chain_manager;
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
@@ -240,7 +239,6 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToEmptyFilterChain) {
-  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes()).WillOnce(Return(1024 * 1024));
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),

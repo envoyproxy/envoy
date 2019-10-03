@@ -32,8 +32,6 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  // EnvoyQuicStream
-  void switchStreamBlockState(bool should_block) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
@@ -42,6 +40,11 @@ public:
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
 protected:
+  // EnvoyQuicStream
+  void switchStreamBlockState(bool should_block) override;
+  uint32_t streamId() override;
+  Network::Connection* connection() override;
+
   // quic::QuicSpdyStream
   void OnInitialHeadersComplete(bool fin, size_t frame_len,
                                 const quic::QuicHeaderList& header_list) override;

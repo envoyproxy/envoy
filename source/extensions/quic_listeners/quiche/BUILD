@@ -176,6 +176,7 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_client_connection_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",

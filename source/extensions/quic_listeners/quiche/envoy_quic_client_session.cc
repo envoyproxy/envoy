@@ -5,17 +5,19 @@ namespace Quic {
 
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    std::unique_ptr<EnvoyQuicConnection> connection, const quic::QuicServerId& server_id,
+    std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
     quic::QuicCryptoClientConfig* crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit)
     : QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
-                                  crypto_config, push_promise_index) {}
+                                  crypto_config, push_promise_index) {
+  Initialize();
+}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
-  QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
   ASSERT(!connection()->connected());
+  QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const {
@@ -23,9 +25,7 @@ absl::string_view EnvoyQuicClientSession::requestedServerName() const {
 }
 
 void EnvoyQuicClientSession::connect() {
-  Initialize();
-  CryptoConnect();
-  set_max_allowed_push_id(0u);
+  dynamic_cast<EnvoyQuicClientConnection*>(quic_connection_)->setUpConnectionSocket();
 }
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
@@ -53,6 +53,11 @@ void EnvoyQuicClientSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) 
   if (event == HANDSHAKE_CONFIRMED) {
     raiseEvent(Network::ConnectionEvent::Connected);
   }
+}
+
+void EnvoyQuicClientSession::cryptoConnect() {
+  CryptoConnect();
+  set_max_allowed_push_id(0u);
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {

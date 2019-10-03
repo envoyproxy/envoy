@@ -40,24 +40,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
           envoyAddressInstanceToQuicSocketAddress(connection_socket->remoteAddress()), helper,
           alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
           std::move(connection_socket)),
-      dispatcher_(dispatcher) {
-  if (connectionSocket()->ioHandle().isOpen()) {
-    file_event_ = dispatcher.createFileEvent(
-        connectionSocket()->ioHandle().fd(),
-        [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
-        Event::FileReadyType::Read | Event::FileReadyType::Write);
-
-    if (!Network::Socket::applyOptions(connectionSocket()->options(), *connectionSocket(),
-                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
-      ENVOY_LOG_MISC(error, "Fail to apply listening options");
-      connectionSocket()->close();
-    }
-  }
-  if (!connectionSocket()->ioHandle().isOpen()) {
-    CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to setup connection socket.",
-                    quic::ConnectionCloseBehavior::SILENT_CLOSE);
-  }
-}
+      dispatcher_(dispatcher) {}
 
 EnvoyQuicClientConnection::~EnvoyQuicClientConnection() { file_event_->setEnabled(0); }
 
@@ -67,8 +50,8 @@ void EnvoyQuicClientConnection::processPacket(
     MonotonicTime receive_time) {
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
-      quic::QuicTime::Delta::FromMilliseconds(
-          std::chrono::duration_cast<std::chrono::milliseconds>(receive_time.time_since_epoch())
+      quic::QuicTime::Delta::FromMicroseconds(
+          std::chrono::duration_cast<std::chrono::microseconds>(receive_time.time_since_epoch())
               .count());
   uint64_t num_slice = buffer->getRawSlices(nullptr, 0);
   ASSERT(num_slice == 1);
@@ -85,6 +68,25 @@ void EnvoyQuicClientConnection::processPacket(
 uint64_t EnvoyQuicClientConnection::maxPacketSize() const {
   // TODO(danzh) make this variable configurable to support jumbo frames.
   return Network::MAX_UDP_PACKET_SIZE;
+}
+
+void EnvoyQuicClientConnection::setUpConnectionSocket() {
+  if (connectionSocket()->ioHandle().isOpen()) {
+    file_event_ = dispatcher_.createFileEvent(
+        connectionSocket()->ioHandle().fd(),
+        [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
+        Event::FileReadyType::Read | Event::FileReadyType::Write);
+
+    if (!Network::Socket::applyOptions(connectionSocket()->options(), *connectionSocket(),
+                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+      ENVOY_LOG_MISC(error, "Fail to apply listening options");
+      connectionSocket()->close();
+    }
+  }
+  if (!connectionSocket()->ioHandle().isOpen()) {
+    CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to setup connection socket.",
+                    quic::ConnectionCloseBehavior::SILENT_CLOSE);
+  }
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {

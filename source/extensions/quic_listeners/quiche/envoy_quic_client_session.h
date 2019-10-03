@@ -12,18 +12,24 @@
 #pragma GCC diagnostic pop
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
 
+// Act as a Network::ClientConnection to ClientCodec.
+// TODO(danzh) This class doesn't need to inherit Network::FilterManager
+// interface but need all other Network::Connection implementation in
+// QuicFilterManagerConnectionImpl. Refactor QuicFilterManagerConnectionImpl to
+// move FilterManager interface to EnvoyQuicServerSession.
 class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
                                public quic::QuicSpdyClientSession,
                                public Network::ClientConnection {
 public:
   EnvoyQuicClientSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
-                         std::unique_ptr<EnvoyQuicConnection> connection,
+                         std::unique_ptr<EnvoyQuicClientConnection> connection,
                          const quic::QuicServerId& server_id,
                          quic::QuicCryptoClientConfig* crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
@@ -40,6 +46,7 @@ public:
   absl::string_view requestedServerName() const override;
 
   // Network::ClientConnection
+  // Only register socket and set socket options.
   void connect() override;
 
   // quic::QuicSession
@@ -49,6 +56,10 @@ public:
   void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
   void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
+
+  // Do version negotiation and crypto handshake. Fail the connection if server
+  // doesn't support the one and only supported version.
+  void cryptoConnect();
 
   using quic::QuicSpdyClientSession::stream_map;
 

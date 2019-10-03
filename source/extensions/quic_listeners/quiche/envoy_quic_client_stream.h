@@ -31,15 +31,19 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  // EnvoyQuicStream
-  void switchStreamBlockState(bool should_block) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
+  void OnCanWrite() override;
   // quic::Stream
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
 protected:
+  // EnvoyQuicStream
+  void switchStreamBlockState(bool should_block) override;
+  uint32_t streamId() override;
+  Network::Connection* connection() override;
+
   // quic::QuicSpdyStream
   // Overridden to pass headers to decoder.
   void OnInitialHeadersComplete(bool fin, size_t frame_len,

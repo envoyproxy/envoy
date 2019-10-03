@@ -38,11 +38,7 @@ public:
   bool reset() { return saw_reset_; }
   Http::StreamResetReason reset_reason() { return reset_reason_; }
   const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
-  const Http::HeaderMap& headers() {
-    ASSERT(headers_);
-    return *headers_;
-    std::cerr << "========== return headers" << *headers_ << "\n";
-  }
+  const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
@@ -142,7 +138,7 @@ struct ApiFilesystemConfig {
 /**
  * Test fixture for all integration tests.
  */
-class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
+class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;

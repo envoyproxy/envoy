@@ -59,7 +59,6 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
   ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
-  std::cerr << "========= insert new request " << request.get() << "\n";
   request->moveIntoList(std::move(request), active_requests_);
   disableIdleTimer();
   return *active_requests_.front()->encoder_;
@@ -158,6 +157,15 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
   }
   case Type::HTTP3: {
+    // TODO(danzh) this enforce dependency from core code to QUICHE. Is there a
+    // better way to aoivd such dependency in case QUICHE breaks Envoy build.
+    // Alternatives:
+    // 1) move codec creation to Network::Connection instance, in
+    // QUIC's case, EnvoyQuicClientSession. This is not ideal as
+    // Network::Connection is not necessart to speak HTTP.
+    // 2) make codec creation in a static registered factory again. It can be
+    // only necessary for QUIC and for HTTP2 and HTTP1 just use the existing
+    // logic.
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_), *this);
   }

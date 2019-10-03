@@ -48,13 +48,14 @@ void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& head
 }
 
 void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
-  ENVOY_LOG(debug, "stream {} encodeHeaders: (end_stream={}) ", id(), headers, end_stream);
+  ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "stream {} encodeData (end_stream={}).", id(), end_stream);
+  ENVOY_STREAM_LOG(debug, "encodeData (end_stream={}) of {} bytes.", *this, end_stream,
+                   data.length());
   local_end_stream_ = end_stream;
   // This is counting not serialized bytes in the send buffer.
   uint64_t bytes_to_send_old = BufferedDataBytes();
@@ -76,12 +77,13 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
 void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
-  ENVOY_LOG(debug, "stream {} encodeTrailers: ", id(), trailers);
+  ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
 }
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-  ASSERT(false, "Metadata Frame is not supported in QUIC");
+  // Metadata Frame is not supported in QUIC.
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
@@ -145,11 +147,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   bool empty_payload_with_fin = buffer->length() == 0 && finished_reading;
   if (!empty_payload_with_fin || !end_stream_decoded_) {
     ASSERT(decoder() != nullptr);
-    std::cerr << "============ decodeData with finished_reading " << finished_reading
-              << " empty_payload_with_fin " << empty_payload_with_fin << " end_stream_decoded_ "
-              << end_stream_decoded_ << ".\n";
     decoder()->decodeData(*buffer, finished_reading);
-    std::cerr << "=========== finished decodeData\n";
     if (finished_reading) {
       end_stream_decoded_ = true;
     }
@@ -192,25 +190,13 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
-  Http::StreamResetReason reason;
-  if (frame.error_code == quic::QUIC_REFUSED_STREAM) {
-    reason = Http::StreamResetReason::RemoteRefusedStreamReset;
-  } else {
-    reason = Http::StreamResetReason::RemoteReset;
-  }
-  runResetCallbacks(reason);
+  runResetCallbacks(quicRstErrorToEnvoyResetReason(frame.error_code));
 }
 
 void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
-  Http::StreamResetReason reason;
-  if (error == quic::QUIC_NO_ERROR) {
-    reason = Http::StreamResetReason::ConnectionTermination;
-  } else {
-    reason = Http::StreamResetReason::ConnectionFailure;
-  }
-  runResetCallbacks(reason);
+  runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
 }
 
 void EnvoyQuicServerStream::OnCanWrite() {
@@ -225,6 +211,12 @@ void EnvoyQuicServerStream::OnCanWrite() {
     dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(buffered_data_new -
                                                                         buffered_data_old);
   }
+}
+
+uint32_t EnvoyQuicServerStream::streamId() { return id(); }
+
+Network::Connection* EnvoyQuicServerStream::connection() {
+  return dynamic_cast<EnvoyQuicServerSession*>(session());
 }
 
 } // namespace Quic

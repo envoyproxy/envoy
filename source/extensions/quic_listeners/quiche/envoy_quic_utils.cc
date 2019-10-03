@@ -99,5 +99,13 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
   }
 }
 
+Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error) {
+  if (error == quic::QUIC_NO_ERROR) {
+    return Http::StreamResetReason::ConnectionTermination;
+  } else {
+    return Http::StreamResetReason::ConnectionFailure;
+  }
+}
+
 } // namespace Quic
 } // namespace Envoy

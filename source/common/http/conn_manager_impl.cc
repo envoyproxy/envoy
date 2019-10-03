@@ -1211,7 +1211,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   state_.remote_complete_ = end_stream;
   if (end_stream) {
     stream_info_.onLastDownstreamRxByteReceived();
-    ENVOY_STREAM_LOG(debug, "======================= request end stream", *this);
+    ENVOY_STREAM_LOG(debug, "request end stream", *this);
   }
 }
 

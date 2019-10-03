@@ -127,9 +127,9 @@ private:
   // them.
   std::list<Network::ConnectionCallbacks*> network_connection_callbacks_;
   std::string transport_failure_reason_;
+  const uint64_t id_;
   uint32_t bytes_to_send_{0};
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
-  const uint64_t id_;
 };
 
 } // namespace Quic

@@ -410,6 +410,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::HTTP3:
+    // TODO(danzh) same as client side. This enforce dependency on QUICHE. Is there a
+    // better way to aoivd such dependency in case QUICHE breaks this extension.
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
   case CodecType::AUTO:

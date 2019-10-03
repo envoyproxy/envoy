@@ -19,7 +19,7 @@ public:
   EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)
       : send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
-                                std::move(above_high_watermark)) {}
+                                std::move(above_high_watermark), ENVOY_LOGGER()) {}
 
   // Http::StreamEncoder
   Stream& getStream() override { return *this; }
@@ -46,8 +46,6 @@ public:
     }
   }
 
-  virtual void switchStreamBlockState(bool should_block) PURE;
-
   void addCallbacks(Http::StreamCallbacks& callbacks) override {
     ASSERT(!local_end_stream_);
     addCallbacks_(callbacks);
@@ -60,6 +58,12 @@ public:
   void setDecoder(Http::StreamDecoder& decoder) { decoder_ = &decoder; }
 
 protected:
+  virtual void switchStreamBlockState(bool should_block) PURE;
+
+  // Needed for ENVOY_STREAM_LOG.
+  virtual uint32_t streamId() PURE;
+  virtual Network::Connection* connection() PURE;
+
   Http::StreamDecoder* decoder() {
     ASSERT(decoder_ != nullptr);
     return decoder_;

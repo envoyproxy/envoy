@@ -2,6 +2,8 @@
 
 #include <functional>
 
+#include "spdlog/spdlog.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -12,18 +14,19 @@ class EnvoyQuicSimulatedWatermarkBuffer {
 public:
   EnvoyQuicSimulatedWatermarkBuffer(uint32_t low_watermark, uint32_t high_watermark,
                                     std::function<void()> below_low_watermark,
-                                    std::function<void()> above_high_watermark)
+                                    std::function<void()> above_high_watermark,
+                                    spdlog::logger& logger)
       : low_watermark_(low_watermark), high_watermark_(high_watermark),
         below_low_watermark_(std::move(below_low_watermark)),
-        above_high_watermark_(std::move(above_high_watermark)) {
+        above_high_watermark_(std::move(above_high_watermark)), logger_(logger) {
     ASSERT(high_watermark == 0 && low_watermark == 0 || high_watermark_ > low_watermark_);
   }
 
   void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_above_high_watermark_ && bytes_buffered > high_watermark_) {
       // Just exceeds high watermark.
-      std::cerr << "cross high watermark " << high_watermark_ << " bytes_buffered "
-                << bytes_buffered << "\n";
+      ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross high watermark {}",
+                          bytes_buffered, high_watermark_);
       is_above_high_watermark_ = true;
       is_below_low_watermark_ = false;
       above_high_watermark_();
@@ -32,9 +35,9 @@ public:
 
   void checkLowWatermark(uint32_t bytes_buffered) {
     if (low_watermark_ > 0 && !is_below_low_watermark_ && bytes_buffered < low_watermark_) {
-      std::cerr << "cross low watermark " << low_watermark_ << " bytes_buffered " << bytes_buffered
-                << "\n";
       // Just cross low watermark.
+      ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross low watermark {}",
+                          bytes_buffered, low_watermark_);
       is_below_low_watermark_ = true;
       is_above_high_watermark_ = false;
       below_low_watermark_();
@@ -52,6 +55,7 @@ private:
   bool is_above_high_watermark_{false};
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
+  spdlog::logger& logger_;
 };
 
 } // namespace Quic

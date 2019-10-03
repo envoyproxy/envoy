@@ -9,13 +9,12 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnec
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
     : quic_connection_(&connection), dispatcher_(dispatcher), filter_manager_(*this),
-      stream_info_(dispatcher.timeSource()),
-      write_buffer_watermark_simulation_(
-          send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
-          [this]() { onSendBufferHighWatermark(); }),
       // QUIC connection id can be 18 bytes. It's easier to use hash value instead
       // of trying to map it into a 64-bit space.
-      id_(quic_connection_->connection_id().Hash()) {
+      stream_info_(dispatcher.timeSource()), id_(quic_connection_->connection_id().Hash()),
+      write_buffer_watermark_simulation_(
+          send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
+          [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
   stream_info_.protocol(Http::Protocol::Http3);
 }
 

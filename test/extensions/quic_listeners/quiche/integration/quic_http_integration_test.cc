@@ -43,7 +43,7 @@ public:
         supported_versions_(quic::CurrentSupportedVersions()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-    // quic::SetVerbosityLogThreshold(1);
+    quic::SetVerbosityLogThreshold(1);
   }
 
   Network::ClientConnectionPtr makeClientConnection(uint32_t port) override {
@@ -60,9 +60,24 @@ public:
     return session;
   }
 
+  // This call may fail because of INVALID_VERSION, because QUIC connection doesn't support
+  // in-connection version negotiation.
+  // TODO(#8479) Popagate INVALID_VERSION error to caller and let caller to use server advertised
+  // version list to create a new connection with mutually supported version and make client codec
+  // again.
   IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn) override {
     IntegrationCodecClientPtr codec = HttpIntegrationTest::makeRawHttpConnection(std::move(conn));
-    codec->setCodecClientCallbacks(client_codec_callback_);
+    ASSERT(!codec->connected());
+    dynamic_cast<EnvoyQuicClientSession*>(codec->connection())->cryptoConnect();
+    // Wait for finishing handshake with server.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    if (codec->disconnected()) {
+      // Connection may get closed during version negotiation or handshake.
+      ENVOY_LOG(error, "Fail to connect to server with error: {}",
+                codec->connection()->transportFailureReason());
+    } else {
+      codec->setCodecClientCallbacks(client_codec_callback_);
+    }
     return codec;
   }
 
@@ -154,12 +169,12 @@ TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(QuicHttpIntegrationTest, UpstreamFlowControlOnGiantResponseBody) {
+TEST_P(QuicHttpIntegrationTest, UpstreamThrottlingOnGiantResponseBody) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/1024 * 1024, false);
 }
 
-TEST_P(QuicHttpIntegrationTest, DownstreamFlowControlOnGiantPost) {
+TEST_P(QuicHttpIntegrationTest, DownstreamThrottlingOnGiantPost) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/1024 * 1024, /*response_size=*/1024, false);
 }

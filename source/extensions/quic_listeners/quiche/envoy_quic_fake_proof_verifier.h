@@ -37,7 +37,6 @@ public:
         signature == absl::StrCat("Fake signature for { ", server_config, " }")) {
       return quic::QUIC_SUCCESS;
     }
-    std::cerr << "======== VerifyProof return failure, signature " << signature << "\n";
     return quic::QUIC_FAILURE;
   }
 
@@ -49,10 +48,10 @@ public:
                   const quic::ProofVerifyContext* /*context*/, std::string* /*error_details*/,
                   std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
                   std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) override {
+    // Cert SCT support is not enabled for fake ProofSource.
     if (cert_sct == "" && certs.size() == 1 && certs[0] == "Fake cert") {
       return quic::QUIC_SUCCESS;
     }
-    std::cerr << "=========== VerifyCertChain return failure cert_sct " << cert_sct << "\n";
     return quic::QUIC_FAILURE;
   }
 
