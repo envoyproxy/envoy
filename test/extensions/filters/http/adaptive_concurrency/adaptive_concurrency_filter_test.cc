@@ -76,7 +76,7 @@ public:
   std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
 };
 
-TEST_F(AdaptiveConcurrencyFilterTest, TestDisabledNoDefaultValue) {
+TEST_F(AdaptiveConcurrencyFilterTest, TestEnabledNoDefaultValue) {
   std::string yaml_config =
       R"EOF(
 gradient_controller_config:
@@ -89,8 +89,8 @@ gradient_controller_config:
     interval:
       seconds: 30
     request_count: 50
-disabled:
-  runtime_key: "adaptive_concurrency.disabled"
+enabled:
+  runtime_key: "adaptive_concurrency.enabled"
 )EOF";
 
   auto config = makeConfig(yaml_config);
@@ -101,10 +101,9 @@ disabled:
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
-  // We expect the default disabled value to be 0 if unspecified, meaning the filter is not
-  // disabled.
+  // We expect the default enabled value to be true if unspecified, with no call to getBoolean.
 
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.disabled", false));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.enabled", true));
 
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
@@ -122,7 +121,7 @@ disabled:
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(AdaptiveConcurrencyFilterTest, TestDisableOverriddenFromRuntime) {
+TEST_F(AdaptiveConcurrencyFilterTest, TestEnableOverriddenFromRuntime) {
   std::string yaml_config =
       R"EOF(
 gradient_controller_config:
@@ -135,9 +134,9 @@ gradient_controller_config:
     interval:
       seconds: 30
     request_count: 50
-disabled:
-  default_value: false
-  runtime_key: "adaptive_concurrency.disabled"
+enabled:
+  default_value: true
+  runtime_key: "adaptive_concurrency.enabled"
 )EOF";
 
   auto config = makeConfig(yaml_config);
@@ -171,14 +170,14 @@ disabled:
   // Request should be blocked when flag is overridden. Note there is no expected call to
   // forwardingDecision() or recordLatencySample().
 
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.disabled", false))
-      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.enabled", true))
+      .WillOnce(Return(false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(AdaptiveConcurrencyFilterTest, TestDisableConfiguredInProto) {
+TEST_F(AdaptiveConcurrencyFilterTest, TestEnableConfiguredInProto) {
   std::string yaml_config =
       R"EOF(
 gradient_controller_config:
@@ -191,9 +190,9 @@ gradient_controller_config:
     interval:
       seconds: 30
     request_count: 50
-disabled:
-  default_value: true
-  runtime_key: "adaptive_concurrency.disabled"
+enabled:
+  default_value: false
+  runtime_key: "adaptive_concurrency.enabled"
 )EOF";
 
   auto config = makeConfig(yaml_config);

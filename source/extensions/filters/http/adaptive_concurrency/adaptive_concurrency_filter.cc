@@ -21,15 +21,15 @@ AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
         proto_config,
     Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
     : stats_prefix_(std::move(stats_prefix)), runtime_(runtime), time_source_(time_source),
-      disabled_runtime_key_(proto_config.disabled().runtime_key()),
-      disabled_default_value_(proto_config.disabled().default_value()) {}
+      enabled_runtime_key_(proto_config.enabled().runtime_key()),
+      enabled_default_value_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.enabled(), default_value, true)) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
     : config_(std::move(config)), controller_(std::move(controller)) {}
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
-  if (config_->filterDisabled()) {
+  if (!config_->filterEnabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 

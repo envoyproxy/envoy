@@ -32,15 +32,15 @@ public:
       Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
 
-  // Returns whether the filter should operate as a pass-through for a request.
-  bool filterDisabled() const {
+  // Returns whether the filter is enabled or should operate as a pass-through for a request.
+  bool filterEnabled() const {
     // RuntimeFeatureFlag proto validates that the runtime key must have at least a single
     // character. If the key is empty, the field was never specified.
-    if (disabled_runtime_key_.empty()) {
-      return false;
+    if (enabled_runtime_key_.empty()) {
+      return true;
     }
 
-    return runtime_.snapshot().getBoolean(disabled_runtime_key_, disabled_default_value_);
+    return runtime_.snapshot().getBoolean(enabled_runtime_key_, enabled_default_value_);
   }
 
   TimeSource& timeSource() const { return time_source_; }
@@ -49,8 +49,8 @@ private:
   const std::string stats_prefix_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
-  const std::string disabled_runtime_key_;
-  const bool disabled_default_value_;
+  const std::string enabled_runtime_key_;
+  const bool enabled_default_value_;
 };
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =

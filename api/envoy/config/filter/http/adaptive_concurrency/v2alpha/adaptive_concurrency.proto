@@ -70,7 +70,7 @@ message AdaptiveConcurrency {
         [(validate.rules).message.required = true];
   }
 
-  // If set to true, the adaptive concurrency filter will operate as a pass-through filter. If a
-  // default value is not specified, the default will be false.
-  api.v2.core.RuntimeFeatureFlag disabled = 2;
+  // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If a
+  // default value is not specified, the filter will be enabled.
+  api.v2.core.RuntimeFeatureFlag enabled = 2;
 }
