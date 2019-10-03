@@ -393,6 +393,7 @@ public:
   MockTransportSocket();
   ~MockTransportSocket() override;
 
+  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
   MOCK_METHOD1(setTransportSocketCallbacks, void(TransportSocketCallbacks& callbacks));
   MOCK_CONST_METHOD0(protocol, std::string());
   MOCK_CONST_METHOD0(failureReason, absl::string_view());

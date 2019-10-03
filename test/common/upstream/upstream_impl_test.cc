@@ -974,7 +974,6 @@ TEST_F(StrictDnsClusterImplTest, DefaultTtlAsDnsRefreshRateWhenResponseEmpty) {
   resolver.dns_callback_(TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
-// TODO(incfly): need to change this to add a createconnection on HostImpl
 TEST(HostImplTest, HostCluster) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);

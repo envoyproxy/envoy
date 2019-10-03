@@ -95,6 +95,10 @@ void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
 
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
+bool ConnectionImpl::isSecureTransport() const {
+  return transport_socket_->implementsSecureTransport();
+}
+
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!ioHandle().isOpen()) {
     return;

@@ -63,6 +63,7 @@ public:
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   void onConnected() override;
+  bool implementsSecureTransport() const override { return true; }
 
   // TsiHandshakerCallbacks
   void onNextDone(NextResultPtr&& result) override;

@@ -92,6 +92,11 @@ public:
   virtual ~TransportSocket() = default;
 
   /**
+   * @return bool whether the transport socket implements secure transport.
+   */
+  virtual bool implementsSecureTransport() const PURE;
+
+  /**
    * Called by connection once to initialize the transport socket callbacks that the transport
    * socket should use.
    * @param callbacks supplies the callbacks instance.

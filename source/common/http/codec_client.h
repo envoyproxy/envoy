@@ -63,6 +63,11 @@ public:
   }
 
   /**
+   * Returns true if the associated connection is using a secure transport socket.
+   */
+  bool useSecureTransport() const { return connection_->isSecureTransport(); }
+
+  /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */

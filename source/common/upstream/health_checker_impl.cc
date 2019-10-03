@@ -213,7 +213,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Host, hostname_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
-  Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
+  Router::FilterUtility::setUpstreamScheme(request_headers, client_->useSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource());
   stream_info.setDownstreamLocalAddress(local_address_);
   stream_info.setDownstreamRemoteAddress(local_address_);
@@ -614,7 +614,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
                                    parent_.service_method_.name(), absl::nullopt);
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
-  Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());
+
+  Router::FilterUtility::setUpstreamScheme(headers_message->headers(),
+                                           client_->useSecureTransport());
 
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 

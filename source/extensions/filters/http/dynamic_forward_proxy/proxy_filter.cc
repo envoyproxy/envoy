@@ -56,7 +56,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(resource);
 
   uint16_t default_port = 80;
-  if (cluster_info_->transportSocketFactory().implementsSecureTransport()) {
+  if (cluster_info_->transportSocketFactory(absl::nullopt).implementsSecureTransport()) {
     default_port = 443;
   }
 

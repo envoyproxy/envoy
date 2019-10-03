@@ -113,6 +113,10 @@ public:
   virtual void enableHalfClose(bool enabled) PURE;
 
   /**
+   */
+  virtual bool isSecureTransport() const PURE;
+
+  /**
    * Close the connection.
    */
   virtual void close(ConnectionCloseType type) PURE;
