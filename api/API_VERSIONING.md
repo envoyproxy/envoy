@@ -83,8 +83,9 @@ Envoy will support at most three major versions of any API package at all times:
 * The current stable major version, e.g. v3.
 * The previous stable major version, e.g. v2. This is needed to ensure that we provide at least 1
   year for a supported major version to sunset. By supporting two stable major versions
-  simultaneously, this makes it easier to coordinate control plane and Envoy rollouts as well. This
-  previous stable major version will be supported for at most 1 year.
+  simultaneously, this makes it easier to coordinate control plane and Envoy
+  rollouts as well. This previous stable major version will be supported for 1
+  year after the introduction of the new current stable major version.
 * Optionally, the next experimental alpha major version, e.g. v4alpha. This is a release candidate
   for the next stable major version. This is only generated when the current stable major version
   requires a breaking change at the next cycle, e.g. a deprecation or field rename. This release
