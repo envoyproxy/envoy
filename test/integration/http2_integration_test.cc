@@ -66,7 +66,8 @@ TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader();
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 // Verifies metadata can be sent at different locations of the responses.
@@ -481,7 +482,8 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
 
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
@@ -590,7 +592,8 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
 
 static std::string decode_headers_only = R"EOF(
 name: decode-headers-only
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 void Http2MetadataIntegrationTest::runHeaderOnlyTest(bool send_request_body, size_t body_size) {
@@ -697,7 +700,8 @@ void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
 static std::string metadata_stop_all_filter = R"EOF(
 name: metadata-stop-all-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
@@ -1139,7 +1143,8 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
 TEST_P(Http2IntegrationTest, PauseAndResume) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -1168,7 +1173,8 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
 TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 

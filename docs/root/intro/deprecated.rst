@@ -39,6 +39,8 @@ Version 1.12.0 (pending)
   has been deprecated in favor of the `traffic_direction` field in
   :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
   specified.
+* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
+  udpa.type.v1.TypedStruct in google.protobuf.Any.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

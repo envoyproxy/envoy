@@ -37,7 +37,8 @@ public:
     const std::string filter =
         R"EOF(
             name: envoy.grpc_json_transcoder
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
             )EOF";
@@ -333,7 +334,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
   const std::string filter =
       R"EOF(
             name: envoy.grpc_json_transcoder
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
               ignore_unknown_query_parameters : true
@@ -356,7 +358,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
   const std::string filter =
       R"EOF(
             name: envoy.grpc_json_transcoder
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true

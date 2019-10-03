@@ -44,9 +44,7 @@ public:
 
       envoy::api::v2::listener::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.rate_limit");
-      ProtobufWkt::Struct ratelimit_config = ProtobufWkt::Struct();
-      TestUtility::jsonConvert(proto_config_, ratelimit_config);
-      ratelimit_filter.mutable_config()->MergeFrom(ratelimit_config);
+      ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ratelimit_filter));
     });
     config_helper_.addConfigModifier(
