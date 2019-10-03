@@ -23,66 +23,50 @@ maximize the chances of your PR being merged.
 
 # Breaking change policy
 
-* As of the 1.3.0 release, the Envoy user-facing configuration and APIs are
-  locked and we will not make breaking changes between official numbered
-  releases. This includes bootstrap configuration, REST/gRPC APIs (EDS, CDS, RDS,
-  etc.), and CLI switches. We will also try to not change behavioral semantics
-  (e.g., HTTP header processing order), though this is harder to outright
-  guarantee.
-* We reserve the right to deprecate configuration, after two release cycles. For example, all
-  deprecations between 1.3.0 and 1.4.0 will be deleted soon AFTER 1.5.0 is tagged and released
-  (at the beginning of the 1.6.0 release cycle). This results in a three to six month window for
-  migrating from deprecated code paths to new code paths.
+Both API and implementation stability are important to Envoy. Since the API is consumed by clients
+beyond Envoy, it has a distinct set of [versioning guidelines](api/API_VERSIONING.md). Below, we
+articulate the Envoy implementation stability rules, which operate within the context of the API
+versioning guidelines:
+
+* Features may be marked as deprecated in a given versioned API at any point in time, but this may
+  only be done when a replacement implementation and configuration path is available in Envoy on
+  master. Deprecators must implement a conversion from the deprecated configuration to the latest
+  `vNalpha` (with the deprecated field) that Envoy uses internally. A field may be deprecated if
+  this tool would be able to perform the conversion. For example, removing a field to describe
+  HTTP/2 window settings is valid if a more comprehensive HTTP/2 protocol options field is being
+  introduced to replace it. The PR author deprecating the old configuration is responsible for
+  updating all tests and canonical configuration, or guarding them with the
+  `DEPRECATED_FEATURE_TEST()` macro. This will be validated by the `bazel.compile_time_options`
+  target, which will hard-fail when deprecated configuration is used. The majority of tests and
+  configuration for a feature should be expressed in terms of the latest Envoy internal
+  configuration (i.e. `vNalpha`), only a minimal number of tests necessary to validate configuration
+  translation should be guarded via the `DEPRECATED_FEATURE_TEST()` macro.
+* We will delete deprecated configuration across major API versions. E.g. a field marked deprecated
+  in v2 will be removed in v3.
 * Unless the community and Envoy maintainer team agrees on an exception, during the
   first release cycle after a feature has been deprecated, use of that feature
   will cause a logged warning, and incrementing the
   [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
-  runtime.deprecated_feature_use stat.
+  `runtime.deprecated_feature_use` stat.
   During the second release cycle, use of the deprecated configuration will
   cause a configuration load failure, unless the feature in question is
   explicitly overridden in
   [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
-  config. Finally during the third release cycle the code and configuration will be removed
-  entirely.
+  config. Finally, following the deprecation of the API major version where the field was first
+  marked deprecated, the entire implementation code will be removed from the Envoy implementation.
 * This policy means that organizations deploying master should have some time to get ready for
-  breaking changes, but we make no guarantees about the length of time.
+  breaking changes at the next major API version. This is typically a window of at least 12 months
+  or until the organization moves to the next major API version.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
   conforms to the public interface documentation should continue to compile and work within the
   deprecation window. Within this window, a warning of deprecation should be carefully logged (some
   features might need rate limiting for logging this). We make no guarantees about code or deployments
   that rely on undocumented behavior.
 * All deprecations/breaking changes will be clearly listed in the [deprecated log](docs/root/intro/deprecated.rst).
-* High risk deprecations//breaking changes may be announced to the
+* High risk deprecations/breaking changes may be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
   it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
   away from deprecated features.
-* Protobuf configuration in an alpha namespace, e.g. `v2alpha`, do not have any
-  restrictions on breaking changes. They may be freely modified, together with
-  their respective features.
-* Configuration in the `v2` namespace are considered stable and subject to the
-  above policy. They are
-  [frozen](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#status).
-  There will be no changes leading to wire incompatibility (as describe in the
-  [API style guide](api/STYLE.md)), however fields may be deprecated over time.
-  When a field is deprecated, it will follow the deprecation release cycle
-  described above.
-* No configuration field or message in the `v2` namespace may be deprecated
-  unless there is a corresponding semantic equivalent available to replace it.
-  The litmus test is to imagine that a stateless translation tool exists that
-  could convert from the earlier API to the new API. A field may be deprecated
-  if this tool would be able to perform the conversion. For example, removing a
-  field to describe HTTP/2 window settings is valid if a more comprehensive
-  HTTP/2 protocol options field is being introduced to replace it. The PR author
-  deprecating the old configuration is responsible for updating all tests and
-  canonical configuration, or guarding them with the DEPRECATED_FEATURE_TEST() macro.
-  This will be validated by the bazel.compile_time_options target, which will hard-fail when
-  deprecated configuration is used.
-* For configuration deprecations that are not covered by the above semantic
-  replacement policy, any deprecation will only take place after
-  community consultation on mailing lists, Slack and GitHub, over the period of
-  a minimum of two Envoy release cycles (~6 months). Cases where a feature is
-  outright deleted with no replacement will get an additional two Envoy release
-  cycles (~12 months) before removal.
 
 # Release cadence
 
