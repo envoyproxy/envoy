@@ -152,7 +152,7 @@ public:
    */
   struct CaseInsensitiveCompare {
     // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     bool operator()(absl::string_view lhs, absl::string_view rhs) const;
   };
 
@@ -163,7 +163,7 @@ public:
    */
   struct CaseInsensitiveHash {
     // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     uint64_t operator()(absl::string_view key) const;
   };
 
@@ -501,13 +501,6 @@ private:
 };
 
 /**
- * Hashing functor for use with unordered_map and unordered_set with string_view as a key.
- */
-struct StringViewHash {
-  std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
-};
-
-/**
  * Hashing functor for use with enum class types.
  * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
  * specializations.
@@ -526,9 +519,9 @@ class WelfordStandardDeviation {
 public:
   /**
    * Accumulates a new value into the standard deviation.
-   * @param newValue the new value
+   * @param new_value the new value
    */
-  void update(double newValue);
+  void update(double new_value);
 
   /**
    * @return double the computed mean value.

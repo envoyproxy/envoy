@@ -107,8 +107,9 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
-    # Setup rules_foreign_cc
+    # Setup external Bazel rules
     _foreign_cc_dependencies()
+    _rules_proto_dependencies()
 
     # Binding to an alias pointing to the selected version of BoringSSL:
     # - BoringSSL FIPS from @boringssl_fips//:ssl,
@@ -156,6 +157,8 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
+    _repository_impl("bazel_compdb")
+    _repository_impl("envoy_build_tools")
 
     _python_deps()
     _cc_deps()
@@ -317,6 +320,12 @@ def _net_zlib():
         actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
+    # Bind for grpc.
+    native.bind(
+        name = "madler_zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
 def _com_google_cel_cpp():
     _repository_impl("com_google_cel_cpp")
 
@@ -412,6 +421,12 @@ def _com_google_absl():
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
     )
+
+    # Bind for grpc.
+    native.bind(
+        name = "absl-base",
+        actual = "@com_google_absl//absl/base",
+    )
     native.bind(
         name = "abseil_flat_hash_map",
         actual = "@com_google_absl//absl/container:flat_hash_map",
@@ -480,13 +495,19 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/time:time",
     )
 
+    # Bind for grpc.
+    native.bind(
+        name = "absl-time",
+        actual = "@com_google_absl//absl/time:time",
+    )
+
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
         # The patch includes
         # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
         # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
+        # TODO(asraa): remove this when protobuf 3.10 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -500,7 +521,7 @@ def _com_google_protobuf():
         # The patch includes
         # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
         # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
+        # TODO(asraa): remove this when protobuf 3.10 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -708,6 +729,9 @@ def _com_github_gperftools_gperftools():
 
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")
+
+def _rules_proto_dependencies():
+    _repository_impl("rules_proto")
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

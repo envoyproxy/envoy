@@ -51,12 +51,14 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
   const RequestWrapper request(request_headers, info);
   const ResponseWrapper response(response_headers, response_trailers, info);
   const ConnectionWrapper connection(info);
+  const UpstreamWrapper upstream(info);
   const PeerWrapper source(info, false);
   const PeerWrapper destination(info, true);
   activation.InsertValue(Request, CelValue::CreateMap(&request));
   activation.InsertValue(Response, CelValue::CreateMap(&response));
   activation.InsertValue(Metadata, CelValue::CreateMessage(&info.dynamicMetadata(), arena));
   activation.InsertValue(Connection, CelValue::CreateMap(&connection));
+  activation.InsertValue(Upstream, CelValue::CreateMap(&upstream));
   activation.InsertValue(Source, CelValue::CreateMap(&source));
   activation.InsertValue(Destination, CelValue::CreateMap(&destination));
 

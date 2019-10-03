@@ -64,13 +64,13 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        connection_handler_(ENVOY_LOGGER(), *dispatcher_),
+        connection_handler_(*dispatcher_, "test_thread"),
         envoy_quic_dispatcher_(
-            &crypto_config_, &version_manager_,
+            &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_) {
+            listener_stats_, *dispatcher_) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _))
@@ -132,6 +132,7 @@ protected:
   Network::SocketPtr listen_socket_;
   EnvoyQuicConnectionHelper connection_helper_;
   quic::QuicCryptoServerConfig crypto_config_;
+  quic::QuicConfig quic_config_;
   quic::QuicVersionManager version_manager_;
 
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
@@ -180,6 +181,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Invoke([]() { return Network::FilterStatus::StopIteration; }));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
 
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   // Upon receiving a full CHLO. A new quic connection should be created and have its filter

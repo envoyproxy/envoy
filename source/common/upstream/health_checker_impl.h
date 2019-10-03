@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/grpc/status.h"
 
@@ -11,7 +12,6 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
 
-#include "include/envoy/api/_virtual_includes/api_interface/envoy/api/api.h"
 #include "src/proto/grpc/health/v1/health.pb.h"
 
 namespace Envoy {

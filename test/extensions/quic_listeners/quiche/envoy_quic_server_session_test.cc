@@ -13,6 +13,7 @@
 #include <string>
 
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_connection.h"
 #include "extensions/quic_listeners/quiche/codec_impl.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
@@ -44,17 +45,18 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
-class TestEnvoyQuicConnection : public EnvoyQuicConnection {
+class TestEnvoyQuicServerConnection : public EnvoyQuicServerConnection {
 public:
-  TestEnvoyQuicConnection(quic::QuicConnectionHelperInterface& helper,
-                          quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter& writer,
-                          const quic::ParsedQuicVersionVector& supported_versions,
-                          Network::ListenerConfig& listener_config, Server::ListenerStats& stats)
-      : EnvoyQuicConnection(quic::test::TestConnectionId(),
-                            quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
-                            helper, alarm_factory, writer, /*owns_writer=*/false,
-                            quic::Perspective::IS_SERVER, supported_versions, listener_config,
-                            stats) {}
+  TestEnvoyQuicServerConnection(quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                quic::QuicPacketWriter& writer,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Network::ListenerConfig& listener_config,
+                                Server::ListenerStats& stats)
+      : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
+                                  quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
+                                  helper, alarm_factory, &writer, /*owns_writer=*/false,
+                                  supported_versions, listener_config, stats) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return EnvoyQuicConnection::connectionStats();
@@ -76,14 +78,14 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(new TestEnvoyQuicConnection(connection_helper_, alarm_factory_, writer_,
-                                                     quic_version_, listener_config_,
-                                                     listener_stats_)),
+        quic_connection_(new TestEnvoyQuicServerConnection(connection_helper_, alarm_factory_,
+                                                           writer_, quic_version_, listener_config_,
+                                                           listener_stats_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<TestEnvoyQuicConnection>(quic_connection_),
+                            std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_),
         read_filter_(new Network::MockReadFilter()) {
@@ -138,7 +140,7 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
-  TestEnvoyQuicConnection* quic_connection_;
+  TestEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
@@ -304,18 +306,16 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNotSupported) {
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_LOG_CONTAINS("error", "Flush write is not implemented for QUIC.",
-                      envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite));
+  envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
 }
 
 TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
   // Not verifying dummy implementation, just to have coverage.
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.enableHalfClose(true), "");
-  envoy_quic_session_.setBufferLimits(1024 * 1024);
+  EXPECT_DEATH(envoy_quic_session_.enableHalfClose(true), "");
   EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
-  EXPECT_FALSE(envoy_quic_session_.aboveHighWatermark());
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
+  EXPECT_DEATH(envoy_quic_session_.aboveHighWatermark(), "");
+  EXPECT_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
   http_connection_->shutdownNotice();
 }
 
@@ -390,11 +390,6 @@ TEST_P(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
   installReadFilter();
   EXPECT_EQ(dispatcher_.get(), &envoy_quic_session_.dispatcher());
   EXPECT_TRUE(envoy_quic_session_.readEnabled());
-  EXPECT_FALSE(envoy_quic_session_.localAddressRestored());
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.unixSocketPeerCredentials(),
-                     "Unix domain socket is not supported.");
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.readDisable(true),
-                     "Quic connection should be able to read through out its life time.");
 }
 
 } // namespace Quic

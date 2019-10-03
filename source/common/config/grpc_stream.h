@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/config/xds_grpc_context.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/common/backoff_strategy.h"

@@ -33,7 +33,7 @@ public:
         io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
   ~HttpInspectorTest() override { io_handle_->close(); }
 
-  void init() {
+  void init(bool include_inline_recv = true) {
     filter_ = std::make_unique<Filter>(cfg_);
 
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
@@ -41,11 +41,18 @@ public:
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
-    EXPECT_CALL(dispatcher_,
-                createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
-        .WillOnce(
-            DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
-    filter_->onAccept(cb_);
+    if (include_inline_recv) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
+
+      EXPECT_CALL(dispatcher_,
+                  createFileEvent_(_, _, Event::FileTriggerType::Edge,
+                                   Event::FileReadyType::Read | Event::FileReadyType::Closed))
+          .WillOnce(DoAll(SaveArg<1>(&file_event_callback_),
+                          ReturnNew<NiceMock<Event::MockFileEvent>>()));
+
+      filter_->onAccept(cb_);
+    }
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
@@ -68,8 +75,67 @@ TEST_F(HttpInspectorTest, SkipHttpInspectForTLS) {
   EXPECT_EQ(filter_->onAccept(cb_), Network::FilterStatus::Continue);
 }
 
+TEST_F(HttpInspectorTest, InlineReadIoError) {
+  init(/*include_inline_recv=*/false);
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([](int, void*, size_t, int) -> Api::SysCallSizeResult {
+        return Api::SysCallSizeResult{ssize_t(-1), 0};
+      }));
+  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, close()).Times(1);
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  // It's arguable if io error should bump the not_found counter
+  EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+}
+
+TEST_F(HttpInspectorTest, InlineReadInspectHttp10) {
+  init(/*include_inline_recv=*/false);
+  const absl::string_view header =
+      "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
+      "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
+      "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
+      "15000\r\ncontent-length: 0\r\n\r\n";
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        ASSERT(length >= header.size());
+        memcpy(buffer, header.data(), header.size());
+        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+      }));
+  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
+
+  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::Continue);
+  EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+}
+
+TEST_F(HttpInspectorTest, InlineReadParseError) {
+  init(/*include_inline_recv=*/false);
+  const absl::string_view header =
+      "NOT_A_LEGAL_PREFIX /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: "
+      "curl/7.64.0\r\naccept: "
+      "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
+      "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
+      "15000\r\ncontent-length: 0\r\n\r\n";
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        ASSERT(length >= header.size());
+        memcpy(buffer, header.data(), header.size());
+        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+      }));
+  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::Continue);
+  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+}
+
 TEST_F(HttpInspectorTest, InspectHttp10) {
-  init();
+  init(true);
   const absl::string_view header =
       "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
@@ -199,7 +265,7 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
         return Api::SysCallSizeResult{ssize_t(data.size()), 0};
       }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("h2")};
+  const std::vector<absl::string_view> alpn_protos{absl::string_view("h2c")};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
@@ -232,7 +298,7 @@ TEST_F(HttpInspectorTest, ReadError) {
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
     return Api::SysCallSizeResult{ssize_t(-1), ENOTSUP};
   }));
-  EXPECT_CALL(cb_, continueFilterChain(true));
+  EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().read_error_.value());
 }
@@ -240,7 +306,7 @@ TEST_F(HttpInspectorTest, ReadError) {
 TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
 
   init();
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2c")};
 
   const std::string header =
       "505249202a20485454502f322e300d0a0d0a534d0d0a0d0a00000c04000000000000041000000000020000000000"
@@ -386,7 +452,10 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 
   init();
 
-  const absl::string_view data = "GET /index HTT\r";
+  const std::string valid_header = "GET /index HTTP/1.1\r";
+  //  offset:                       0         10
+  const std::string truncate_header = valid_header.substr(0, 14).append("\r");
+
   {
     InSequence s;
 
@@ -394,14 +463,14 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
       return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
     }));
 
-    for (size_t i = 1; i <= data.length(); i++) {
+    for (size_t i = 1; i <= truncate_header.length(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(
-              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+          .WillOnce(Invoke([&truncate_header, i](int, void* buffer, size_t length,
+                                                 int) -> Api::SysCallSizeResult {
+            ASSERT(length >= truncate_header.size());
+            memcpy(buffer, truncate_header.data(), truncate_header.size());
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
     }
   }
 

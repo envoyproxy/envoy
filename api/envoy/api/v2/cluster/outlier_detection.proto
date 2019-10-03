@@ -26,26 +26,26 @@ message OutlierDetection {
   // The time interval between ejection analysis sweeps. This can result in
   // both new ejections as well as hosts being returned to service. Defaults
   // to 10000ms or 10s.
-  google.protobuf.Duration interval = 2 [(validate.rules).duration.gt = {}];
+  google.protobuf.Duration interval = 2 [(validate.rules).duration = {gt {}}];
 
   // The base time that a host is ejected for. The real time is equal to the
   // base time multiplied by the number of times the host has been ejected.
   // Defaults to 30000ms or 30s.
-  google.protobuf.Duration base_ejection_time = 3 [(validate.rules).duration.gt = {}];
+  google.protobuf.Duration base_ejection_time = 3 [(validate.rules).duration = {gt {}}];
 
   // The maximum % of an upstream cluster that can be ejected due to outlier
   // detection. Defaults to 10% but will eject at least one host regardless of the value.
-  google.protobuf.UInt32Value max_ejection_percent = 4 [(validate.rules).uint32.lte = 100];
+  google.protobuf.UInt32Value max_ejection_percent = 4 [(validate.rules).uint32 = {lte: 100}];
 
   // The % chance that a host will be actually ejected when an outlier status
   // is detected through consecutive 5xx. This setting can be used to disable
   // ejection or to ramp it up slowly. Defaults to 100.
-  google.protobuf.UInt32Value enforcing_consecutive_5xx = 5 [(validate.rules).uint32.lte = 100];
+  google.protobuf.UInt32Value enforcing_consecutive_5xx = 5 [(validate.rules).uint32 = {lte: 100}];
 
   // The % chance that a host will be actually ejected when an outlier status
   // is detected through success rate statistics. This setting can be used to
   // disable ejection or to ramp it up slowly. Defaults to 100.
-  google.protobuf.UInt32Value enforcing_success_rate = 6 [(validate.rules).uint32.lte = 100];
+  google.protobuf.UInt32Value enforcing_success_rate = 6 [(validate.rules).uint32 = {lte: 100}];
 
   // The number of hosts in a cluster that must have enough request volume to
   // detect success rate outliers. If the number of hosts is less than this
@@ -77,7 +77,7 @@ message OutlierDetection {
   // is detected through consecutive gateway failures. This setting can be
   // used to disable ejection or to ramp it up slowly. Defaults to 0.
   google.protobuf.UInt32Value enforcing_consecutive_gateway_failure = 11
-      [(validate.rules).uint32.lte = 100];
+      [(validate.rules).uint32 = {lte: 100}];
 
   // Determines whether to distinguish local origin failures from external errors. If set to true
   // the following configuration parameters are taken into account:
@@ -101,7 +101,7 @@ message OutlierDetection {
   // :ref:`split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>`
   // is set to true.
   google.protobuf.UInt32Value enforcing_consecutive_local_origin_failure = 14
-      [(validate.rules).uint32.lte = 100];
+      [(validate.rules).uint32 = {lte: 100}];
 
   // The % chance that a host will be actually ejected when an outlier status
   // is detected through success rate statistics for locally originated errors.
@@ -110,5 +110,37 @@ message OutlierDetection {
   // :ref:`split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>`
   // is set to true.
   google.protobuf.UInt32Value enforcing_local_origin_success_rate = 15
-      [(validate.rules).uint32.lte = 100];
+      [(validate.rules).uint32 = {lte: 100}];
+
+  // The failure percentage to use when determining failure percentage-based outlier detection. If
+  // the failure percentage of a given host is greater than or equal to this value, it will be
+  // ejected. Defaults to 85.
+  google.protobuf.UInt32Value failure_percentage_threshold = 16
+      [(validate.rules).uint32 = {lte: 100}];
+
+  // The % chance that a host will be actually ejected when an outlier status is detected through
+  // failure percentage statistics. This setting can be used to disable ejection or to ramp it up
+  // slowly. Defaults to 0.
+  //
+  // [#next-major-version: setting this without setting failure_percentage_threshold should be
+  // invalid in v4.]
+  google.protobuf.UInt32Value enforcing_failure_percentage = 17
+      [(validate.rules).uint32 = {lte: 100}];
+
+  // The % chance that a host will be actually ejected when an outlier status is detected through
+  // local-origin failure percentage statistics. This setting can be used to disable ejection or to
+  // ramp it up slowly. Defaults to 0.
+  google.protobuf.UInt32Value enforcing_failure_percentage_local_origin = 18
+      [(validate.rules).uint32 = {lte: 100}];
+
+  // The minimum number of hosts in a cluster in order to perform failure percentage-based ejection.
+  // If the total number of hosts in the cluster is less than this value, failure percentage-based
+  // ejection will not be performed. Defaults to 5.
+  google.protobuf.UInt32Value failure_percentage_minimum_hosts = 19;
+
+  // The minimum number of total requests that must be collected in one interval (as defined by the
+  // interval duration above) to perform failure percentage-based ejection for this host. If the
+  // volume is lower than this setting, failure percentage-based ejection will not be performed for
+  // this host. Defaults to 50.
+  google.protobuf.UInt32Value failure_percentage_request_volume = 20;
 }

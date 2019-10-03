@@ -43,7 +43,8 @@ If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, 
 :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate. 
 For strict DNS cluster, if the minimum of all record TTLs is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
 will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
-defaults to 5000ms if not specified.
+defaults to 5000ms if not specified. The :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>`
+controls the refresh frequency during failures, and, if not configured, the DNS refresh rate will be used.
 
 .. _arch_overview_service_discovery_types_logical_dns:
 
@@ -68,7 +69,8 @@ If :ref:`respect_dns_ttl <envoy_api_field_Cluster.respect_dns_ttl>` is enabled, 
 :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` are used to control DNS refresh rate. 
 For logical DNS cluster, if the TTL of first record is 0, :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
 will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_api_field_Cluster.dns_refresh_rate>` 
-defaults to 5000ms if not specified.
+defaults to 5000ms if not specified. The :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>`
+controls the refresh frequency during failures, and, if not configured, the DNS refresh rate will be used.
 
 .. _arch_overview_service_discovery_types_original_destination:
 

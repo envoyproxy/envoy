@@ -18,6 +18,7 @@ BSON
 CAS
 CB
 CBs
+CEL
 CDS
 CHACHA
 CHLO
@@ -153,6 +154,7 @@ LDS
 LEV
 LHS
 LF
+LRS
 MB
 MD
 MGET
@@ -328,9 +330,11 @@ abcd
 absl
 accessor
 accessors
+acks
 acls
 addr
 agg
+alice
 alignas
 alignof
 alloc
@@ -426,6 +430,7 @@ decls
 dedup
 dedupe
 deduplicate
+deduplicates
 deflateInit
 deletable
 deleter
@@ -640,6 +645,7 @@ paren
 parentid
 parsers
 passthroughs
+pausable
 pcall
 pcap
 pclose
@@ -814,6 +820,7 @@ unordered
 unowned
 unparented
 unpause
+unpaused
 unpopulated
 unprotect
 unref

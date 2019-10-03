@@ -31,6 +31,9 @@ envoy_proto_descriptor(
     name = "bookstore_proto_descriptor",
     srcs = [
         "bookstore.proto",
+        # JSON transcoder doesn't link against ":helloworld_proto_cc", so we can add it to the
+        # descriptor and test that we can actually transcode types not linked into the test binary.
+        "helloworld.proto",
     ],
     out = "bookstore.descriptor",
     external_deps = [

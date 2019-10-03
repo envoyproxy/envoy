@@ -20,7 +20,7 @@ import "validate/validate.proto";
 // will populate :ref:`StreamAccessLogsMessage.http_logs
 // <envoy_api_field_service.accesslog.v3alpha.StreamAccessLogsMessage.http_logs>`.
 message HttpGrpcAccessLogConfig {
-  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message.required = true];
+  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 
   // Additional request headers to log in :ref:`HTTPRequestProperties.request_headers
   // <envoy_api_field_data.accesslog.v3alpha.HTTPRequestProperties.request_headers>`.
@@ -38,7 +38,7 @@ message HttpGrpcAccessLogConfig {
 // Configuration for the built-in *envoy.tcp_grpc_access_log* type. This configuration will
 // populate *StreamAccessLogsMessage.tcp_logs*.
 message TcpGrpcAccessLogConfig {
-  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message.required = true];
+  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 }
 
 // Common configuration for gRPC access logs.
@@ -46,15 +46,15 @@ message CommonGrpcAccessLogConfig {
   // The friendly name of the access log to be returned in :ref:`StreamAccessLogsMessage.Identifier
   // <envoy_api_msg_service.accesslog.v3alpha.StreamAccessLogsMessage.Identifier>`. This allows the
   // access log server to differentiate between different access logs coming from the same Envoy.
-  string log_name = 1 [(validate.rules).string.min_bytes = 1];
+  string log_name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The gRPC service for the access log service.
-  envoy.api.v3alpha.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
+  api.v3alpha.core.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
 
   // Interval for flushing access logs to the gRPC stream. Logger will flush requests every time
   // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
   // 1 second.
-  google.protobuf.Duration buffer_flush_interval = 3 [(validate.rules).duration.gt = {}];
+  google.protobuf.Duration buffer_flush_interval = 3 [(validate.rules).duration = {gt {}}];
 
   // Soft size limit in bytes for access log entries buffer. Logger will buffer requests until
   // this limit it hit, or every time flush interval is elapsed, whichever comes first. Setting it

@@ -50,7 +50,8 @@ bool ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallIntResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
   if (result.rc_ >= 0) {
-    RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0, "");
+    RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0,
+                   absl::StrCat("Fail to close fd: response code ", result.rc_));
   }
   return result.rc_ != -1;
 }
@@ -135,14 +136,14 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
+IoHandlePtr InstanceBase::socketFromSocketType(SocketType socket_type) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
 #endif
 
-  if (socketType == SocketType::Stream) {
+  if (socket_type == SocketType::Stream) {
     flags |= SOCK_STREAM;
   } else {
     flags |= SOCK_DGRAM;
