@@ -10,17 +10,17 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
-                         bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info)
+NewGrpcMuxImpl::NewGrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
+                               bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info)
     : subscription_state_factory_(std::move(subscription_state_factory)),
       skip_subsequent_node_(skip_subsequent_node), local_info_(local_info) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
-Watch* GrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
-                                     const std::set<std::string>& resources,
-                                     SubscriptionCallbacks& callbacks,
-                                     std::chrono::milliseconds init_fetch_timeout) {
+Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
+                                        const std::set<std::string>& resources,
+                                        SubscriptionCallbacks& callbacks,
+                                        std::chrono::milliseconds init_fetch_timeout) {
   if (watch == nullptr) {
     return addWatch(type_url, resources, callbacks, init_fetch_timeout);
   } else {
@@ -29,33 +29,33 @@ Watch* GrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
   }
 }
 
-void GrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
+void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   updateWatch(type_url, watch, {});
   watchMapFor(type_url).removeWatch(watch);
 }
 
-void GrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
+void NewGrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
 
-void GrpcMuxImpl::resume(const std::string& type_url) {
+void NewGrpcMuxImpl::resume(const std::string& type_url) {
   pausable_ack_queue_.resume(type_url);
   trySendDiscoveryRequests();
 }
 
-bool GrpcMuxImpl::paused(const std::string& type_url) const {
+bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
   return pausable_ack_queue_.paused(type_url);
 }
 
-void GrpcMuxImpl::start() { establishGrpcStream(); }
+void NewGrpcMuxImpl::start() { establishGrpcStream(); }
 
-void GrpcMuxImpl::disableInitFetchTimeoutTimer() {
+void NewGrpcMuxImpl::disableInitFetchTimeoutTimer() {
   for (auto& sub : subscriptions_) {
     sub.second->disableInitFetchTimeoutTimer();
   }
 }
 
-Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                             SubscriptionCallbacks& callbacks,
-                             std::chrono::milliseconds init_fetch_timeout) {
+Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                                SubscriptionCallbacks& callbacks,
+                                std::chrono::milliseconds init_fetch_timeout) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
@@ -72,8 +72,8 @@ Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::st
 // Updates the list of resource names watched by the given watch. If an added name is new across
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
-void GrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                              const std::set<std::string>& resources) {
+void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
+                                 const std::set<std::string>& resources) {
   ASSERT(watch != nullptr);
   SubscriptionState* sub = subscriptionStateFor(type_url);
   WatchMap& watch_map = watchMapFor(type_url);
@@ -87,15 +87,15 @@ void GrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   }
 }
 
-void GrpcMuxImpl::addSubscription(const std::string& type_url,
-                                  std::chrono::milliseconds init_fetch_timeout) {
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
+                                     std::chrono::milliseconds init_fetch_timeout) {
   watch_maps_.emplace(type_url, std::make_unique<WatchMap>());
   subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
                                        type_url, *watch_maps_[type_url], init_fetch_timeout));
   subscription_ordering_.emplace_back(type_url);
 }
 
-SubscriptionState* GrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
+SubscriptionState* NewGrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Tried to look up SubscriptionState for non-existent subscription {}.",
@@ -103,7 +103,7 @@ SubscriptionState* GrpcMuxImpl::subscriptionStateFor(const std::string& type_url
   return sub->second.get();
 }
 
-WatchMap& GrpcMuxImpl::watchMapFor(const std::string& type_url) {
+WatchMap& NewGrpcMuxImpl::watchMapFor(const std::string& type_url) {
   auto watch_map = watch_maps_.find(type_url);
   RELEASE_ASSERT(
       watch_map != watch_maps_.end(),
@@ -111,7 +111,7 @@ WatchMap& GrpcMuxImpl::watchMapFor(const std::string& type_url) {
   return *watch_map->second;
 }
 
-void GrpcMuxImpl::handleEstablishedStream() {
+void NewGrpcMuxImpl::handleEstablishedStream() {
   for (auto& sub : subscriptions_) {
     sub.second->markStreamFresh();
   }
@@ -119,7 +119,7 @@ void GrpcMuxImpl::handleEstablishedStream() {
   trySendDiscoveryRequests();
 }
 
-void GrpcMuxImpl::handleStreamEstablishmentFailure() {
+void NewGrpcMuxImpl::handleStreamEstablishmentFailure() {
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
@@ -139,8 +139,8 @@ void GrpcMuxImpl::handleStreamEstablishmentFailure() {
   } while (all_subscribed.size() != subscriptions_.size());
 }
 
-void GrpcMuxImpl::genericHandleResponse(const std::string& type_url,
-                                        const void* response_proto_ptr) {
+void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
+                                           const void* response_proto_ptr) {
   auto sub = subscriptions_.find(type_url);
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -153,7 +153,7 @@ void GrpcMuxImpl::genericHandleResponse(const std::string& type_url,
   trySendDiscoveryRequests();
 }
 
-void GrpcMuxImpl::trySendDiscoveryRequests() {
+void NewGrpcMuxImpl::trySendDiscoveryRequests() {
   while (true) {
     // Do any of our subscriptions even want to send a request?
     absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
@@ -186,7 +186,7 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
 
 // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
 // whether we *want* to send a DeltaDiscoveryRequest).
-bool GrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
+bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
   RELEASE_ASSERT(
       !pausable_ack_queue_.paused(type_url),
       fmt::format("canSendDiscoveryRequest() called on paused type_url {}. Pausedness is "
@@ -209,7 +209,7 @@ bool GrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
 // First, prioritizes ACKs over non-ACK subscription interest updates.
 // Then, prioritizes non-ACK updates in the order the various types
 // of subscriptions were activated.
-absl::optional<std::string> GrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
+absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
   // type_url from pausable_ack_queue_ if possible, before looking at pending updates.
   if (!pausable_ack_queue_.empty()) {

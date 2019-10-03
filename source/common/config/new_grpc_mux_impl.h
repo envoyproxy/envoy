@@ -21,10 +21,10 @@ namespace Config {
 // This class owns the GrpcStream used to talk to the server, maintains queuing
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
-class GrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
+class NewGrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
-              bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info);
+  NewGrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
+                 bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info);
 
   Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                           const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
@@ -122,15 +122,15 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 };
 
-class GrpcMuxDelta : public GrpcMuxImpl,
+class GrpcMuxDelta : public NewGrpcMuxImpl,
                      public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-      : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher),
-                    skip_subsequent_node, local_info),
+      : NewGrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher),
+                       skip_subsequent_node, local_info),
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                      rate_limit_settings) {}
 
@@ -164,15 +164,15 @@ protected:
       grpc_stream_;
 };
 
-class GrpcMuxSotw : public GrpcMuxImpl,
+class GrpcMuxSotw : public NewGrpcMuxImpl,
                     public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
               const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-      : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
-                    skip_subsequent_node, local_info),
+      : NewGrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
+                       skip_subsequent_node, local_info),
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                      rate_limit_settings) {}
   // GrpcStreamCallbacks
