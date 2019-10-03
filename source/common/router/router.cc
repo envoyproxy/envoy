@@ -501,9 +501,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
+  envoy::api::v2::core::Metadata host_metadata;
+  if (conn_pool->host()->metadata()) {
+    host_metadata.MergeFrom(*conn_pool->host()->metadata());
+  }
   Network::TransportSocketFactory& socket_factory = cluster_->transportSocketFactory(
       absl::optional<Upstream::ClusterInfo::TransportSocketFactoryOption>(
-          {conn_pool->host()->address()->asString(), *conn_pool->host()->metadata()}));
+          {conn_pool->host()->address()->asString(), host_metadata}));
   FilterUtility::setUpstreamScheme(headers, socket_factory.implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
