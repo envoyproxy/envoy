@@ -213,6 +213,12 @@ public:
   virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const PURE;
 
   /**
+   * @return std::vector<Http::HeaderMatcherSharedPt>& list of request header
+   * matchers that will be checked before enabling retries.
+   */
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const PURE;
+
+  /**
    * @return absl::optional<std::chrono::milliseconds> base retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> baseInterval() const PURE;
