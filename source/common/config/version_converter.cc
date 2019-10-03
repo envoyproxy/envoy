@@ -32,7 +32,7 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
                                Protobuf::Message& next_message) {
   // Wow, why so complicated? Could we just do this conversion with:
   //
-  //   next_message = MergeFromString(prev_message.SerializeAsString())
+  //   next_message.MergeFromString(prev_message.SerializeAsString())
   //
   // and then some clever mangling of the UnknownFieldSet?
   //
