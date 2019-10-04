@@ -60,7 +60,7 @@ Version history
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
 * router: added new :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy. Retries can now be configured to trigger by arbitrary response header matching.
 * router: added ability to reverse header evaluation order, see :ref:`route configuration's reverse header
-  evaluation order flag <envoy_api_msg_RouteConfiguration.reverse_header_evaluation_order>`
+  evaluation order flag <envoy_api_field_RouteConfiguration.reverse_header_evaluation_order>`
 * router: added new :ref:`retriable request headers <envoy_api_field_route.RetryPolicy.retriable_request_headers>` to retry policies. Retries can now be configured to only trigger on request header match.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
