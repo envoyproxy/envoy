@@ -1,11 +1,11 @@
 #include "envoy/config/filter/http/alpn/v2alpha/alpn.pb.h"
 #include "envoy/config/filter/http/alpn/v2alpha/alpn.pb.validate.h"
 
-#include "extensions/filters/http/alpn/config.h"
 #include "extensions/filters/http/alpn/alpn_filter.h"
-#include "test/test_common/utility.h"
+#include "extensions/filters/http/alpn/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

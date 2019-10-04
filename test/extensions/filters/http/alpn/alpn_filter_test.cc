@@ -1,8 +1,8 @@
 #include "envoy/config/filter/http/alpn/v2alpha/alpn.pb.h"
 
+#include "common/network/application_protocol.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
-#include "common/network/application_protocol.h"
 
 #include "extensions/filters/http/alpn/alpn_filter.h"
 
