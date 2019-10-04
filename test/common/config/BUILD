@@ -362,7 +362,7 @@ envoy_cc_test(
     name = "version_converter_test",
     srcs = ["version_converter_test.cc"],
     deps = [
-        ":version_converter_proto_cc",
+        ":version_converter_proto_cc_proto",
         "//source/common/config:version_converter_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
