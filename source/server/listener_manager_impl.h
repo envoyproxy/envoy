@@ -114,54 +114,6 @@ struct ListenerManagerStats {
   ALL_LISTENER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-class ServerFactoryContextImpl : public Configuration::FactoryContext {
-public:
-  explicit ServerFactoryContextImpl(Instance& server)
-      : server_(server), server_scope_(server_.stats().createScope("")) {}
-
-  // Server::Configuration::ListenerFactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
-  Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
-  Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
-  Grpc::Context& grpcContext() override { return server_.grpcContext(); }
-  bool healthCheckFailed() override { return server_.healthCheckFailed(); }
-  Tracing::HttpTracer& httpTracer() override { return httpContext().tracer(); }
-  Http::Context& httpContext() override { return server_.httpContext(); }
-  const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
-  Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
-  Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
-  Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
-  OverloadManager& overloadManager() override { return server_.overloadManager(); }
-  ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
-  Admin& admin() override { return server_.admin(); }
-  TimeSource& timeSource() override { return api().timeSource(); }
-  Api::Api& api() override { return server_.api(); }
-  ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
-  ProcessContext& processContext() override { return server_.processContext(); }
-
-  // ugly
-  virtual Stats::Scope& scope() override { return *server_scope_; }
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  virtual envoy::api::v2::core::TrafficDirection direction() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  virtual const Network::DrainDecision& drainDecision() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  virtual Init::Manager& initManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  virtual Stats::Scope& listenerScope() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  virtual const envoy::api::v2::core::Metadata& listenerMetadata() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  virtual Configuration::FactoryContext* getServerContext() override { return this; }
-
-private:
-  Instance& server_;
-  Stats::ScopePtr server_scope_;
-};
-
 /**
  * Implementation of ListenerManager.
  */
@@ -188,7 +140,6 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
-  ServerFactoryContextImpl server_factory_context_;
   ListenerComponentFactory& factory_;
 
 private:
@@ -334,36 +285,30 @@ public:
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
-    return server_factory_context_.accessLogManager();
+    return parent_.server_.accessLogManager();
   }
-  Upstream::ClusterManager& clusterManager() override {
-    return server_factory_context_.clusterManager();
-  }
-  Event::Dispatcher& dispatcher() override { return server_factory_context_.dispatcher(); }
-  Grpc::Context& grpcContext() override { return server_factory_context_.grpcContext(); }
-  bool healthCheckFailed() override { return server_factory_context_.healthCheckFailed(); }
+  Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
+  Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
+  Grpc::Context& grpcContext() override { return parent_.server_.grpcContext(); }
+  bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return httpContext().tracer(); }
-  Http::Context& httpContext() override { return server_factory_context_.httpContext(); }
-  const LocalInfo::LocalInfo& localInfo() const override {
-    return server_factory_context_.localInfo();
-  }
-  Envoy::Runtime::RandomGenerator& random() override { return server_factory_context_.random(); }
-  Envoy::Runtime::Loader& runtime() override { return server_factory_context_.runtime(); }
-  Singleton::Manager& singletonManager() override {
-    return server_factory_context_.singletonManager();
-  }
-  OverloadManager& overloadManager() override { return server_factory_context_.overloadManager(); }
-  ThreadLocal::Instance& threadLocal() override { return server_factory_context_.threadLocal(); }
-  Admin& admin() override { return server_factory_context_.admin(); }
+  Http::Context& httpContext() override { return parent_.server_.httpContext(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return parent_.server_.localInfo(); }
+  Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
+  Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
+  Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
+  OverloadManager& overloadManager() override { return parent_.server_.overloadManager(); }
+  ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
+  Admin& admin() override { return parent_.server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
-  Api::Api& api() override { return server_factory_context_.api(); }
+  Api::Api& api() override { return parent_.server_.api(); }
   ServerLifecycleNotifier& lifecycleNotifier() override {
-    return server_factory_context_.lifecycleNotifier();
+    return parent_.server_.lifecycleNotifier();
   }
-  ProcessContext& processContext() override { return server_factory_context_.processContext(); }
+  ProcessContext& processContext() override { return parent_.server_.processContext(); }
 
   // Overrided Servers
-  virtual Configuration::FactoryContext* getServerContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext(bool is_dynamic) const override;
   Network::DrainDecision& drainDecision() override { return *this; }
   Stats::Scope& scope() override { return *global_scope_; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -408,7 +353,6 @@ private:
   }
 
   ListenerManagerImpl& parent_;
-  ServerFactoryContextImpl& server_factory_context_;
 
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;

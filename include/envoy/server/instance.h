@@ -224,6 +224,11 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
+   * @return Configuration::ServerFactoryContext& factory context for filters.
+   */
+  virtual Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) PURE;
 };
 
 } // namespace Server

@@ -102,6 +102,7 @@ public:
   virtual Api::Api& api() PURE;
 };
 
+class ServerFactoryContext;
 /**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
@@ -111,8 +112,7 @@ class FactoryContext : public virtual CommonFactoryContext {
 public:
   ~FactoryContext() override = default;
 
-  virtual FactoryContext* getServerContext() { return nullptr; }
-
+  virtual ServerFactoryContext& getServerFactoryContext(bool is_dynamic) const PURE;
   /**
    * @return AccessLogManager for use by the entire server.
    */
@@ -189,19 +189,76 @@ public:
 
 // Proof of Concept class
 class ServerFactoryContext : public virtual CommonFactoryContext {
-  // Hide and export only serverMessageValidationVisitor
-  // Will decide later
-  virtual ProtobufMessage::ValidationContext& messageValidationContext() {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  };
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  };
-
 public:
-  virtual ProtobufMessage::ValidationVisitor& serverMessageValidationVisitor() {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  virtual ~ServerFactoryContext() = default;
+
+  /**
+   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
+   *         for all singleton processing.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return information about the local environment the server is running in.
+   */
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
+
+  /**
+   * @return RandomGenerator& the random generator for the server.
+   */
+  virtual Envoy::Runtime::RandomGenerator& random() PURE;
+
+  /**
+   * @return Runtime::Loader& the singleton runtime loader for the server.
+   */
+  virtual Envoy::Runtime::Loader& runtime() PURE;
+
+  /**
+   * @return Stats::Scope& the filter's stats scope.
+   */
+  virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return Singleton::Manager& the server-wide singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
+   */
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return Server::Admin& the server's global admin HTTP endpoint.
+   */
+  virtual Server::Admin& admin() PURE;
+
+  /**
+   * @return TimeSource& a reference to the time source.
+   */
+  virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
+  virtual Api::Api& api() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor&
+   */
+  virtual ProtobufMessage::ValidationVisitor& serverMessageValidationVisitor() PURE;
 };
 
 class ServerFactoryCxtUtil {
