@@ -400,6 +400,30 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
       R"({"code":5,"message":"Shelf 100 Not Found"})", true, true);
 }
 
+// Streaming backend returns an error in a trailer-only response.
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
+  const std::string filter =
+      R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor: "{}"
+              services: "bookstore.Bookstore"
+              convert_grpc_status: true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/37/books"}, {":authority", "host"}},
+      "", {"shelf: 37"}, {}, Status(Code::NOT_FOUND, "Shelf 37 Not Found"),
+      Http::TestHeaderMapImpl{{":status", "404"},
+                              {"content-type", "application/json"},
+                              {"grpc-status", UnexpectedHeaderValue},
+                              {"grpc-message", UnexpectedHeaderValue}},
+      R"({"code":5,"message":"Shelf 37 Not Found"})");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::DeleteBookRequest, Empty>(

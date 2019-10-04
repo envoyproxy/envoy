@@ -5,6 +5,11 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/assert.h"
+
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 /**
  * These are helper macros for allocating "fixed" stats throughout the code base in a way that
@@ -37,12 +42,22 @@ namespace Envoy {
 #define GENERATE_GAUGE_STRUCT(NAME, MODE) Envoy::Stats::Gauge& NAME##_;
 #define GENERATE_HISTOGRAM_STRUCT(NAME) Envoy::Stats::Histogram& NAME##_;
 
-#define FINISH_STAT_DECL_(X) + std::string(#X)),
-#define FINISH_STAT_DECL_MODE_(X, MODE) + std::string(#X), Envoy::Stats::Gauge::ImportMode::MODE),
+#define FINISH_STAT_DECL_(X) #X)),
+#define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
 
-#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(PREFIX FINISH_STAT_DECL_
-#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(PREFIX FINISH_STAT_DECL_MODE_
-#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(PREFIX FINISH_STAT_DECL_
+static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_view token) {
+  if (prefix.empty()) {
+    return std::string(token);
+  } else if (absl::EndsWith(prefix, ".")) {
+    // TODO(jmarantz): eliminate this case -- remove all the trailing dots from prefixes.
+    return absl::StrCat(prefix, token);
+  }
+  return absl::StrCat(prefix, ".", token);
+}
+
+#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
+#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(statPrefixJoin(PREFIX, FINISH_STAT_DECL_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")

@@ -15,7 +15,6 @@ import "envoy/api/v2/endpoint/endpoint.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
-// [#proto-status: experimental]
 // HDS is Health Discovery Service. It compliments Envoy’s health checking
 // service by designating this Envoy to be a healthchecker for a subset of hosts
 // in the cluster. The status of these health checks will be reported to the

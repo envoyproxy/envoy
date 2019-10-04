@@ -99,6 +99,9 @@ private:
   std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
+
+  // Test only.
+  friend class ThreadLocalInstanceImplTest;
 };
 
 } // namespace ThreadLocal
