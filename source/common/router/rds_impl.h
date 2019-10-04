@@ -196,7 +196,7 @@ private:
 
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   ThreadLocal::SlotPtr tls_;
 
   friend class RouteConfigProviderManagerImpl;

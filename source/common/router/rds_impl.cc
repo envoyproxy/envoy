@@ -43,7 +43,7 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : 
     
-config_(new ConfigImpl(config, factory_context.getServerFactoryContext(/*is_dynamic=*/false),
+config_(new ConfigImpl(config, factory_context.getServerFactoryContext(/*is_dynamic=*/false),true)),
 
      route_config_proto_{config},
       last_updated_(factory_context.timeSource().systemTime()),

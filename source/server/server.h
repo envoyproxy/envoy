@@ -225,7 +225,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   OptProcessContextRef processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
 
 Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {

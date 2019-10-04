@@ -232,7 +232,7 @@ public:
                ProtobufMessage::ValidationVisitor& validation_visitor);
   ~ListenerImpl() override;
 
-Configuration::ServerFactoryContext& ListenerImpl::getServerFactoryContext(bool is_dynamic) const override {
+Configuration::ServerFactoryContext& getServerFactoryContext(bool is_dynamic) const override {
   return parent_.server_.serverFactoryContext(is_dynamic);
 }
   /**
