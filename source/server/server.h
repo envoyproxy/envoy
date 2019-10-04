@@ -260,6 +260,7 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   bool workers_started_;
+  bool live_;
   bool shutdown_;
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;

@@ -54,6 +54,55 @@ TEST_P(IntegrationAdminTest, HealthCheck) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+TEST_P(IntegrationAdminTest, HealthCheckWithoutServerStats) {
+  envoy::config::metrics::v2::StatsMatcher stats_matcher;
+  stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
+  initialize(stats_matcher);
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "POST", "/healthcheck", "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("server.")));
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/healthcheck/fail",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/healthcheck", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("server.")));
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/healthcheck/ok", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/healthcheck", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("server.")));
+}
+
 TEST_P(IntegrationAdminTest, HealthCheckWithBufferFilter) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
   initialize();

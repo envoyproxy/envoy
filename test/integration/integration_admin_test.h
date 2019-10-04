@@ -15,6 +15,14 @@ public:
     HttpIntegrationTest::initialize();
   }
 
+  void initialize(envoy::config::metrics::v2::StatsMatcher stats_matcher) {
+    config_helper_.addConfigModifier(
+        [stats_matcher](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+          *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher;
+        });
+    initialize();
+  }
+
   /**
    *  Destructor for an individual test.
    */
