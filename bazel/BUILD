@@ -8,7 +8,6 @@ load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",
-    "sh_test_wrapper.sh",
 ])
 
 genrule(

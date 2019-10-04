@@ -165,7 +165,7 @@ environment. In general, there should be no non-local network access. In additio
 
 * Paths should be constructed using:
   * The methods in [`TestEnvironment`](test/test_common/environment.h) for C++ tests.
-  * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_RUNDIR}` for read-only access to
+  * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_SRCDIR}` for read-only access to
     test inputs in shell tests.
   * With `{{ test_tmpdir }}`, `{{ test_rundir }}` and `{{ test_udsdir }}` respectively for JSON templates.
     `{{ test_udsdir }}` is provided for pathname based Unix Domain Sockets, which must fit within a

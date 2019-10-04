@@ -278,8 +278,8 @@ def envoy_sh_test(
         )
     native.sh_test(
         name = name,
-        srcs = ["//bazel:sh_test_wrapper.sh"],
-        data = srcs + data,
+        srcs = srcs,
+        data = data,
         args = srcs,
         tags = tags,
         **kargs
