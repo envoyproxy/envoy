@@ -32,7 +32,7 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0, ""));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
                       ASSERT(0, "With some logs"));
-  EXPECT_DEATH({ ASSERT_DFATAL(0); }, ".*ASSERT_DFATAL(0).*");
+  EXPECT_LOG_CONTAINS("critical", "ASSERT_DFATAL(0)", ASSERT_DFATAL(0));
   expected_counted_failures = 3;
 #else
   EXPECT_NO_LOGS(ASSERT(0));
