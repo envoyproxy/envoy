@@ -198,7 +198,6 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
-  std::cerr << "============ HttpIntegrationTest::makeRawHttpConnection\n";
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->http2_settings_.allow_connect_ = true;
   cluster->http2_settings_.allow_metadata_ = true;
