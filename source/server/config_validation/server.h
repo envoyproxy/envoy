@@ -96,7 +96,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   OptProcessContextRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 
@@ -106,6 +106,10 @@ public:
 
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
+  }
+
+   Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {
+    return is_dynamic ? dynamic_server_context_ : static_server_context_;
   }
 
   // Server::ListenerComponentFactory
@@ -194,6 +198,8 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
+  ServerFactoryContextImpl dynamic_server_context_;
+  ServerFactoryContextImpl static_server_context_;
 };
 
 } // namespace Server
