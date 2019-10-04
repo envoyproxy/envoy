@@ -41,7 +41,11 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::api::v2::RouteConfiguration& config,
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config},
+    : 
+    
+config_(new ConfigImpl(config, factory_context.getServerFactoryContext(/*is_dynamic=*/false),
+
+     route_config_proto_{config},
       last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
   route_config_provider_manager_.static_route_config_providers_.insert(this);
@@ -54,10 +58,12 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
+    const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
+    Init::Manager& init_manager,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager, bool is_delta)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
+      init_manager_(init_manager),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
@@ -114,7 +120,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
-      vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());
+      vhds_subscription_->registerInitTargetWithInitManager(getRdsConfigInitManager());
     } else {
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 config_update_info_->configHash());
@@ -174,7 +180,9 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)),
-      config_update_info_(subscription_->routeConfigUpdate()), factory_context_(factory_context),
+      config_update_info_(subscription_->routeConfigUpdate()), 
+      factory_context_(factory_context.getServerFactoryContext(/*is_dynamic=*/true)),
+      //provider_init_manager_(factory_context.initManager()),
       tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
@@ -228,7 +236,8 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     Init::Manager& init_manager, bool is_delta) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
-
+  auto& server_factory_context = factory_context.getServerFactoryContext(/*is_dynamic=*/true);
+  
   RdsRouteConfigSubscriptionSharedPtr subscription;
 
   auto it = route_config_subscriptions_.find(manager_identifier);
@@ -236,8 +245,9 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
-    subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
-                                                      stat_prefix, *this, is_delta));
+    subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, server_factory_context,
+    factory_context.initManager(),
+                                                      stat_prefix, *this, is_delta));                                                         
     init_manager.add(subscription->init_target_);
     route_config_subscriptions_.insert({manager_identifier, subscription});
   } else {
