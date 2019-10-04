@@ -207,7 +207,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return the time source used for the server.
@@ -224,6 +224,12 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
+   * @param is_dynamic true if the validation visitor is for dynamic config
+   * @return Configuration::ServerFactoryContext& factory context for filters.
+   */
+  virtual Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) PURE;
 };
 
 } // namespace Server
