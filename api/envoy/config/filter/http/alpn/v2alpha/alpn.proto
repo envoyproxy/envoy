@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.alpn.v2alpha;
+
+option java_outer_classname = "AlpnProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.alpn.v2alpha";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Alpn Filter]
+
+// The filter overrides the ALPN in TLS context for upstream connections.
+message FilterConfig {
+  // Downstream protocols
+  enum Protocol {
+    HTTP10 = 0;
+    HTTP11 = 1;
+    HTTP2 = 2;
+  }
+
+  message Entry {
+    // Downstream protocol
+    Protocol downstream_protocol = 1;
+
+    // Application protocols override.
+    repeated string alpn = 2 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  repeated Entry alpn_override = 1 [(validate.rules).repeated = {min_items: 1}];
+}

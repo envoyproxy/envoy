@@ -52,7 +52,7 @@ extensions/filters/common/original_src @snowp @klarose
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # http inspector
-/*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan
+/*/extensions/filters/listener/http_inspector @yxue @PiotrSikora @lizan
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu
 # webassembly common extension
@@ -68,6 +68,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/ext_authz @gsagula @dio
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
+/*/extensions/filters/http/alpn @yxue @lizan
 /*/extensions/filters/common/ext_authz @gsagula @dio
 /*/extensions/filters/common/original_src @klarose @snowp
 /*/extensions/filters/listener/tls_inspector @piotrsikora @htuch
