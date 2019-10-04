@@ -1,6 +1,6 @@
 ![Envoy Logo](https://github.com/envoyproxy/artwork/blob/master/PNG/Envoy_Logo_Final_PANTONE.png)
 
-[C++ L7 proxy and communication bus](https://www.envoyproxy.io/)
+[Cloud-native high-performance edge/middle/service proxy](https://www.envoyproxy.io/)
 
 Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNCF). If you are a
 company that wants to help shape the evolution of technologies that are container-packaged,

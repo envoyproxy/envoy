@@ -32,6 +32,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/network:filter_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/filters/network:well_known_names",
     ],
 )

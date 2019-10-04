@@ -36,7 +36,7 @@ SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(idx < slots_.size());
   std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, idx));
   slots_[idx] = slot.get();
-  return slot;
+  return std::make_unique<Bookkeeper>(*this, std::move(slot));
 }
 
 bool InstanceImpl::SlotImpl::currentThreadRegistered() {
