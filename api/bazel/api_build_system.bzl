@@ -43,14 +43,11 @@ _PY_BAZEL_RULE_MAPPING = {
     "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_py_proto",
 }
 
-def _Suffix(d, suffix):
-    return d + suffix
-
 def _proto_mapping(dep, proto_dep_map, proto_suffix):
     mapped = proto_dep_map.get(dep)
     if mapped == None:
         prefix = "@" + Label(dep).workspace_name if not dep.startswith("//") else ""
-        return _Suffix(prefix + "//" + Label(dep).package + ":" + Label(dep).name, proto_suffix)
+        return prefix + "//" + Label(dep).package + ":" + Label(dep).name + proto_suffix
     return mapped
 
 def _go_proto_mapping(dep):
@@ -67,7 +64,7 @@ def _py_proto_mapping(dep):
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
 def _api_py_proto_library(name, srcs = [], deps = []):
     _py_proto_library(
-        name = _Suffix(name, _PY_PROTO_SUFFIX),
+        name = name + _PY_PROTO_SUFFIX,
         srcs = srcs,
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
@@ -125,7 +122,7 @@ def api_cc_py_proto_library(
         deps = deps + _COMMON_PROTO_DEPS,
         visibility = visibility,
     )
-    cc_proto_library_name = _Suffix(name, _CC_PROTO_SUFFIX)
+    cc_proto_library_name = name + _CC_PROTO_SUFFIX
     pgv_cc_proto_library(
         name = cc_proto_library_name,
         linkstatic = linkstatic,
@@ -143,7 +140,7 @@ def api_cc_py_proto_library(
     # Optionally define gRPC services
     if has_services:
         # TODO: when Python services are required, add to the below stub generations.
-        cc_grpc_name = _Suffix(name, _CC_GRPC_SUFFIX)
+        cc_grpc_name = name + _CC_GRPC_SUFFIX
         cc_proto_deps = [cc_proto_library_name] + [_cc_proto_mapping(dep) for dep in deps]
         _api_cc_grpc_library(name = cc_grpc_name, proto = relative_name, deps = cc_proto_deps)
 
@@ -177,9 +174,9 @@ def api_proto_package(srcs = [], deps = [], has_services = False, visibility = [
         compilers = ["@io_bazel_rules_go//proto:go_grpc", "//bazel:pgv_plugin_go"]
 
     go_proto_library(
-        name = _Suffix(name, _GO_PROTO_SUFFIX),
+        name = name + _GO_PROTO_SUFFIX,
         compilers = compilers,
-        importpath = _Suffix(_GO_IMPORTPATH_PREFIX, native.package_name()),
+        importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
         proto = name,
         visibility = ["//visibility:public"],
         deps = [_go_proto_mapping(dep) for dep in deps] + [
