@@ -25,17 +25,20 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ ASSERT(0); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, ""); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, "With some logs"); }, ".*assert failure: 0. Details: With some logs.*");
+  EXPECT_DEATH({ LOG_DFATAL(0); }, ".assert failure: 0*");
   expected_counted_failures = 0;
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0, ""));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
                       ASSERT(0, "With some logs"));
+  EXPECT_DEATH({ LOG_DFATAL(0); }, ".*LOG_DFATAL(0).*");
   expected_counted_failures = 3;
 #else
   EXPECT_NO_LOGS(ASSERT(0));
   EXPECT_NO_LOGS(ASSERT(0, ""));
   EXPECT_NO_LOGS(ASSERT(0, "With some logs"));
+  EXPECT_LOG_CONTAINS("error", "LOG_DFATAL(0)", LOG_DFATAL(0));
   expected_counted_failures = 0;
 #endif
 

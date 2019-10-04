@@ -91,7 +91,13 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 // _ASSERT_VERBOSE, and this will call _ASSERT_VERBOSE,(__VA_ARGS__)
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
+
+// When compiled for debug, LOG_DFATAL is simply an ASSERT.
+#define LOG_DFATAL(expr) ASSERT(expr)
+#define LOG_DFATAL_OR_RETURN(expr) ASSERT(expr)
+
 #else
+
 // This non-implementation ensures that its argument is a valid expression that can be statically
 // casted to a bool, but the expression is never evaluated and will be compiled away.
 #define ASSERT(X, ...)                                                                             \
@@ -99,6 +105,17 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
     constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
     (void)__assert_dummy_variable;                                                                 \
   } while (false)
+
+// When compiled for optimization, LOG_DFATAL works like ENVOY_LOG_MISC_(error, ...)
+#define LOG_DFATAL(expr) ENVOY_LOG_MISC(error, "LOG_DFATAL({})", #expr)
+#define LOG_DFATAL_OR_RETURN(expr) \
+  do { \
+    if (!(expr)) { \
+      ENVOY_LOG_MISC(error, "LOG_DFATAL_OR_RETURN({})", #expr); \
+      return; \
+    } \
+  } while (false)
+
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 /**

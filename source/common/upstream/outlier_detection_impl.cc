@@ -329,11 +329,17 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
     return;
   }
 
-  std::chrono::milliseconds base_eject_time =
-      std::chrono::milliseconds(runtime_.snapshot().getInteger(
-          "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
-  ASSERT(monitor->numEjections() > 0);
-  if ((base_eject_time * monitor->numEjections()) <= (now - monitor->lastEjectionTime().value())) {
+  auto num_ejections = monitor->numEjections();
+  LOG_DFATAL_OR_RETURN(num_ejections > 0);
+  auto last_ejection_time = monitor->lastEjectionTime();
+  LOG_DFATAL_OR_RETURN(last_ejection_time);
+  if (now < last_ejection_time.value()) {
+    return;
+  }
+
+  auto base_eject_time = std::chrono::milliseconds(runtime_.snapshot().getInteger(
+      "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
+  if ((base_eject_time * num_ejections) <= (now - last_ejection_time.value())) {
     stats_.ejections_active_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
