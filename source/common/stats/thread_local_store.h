@@ -370,6 +370,8 @@ private:
     case Histogram::Unit::Milliseconds:
       return null_histogram_ms_;
     }
+
+    return null_histogram_;
   }
 
   Allocator& alloc_;

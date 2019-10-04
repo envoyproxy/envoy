@@ -41,6 +41,8 @@ public:
     case Histogram::Unit::Milliseconds:
       return;
     }
+
+    ASSERT(0);
   }
 
   /**
@@ -67,6 +69,8 @@ private:
     case Histogram::Unit::Milliseconds:
       return getRawDuration<std::chrono::milliseconds>().count();
     }
+
+    return 0;
   }
 
   TimeSource& time_source_;

@@ -109,6 +109,8 @@ public:
     case Unit::Milliseconds:
       return "ms";
     }
+
+    return "";
   }
 
   /**
