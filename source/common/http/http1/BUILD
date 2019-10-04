@@ -9,6 +9,11 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "header_formatter_lib",
+    hdrs = ["header_formatter.h"],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -32,6 +37,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/http1:header_formatter_lib",
         "//source/common/runtime:runtime_lib",
     ],
 )

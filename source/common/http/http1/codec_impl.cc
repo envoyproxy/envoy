@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
@@ -34,7 +35,9 @@ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Sett
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 
-StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {
+StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
+                                     HeaderKeyFormatter* header_key_formatter)
+    : connection_(connection), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -67,7 +70,7 @@ void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+      [this](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         absl::string_view key_to_use = header.key().getStringView();
         uint32_t key_size_to_use = header.key().size();
         // Translate :authority -> host so that upper layers do not need to deal with this.
@@ -81,8 +84,13 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
           return HeaderMap::Iterate::Continue;
         }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeHeader(key_to_use,
-                                                               header.value().getStringView());
+        if (header_key_formatter_ != nullptr) {
+          static_cast<StreamEncoderImpl*>(context)->encodeHeader(
+              header_key_formatter_->format(key_to_use), header.value().getStringView());
+        } else {
+          static_cast<StreamEncoderImpl*>(context)->encodeHeader(key_to_use,
+                                                                 header.value().getStringView());
+        }
         return HeaderMap::Iterate::Continue;
       },
       this);
@@ -116,17 +124,32 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
       if (is_content_length_allowed_) {
-        encodeHeader(Headers::get().ContentLength.get().c_str(),
-                     Headers::get().ContentLength.get().size(), "0", 1);
+        if (header_key_formatter_ != nullptr) {
+          const auto formatted_header =
+              header_key_formatter_->format(Headers::get().ContentLength.get().c_str());
+          encodeHeader(formatted_header.c_str(), formatted_header.size(), "0", 1);
+        } else {
+          encodeHeader(Headers::get().ContentLength.get().c_str(),
+                       Headers::get().ContentLength.get().size(), "0", 1);
+        }
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else {
-      encodeHeader(Headers::get().TransferEncoding.get().c_str(),
-                   Headers::get().TransferEncoding.get().size(),
-                   Headers::get().TransferEncodingValues.Chunked.c_str(),
-                   Headers::get().TransferEncodingValues.Chunked.size());
+      if (header_key_formatter_ != nullptr) {
+        const auto formatted_header =
+            header_key_formatter_->format(Headers::get().TransferEncoding.get().c_str());
+        encodeHeader(formatted_header.c_str(), formatted_header.size(),
+                     Headers::get().TransferEncodingValues.Chunked.c_str(),
+                     Headers::get().TransferEncodingValues.Chunked.size());
+      } else {
+        encodeHeader(Headers::get().TransferEncoding.get().c_str(),
+                     Headers::get().TransferEncoding.get().size(),
+                     Headers::get().TransferEncodingValues.Chunked.c_str(),
+                     Headers::get().TransferEncodingValues.Chunked.size());
+      }
+
       // We do not apply chunk encoding for HTTP upgrades.
       // If there is a body in a WebSocket Upgrade response, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
@@ -545,7 +568,15 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
                                            ServerConnectionCallbacks& callbacks,
                                            Http1Settings settings, uint32_t max_request_headers_kb)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb),
-      callbacks_(callbacks), codec_settings_(settings) {}
+      callbacks_(callbacks), codec_settings_(settings) {
+  switch (codec_settings_.header_key_format_) {
+  case Http1Settings::HeaderKeyFormat::Default:
+    break;
+  case Http1Settings::HeaderKeyFormat::TrainCase:
+    header_key_formatter_ = std::make_unique<TrainCaseHeaderKeyFormatter>();
+    break;
+  }
+}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -645,7 +676,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_);
-    active_request_ = std::make_unique<ActiveRequest>(*this);
+    active_request_ = std::make_unique<ActiveRequest>(*this, header_key_formatter_.get());
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
   }
 }

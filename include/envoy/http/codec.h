@@ -222,6 +222,13 @@ struct Http1Settings {
   bool accept_http_10_{false};
   // Set a default host if no Host: header is present for HTTP/1.0 requests.`
   std::string default_host_for_http_10_;
+
+  enum class HeaderKeyFormat {
+    Default,
+    TrainCase,
+  };
+
+  HeaderKeyFormat header_key_format_;
 };
 
 /**

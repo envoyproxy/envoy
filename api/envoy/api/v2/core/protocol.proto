@@ -42,6 +42,24 @@ message Http1ProtocolOptions {
   // Envoy does not otherwise support HTTP/1.0 without a Host header.
   // This is a no-op if *accept_http_10* is not true.
   string default_host_for_http_10 = 3;
+
+  message HeaderKeyFormat {
+    enum HeaderFormat {
+      // By default, all headers are lower cased.
+      DEFAULT = 0;
+
+      // Formats the header using Train-Case: the first character and any character following a
+      // special character will be capitalized if it's an alpha character. For example,
+      // "content-type" becomes "Content-Type", and "foo$b#$ar" becomes "Foo$B#$Ar".
+      TRAIN_CASE = 1;
+    }
+
+    HeaderFormat header_format = 1;
+  }
+
+  // Describes how the keys for response headers should be formatted. By default, all header keys
+  // are lower cased.
+  HeaderKeyFormat response_header_key_format = 4;
 }
 
 // [#comment:next free field: 13]

@@ -18,6 +18,7 @@
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http1/header_formatter.h"
 
 namespace Envoy {
 namespace Http {
@@ -66,7 +67,7 @@ public:
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
 
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection);
+  StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
 
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
@@ -100,6 +101,7 @@ private:
   bool processing_100_continue_{false};
   bool is_response_to_head_request_{false};
   bool is_content_length_allowed_{true};
+  HeaderKeyFormatter* header_key_formatter_;
 };
 
 /**
@@ -107,7 +109,7 @@ private:
  */
 class ResponseStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  ResponseStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
+  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter) : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -123,7 +125,7 @@ private:
  */
 class RequestStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
+  RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection, nullptr) {}
   bool headRequest() { return head_request_; }
 
   // Http::StreamEncoder
@@ -321,7 +323,7 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection) : response_encoder_(connection) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter) : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
     StreamDecoder* request_decoder_{};
@@ -355,6 +357,7 @@ private:
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
+  HeaderKeyFormatterPtr header_key_formatter_;
 };
 
 /**

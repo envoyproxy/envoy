@@ -478,7 +478,7 @@ public:
    * @param context supplies the context passed to iterate().
    * @return Iterate::Continue to continue iteration.
    */
-  using ConstIterateCb = Iterate (*)(const HeaderEntry&, void*);
+  using ConstIterateCb = std::function<Iterate(const HeaderEntry&, void*)>;
 
   /**
    * Iterate over a constant header map.
