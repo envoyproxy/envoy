@@ -14,9 +14,9 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
 
 CdsApiPtr
 ValidationClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                           ClusterManager& cm) {
+                                           bool is_delta, ClusterManager& cm) {
   // Create the CdsApiImpl...
-  ProdClusterManagerFactory::createCds(cds_config, cm);
+  ProdClusterManagerFactory::createCds(cds_config, is_delta, cm);
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;
 }
@@ -38,9 +38,8 @@ ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePri
   return nullptr;
 }
 
-Host::CreateConnectionData
-ValidationClusterManager::tcpConnForCluster(const std::string&, LoadBalancerContext*,
-                                            Network::TransportSocketOptionsSharedPtr) {
+Host::CreateConnectionData ValidationClusterManager::tcpConnForCluster(const std::string&,
+                                                                       LoadBalancerContext*) {
   return Host::CreateConnectionData{nullptr, nullptr};
 }
 

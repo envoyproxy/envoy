@@ -11,6 +11,7 @@ Version history
 * admin: added config dump support for Secret Discovery Service :ref:`SecretConfigDump <envoy_api_msg_admin.v2alpha.SecretsConfigDump>`.
 * api: added ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` option to omit the node identifier from the subsequent discovery requests on the same stream.
 * buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
+* config: added support for :ref:`delta xDS <arch_overview_dynamic_config_delta>` (including ADS) delivery
 * config: enforcing that terminal filters (e.g. HttpConnectionManager for L4, router for L7) be the last in their respective filter chains.
 * config: added access log :ref:`extension filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`.
 * config: added support for :option:`--reject-unknown-dynamic-fields`, providing independent control
@@ -60,6 +61,7 @@ Version history
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
 * router: added new :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy. Retries can now be configured to trigger by arbitrary response header matching.
+* router: added new :ref:`retriable request headers <envoy_api_field_route.RetryPolicy.retriable_request_headers>` to retry policies. Retries can now be configured to only trigger on request header match.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.

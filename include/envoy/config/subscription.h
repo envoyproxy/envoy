@@ -89,7 +89,7 @@ public:
    * @param resources vector of resource names to fetch. It's a (not unordered_)set so that it can
    * be passed to std::set_difference, which must be given sorted collections.
    */
-  virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
+  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

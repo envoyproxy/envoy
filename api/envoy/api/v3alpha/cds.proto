@@ -793,8 +793,6 @@ message Cluster {
 //
 // To facilitate this, the config message for the top-level LB policy may include a field of
 // type LoadBalancingPolicy that specifies the child policy.
-//
-// [#proto-status: experimental]
 message LoadBalancingPolicy {
   message Policy {
     // Required. The name of the LB policy.

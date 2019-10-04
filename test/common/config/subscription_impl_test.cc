@@ -39,12 +39,14 @@ public:
     }
   }
 
+  void TearDown() override { test_harness_->doSubscriptionTearDown(); }
+
   void startSubscription(const std::set<std::string>& cluster_names) {
     test_harness_->startSubscription(cluster_names);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) {
-    test_harness_->updateResources(cluster_names);
+  void updateResourceInterest(const std::set<std::string>& cluster_names) {
+    test_harness_->updateResourceInterest(cluster_names);
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
@@ -90,72 +92,75 @@ INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplInitFetchTimeoutT
 // Validate basic request-response succeeds.
 TEST_P(SubscriptionImplTest, InitialRequestResponse) {
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  statsAre(2, 1, 0, 0, 0, 7148434200721666028);
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, 7148434200721666028));
 }
 
 // Validate that multiple streamed updates succeed.
 TEST_P(SubscriptionImplTest, ResponseStream) {
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  statsAre(2, 1, 0, 0, 0, 7148434200721666028);
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, 7148434200721666028));
   deliverConfigUpdate({"cluster0", "cluster1"}, "1", true);
-  statsAre(3, 2, 0, 0, 0, 13237225503670494420U);
+  EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, 13237225503670494420U));
 }
 
 // Validate that the client can reject a config.
 TEST_P(SubscriptionImplTest, RejectConfig) {
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
-  statsAre(2, 0, 1, 0, 0, 0);
+  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0));
 }
 
 // Validate that the client can reject a config and accept the same config later.
 TEST_P(SubscriptionImplTest, RejectAcceptConfig) {
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
-  statsAre(2, 0, 1, 0, 0, 0);
+  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  statsAre(3, 1, 1, 0, 0, 7148434200721666028);
+  EXPECT_TRUE(statsAre(3, 1, 1, 0, 0, 7148434200721666028));
 }
 
 // Validate that the client can reject a config and accept another config later.
 TEST_P(SubscriptionImplTest, RejectAcceptNextConfig) {
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
-  statsAre(2, 0, 1, 0, 0, 0);
+  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "1", true);
-  statsAre(3, 1, 1, 0, 0, 13237225503670494420U);
+  EXPECT_TRUE(statsAre(3, 1, 1, 0, 0, 13237225503670494420U));
 }
 
 // Validate that stream updates send a message with the updated resources.
 TEST_P(SubscriptionImplTest, UpdateResources) {
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  statsAre(2, 1, 0, 0, 0, 7148434200721666028);
-  updateResources({"cluster2"});
-  statsAre(3, 1, 0, 0, 0, 7148434200721666028);
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, 7148434200721666028));
+  updateResourceInterest({"cluster2"});
+  EXPECT_TRUE(statsAre(3, 1, 0, 0, 0, 7148434200721666028));
 }
 
 // Validate that initial fetch timer is created and calls callback on timeout
 TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
+  if (GetParam() == SubscriptionType::Filesystem) {
+    return; // initial_fetch_timeout not implemented for filesystem.
+  }
   InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   if (GetParam() == SubscriptionType::Http) {
     expectDisableInitFetchTimeoutTimer();
   }
   expectConfigUpdateFailed();
 
   callInitFetchTimeoutCb();
-  statsAre(1, 0, 0, 0, 1, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 1, 0));
 }
 
 // Validate that initial fetch timer is disabled on config update
@@ -163,7 +168,7 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, DisableInitTimeoutOnSuccess) {
   InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   expectDisableInitFetchTimeoutTimer();
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
 }
@@ -173,7 +178,7 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, DisableInitTimeoutOnFail) {
   InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
-  statsAre(1, 0, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   expectDisableInitFetchTimeoutTimer();
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
 }

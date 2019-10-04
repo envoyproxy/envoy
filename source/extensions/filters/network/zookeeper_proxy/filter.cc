@@ -8,6 +8,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/network/well_known_names.h"
 

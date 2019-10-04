@@ -40,6 +40,30 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "recent_lookups_test",
+    srcs = ["recent_lookups_test.cc"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/stats:recent_lookups_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "recent_lookups_speed_test",
+    srcs = ["recent_lookups_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_lib",
+        "//source/common/stats:recent_lookups_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stat_merger_test",
     srcs = ["stat_merger_test.cc"],
     deps = [
