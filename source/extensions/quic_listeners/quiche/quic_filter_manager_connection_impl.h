@@ -122,6 +122,7 @@ private:
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
   // and the rest incoming data bypasses these filters.
   Network::FilterManagerImpl filter_manager_;
+
   StreamInfo::StreamInfoImpl stream_info_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
