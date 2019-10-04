@@ -466,7 +466,7 @@ message HttpConnectionManager {
 
 message LocalReplyConfig {
   // Configuration of list of mappers which allows to filter and change local response.
-  // Code iterate through mappers until first match of filter.
+  // The client will iterate through mappers until first match.
   repeated ResponseMapper mapper = 1;
 
   // Allows to define custom format of local reply.

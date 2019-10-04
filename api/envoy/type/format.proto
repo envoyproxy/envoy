@@ -10,11 +10,11 @@ import "google/protobuf/struct.proto";
 
 // [#protodoc-title: Format]
 
-// Allows to define custom format of returned data.
+// Allows to define one of format: flat plain text or structured json.
 message StringOrJson {
 
   oneof format {
-    // Plain text format. Allows to specify some custom message to returns.
+    // Allows to specify flat plain text format.
     //
     // .. code-block:: yaml
     //
@@ -22,7 +22,7 @@ message StringOrJson {
     //
     string string_format = 1;
 
-    // Json format as dictionary. Allows to specify some custom message to return in json format.
+    // Allows to specify structured data as json.
     //
     // .. code-block:: yaml
     //
@@ -30,7 +30,7 @@ message StringOrJson {
     //    protocol: "HTTP/1.1"
     //    message: "My message"
     //
-    // The following JSON object would be returned:
+    // The following JSON object would be created:
     //
     // .. code-block:: json
     //
