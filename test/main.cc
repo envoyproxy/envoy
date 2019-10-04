@@ -11,6 +11,9 @@
 #include "common/signal/signal_action.h"
 #endif
 
+#include "tools/cpp/runfiles/runfiles.h"
+
+using bazel::tools::cpp::runfiles::Runfiles;
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
@@ -22,10 +25,13 @@ int main(int argc, char** argv) {
   Envoy::SignalAction handle_sigs;
 #endif
 
-  Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
-                                    (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
-                                     Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")),
-                                    1);
+  std::string error;
+  std::unique_ptr<Runfiles> runfiles(Runfiles::Create(argv[0], &error));
+  RELEASE_ASSERT(Envoy::TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
+                     runfiles != nullptr,
+                 error);
+
+  Envoy::TestEnvironment::setRunfiles(runfiles.get());
 
   // Select whether to test only for IPv4, IPv6, or both. The default is to
   // test for both. Options are {"v4only", "v6only", "all"}. Set

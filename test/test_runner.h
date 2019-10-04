@@ -88,7 +88,6 @@ public:
     // they are available in the test XML.
     // TODO(htuch): Log these as well?
     testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
-    testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
     TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 

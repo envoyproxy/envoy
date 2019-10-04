@@ -7,7 +7,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" || "$1" == "bazel.compile_time_options" ]]; then
+        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -87,7 +87,7 @@ if [[ $# -gt 1 ]]; then
   shift
   TEST_TARGETS=$*
 else
-  TEST_TARGETS=//test/...
+  TEST_TARGETS=@envoy//test/...
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -203,9 +203,10 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static --build_tag_filters=-nofips
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
 
