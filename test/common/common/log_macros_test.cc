@@ -101,14 +101,14 @@ TEST(Logger, checkLoggerLevel) {
     }
   };
 
-  LogTestClass testObj;
+  LogTestClass test_obj;
 
   // Set Loggers severity low
-  testObj.setLevel(spdlog::level::trace);
-  EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(1));
+  test_obj.setLevel(spdlog::level::trace);
+  EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(1));
 
-  testObj.setLevel(spdlog::level::info);
-  EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(2));
+  test_obj.setLevel(spdlog::level::info);
+  EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(2));
 }
 
 TEST(RegistryTest, LoggerWithName) {
