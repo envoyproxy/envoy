@@ -208,7 +208,7 @@ message RedisProxy {
   // configuring the backing clusters.
   PrefixRoutes prefix_routes = 5;
 
-  // Authenticate Redis client connections locally by forcing downstream clients to issue a 'Redis
+  // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
   // AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other
   // command. If an AUTH command's password matches this password, an "OK" response will be returned
   // to the client. If the AUTH command password does not match this password, then an "ERR invalid
