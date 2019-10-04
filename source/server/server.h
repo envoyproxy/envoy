@@ -228,7 +228,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
 
-Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {
+  Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {
     return is_dynamic ? dynamic_server_context_ : static_server_context_;
   }
 
@@ -316,10 +316,10 @@ private:
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
-  
+
   ServerFactoryContextImpl dynamic_server_context_;
   ServerFactoryContextImpl static_server_context_;
-  
+
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 

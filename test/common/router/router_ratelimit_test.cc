@@ -80,7 +80,7 @@ public:
     config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<ConfigImpl> config_;
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;

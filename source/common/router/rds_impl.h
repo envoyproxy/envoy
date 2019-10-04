@@ -131,16 +131,14 @@ private:
 
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
-      Init::Manager& init_manager,
+      const uint64_t manager_identifier,
+      Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
       const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
       bool is_delta);
 
   bool validateUpdateSize(int num_resources);
 
-	  Init::Manager& getRdsConfigInitManager() { 
-      return init_manager_;
-    }
+  Init::Manager& getRdsConfigInitManager() { return init_manager_; }
 
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;

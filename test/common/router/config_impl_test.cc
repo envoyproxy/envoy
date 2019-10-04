@@ -49,7 +49,7 @@ namespace {
 class TestConfigImpl : public ConfigImpl {
 public:
   TestConfigImpl(const envoy::api::v2::RouteConfiguration& config,
-                 Server::Configuration::FactoryContext& factory_context,
+                 Server::Configuration::ServerFactoryContext& factory_context,
                  bool validate_clusters_default)
       : ConfigImpl(config, factory_context, validate_clusters_default), config_(config) {}
 
@@ -109,7 +109,7 @@ protected:
 
   Stats::TestSymbolTable symbol_table_;
   Api::ApiPtr api_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 };
 
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
@@ -3308,7 +3308,7 @@ virtual_hosts:
         match: { path: /host }
         redirect: { host_redirect: new.lyft.com }
   )EOF";
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
@@ -5913,7 +5913,7 @@ public:
     }
     Router::RouteSpecificFilterConfigConstSharedPtr
     createRouteSpecificFilterConfig(const Protobuf::Message& message,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::ServerFactoryContext&) override {
       auto obj = std::make_shared<DerivedFilterConfig>();
       obj->config_.MergeFrom(message);
       return obj;

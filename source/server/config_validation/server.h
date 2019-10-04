@@ -108,7 +108,7 @@ public:
     return validation_context_;
   }
 
-   Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {
+  Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {
     return is_dynamic ? dynamic_server_context_ : static_server_context_;
   }
 

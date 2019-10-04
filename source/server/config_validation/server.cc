@@ -53,7 +53,7 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), time_system_(time_system),
-      	      dynamic_server_context_(*this, /*is_dynamic=*/true),
+      dynamic_server_context_(*this, /*is_dynamic=*/true),
       static_server_context_(*this, /*is_dynamic=*/false) {
   try {
     initialize(options, local_address, component_factory);

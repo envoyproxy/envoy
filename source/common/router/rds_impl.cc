@@ -41,12 +41,12 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::api::v2::RouteConfiguration& config,
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : 
-    
-config_(new ConfigImpl(config, factory_context.getServerFactoryContext(/*is_dynamic=*/false),true)),
+    :
 
-     route_config_proto_{config},
-      last_updated_(factory_context.timeSource().systemTime()),
+      config_(new ConfigImpl(config, factory_context.getServerFactoryContext(/*is_dynamic=*/false),
+                             true)),
+
+      route_config_proto_{config}, last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
   route_config_provider_manager_.static_route_config_providers_.insert(this);
 }
@@ -59,8 +59,7 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
-    Init::Manager& init_manager,
-    const std::string& stat_prefix,
+    Init::Manager& init_manager, const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager, bool is_delta)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       init_manager_(init_manager),
@@ -180,9 +179,9 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)),
-      config_update_info_(subscription_->routeConfigUpdate()), 
+      config_update_info_(subscription_->routeConfigUpdate()),
       factory_context_(factory_context.getServerFactoryContext(/*is_dynamic=*/true)),
-      //provider_init_manager_(factory_context.initManager()),
+      // provider_init_manager_(factory_context.initManager()),
       tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
@@ -237,7 +236,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
   auto& server_factory_context = factory_context.getServerFactoryContext(/*is_dynamic=*/true);
-  
+
   RdsRouteConfigSubscriptionSharedPtr subscription;
 
   auto it = route_config_subscriptions_.find(manager_identifier);
@@ -245,9 +244,9 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
-    subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, server_factory_context,
-    factory_context.initManager(),
-                                                      stat_prefix, *this, is_delta));                                                         
+    subscription.reset(new RdsRouteConfigSubscription(
+        rds, manager_identifier, server_factory_context, factory_context.initManager(), stat_prefix,
+        *this, is_delta));
     init_manager.add(subscription->init_target_);
     route_config_subscriptions_.insert({manager_identifier, subscription});
   } else {

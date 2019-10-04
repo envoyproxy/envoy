@@ -71,7 +71,7 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   try {
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
     TestUtility::validate(input.config());
     ConfigImpl config(cleanRouteConfig(input.config()), factory_context, true);
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(input.headers());

@@ -77,7 +77,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-        dynamic_server_context_(*this, /*is_dynamic=*/true),
+      dynamic_server_context_(*this, /*is_dynamic=*/true),
       static_server_context_(*this, /*is_dynamic=*/false) {
   try {
     if (!options.logPath().empty()) {
