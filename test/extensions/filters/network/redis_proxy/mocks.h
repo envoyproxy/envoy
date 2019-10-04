@@ -48,7 +48,6 @@ public:
                HandlePtr(const std::string& cluster_name,
                          const std::chrono::milliseconds min_time_between_triggering,
                          const uint32_t redirects_threshold, const RedirectCB cb));
-  MOCK_METHOD1(unregisterCluster, void(const std::string& cluster_name));
 };
 
 namespace ConnPool {

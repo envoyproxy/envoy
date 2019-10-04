@@ -148,6 +148,8 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 

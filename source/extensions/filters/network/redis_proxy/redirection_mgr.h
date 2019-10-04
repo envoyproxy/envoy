@@ -53,12 +53,6 @@ public:
   virtual HandlePtr registerCluster(const std::string& cluster_name,
                                     const std::chrono::milliseconds min_time_between_triggering,
                                     const uint32_t redirects_threshold, const RedirectCB cb) PURE;
-
-  /**
-   * Unregister a cluster from the manager (called by main thread only).
-   * @param cluster_name is the name of the cluster.
-   */
-  virtual void unregisterCluster(const std::string& cluster_name) PURE;
 };
 
 using RedirectionManagerSharedPtr = std::shared_ptr<RedirectionManager>;
