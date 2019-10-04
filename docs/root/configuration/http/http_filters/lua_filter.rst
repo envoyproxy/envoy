@@ -504,7 +504,25 @@ set()
   dynamicMetadata:set(filterName, key, value)
 
 Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
-e.g. *envoy.lb*. The type of *key* and *value* is *string*.
+e.g. *envoy.lb*. The type of *key* is *string*. The type of *value* is any Lua type that can be mapped
+to a metadata value: *table*, *numeric*, *boolean*, *string* and *nil*. When using a *table* as an argument,
+its keys can only be *string* or *numeric*.
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local headers = request_handle:headers()
+    request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "request.info", {
+      auth: headers:get("authorization),
+      token: headers:get("x-request-token"),
+    })
+  end
+
+  function envoy_on_response(response_handle)
+    local meta = response_handle:streamInfo():dynamicMetadata()["request.info"]
+    response_handle:logInfo("Auth: "..meta.auth..", token: "..meta.token)
+  end
+
 
 __pairs()
 ^^^^^^^^^

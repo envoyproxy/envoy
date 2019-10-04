@@ -18,7 +18,7 @@
 #include "common/http/headers.h"
 #include "test/test_common/utility.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_connection.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
@@ -68,9 +68,8 @@ public:
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         quic_connection_(quic::test::TestConnectionId(),
                          quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
-                         connection_helper_, alarm_factory_, writer_,
-                         /*owns_writer=*/false, quic::Perspective::IS_SERVER, {quic_version_},
-                         listener_config_, listener_stats_),
+                         connection_helper_, alarm_factory_, &writer_,
+                         /*owns_writer=*/false, {quic_version_}, listener_config_, listener_stats_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, /*visitor=*/nullptr,
                       /*helper=*/nullptr, /*crypto_config=*/nullptr,
                       /*compressed_certs_cache=*/nullptr),
@@ -107,7 +106,7 @@ protected:
   quic::QuicConfig quic_config_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
-  EnvoyQuicConnection quic_connection_;
+  EnvoyQuicServerConnection quic_connection_;
   MockQuicServerSession quic_session_;
   quic::QuicStreamId stream_id_;
   EnvoyQuicServerStream quic_stream_;

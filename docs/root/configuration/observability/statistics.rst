@@ -22,7 +22,7 @@ Server related statistics are rooted at *server.* with following statistics:
   state, Gauge, Current :ref:`State <envoy_api_enum_admin.v2alpha.ServerInfo.state>` of the Server.
   parent_connections, Gauge, Total connections of the old Envoy process on hot restart
   total_connections, Gauge, Total connections of both new and old Envoy processes
-  version, Gauge, Integer represented version number based on SCM revision
+  version, Gauge, Integer represented version number based on SCM revision or :ref:stats_server_version_override` <envoy_api_field_config.bootstrap.v2.Bootstrap.header_prefix>` if set.
   days_until_first_cert_expiring, Gauge, Number of days until the next certificate being managed will expire
   hot_restart_epoch, Gauge, Current hot restart epoch
   initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections

@@ -264,6 +264,37 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   }
 }
 
+TEST(UtilityTest, PrepareDnsRefreshStrategy) {
+  NiceMock<Runtime::MockRandomGenerator> random;
+
+  {
+    // dns_failure_refresh_rate not set.
+    envoy::api::v2::Cluster cluster;
+    BackOffStrategyPtr strategy = Utility::prepareDnsRefreshStrategy(cluster, 5000, random);
+    EXPECT_NE(nullptr, dynamic_cast<FixedBackOffStrategy*>(strategy.get()));
+  }
+
+  {
+    // dns_failure_refresh_rate set.
+    envoy::api::v2::Cluster cluster;
+    cluster.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
+    cluster.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(10);
+    BackOffStrategyPtr strategy = Utility::prepareDnsRefreshStrategy(cluster, 5000, random);
+    EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
+  }
+
+  {
+    // dns_failure_refresh_rate set with invalid max_interval.
+    envoy::api::v2::Cluster cluster;
+    cluster.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
+    cluster.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(2);
+    EXPECT_THROW_WITH_REGEX(Utility::prepareDnsRefreshStrategy(cluster, 5000, random),
+                            EnvoyException,
+                            "cluster.dns_failure_refresh_rate must have max_interval greater than "
+                            "or equal to the base_interval");
+  }
+}
+
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();

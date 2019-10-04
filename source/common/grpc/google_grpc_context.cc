@@ -7,23 +7,22 @@
 #include "common/common/macros.h"
 #include "common/common/thread.h"
 
-#ifdef ENVOY_GOOGLE_GRPC
 #include "grpcpp/grpcpp.h"
-#endif
 
 namespace Envoy {
 namespace Grpc {
 
 GoogleGrpcContext::GoogleGrpcContext() : instance_tracker_(instanceTracker()) {
+#ifdef ENVOY_GOOGLE_GRPC
   Thread::LockGuard lock(instance_tracker_.mutex_);
   if (++instance_tracker_.live_instances_ == 1) {
-#ifdef ENVOY_GOOGLE_GRPC
     grpc_init();
-#endif
   }
+#endif
 }
 
 GoogleGrpcContext::~GoogleGrpcContext() {
+#ifdef ENVOY_GOOGLE_GRPC
   // Per https://github.com/grpc/grpc/issues/20303 it is OK to call
   // grpc_shutdown_blocking() as long as no one can concurrently call
   // grpc_init(). We use check_format.py to ensure that this file contains the
@@ -32,10 +31,9 @@ GoogleGrpcContext::~GoogleGrpcContext() {
   Thread::LockGuard lock(instance_tracker_.mutex_);
   ASSERT(instance_tracker_.live_instances_ > 0);
   if (--instance_tracker_.live_instances_ == 0) {
-#ifdef ENVOY_GOOGLE_GRPC
     grpc_shutdown_blocking(); // Waiting for quiescence avoids non-determinism in tests.
-#endif
   }
+#endif
 }
 
 GoogleGrpcContext::InstanceTracker& GoogleGrpcContext::instanceTracker() {

@@ -69,18 +69,7 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   Returns:
     A string with additional RST from annotations.
   """
-  s = annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
-  if annotations.NOT_IMPLEMENTED_WARN_ANNOTATION in comment.annotations:
-    s += '\n.. WARNING::\n  Not implemented yet\n'
-  if type_name == 'message' or type_name == 'enum':
-    if annotations.PROTO_STATUS_ANNOTATION in comment.annotations:
-      status = comment.annotations[annotations.PROTO_STATUS_ANNOTATION]
-      if status not in ['frozen', 'draft', 'experimental']:
-        raise ProtodocError('Unknown proto status: %s' % status)
-      if status == 'draft' or status == 'experimental':
-        s += ('\n.. WARNING::\n This %s type has :ref:`%s '
-              '<config_overview_v2_status>` status.\n' % (type_name, status))
-  return s
+  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
 
 
 def MapLines(f, s):

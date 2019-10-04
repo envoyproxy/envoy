@@ -1102,6 +1102,38 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
   ASSERT_EQ(out[1], "bar");
 }
 
+// Resets the downstream stream immediately and verifies that we clean up everything.
+TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
+  config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+
+  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                        TestUtility::DefaultTimeout,
+                                                        max_request_headers_kb_));
+
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    codec_client_->close();
+  } else {
+    codec_client_->sendReset(encoder_decoder.first);
+  }
+
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  codec_client_->waitForDisconnect();
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,

@@ -802,6 +802,16 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
+  if (options && !options->applicationProtocolListOverride().empty()) {
+    std::vector<uint8_t> parsed_override_alpn =
+        parseAlpnProtocols(absl::StrJoin(options->applicationProtocolListOverride(), ","));
+    if (!parsed_override_alpn.empty()) {
+      int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
+                                   parsed_override_alpn.size());
+      RELEASE_ASSERT(rc == 0, "");
+    }
+  }
+
   if (allow_renegotiation_) {
     SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }
