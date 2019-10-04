@@ -45,4 +45,15 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_EQ(expected_counted_failures, assert_fail_count);
 }
 
+TEST(AssertDeathTest, LogDfatalOrReturn) {
+#ifndef NDEBUG
+  EXPECT_DEATH({ LOG_DFATAL_OR_RETURN(0); }, ".assert failure: 0*");
+#elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+  EXPECT_DEATH({ LOG_DFATAL_OR_RETURN(0); }, ".*LOG_DFATAL_OR_RETURN(0).*");
+#else
+  EXPECT_LOG_CONTAINS("error", "LOG_DFATAL_OR_RETURN(0)", LOG_DFATAL_OR_RETURN(0));
+  EXPECT_TRUE(false) << "statement should not be reached due to _OR_RETURN";
+#endif
+}
+
 } // namespace Envoy

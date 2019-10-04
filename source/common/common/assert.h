@@ -108,12 +108,12 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 
 // When compiled for optimization, LOG_DFATAL works like ENVOY_LOG_MISC_(error, ...)
 #define LOG_DFATAL(expr) ENVOY_LOG_MISC(error, "LOG_DFATAL({})", #expr)
-#define LOG_DFATAL_OR_RETURN(expr) \
-  do { \
-    if (!(expr)) { \
-      ENVOY_LOG_MISC(error, "LOG_DFATAL_OR_RETURN({})", #expr); \
-      return; \
-    } \
+#define LOG_DFATAL_OR_RETURN(expr)                                                                 \
+  do {                                                                                             \
+    if (!(expr)) {                                                                                 \
+      ENVOY_LOG_MISC(error, "LOG_DFATAL_OR_RETURN({})", #expr);                                    \
+      return;                                                                                      \
+    }                                                                                              \
   } while (false)
 
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
