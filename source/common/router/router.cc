@@ -90,8 +90,8 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
 
 } // namespace
 
-void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool isSecureTransport) {
-  if (isSecureTransport) {
+void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport) {
+  if (use_secure_transport) {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);
