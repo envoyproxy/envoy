@@ -16,11 +16,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +34,7 @@ public:
     return filter;
   }
 
-  std::unique_ptr<AlpnFilter> makeAlpnOverrideFilter(AlpnOverride alpn) {
+  std::unique_ptr<AlpnFilter> makeAlpnOverrideFilter(const AlpnOverride& alpn) {
     envoy::config::filter::http::alpn::v2alpha::FilterConfig proto_config;
     for (const auto& p : alpn) {
       envoy::config::filter::http::alpn::v2alpha::FilterConfig_Entry entry;
