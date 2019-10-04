@@ -1,6 +1,5 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
-#include <bits/stdint-uintn.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
