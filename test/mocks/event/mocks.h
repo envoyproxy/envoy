@@ -119,6 +119,7 @@ public:
   MOCK_CONST_METHOD0(isThreadSafe, bool());
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
   MOCK_METHOD0(getCurrentThreadId, Thread::ThreadId());
+  MOCK_CONST_METHOD0(getSchedulerPrepareTime, timeval());
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
