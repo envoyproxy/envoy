@@ -45,7 +45,7 @@ public:
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr),
+                     Upstream::ResourcePriority::Default, nullptr, nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
