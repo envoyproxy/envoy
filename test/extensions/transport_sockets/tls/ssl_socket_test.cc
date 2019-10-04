@@ -808,6 +808,7 @@ TEST_P(SslSocketTest, GetCertDigest) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedDigest(TEST_NO_SAN_CERT_HASH)
+               .setExpectLocalCertPresented()
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
@@ -879,6 +880,7 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedDigest(TEST_NO_SAN_CERT_HASH)
+               .setExpectLocalCertPresented()
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
@@ -935,6 +937,7 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+               .setExpectLocalCertPresented()
                .setExpectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -1089,6 +1092,7 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedLocalUri("spiffe://lyft.com/test-team")
+               .setExpectLocalCertPresented()
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
@@ -3761,7 +3765,8 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
 )EOF";
   TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
                                           GetParam());
-  testUtil(successful_test_options.setExpectedSerialNumber(TEST_SAN_DNS2_CERT_SERIAL));
+  testUtil(successful_test_options.setExpectedSerialNumber(TEST_SAN_DNS2_CERT_SERIAL)
+               .setExpectLocalCertPresented());
 }
 
 TEST_P(SslSocketTest, GetRequestedServerName) {
@@ -4246,7 +4251,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
 
   TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
                                           GetParam());
-  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true).setExpectLocalCertPresented());
 }
 
 // Test asynchronous decryption (RSA).
@@ -4342,7 +4347,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
 
   TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
                                           GetParam());
-  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true).setExpectLocalCertPresented());
 }
 
 // Test asynchronous signing (ECDHE) failure (invalid signature).
