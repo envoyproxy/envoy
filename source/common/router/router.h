@@ -325,6 +325,10 @@ public:
     return callbacks_->getUpstreamSocketOptions();
   }
 
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return transport_socket_options_;
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
@@ -576,6 +580,8 @@ private:
   bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
+
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 };
 
 class ProdFilter : public Filter {
