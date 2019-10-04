@@ -330,9 +330,9 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   }
 
   auto num_ejections = monitor->numEjections();
-  LOG_DFATAL_OR_RETURN(num_ejections > 0);
+  ASSERT_DFATAL_OR(num_ejections > 0, return );
   auto last_ejection_time = monitor->lastEjectionTime();
-  LOG_DFATAL_OR_RETURN(last_ejection_time);
+  ASSERT_DFATAL_OR(last_ejection_time, return );
   if (now < last_ejection_time.value()) {
     return;
   }

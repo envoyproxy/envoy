@@ -25,20 +25,20 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ ASSERT(0); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, ""); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, "With some logs"); }, ".*assert failure: 0. Details: With some logs.*");
-  EXPECT_DEATH({ LOG_DFATAL(0); }, ".assert failure: 0*");
+  EXPECT_DEATH({ ASSERT_DFATAL(0); }, ".assert failure: 0*");
   expected_counted_failures = 0;
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0, ""));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
                       ASSERT(0, "With some logs"));
-  EXPECT_DEATH({ LOG_DFATAL(0); }, ".*LOG_DFATAL(0).*");
+  EXPECT_DEATH({ ASSERT_DFATAL(0); }, ".*ASSERT_DFATAL(0).*");
   expected_counted_failures = 3;
 #else
   EXPECT_NO_LOGS(ASSERT(0));
   EXPECT_NO_LOGS(ASSERT(0, ""));
   EXPECT_NO_LOGS(ASSERT(0, "With some logs"));
-  EXPECT_LOG_CONTAINS("error", "LOG_DFATAL(0)", LOG_DFATAL(0));
+  EXPECT_LOG_CONTAINS("error", "ASSERT_DFATAL(0)", ASSERT_DFATAL(0));
   expected_counted_failures = 0;
 #endif
 
@@ -47,12 +47,12 @@ TEST(AssertDeathTest, VariousLogs) {
 
 TEST(AssertDeathTest, LogDfatalOrReturn) {
 #ifndef NDEBUG
-  EXPECT_DEATH({ LOG_DFATAL_OR_RETURN(0); }, ".assert failure: 0*");
+  EXPECT_DEATH({ ASSERT_DFATAL_OR(0, return ); }, ".assert failure: 0*");
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
-  EXPECT_DEATH({ LOG_DFATAL_OR_RETURN(0); }, ".*LOG_DFATAL_OR_RETURN(0).*");
+  EXPECT_DEATH({ ASSERT_DFATAL_OR(0, return ); }, ".*ASSERT_DFATAL_OR(0, return).*");
 #else
-  EXPECT_LOG_CONTAINS("error", "LOG_DFATAL_OR_RETURN(0)", LOG_DFATAL_OR_RETURN(0));
-  EXPECT_TRUE(false) << "statement should not be reached due to _OR_RETURN";
+  EXPECT_LOG_CONTAINS("error", "ASSERT_DFATAL_OR(0)", ASSERT_DFATAL_OR(0, return ));
+  EXPECT_TRUE(false) << "statement should not be reached due to _OR";
 #endif
 }
 

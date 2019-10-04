@@ -92,9 +92,9 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
 
-// When compiled for debug, LOG_DFATAL is simply an ASSERT.
-#define LOG_DFATAL(expr) ASSERT(expr)
-#define LOG_DFATAL_OR_RETURN(expr) ASSERT(expr)
+// When compiled for debug, ASSERT_DFATAL is simply an ASSERT.
+#define ASSERT_DFATAL(expr) ASSERT(expr)
+#define ASSERT_DFATAL_OR(expr, escape) ASSERT(expr)
 
 #else
 
@@ -106,15 +106,18 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
     (void)__assert_dummy_variable;                                                                 \
   } while (false)
 
-// When compiled for optimization, LOG_DFATAL works like ENVOY_LOG_MISC_(error, ...)
-#define LOG_DFATAL(expr) ENVOY_LOG_MISC(error, "LOG_DFATAL({})", #expr)
-#define LOG_DFATAL_OR_RETURN(expr)                                                                 \
-  do {                                                                                             \
-    if (!(expr)) {                                                                                 \
-      ENVOY_LOG_MISC(error, "LOG_DFATAL_OR_RETURN({})", #expr);                                    \
-      return;                                                                                      \
-    }                                                                                              \
-  } while (false)
+// When compiled for optimization, ASSERT_DFATAL works like ENVOY_LOG_MISC_(error, ...)
+#define ASSERT_DFATAL(expr) ENVOY_LOG_MISC(error, "ASSERT_DFATAL({})", #expr)
+
+// Note that ASSERT_DFATAL_OR's multi-line definition is not wrapped in a
+// do/while because it's possible the caller may want to use 'break' as the
+// escape. This is OK because Envoy style is to use braces for all conditionals,
+// so there can be no mistaken binding of a trailing else.
+#define ASSERT_DFATAL_OR(expr, escape)                                                             \
+  if (!(expr)) {                                                                                   \
+    ENVOY_LOG_MISC(error, "ASSERT_DFATAL_OR({}, {})", #expr, #escape);                             \
+    escape;                                                                                        \
+  }
 
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
