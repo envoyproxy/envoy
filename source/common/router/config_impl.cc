@@ -280,8 +280,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
                           factory_context),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()),
-      internal_redirect_action_(convertInternalRedirectAction(route.route())),
-      reverse_header_evaluation_order_(vhost.reverseHeaderEvaluationOrder()) {
+      internal_redirect_action_(convertInternalRedirectAction(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -382,7 +381,7 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
-  if (!reverse_header_evaluation_order_) {
+  if (!vhost_.globalRouteConfig().reverseHeaderEvaluationOrder()) {
     // Append user-specified request headers in the following order: route-level headers, virtual
     // host level headers and finally global connection manager level headers.
     request_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -415,7 +414,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  if (!reverse_header_evaluation_order_) {
+  if (!vhost_.globalRouteConfig().reverseHeaderEvaluationOrder()) {
     // Append user-specified request headers in the following order: route-level headers, virtual
     // host level headers and finally global connection manager level headers.
     response_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -835,8 +834,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
       per_filter_configs_(virtual_host.typed_per_filter_config(), virtual_host.per_filter_config(),
                           factory_context),
       include_attempt_count_(virtual_host.include_request_attempt_count()),
-      virtual_cluster_catch_all_(stat_name_pool_),
-      reverse_header_evaluation_order_(virtual_host.reverse_header_evaluation_order()) {
+      virtual_cluster_catch_all_(stat_name_pool_) {
 
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
@@ -1082,7 +1080,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
-      uses_vhds_(config.has_vhds()) {
+      uses_vhds_(config.has_vhds()),
+      reverse_header_evaluation_order_(config.reverse_header_evaluation_order()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));

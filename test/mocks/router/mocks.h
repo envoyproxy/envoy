@@ -225,7 +225,6 @@ public:
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   MOCK_METHOD0(retryHostPredicate, Upstream::RetryHostPredicateSharedPtr());
-  MOCK_CONST_METHOD0(reverseHeaderEvaluationOrder, bool());
 
   Stats::StatName statName() const override {
     stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
@@ -382,6 +381,7 @@ public:
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(usesVhds, bool());
+  MOCK_CONST_METHOD0(reverseHeaderEvaluationOrder, bool());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;

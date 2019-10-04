@@ -28,7 +28,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 19]
+// [#comment:next free field: 18]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -145,16 +145,6 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
-
-  // By default, the headers that should be added/removed are evaluated in the following order:
-  //
-  // * route-level headers
-  // * virtual host level headers
-  // * and finally global connection manager level headers
-  //
-  // To allow setting overrides at the route or virtual host level, this order can be reversed
-  // by setting this option to true. Defaults to false.
-  bool reverse_header_evaluation_order = 18;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do

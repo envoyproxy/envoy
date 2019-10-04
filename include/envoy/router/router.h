@@ -430,13 +430,6 @@ public:
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCount() const PURE;
-
-  /**
-   * @return bool whether to reverse the header evaluation order when adding or
-   * removing headers. The default evaluation order is route level, virtual host
-   * level and global connection manager level.
-   */
-  virtual bool reverseHeaderEvaluationOrder() const PURE;
 };
 
 /**
@@ -853,6 +846,13 @@ public:
    * @return whether router configuration uses VHDS.
    */
   virtual bool usesVhds() const PURE;
+
+  /**
+   * @return bool whether to reverse the header evaluation order when adding or
+   * removing headers. The default evaluation order is route level, then virtual host
+   * level and finally global connection manager level.
+   */
+  virtual bool reverseHeaderEvaluationOrder() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

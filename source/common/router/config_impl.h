@@ -172,7 +172,6 @@ public:
   const absl::optional<envoy::api::v2::route::HedgePolicy>& hedgePolicy() const {
     return hedge_policy_;
   }
-  bool reverseHeaderEvaluationOrder() const override { return reverse_header_evaluation_order_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -217,7 +216,6 @@ private:
   absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
   absl::optional<envoy::api::v2::route::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
-  const bool reverse_header_evaluation_order_;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -669,7 +667,6 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   InternalRedirectAction internal_redirect_action_;
-  const bool reverse_header_evaluation_order_;
 };
 
 /**
@@ -804,6 +801,8 @@ public:
 
   bool usesVhds() const override { return uses_vhds_; }
 
+  bool reverseHeaderEvaluationOrder() const override { return reverse_header_evaluation_order_; }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -812,6 +811,7 @@ private:
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
   const bool uses_vhds_;
+  const bool reverse_header_evaluation_order_;
 };
 
 /**
@@ -828,6 +828,7 @@ public:
 
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
+  bool reverseHeaderEvaluationOrder() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

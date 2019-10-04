@@ -113,7 +113,6 @@ name: foo
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
-    reverse_header_evaluation_order: {0}
     response_headers_to_add:
       - header:
           key: x-global-header1
@@ -159,7 +158,6 @@ virtual_hosts:
           cluster: "www2"
   - name: www2_staging
     domains: ["www-staging.lyft.net"]
-    reverse_header_evaluation_order: {0}
     response_headers_to_add:
       - header:
           key: x-vhost-header1
@@ -177,7 +175,6 @@ virtual_hosts:
             append: {1}
   - name: default
     domains: ["*"]
-    reverse_header_evaluation_order: {0}
     routes:
       - match:
           prefix: "/"
@@ -190,6 +187,7 @@ response_headers_to_add:
       value: global1
     append: {1}
 response_headers_to_remove: ["x-global-remove"]
+reverse_header_evaluation_order: {0}
 )EOF";
 
     return fmt::format(yaml, reverse, append);
@@ -201,7 +199,6 @@ name: foo
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
-    reverse_header_evaluation_order: {0}
     request_headers_to_add:
       - header:
           key: x-global-header
@@ -237,7 +234,6 @@ virtual_hosts:
           cluster: www2
   - name: default
     domains: ["*"]
-    reverse_header_evaluation_order: {0}
     routes:
       - match:
           prefix: "/"
@@ -249,6 +245,7 @@ request_headers_to_add:
       value: global
     append: false
 request_headers_to_remove: ["x-global-nope"]
+reverse_header_evaluation_order: {0}
 )EOF";
 
     return fmt::format(yaml, reverse);
@@ -1361,7 +1358,6 @@ name: foo
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
-    reverse_header_evaluation_order: true
     routes:
       - match:
           prefix: "/cacheable"
@@ -1376,6 +1372,7 @@ response_headers_to_add:
   - header:
       key: cache-control
       value: private
+reverse_header_evaluation_order: true
 )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 

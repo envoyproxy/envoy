@@ -165,6 +165,7 @@ private:
 
     const std::string& name() const override { return EMPTY_STRING; }
     bool usesVhds() const override { return false; }
+    bool reverseHeaderEvaluationOrder() const override { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
@@ -179,7 +180,6 @@ private:
       return nullptr;
     }
     bool includeAttemptCount() const override { return false; }
-    bool reverseHeaderEvaluationOrder() const override { return false; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
