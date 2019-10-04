@@ -1,4 +1,3 @@
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
 # Patch upstream Abseil to prevent Foundation dependency from leaking into Android builds.
@@ -40,11 +39,11 @@ http_file(
     urls = ["https://github.com/google/xctestrunner/releases/download/0.2.10/ios_test_runner.par"],
 )
 
-git_repository(
+http_archive(
     name = "build_bazel_rules_apple",
-    commit = "a595f71b94f75d531ebdf8ae31cc8eb1ead6a480",
-    remote = "https://github.com/bazelbuild/rules_apple.git",
-    shallow_since = "1568153651 -0700",
+    sha256 = "177888104787d5d3953cfec09e19130e460167d6ef9118c4c0907c41bf0fb13f",
+    strip_prefix = "rules_apple-a595f71b94f75d531ebdf8ae31cc8eb1ead6a480",
+    urls = ["https://github.com/bazelbuild/rules_apple/archive/a595f71b94f75d531ebdf8ae31cc8eb1ead6a480.tar.gz"],
 )
 
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
@@ -69,18 +68,18 @@ rules_foreign_cc_dependencies()
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
-git_repository(
+http_archive(
     name = "build_bazel_apple_support",
-    commit = "e16463ef91ed77622c17441f9569bda139d45b18",
-    remote = "https://github.com/bazelbuild/apple_support.git",
-    shallow_since = "1565374645 -0700",
+    sha256 = "595a6652d8d65380a3d764826bf1a856a8cc52371bbd961dfcd942fdb14bc133",
+    strip_prefix = "apple_support-e16463ef91ed77622c17441f9569bda139d45b18",
+    urls = ["https://github.com/bazelbuild/apple_support/archive/e16463ef91ed77622c17441f9569bda139d45b18.tar.gz"],
 )
 
-git_repository(
+http_archive(
     name = "build_bazel_rules_swift",
-    commit = "90995572723ed47cbf2968480db250e97a9f5894",
-    remote = "https://github.com/bazelbuild/rules_swift.git",
-    shallow_since = "1568067570 -0700",
+    sha256 = "1a0ad44a137bf56df24c5b09daa51abdb92ebb5dbe219fd9ce92e2196676c314",
+    strip_prefix = "rules_swift-90995572723ed47cbf2968480db250e97a9f5894",
+    urls = ["https://github.com/bazelbuild/rules_swift/archive/90995572723ed47cbf2968480db250e97a9f5894.tar.gz"],
 )
 
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
@@ -99,11 +98,11 @@ android_sdk_repository(name = "androidsdk")
 
 android_ndk_repository(name = "androidndk")
 
-git_repository(
+http_archive(
     name = "rules_jvm_external",
-    commit = "fc5bd21820581f342a4119a89bfdf36e79c6c549",
-    remote = "https://github.com/bazelbuild/rules_jvm_external.git",
-    shallow_since = "1552938175 -0400",
+    sha256 = "db56dbd8e96ab31d1ee57c168d6343949d95f36a21085b33003d03585c4dba44",
+    strip_prefix = "rules_jvm_external-fc5bd21820581f342a4119a89bfdf36e79c6c549",
+    urls = ["https://github.com/bazelbuild/rules_jvm_external/archive/fc5bd21820581f342a4119a89bfdf36e79c6c549.tar.gz"],
 )
 
 load("@rules_jvm_external//:defs.bzl", "maven_install")
@@ -122,11 +121,11 @@ maven_install(
     ],
 )
 
-git_repository(
+http_archive(
     name = "io_bazel_rules_kotlin",
-    commit = "200802f0525af6e3ff4d50985c4f105e0685b883",  # tag legacy-modded-0_26_1-02
-    remote = "https://github.com/cgruber/rules_kotlin",
-    shallow_since = "1561081499 -0700",
+    sha256 = "52f88499cdd7db892a500951ea5cbb749245c5635e6da0b80a3b7ad4ea976f31",
+    strip_prefix = "rules_kotlin-200802f0525af6e3ff4d50985c4f105e0685b883",  # tag legacy-modded-0_26_1-02
+    urls = ["https://github.com/cgruber/rules_kotlin/archive/200802f0525af6e3ff4d50985c4f105e0685b883.tar.gz"],
 )
 
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
