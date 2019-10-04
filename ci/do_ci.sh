@@ -204,7 +204,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
 
-  if [[ "$TEST_TARGETS" == "//test/..."]]; then
+  if [[ "${TEST_TARGETS}" == "//test/..." ]]; then
     cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     TEST_TARGETS="@envoy//test/..."
   fi
