@@ -7,6 +7,7 @@ aar_with_jni(
     name = "android_aar",
     android_library = "envoy_lib",
     archive_name = "envoy",
+    proguard_rules = "//library:proguard_rules",
     visibility = ["//visibility:public"],
 )
 
