@@ -22,8 +22,8 @@ envoy_cc_library(
         "//source/common/config:resources_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2/cluster:outlier_detection_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/cluster:pkg_cc_proto",
     ],
 )
 
@@ -63,8 +63,8 @@ envoy_cc_library(
         "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -121,8 +121,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/router:router_lib",
-        "@envoy_api//envoy/api/v2/core:health_check_cc",
-        "@envoy_api//envoy/data/core/v2alpha:health_check_event_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -178,7 +178,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/service/load_stats/v2:lrs_cc",
+        "@envoy_api//envoy/service/load_stats/v2:pkg_cc_proto",
     ],
 )
 
@@ -204,7 +204,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/service/discovery/v2:hds_cc",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -267,9 +267,9 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2/cluster:outlier_detection_cc",
-        "@envoy_api//envoy/data/cluster/v2alpha:outlier_detection_event_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/cluster:pkg_cc_proto",
+        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -336,9 +336,9 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters:well_known_names",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],
 )
 
@@ -391,7 +391,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -445,8 +445,8 @@ envoy_cc_library(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],
 )
 
@@ -476,7 +476,7 @@ envoy_cc_library(
         "//source/extensions/clusters:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -512,7 +512,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/extensions/clusters:well_known_names",
         "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],
 )

@@ -35,6 +35,6 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1:config_cc",
+        "@envoy_api//envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1:pkg_cc_proto",
     ],
 )
