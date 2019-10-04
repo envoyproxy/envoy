@@ -1,11 +1,15 @@
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
@@ -25,7 +29,6 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -48,109 +51,98 @@ namespace {
 using ::Envoy::Network::UpstreamServerName;
 
 namespace {
-Config constructConfigFromJson(const Json::Object& json,
+Config constructConfigFromYaml(const std::string& json,
                                Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
-  Envoy::Config::FilterJson::translateTcpProxy(json, tcp_proxy);
+  TestUtility::loadFromYamlAndValidate(json, tcp_proxy);
   return Config(tcp_proxy, context);
 }
 
 } // namespace
 
 TEST(ConfigTest, NoRouteConfig) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name"
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromJson(*config, factory_context), EnvoyException);
+  EXPECT_THROW(constructConfigFromYaml(yaml, factory_context), EnvoyException);
 }
 
 TEST(ConfigTest, BadConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": 1,
-    "route_config": {
-      "routes": [
-        {
-          "cluster": "fake_cluster"
-        }
-      ]
-    }
-   }
+  const std::string yaml_string = R"EOF(
+  stat_prefix: 1
+  cluster: cluster
+  deprecated_v1:
+    routes:
+    - cluster: fake_cluster
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromJson(*json_config, factory_context), Json::Exception);
+  EXPECT_THROW(constructConfigFromYaml(yaml_string, factory_context), EnvoyException);
+}
+
+TEST(ConfigTest, EmptyRouteConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: cluster
+  deprecated_v1:
+    routes: []
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  EXPECT_THROW(constructConfigFromYaml(yaml, factory_context_), EnvoyException);
 }
 
 TEST(ConfigTest, Routes) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-          {
-            "destination_ip_list": [
-              "10.10.10.10/32",
-              "10.10.11.0/24",
-              "10.11.0.0/16",
-              "11.0.0.0/8",
-              "128.0.0.0/1"
-            ],
-            "cluster": "with_destination_ip_list"
-          },
-          {
-            "destination_ip_list": [
-              "::1/128",
-              "2001:abcd::/64"
-            ],
-            "cluster": "with_v6_destination"
-          },
-          {
-            "destination_ports": "1-1024,2048-4096,12345",
-            "cluster": "with_destination_ports"
-          },
-          {
-            "source_ports": "23457,23459",
-            "cluster": "with_source_ports"
-          },
-          {
-            "destination_ip_list": [
-              "2002::/32"
-            ],
-            "source_ip_list": [
-              "2003::/64"
-            ],
-            "cluster": "with_v6_source_and_destination"
-          },
-          {
-            "destination_ip_list": [
-              "10.0.0.0/24"
-            ],
-            "source_ip_list": [
-              "20.0.0.0/24"
-            ],
-            "destination_ports" : "10000",
-            "source_ports": "20000",
-            "cluster": "with_everything"
-          },
-          {
-            "cluster": "catch_all"
-          }
-        ]
-      }
-    }
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: cluster
+  deprecated_v1:
+    routes:
+    - destination_ip_list:
+      - address_prefix: 10.10.10.10
+        prefix_len: 32
+      - address_prefix: 10.10.11.0
+        prefix_len: 24
+      - address_prefix: 10.11.0.0
+        prefix_len: 16
+      - address_prefix: 11.0.0.0
+        prefix_len: 8
+      - address_prefix: 128.0.0.0
+        prefix_len: 1
+      cluster: with_destination_ip_list
+    - destination_ip_list:
+      - address_prefix: "::1"
+        prefix_len: 128
+      - address_prefix: "2001:abcd::"
+        prefix_len: 64
+      cluster: with_v6_destination
+    - destination_ports: 1-1024,2048-4096,12345
+      cluster: with_destination_ports
+    - source_ports: '23457,23459'
+      cluster: with_source_ports
+    - destination_ip_list:
+      - address_prefix: "2002::"
+        prefix_len: 32
+      source_ip_list:
+      - address_prefix: "2003::"
+        prefix_len: 64
+      cluster: with_v6_source_and_destination
+    - destination_ip_list:
+      - address_prefix: 10.0.0.0
+        prefix_len: 24
+      source_ip_list:
+      - address_prefix: 20.0.0.0
+        prefix_len: 24
+      destination_ports: '10000'
+      source_ports: '20000'
+      cluster: with_everything
+    - cluster: catch_all
     )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-
-  Config config_obj(constructConfigFromJson(*json_config, factory_context_));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
 
   {
     // hit route with destination_ip (10.10.10.10/32)
@@ -303,26 +295,6 @@ TEST(ConfigTest, Routes) {
   }
 }
 
-TEST(ConfigTest, EmptyRouteConfig) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-        ]
-      }
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-
-  Config config_obj(constructConfigFromJson(*json_config, factory_context_));
-
-  NiceMock<Network::MockConnection> connection;
-  EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
-}
-
 TEST(ConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
@@ -378,7 +350,7 @@ public:
 
   // Return the default config, plus one file access log with the specified format
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy
-  accessLogConfig(const std::string access_log_format) {
+  accessLogConfig(const std::string& access_log_format) {
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
     envoy::config::filter::accesslog::v2::AccessLog* access_log =
         config.mutable_access_log()->Add();
@@ -396,26 +368,24 @@ public:
     configure(config);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
-    if (connections >= 1) {
-      for (uint32_t i = 0; i < connections; i++) {
-        upstream_connections_.push_back(
-            std::make_unique<NiceMock<Network::MockClientConnection>>());
-        upstream_connection_data_.push_back(
-            std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
-        ON_CALL(*upstream_connection_data_.back(), connection())
-            .WillByDefault(ReturnRef(*upstream_connections_.back()));
-        upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
-        conn_pool_handles_.push_back(
-            std::make_unique<NiceMock<Tcp::ConnectionPool::MockCancellable>>());
+    for (uint32_t i = 0; i < connections; i++) {
+      upstream_connections_.push_back(
+          std::make_unique<NiceMock<Network::MockClientConnection>>());
+      upstream_connection_data_.push_back(
+          std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+      ON_CALL(*upstream_connection_data_.back(), connection())
+          .WillByDefault(ReturnRef(*upstream_connections_.back()));
+      upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+      conn_pool_handles_.push_back(
+          std::make_unique<NiceMock<Tcp::ConnectionPool::MockCancellable>>());
 
-        ON_CALL(*upstream_hosts_.at(i), cluster())
-            .WillByDefault(ReturnPointee(
-                factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
-        ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
-        upstream_connections_.at(i)->local_address_ = upstream_local_address_;
-        EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
-            .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
-      }
+      ON_CALL(*upstream_hosts_.at(i), cluster())
+          .WillByDefault(ReturnPointee(
+              factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
+      ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
+      upstream_connections_.at(i)->local_address_ = upstream_local_address_;
+      EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
+          .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
     }
 
     {
@@ -1134,22 +1104,16 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
 class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() {
-    std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-          {
-            "destination_ports": "1-9999",
-            "cluster": "fake_cluster"
-          }
-        ]
-      }
-    }
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fallback_cluster
+    deprecated_v1:
+      routes:
+      - destination_ports: 1-9999
+        cluster: fake_cluster
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new Config(constructConfigFromJson(*config, factory_context_)));
+    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
   }
 
   void setup() {
@@ -1169,28 +1133,27 @@ public:
 };
 
 TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
-  uint32_t total_cx = config_->stats().downstream_cx_total_.value();
-  uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
+  const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
+  const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
 
   setup();
 
   // Port 10000 is outside the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 10000);
 
-  // Expect filter to stop iteration and close connection.
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  // Expect filter to try to open a connection to the fallback cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fallback_cluster", _, _))
+      .WillOnce(Return(nullptr));
+
+  filter_->onNewConnection();
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
-  EXPECT_EQ(non_routable_cx + 1, config_->stats().downstream_cx_no_route_.value());
-
-  // Cleanup
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
 TEST_F(TcpProxyRoutingTest, RoutableConnection) {
-  uint32_t total_cx = config_->stats().downstream_cx_total_.value();
-  uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
+  const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
+  const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
 
   setup();
 
