@@ -25,6 +25,12 @@ _COMMON_PROTO_DEPS = [
     "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
 ]
 
+# When we have external proto dependencies, we need to be able to map from the
+# proto_library dependency to the relevant {cc,go,py}_library when generating
+# the respective language library for some target. If you add a new API
+# dependency on some external proto, please provide the mappings here for
+# Go/C++/Python.
+
 _GO_BAZEL_RULE_MAPPING = {
     "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_go",
     "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
