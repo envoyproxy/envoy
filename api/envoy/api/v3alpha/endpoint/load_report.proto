@@ -53,6 +53,7 @@ message UpstreamLocalityStats {
   uint32 priority = 6;
 }
 
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message UpstreamEndpointStats {
   // Upstream host address.
   core.Address address = 1;
