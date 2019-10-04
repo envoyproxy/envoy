@@ -7,6 +7,12 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+load(
+    "//source/extensions:all_extensions.bzl",
+    "envoy_all_extensions",
+    "envoy_windows_extensions",
+)
+load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -344,5 +350,21 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "version_converter_proto",
+    srcs = ["version_converter.proto"],
+)
+
+envoy_cc_test(
+    name = "version_converter_test",
+    srcs = ["version_converter_test.cc"],
+    deps = [
+        ":version_converter_proto_cc",
+        "//source/common/config:version_converter_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
