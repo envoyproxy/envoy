@@ -234,11 +234,13 @@ public:
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return LdsApiPtr{createLdsApi_(lds_config)};
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
+                         bool is_delta) override {
+    return LdsApiPtr{createLdsApi_(lds_config, is_delta)};
   }
 
-  MOCK_METHOD1(createLdsApi_, LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config));
+  MOCK_METHOD2(createLdsApi_,
+               LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
   MOCK_METHOD2(createNetworkFilterFactoryList,
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -269,7 +271,8 @@ public:
 
   MOCK_METHOD3(addOrUpdateListener, bool(const envoy::api::v2::Listener& config,
                                          const std::string& version_info, bool modifiable));
-  MOCK_METHOD1(createLdsApi, void(const envoy::api::v2::core::ConfigSource& lds_config));
+  MOCK_METHOD2(createLdsApi,
+               void(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));

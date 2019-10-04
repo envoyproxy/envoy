@@ -44,8 +44,9 @@ message DiscoveryRequest {
 
   // nonce corresponding to DiscoveryResponse being ACK/NACKed. See above
   // discussion on version_info and the DiscoveryResponse nonce comment. This
-  // may be empty if no nonce is available, e.g. at startup or for non-stream
-  // xDS implementations.
+  // may be empty only if 1) this is a non-persistent-stream xDS such as HTTP,
+  // or 2) the client has not yet accepted an update in this xDS stream (unlike
+  // delta, where it is populated only for new explicit ACKs).
   string response_nonce = 5;
 
   // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
@@ -176,7 +177,7 @@ message DeltaDiscoveryRequest {
   // When the DeltaDiscoveryRequest is a ACK or NACK message in response
   // to a previous DeltaDiscoveryResponse, the response_nonce must be the
   // nonce in the DeltaDiscoveryResponse.
-  // Otherwise response_nonce must be omitted.
+  // Otherwise (unlike in DiscoveryRequest) response_nonce must be omitted.
   string response_nonce = 6;
 
   // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`

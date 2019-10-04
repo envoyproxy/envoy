@@ -212,10 +212,6 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
       read_callbacks_->connection().readDisable(false);
     }
   }
-
-  if (connection_idle_timer_ && streams_.empty()) {
-    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
-  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -238,6 +234,10 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
+
+  if (connection_idle_timer_ && streams_.empty()) {
+    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
+  }
 }
 
 StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
@@ -284,6 +284,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     }
   }
 
+  // TODO(alyssawilk) clean this up after #8352 is well vetted.
   bool redispatch;
   do {
     redispatch = false;
@@ -519,9 +520,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(),
-                                             response_headers_.get(), response_trailers_.get(),
-                                             stream_info_, *this);
+    Tracing::HttpTracerUtility::finalizeDownstreamSpan(
+        *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+        stream_info_, *this);
   }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
@@ -1084,7 +1085,8 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::DecodeHeaders) ||
-      (state_.filter_call_state_ & FilterCallState::DecodeData)) {
+      (state_.filter_call_state_ & FilterCallState::DecodeData) ||
+      ((state_.filter_call_state_ & FilterCallState::DecodeTrailers) && !filter.canIterate())) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.decoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
@@ -1555,7 +1557,8 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
-      (state_.filter_call_state_ & FilterCallState::EncodeData)) {
+      (state_.filter_call_state_ & FilterCallState::EncodeData) ||
+      ((state_.filter_call_state_ & FilterCallState::EncodeTrailers) && !filter.canIterate())) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.encoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers/data callback, buffer the data.

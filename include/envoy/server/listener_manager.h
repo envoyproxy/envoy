@@ -39,7 +39,8 @@ public:
    * @return an LDS API provider.
    * @param lds_config supplies the management server configuration.
    */
-  virtual LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
+  virtual LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
+                                 bool is_delta) PURE;
 
   /**
    * Creates a socket.
@@ -128,7 +129,8 @@ public:
    * pieces of the server existing.
    * @param lds_config supplies the management server configuration.
    */
-  virtual void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
+  virtual void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
+                            bool is_delta) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently

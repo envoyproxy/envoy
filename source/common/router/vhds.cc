@@ -23,11 +23,11 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    const std::string& stat_prefix,
                                    std::unordered_set<RouteConfigProvider*>& route_config_providers)
     : config_update_info_(config_update_info),
-      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
-                   [this]() { subscription_->start({}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
+      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
+                   [this]() { subscription_->start({}); }),
       route_config_providers_(route_config_providers) {
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()
@@ -42,7 +42,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
           Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
-          *scope_, *this);
+          *scope_, *this, /*is_delta=*/true);
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

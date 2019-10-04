@@ -69,11 +69,11 @@ public:
   /**
    * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
    * NOTE:  public for testing
-   * @param san the subjectAltName to match
+   * @param dns_name the DNS name to match
    * @param pattern the pattern to match against (*.example.com)
    * @return true if the san matches pattern
    */
-  static bool dNSNameMatch(const std::string& dnsName, const char* pattern);
+  static bool dnsNameMatch(const std::string& dns_name, const char* pattern);
 
   SslStats& stats() { return stats_; }
 
@@ -171,7 +171,7 @@ protected:
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
   const unsigned tls_max_version_;
-  mutable Stats::StatNameSet stat_name_set_;
+  mutable Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_ssl_cipher_;
   const Stats::StatName unknown_ssl_curve_;
   const Stats::StatName unknown_ssl_algorithm_;

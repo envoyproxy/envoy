@@ -125,6 +125,12 @@ public:
     fn(toStringView(stat_name));
   }
 
+  StatNameSetPtr makeSet(absl::string_view name) override {
+    // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
+    return StatNameSetPtr(new StatNameSet(*this, name));
+  }
+  void forgetSet(StatNameSet&) override {}
+
 private:
   absl::string_view toStringView(const StatName& stat_name) const {
     return {reinterpret_cast<const char*>(stat_name.data()),
@@ -132,6 +138,7 @@ private:
   }
 
   StoragePtr encodeHelper(absl::string_view name) const {
+    ASSERT(!absl::EndsWith(name, "."));
     auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
     uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());

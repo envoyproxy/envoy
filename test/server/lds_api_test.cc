@@ -36,7 +36,7 @@ public:
     envoy::api::v2::core::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, init_manager_, store_,
-                                        listener_manager_, validation_visitor_);
+                                        listener_manager_, validation_visitor_, false);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
@@ -83,6 +83,7 @@ public:
     listeners.Add()->PackFrom(listener);
   }
 
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> grpc_mux_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Init::MockManager init_manager_;
   Init::ExpectableWatcherImpl init_watcher_;

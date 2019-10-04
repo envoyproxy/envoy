@@ -423,6 +423,29 @@ TEST_F(RedisLoadBalancerContextImplTest, UnsupportedCommand) {
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context3.readPolicy());
 }
 
+TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
+  std::vector<NetworkFilters::Common::Redis::RespValue> set_foo(3);
+  set_foo[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  set_foo[0].asString() = "set";
+  set_foo[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  set_foo[1].asString() = "{foo}bar";
+  set_foo[2].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  set_foo[2].asString() = "bar";
+
+  NetworkFilters::Common::Redis::RespValue set_request;
+  set_request.type(NetworkFilters::Common::Redis::RespType::Array);
+  set_request.asArray().swap(set_foo);
+
+  // Enable_hash tagging should be override when is_redis_cluster is true. This is treated like
+  // "foo"
+  RedisLoadBalancerContextImpl context2("{foo}bar", false, true, set_request,
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+
+  EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
+  EXPECT_EQ(false, context2.isReadCommand());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context2.readPolicy());
+}
+
 } // namespace Redis
 } // namespace Clusters
 } // namespace Extensions

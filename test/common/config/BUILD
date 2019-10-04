@@ -96,6 +96,30 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "new_grpc_mux_impl_test",
+    srcs = ["new_grpc_mux_impl_test.cc"],
+    deps = [
+        "//source/common/config:new_grpc_mux_lib",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/service/discovery/v2:ads_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "grpc_stream_test",
     srcs = ["grpc_stream_test.cc"],
     deps = [

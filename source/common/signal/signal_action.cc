@@ -5,6 +5,7 @@
 #include <csignal>
 
 #include "common/common/assert.h"
+#include "common/common/version.h"
 
 namespace Envoy {
 
@@ -80,6 +81,10 @@ void SignalAction::installSigHandlers() {
   stack.ss_flags = 0;
 
   RELEASE_ASSERT(sigaltstack(&stack, &previous_altstack_) == 0, "");
+
+  // Make sure VersionInfo::version() is initialized so we don't allocate std::string in signal
+  // handlers.
+  RELEASE_ASSERT(!VersionInfo::version().empty(), "");
 
   int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {

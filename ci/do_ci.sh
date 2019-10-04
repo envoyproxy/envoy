@@ -142,9 +142,6 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  if [[ ! -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v4only"
-  fi
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan ${TEST_TARGETS}
@@ -162,7 +159,7 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
     --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
-    --test_filter="*SslTapIntegrationTest*" \
+    --test_env=PATH="/usr/sbin:${PATH}" \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
