@@ -369,8 +369,7 @@ public:
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {
-      upstream_connections_.push_back(
-          std::make_unique<NiceMock<Network::MockClientConnection>>());
+      upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
       upstream_connection_data_.push_back(
           std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
       ON_CALL(*upstream_connection_data_.back(), connection())
