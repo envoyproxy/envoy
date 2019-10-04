@@ -690,13 +690,19 @@ Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderM
                                             Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   const bool inbound_only = params.find("inboundonly") != params.end();
-  for (const Network::ListenerConfig& listener : server_.listenerManager().listeners()) {
+  bool listeners_matched = false;
+  for (Network::ListenerConfig& listener : server_.listenerManager().listeners()) {
     if (!inbound_only || listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
-      server_.listenerManager().stopListener(listener.name());
+      server_.listenerManager().stopListener(listener);
+      listeners_matched = true;
     }
   }
 
-  response.add("OK\n");
+  if (listeners_matched) {
+    response.add("OK\n");
+  } else {
+    response.add("No listeners matched\n");
+  }
   return Http::Code::OK;
 }
 

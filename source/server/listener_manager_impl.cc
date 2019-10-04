@@ -648,7 +648,7 @@ bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
   return false;
 }
 
-void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener, bool remove_listener) {
+void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // First add the listener to the draining list.
   std::list<DrainingListener>::iterator draining_it = draining_listeners_.emplace(
       draining_listeners_.begin(), std::move(listener), workers_.size());
@@ -665,28 +665,25 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener, bool remove_
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
-  draining_it->listener_->localDrainManager().startDrainSequence(
-      [this, draining_it, remove_listener]() -> void {
-        if (remove_listener) {
-          draining_it->listener_->debugLog("removing listener");
-          for (const auto& worker : workers_) {
-            // Once the drain time has completed via the drain manager's timer, we tell the workers
-            // to remove the listener.
-            worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-              // The remove listener completion is called on the worker thread. We post back to the
-              // main thread to avoid locking. This makes sure that we don't destroy the listener
-              // while filters might still be using its context (stats, etc.).
-              server_.dispatcher().post([this, draining_it]() -> void {
-                if (--draining_it->workers_pending_removal_ == 0) {
-                  draining_it->listener_->debugLog("listener removal complete");
-                  draining_listeners_.erase(draining_it);
-                  stats_.total_listeners_draining_.set(draining_listeners_.size());
-                }
-              });
-            });
+  draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
+    draining_it->listener_->debugLog("removing listener");
+    for (const auto& worker : workers_) {
+      // Once the drain time has completed via the drain manager's timer, we tell the workers
+      // to remove the listener.
+      worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
+        // The remove listener completion is called on the worker thread. We post back to the
+        // main thread to avoid locking. This makes sure that we don't destroy the listener
+        // while filters might still be using its context (stats, etc.).
+        server_.dispatcher().post([this, draining_it]() -> void {
+          if (--draining_it->workers_pending_removal_ == 0) {
+            draining_it->listener_->debugLog("listener removal complete");
+            draining_listeners_.erase(draining_it);
+            stats_.total_listeners_draining_.set(draining_listeners_.size());
           }
-        }
+        });
       });
+    }
+  });
 
   updateWarmingActiveGauges();
 }
@@ -751,7 +748,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
   (*existing_warming_listener)->debugLog("warm complete. updating active listener");
   if (existing_active_listener != active_listeners_.end()) {
-    drainListener(std::move(*existing_active_listener), true);
+    drainListener(std::move(*existing_active_listener));
     *existing_active_listener = std::move(*existing_warming_listener);
   } else {
     active_listeners_.emplace_back(std::move(*existing_warming_listener));
@@ -770,36 +767,11 @@ uint64_t ListenerManagerImpl::numConnections() {
   return num_connections;
 }
 
-bool ListenerManagerImpl::stopListener(const std::string& name) {
-  ENVOY_LOG(debug, "begin stop listener: name={}", name);
-
-  auto existing_active_listener = getListenerByName(active_listeners_, name);
-  auto existing_warming_listener = getListenerByName(warming_listeners_, name);
-
-  if (existing_warming_listener == warming_listeners_.end() &&
-      existing_active_listener == active_listeners_.end()) {
-    ENVOY_LOG(debug, "unknown listener '{}'. no stop", name);
-    return false;
+void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener) {
+  ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
+  for (const auto& worker : workers_) {
+    worker->stopListener(listener);
   }
-
-  // Destroy a warming listener directly.
-  if (existing_warming_listener != warming_listeners_.end()) {
-    (*existing_warming_listener)->debugLog("removing warming listener");
-    warming_listeners_.erase(existing_warming_listener);
-  }
-
-  // If there is an active listener it needs to be moved to draining after workers have started, or
-  // destroyed directly.
-  if (existing_active_listener != active_listeners_.end()) {
-    // Listeners in active_listeners_ are added to workers after workers start, so we drain
-    // listeners only after this occurs.
-    if (workers_started_) {
-      drainListener(std::move(*existing_active_listener), false);
-    }
-  }
-
-  updateWarmingActiveGauges();
-  return true;
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
@@ -827,7 +799,7 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     // Listeners in active_listeners_ are added to workers after workers start, so we drain
     // listeners only after this occurs.
     if (workers_started_) {
-      drainListener(std::move(*existing_active_listener), true);
+      drainListener(std::move(*existing_active_listener));
     }
     active_listeners_.erase(existing_active_listener);
   }

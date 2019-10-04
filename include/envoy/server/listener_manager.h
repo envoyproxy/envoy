@@ -154,11 +154,17 @@ public:
   virtual bool removeListener(const std::string& name) PURE;
 
   /*
-   * Stop a listener by name.
-   * @param name supplies the listener name to stop.
-   * @return TRUE if the listener was found and stopped.
+   * Stops a listener from accepting new connections without actually removing any of them. This is
+   * used by /drain_listeners admin endpoint. This methods directly stops the listeners on workers.
+   * There is a potential race condition, where the listener that is being stopped here, might have
+   * got updated configuration and there by may be in warming state that might add listeners back to
+   * workers. Given that this API is intenteded to be used from admin endpoint that is supposedly
+   * used when Envoy is terminating, that is considered as an edge case. The complexity of handling
+   * warmed listeners and preventing it being added back by name is not worth the usecase of this
+   * API.
+   * @param name supplies the listener config to stop.
    */
-  virtual bool stopListener(const std::string& name) PURE;
+  virtual void stopListener(Network::ListenerConfig& listener) PURE;
 
   /**
    * Start all workers accepting new connections on all added listeners.

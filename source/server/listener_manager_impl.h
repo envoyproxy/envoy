@@ -136,7 +136,7 @@ public:
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
-  bool stopListener(const std::string& name) override;
+  void stopListener(Network::ListenerConfig& listener) override;
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
   void stopWorkers() override;
@@ -172,9 +172,8 @@ private:
    * Mark a listener for draining. The listener will no longer be considered active but will remain
    * present to allow connection draining.
    * @param listener supplies the listener to drain.
-   * @param remove_listener indicates whether the listener should be removed after draining.
    */
-  void drainListener(ListenerImplPtr&& listener, bool remove_listener);
+  void drainListener(ListenerImplPtr&& listener);
 
   /**
    * Get a listener by name. This routine is used because listeners have inherent order in static

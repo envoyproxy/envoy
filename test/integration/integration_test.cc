@@ -91,6 +91,7 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_TRUE(admin_response->complete());
   EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
+  EXPECT_EQ("OK\n", admin_response->body());
 
   upstream_request_->encodeData(512, true);
 
@@ -99,8 +100,6 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-
-  test_server_->waitForGaugeGe("listener_manager.total_listeners_draining", 1);
 
   cleanupUpstreamAndDownstream();
 }

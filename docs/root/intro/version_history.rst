@@ -9,6 +9,7 @@ Version history
 * access log: reintroduce :ref:`filesystem <filesystem_stats>` stats and added the `write_failed` counter to track failed log writes
 * admin: added ability to configure listener :ref:`socket options <envoy_api_field_config.bootstrap.v2.Admin.socket_options>`.
 * admin: added config dump support for Secret Discovery Service :ref:`SecretConfigDump <envoy_api_msg_admin.v2alpha.SecretsConfigDump>`.
+* admin: added support for :ref:`draining <operations_admin_interface_drain>` listeners via admin interface.
 * api: added ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` option to omit the node identifier from the subsequent discovery requests on the same stream.
 * buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
 * config: added support for :ref:`delta xDS <arch_overview_dynamic_config_delta>` (including ADS) delivery
@@ -113,7 +114,6 @@ Version history
 * admin: added host priority to :http:get:`/clusters` and :http:get:`/clusters?format=json` endpoint response
 * admin: the :ref:`/clusters endpoint <operations_admin_interface_clusters>` now shows hostname
   for each host, useful for DNS based clusters.
-* admin: added support for :ref:`draining <operations_admin_interface_drain>` listeners via admin interface.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
 * config: added :ref:stats_server_version_override` <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_server_version_override>` in bootstrap, that can be used to override :ref:`server.version statistic <server_statistics>`.

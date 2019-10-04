@@ -427,7 +427,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_EQ(0, test_server_->gauge("listener_manager.total_listeners_draining")->value());
+  EXPECT_EQ("No listeners matched\n", response->body());
 
   // Validate that the outbound listener is drained on drain listeners.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
@@ -435,7 +435,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  test_server_->waitForGaugeGe("listener_manager.total_listeners_draining", 1);
+  EXPECT_EQ("OK\n", response->body());
 }
 
 // Validates that the inboundonly drains inbound listeners.
@@ -453,7 +453,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  test_server_->waitForGaugeGe("listener_manager.total_listeners_draining", 1);
+  EXPECT_EQ("OK\n", response->body());
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
