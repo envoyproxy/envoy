@@ -171,7 +171,7 @@ static void ios_on_error(envoy_error error, void *context) {
   envoy_stream_t _streamHandle;
 }
 
-- (instancetype)initWithHandle:(intptr_t)handle callbacks:(EnvoyHTTPCallbacks *)callbacks {
+- (instancetype)initWithHandle:(envoy_stream_t)handle callbacks:(EnvoyHTTPCallbacks *)callbacks {
   self = [super init];
   if (!self) {
     return nil;
