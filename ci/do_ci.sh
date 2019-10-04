@@ -87,7 +87,7 @@ if [[ $# -gt 1 ]]; then
   shift
   TEST_TARGETS=$*
 else
-  TEST_TARGETS=@envoy//test/...
+  TEST_TARGETS=//test/...
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -203,7 +203,11 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
-  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+
+  if [[ "$TEST_TARGETS" == "//test/..."]]; then
+    cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+    TEST_TARGETS="@envoy//test/..."
+  fi
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips

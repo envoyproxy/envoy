@@ -32,7 +32,7 @@ else
 fi
 
 for target in ${COVERAGE_TARGETS}; do
-  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}${target})" | grep -E "^(@envoy)?//")"
+  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}${target})" | grep "^//")"
 done
 
 # Run the QUICHE platform api tests for coverage.
