@@ -74,6 +74,7 @@ public:
     current_object_ = object;
     return return_object;
   }
+  timeval getSchedulerPrepareTime() const override { return base_scheduler_.getPrepareTime(); }
 
   // FatalErrorInterface
   void onFatalError() const override {

@@ -47,6 +47,11 @@ public:
    */
   void initializeStats(DispatcherStats* stats);
 
+  /**
+   * @return timestamp immediately before polling
+   */
+  timeval getPrepareTime() const { return prepare_time_; }
+
 private:
   static void onPrepare(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
   static void onCheck(evwatch*, const evwatch_check_cb_info*, void* arg);

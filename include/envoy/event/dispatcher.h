@@ -218,6 +218,8 @@ public:
    * current thread of execution is on the same thread upon which the dispatcher loop is running.
    */
   virtual bool isThreadSafe() const PURE;
+
+  virtual timeval getSchedulerPrepareTime() const PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

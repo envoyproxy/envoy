@@ -4,8 +4,9 @@ namespace Envoy {
 namespace Quic {
 
 quic::QuicTime EnvoyQuicClock::ApproximateNow() const {
-  // This might be expensive as Dispatcher doesn't store approximate time_point.
-  return Now();
+  const timeval prepare_time_ = dispatcher_.getSchedulerPrepareTime();
+  return quic::QuicTime::Zero() + quic::QuicTime::Delta::FromSeconds(prepare_time_.tv_sec) +
+         quic::QuicTime::Delta::FromMicroseconds(prepare_time_.tv_usec);
 }
 
 quic::QuicTime EnvoyQuicClock::Now() const {
