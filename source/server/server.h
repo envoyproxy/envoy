@@ -145,7 +145,7 @@ class InstanceImpl;
 
 class ServerFactoryContextImpl : public Configuration::ServerFactoryContext {
 public:
-  explicit ServerFactoryContextImpl(Instance& server, bool is_dynamic_)
+  explicit ServerFactoryContextImpl(Instance& server, bool is_dynamic)
       : server_(server), server_scope_(server_.stats().createScope("")),
         validation_visitor_(is_dynamic_
                                 ? server_.messageValidationContext().dynamicValidationVisitor()

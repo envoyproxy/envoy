@@ -108,6 +108,10 @@ public:
     return validation_context_;
   }
 
+  Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {
+    return is_dynamic ? dynamic_server_context_ : static_server_context_;
+  }
+
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
@@ -193,6 +197,8 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
+  ServerFactoryContextImpl dynamic_server_context_;
+  ServerFactoryContextImpl static_server_context_;
 };
 
 } // namespace Server

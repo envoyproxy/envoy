@@ -261,13 +261,6 @@ public:
   virtual ProtobufMessage::ValidationVisitor& serverMessageValidationVisitor() PURE;
 };
 
-class ServerFactoryCxtUtil {
-public:
-  static ServerFactoryContext& generateServerFactoryContext(FactoryContext&) {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-};
-
 class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**

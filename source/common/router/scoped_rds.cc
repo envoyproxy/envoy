@@ -262,11 +262,9 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
          fmt::format("trying to update route config for non-existing scope {}", scope_name));
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::api::v2::ScopedRouteConfiguration(iter->second->configProto()),
-      std::make_shared<ConfigImpl>(
-          rds_subscription.routeConfigUpdate()->routeConfiguration(),
-          Server::Configuration::ServerFactoryCxtUtil::generateServerFactoryContext(
-              factory_context_),
-          false));
+      std::make_shared<ConfigImpl>(rds_subscription.routeConfigUpdate()->routeConfiguration(),
+                                   factory_context_.getServerFactoryContext(/*is_dynamic=*/false),
+                                   false));
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =

@@ -52,7 +52,9 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system),
+      dynamic_server_context_(*this, /*is_dynamic=*/true),
+      static_server_context_(*this, /*is_dynamic=*/false) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
