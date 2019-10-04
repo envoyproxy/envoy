@@ -24,7 +24,8 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
-   * @return bool whether the local certificate is presented.
+   * @return bool whether the local certificate is requested on the client by the server. This
+   * flag is always true on the server.
    **/
   virtual bool localCertificatePresented() const PURE;
 

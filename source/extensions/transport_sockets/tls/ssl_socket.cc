@@ -48,7 +48,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(SocketState::PreHandshake) {
   bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
   ssl_ = ssl.get();
-  info_ = std::make_shared<SslSocketInfo>(std::move(ssl));
+  info_ = std::make_shared<SslSocketInfo>(std::move(ssl), state);
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_);
   } else {
@@ -301,15 +301,28 @@ void SslSocket::shutdownSsl() {
   }
 }
 
+SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, InitialState state) : ssl_(std::move(ssl)) {
+  if (state == InitialState::Client) {
+    SSL_set_cert_cb(
+        ssl_.get(),
+        [](SSL*, void* arg) -> int {
+          auto info = static_cast<SslSocketInfo*>(arg);
+          info->local_cert_presented = true;
+          return 1;
+        },
+        this);
+  } else {
+    ASSERT(state == InitialState::Server);
+    local_cert_presented = true;
+  }
+}
+
 bool SslSocketInfo::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   return cert != nullptr;
 }
 
-bool SslSocketInfo::localCertificatePresented() const {
-  X509* cert = SSL_get_certificate(ssl_.get());
-  return cert != nullptr;
-}
+bool SslSocketInfo::localCertificatePresented() const { return local_cert_presented; }
 
 std::vector<std::string> SslSocketInfo::uriSanLocalCertificate() const {
   if (!cached_uri_san_local_certificate_.empty()) {

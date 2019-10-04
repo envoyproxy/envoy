@@ -43,7 +43,7 @@ enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, S
 
 class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 public:
-  SslSocketInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
+  SslSocketInfo(bssl::UniquePtr<SSL> ssl, InitialState state);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -84,6 +84,7 @@ private:
   mutable std::vector<std::string> cached_dns_san_local_certificate_;
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
+  bool local_cert_presented = false;
 };
 
 class SslSocket : public Network::TransportSocket,

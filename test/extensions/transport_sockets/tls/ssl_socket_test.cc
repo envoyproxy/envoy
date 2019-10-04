@@ -100,7 +100,7 @@ public:
                   bool expect_success, Network::Address::IpVersion version)
       : TestUtilOptionsBase(expect_success, version), client_ctx_yaml_(client_ctx_yaml),
         server_ctx_yaml_(server_ctx_yaml), expect_no_cert_(false), expect_no_cert_chain_(false),
-        expect_private_key_method_(false),
+        expect_local_cert_(false), expect_private_key_method_(false),
         expected_server_close_event_(Network::ConnectionEvent::RemoteClose) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake");
@@ -128,6 +128,13 @@ public:
 
   TestUtilOptions& setExpectNoCertChain() {
     expect_no_cert_chain_ = true;
+    return *this;
+  }
+
+  bool expectLocalCertPresented() const { return expect_local_cert_; }
+
+  TestUtilOptions& setExpectLocalCertPresented() {
+    expect_local_cert_ = true;
     return *this;
   }
 
@@ -230,6 +237,7 @@ private:
 
   bool expect_no_cert_;
   bool expect_no_cert_chain_;
+  bool expect_local_cert_;
   bool expect_private_key_method_;
   Network::ConnectionEvent expected_server_close_event_;
   std::string expected_digest_;
@@ -382,10 +390,18 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
       }
+
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
                   server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
       }
+
+      if (options.expectLocalCertPresented()) {
+        EXPECT_TRUE(client_connection->ssl()->localCertificatePresented());
+      } else {
+        EXPECT_FALSE(client_connection->ssl()->localCertificatePresented());
+      }
+
       // By default, the session is not created with session resumption. The
       // client should see a session ID but the server should not.
       EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
@@ -890,6 +906,7 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedDigest(TEST_NO_SAN_CERT_HASH)
+               .setExpectLocalCertPresented()
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
@@ -991,7 +1008,8 @@ TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
 
   // The SAN field only has DNS, expect "" for uriSanPeerCertificate().
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.setExpectedSerialNumber(TEST_SAN_DNS_CERT_SERIAL));
+  testUtil(
+      test_options.setExpectedSerialNumber(TEST_SAN_DNS_CERT_SERIAL).setExpectLocalCertPresented());
 }
 
 TEST_P(SslSocketTest, NoCert) {
@@ -1099,6 +1117,7 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectLocalCertPresented()
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerSubject(
@@ -1135,6 +1154,7 @@ TEST_P(SslSocketTest, GetPeerCert) {
       TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectLocalCertPresented()
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerSubject(
@@ -1173,6 +1193,7 @@ TEST_P(SslSocketTest, GetPeerCertChain) {
           "{{ test_rundir "
           "}}/test/extensions/transport_sockets/tls/test_data/no_san_chain.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectLocalCertPresented()
                .setExpectedPeerCertChain(expected_peer_cert_chain));
 }
 
@@ -1200,6 +1221,7 @@ TEST_P(SslSocketTest, GetIssueExpireTimesPeerCert) {
 )EOF";
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectLocalCertPresented()
                .setExpectedValidFromTimePeerCert(TEST_NO_SAN_CERT_NOT_BEFORE)
                .setExpectedExpirationTimePeerCert(TEST_NO_SAN_CERT_NOT_AFTER));
 }
@@ -1422,6 +1444,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerification) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+               .setExpectLocalCertPresented()
                .setExpectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -1448,6 +1471,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+               .setExpectLocalCertPresented()
                .setExpectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
@@ -3695,7 +3719,8 @@ TEST_P(SslSocketTest, RevokedCertificate) {
 
   TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
                                           GetParam());
-  testUtil(successful_test_options.setExpectedSerialNumber(TEST_SAN_DNS2_CERT_SERIAL));
+  testUtil(successful_test_options.setExpectedSerialNumber(TEST_SAN_DNS2_CERT_SERIAL)
+               .setExpectLocalCertPresented());
 }
 
 TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
@@ -4253,7 +4278,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
 
   TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
                                           GetParam());
-  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true).setExpectLocalCertPresented());
 }
 
 // Test synchronous signing (ECDHE).
@@ -4285,7 +4310,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
 
   TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
                                           GetParam());
-  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true).setExpectLocalCertPresented());
 }
 
 // Test synchronous decryption (RSA).
