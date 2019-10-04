@@ -98,7 +98,7 @@ public:
   /**
    * @return the unit symbol.
    */
-  virtual std::string unit_symbol() const {
+  virtual std::string unitSymbol() const {
     switch (unit()) {
     case Unit::Unspecified:
       return "";

@@ -68,8 +68,8 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers, append the ASCII SI symbol to disambiguate.
-  std::string si_name = histogram.unit_symbol().length() > 0
-                            ? fmt::format("{}_{}", getName(histogram), histogram.unit_symbol())
+  std::string si_name = histogram.unitSymbol().length() > 0
+                            ? fmt::format("{}_{}", getName(histogram), histogram.unitSymbol())
                             : getName(histogram);
 
   const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, si_name,

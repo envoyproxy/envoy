@@ -31,25 +31,25 @@ MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accum
 MockGauge::~MockGauge() = default;
 
 MockHistogram::MockHistogram() {
+  ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
-  ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
 }
 MockHistogram::~MockHistogram() = default;
 
 MockParentHistogram::MockParentHistogram() {
+  ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
-  ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, intervalStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, cumulativeStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
-  ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
 }
 MockParentHistogram::~MockParentHistogram() = default;
 

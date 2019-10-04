@@ -204,12 +204,12 @@ public:
   MockHistogram();
   ~MockHistogram() override;
 
-  MOCK_METHOD1(recordValue, void(uint64_t value));
-  MOCK_CONST_METHOD0(unit, Histogram::Unit());
   MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(unit, Histogram::Unit());
+  MOCK_METHOD1(recordValue, void(uint64_t value));
 
   // Histogram
-  std::string unit_symbol() const override { return Histogram::unit_symbol(); }
+  std::string unitSymbol() const override { return Histogram::unitSymbol(); }
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
@@ -233,21 +233,21 @@ public:
   const std::string bucketSummary() const override { return ""; };
 
   MOCK_CONST_METHOD0(used, bool());
-  MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(unit, Histogram::Unit());
+  MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
 
   // Histogram
-  std::string unit_symbol() const override { return Histogram::unit_symbol(); }
+  std::string unitSymbol() const override { return Histogram::unitSymbol(); }
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
-  Unit unit_;
   bool used_;
+  Unit unit_;
   Store* store_;
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();

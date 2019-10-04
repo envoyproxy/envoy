@@ -89,8 +89,8 @@ public:
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
     // For statsd histograms are all timers, append the ASCII SI symbol to disambiguate.
-    std::string si_name = histogram.unit_symbol().length() > 0
-                              ? fmt::format("{}_{}", histogram.name(), histogram.unit_symbol())
+    std::string si_name = histogram.unitSymbol().length() > 0
+                              ? fmt::format("{}_{}", histogram.name(), histogram.unitSymbol())
                               : histogram.name();
 
     tls_->getTyped<TlsSink>().onTimespanComplete(si_name, std::chrono::milliseconds(value));
