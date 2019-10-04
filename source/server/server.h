@@ -147,7 +147,7 @@ class ServerFactoryContextImpl : public Configuration::ServerFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server, bool is_dynamic)
       : server_(server), server_scope_(server_.stats().createScope("")),
-        validation_visitor_(is_dynamic_
+        validation_visitor_(is_dynamic
                                 ? server_.messageValidationContext().dynamicValidationVisitor()
                                 : server_.messageValidationContext().staticValidationVisitor()) {}
 
@@ -165,11 +165,6 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
-
-  // TODO: delete it soon
-  ProtobufMessage::ValidationVisitor& serverMessageValidationVisitor() override {
-    return messageValidationVisitor();
-  }
 
 private:
   Instance& server_;

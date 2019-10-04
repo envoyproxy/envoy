@@ -254,11 +254,6 @@ public:
    * @return Api::Api& a reference to the api object.
    */
   virtual Api::Api& api() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor&
-   */
-  virtual ProtobufMessage::ValidationVisitor& serverMessageValidationVisitor() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {

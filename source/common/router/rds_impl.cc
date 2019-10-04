@@ -65,7 +65,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier),
-      validation_visitor_(factory_context_.serverMessageValidationVisitor()) {
+      validation_visitor_(factory_context_.messageValidationVisitor()) {
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(),
@@ -73,7 +73,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           *scope_, *this);
 
   config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
-      factory_context.timeSource(), factory_context.serverMessageValidationVisitor());
+      factory_context.timeSource(), factory_context.messageValidationVisitor());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {

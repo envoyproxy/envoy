@@ -396,7 +396,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(),
-                                     factory_context.serverMessageValidationVisitor())),
+                                     factory_context.messageValidationVisitor())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
@@ -1224,7 +1224,7 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, config, factory_context.serverMessageValidationVisitor(), *proto_config);
+      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context);
 }
 
