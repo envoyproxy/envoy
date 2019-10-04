@@ -418,6 +418,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "version_converter_lib",
+    srcs = ["version_converter.cc"],
+    hdrs = ["version_converter.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "watch_map_lib",
     srcs = ["watch_map.cc"],
     hdrs = ["watch_map.h"],

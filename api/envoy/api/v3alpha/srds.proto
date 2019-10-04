@@ -23,7 +23,6 @@ import "validate/validate.proto";
 // dynamically assign a routing table (specified via a
 // :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` message) to each
 // HTTP request.
-// [#proto-status: experimental]
 service ScopedRoutesDiscoveryService {
   rpc StreamScopedRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
@@ -99,7 +98,6 @@ service ScopedRoutesDiscoveryService {
 // RouteConfiguration being assigned to the HTTP request/stream.
 //
 // [#comment:next free field: 4]
-// [#proto-status: experimental]
 message ScopedRouteConfiguration {
   // Specifies a key which is matched against the output of the
   // :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`

@@ -86,6 +86,10 @@ envoy_cc_library(
 envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
+    external_deps = [
+        "abseil_strings",
+        "fmtlib",
+    ],
     include_prefix = envoy_include_prefix(package_name()),
 )
 

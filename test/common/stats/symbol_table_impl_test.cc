@@ -81,7 +81,7 @@ INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
 TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
-  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
+  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", ".x"};
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -101,8 +101,8 @@ TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
 }
 
 TEST_P(StatNameTest, TestUnusualDelimitersRoundtrip) {
-  const std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
-                                               ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
+  const std::vector<std::string> stat_names = {".x",   "..x",    "...x",    "foo",     "foo.x",
+                                               ".foo", ".foo.x", ".foo..x", "..foo.x", "..foo..x"};
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }

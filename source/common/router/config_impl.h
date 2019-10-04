@@ -243,6 +243,9 @@ public:
   const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
     return retriable_headers_;
   }
+  const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
+    return retriable_request_headers_;
+  }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
@@ -260,6 +263,7 @@ private:
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
@@ -423,9 +427,8 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-  absl::string_view processRequestHost(const Http::HeaderMap& headers,
-                                       const absl::string_view& new_scheme,
-                                       const absl::string_view& new_port) const;
+  absl::string_view processRequestHost(const Http::HeaderMap& headers, absl::string_view new_scheme,
+                                       absl::string_view new_port) const;
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
