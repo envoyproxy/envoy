@@ -5,7 +5,7 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 // QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
+#include "quiche/quic/core/http/quic_spdy_client_stream.h"
 
 #pragma GCC diagnostic pop
 
@@ -14,13 +14,12 @@
 namespace Envoy {
 namespace Quic {
 
-// This class is a quic stream and also a response encoder.
-class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase, public EnvoyQuicStream {
+// This class is a quic stream and also a request encoder.
+class EnvoyQuicClientStream : public quic::QuicSpdyClientStream, public EnvoyQuicStream {
 public:
-  EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
+  EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type);
-
-  EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
+  EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type);
 
   // Http::StreamEncoder
@@ -36,7 +35,7 @@ public:
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
   void OnCanWrite() override;
-  // quic::QuicServerSessionBase
+  // quic::Stream
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
 protected:
@@ -46,6 +45,7 @@ protected:
   Network::Connection* connection() override;
 
   // quic::QuicSpdyStream
+  // Overridden to pass headers to decoder.
   void OnInitialHeadersComplete(bool fin, size_t frame_len,
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,

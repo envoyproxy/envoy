@@ -46,6 +46,9 @@ typeToCodecType(Http::CodecClient::Type type) {
   case Http::CodecClient::Type::HTTP2:
     return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         HTTP2;
+  case Http::CodecClient::Type::HTTP3:
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP3;
   default:
     RELEASE_ASSERT(0, "");
   }
@@ -60,7 +63,12 @@ IntegrationCodecClient::IntegrationCodecClient(
       callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  if (type != CodecClient::Type::HTTP3) {
+    // Only expect to have IO event if it's not QUIC. Because call to connect() in CodecClientProd
+    // for QUIC doesn't send anything to server, but just register file event. QUIC connection won't
+    // have any IO event till cryptoConnect() is called later.
+    dispatcher.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationCodecClient::flushWrite() {
@@ -190,6 +198,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
+  std::cerr << "============ HttpIntegrationTest::makeRawHttpConnection\n";
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->http2_settings_.allow_connect_ = true;
   cluster->http2_settings_.allow_metadata_ = true;
@@ -569,7 +578,9 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
   upstream_request_->encodeHeaders(default_response_headers_, false);
+
   upstream_request_->encodeData(512, true);
   response->waitForEndStream();
 
