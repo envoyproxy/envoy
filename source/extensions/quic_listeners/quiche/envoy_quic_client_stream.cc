@@ -10,7 +10,7 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "quiche/quic/platform/api/quic_mem_slice_span.h"
+#include "extensions/quic_listeners/quiche/platform/quic_mem_slice_span_impl.h"
 
 #pragma GCC diagnostic pop
 
