@@ -8,6 +8,8 @@ namespace RedisProxy {
 bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
   ClusterInfoSharedPtr info;
   {
+    // Hold the map lock to avoid a race condition with calls to unregisterCluster
+    // on the main thread.
     Thread::LockGuard lock(map_mutex_);
     auto it = info_map_.find(cluster_name);
     if (it != info_map_.end()) {
