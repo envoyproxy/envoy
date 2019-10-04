@@ -14,8 +14,6 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
   quic_session.setHttpConnectionCallbacks(callbacks);
 }
 
-// TODO(danzh): modify QUIC stack to react based on aggregated bytes across all
-// streams.
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
   for (auto& it : quic_server_session_.stream_map()) {
     if (!it.second->is_static()) {
@@ -50,8 +48,6 @@ QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
   return *stream;
 }
 
-// TODO(danzh): modify QUIC stack to react based on aggregated bytes across all
-// streams.
 void QuicHttpClientConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
   for (auto& it : quic_client_session_.stream_map()) {
     if (!it.second->is_static()) {

@@ -58,6 +58,8 @@ void EnvoyQuicClientSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) 
 void EnvoyQuicClientSession::cryptoConnect() {
   CryptoConnect();
   set_max_allowed_push_id(0u);
+  // Wait for finishing handshake with server.
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {

@@ -51,9 +51,13 @@ public:
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
     Network::Address::InstanceConstSharedPtr local_addr =
         Network::Test::getCanonicalLoopbackAddress(version_);
+    // Initiate a QUIC connection with the highest supported version. If not
+    // supported by server, this connection will fail.
+    // TODO(danzh) Implement retry upon version mismatch and modify test frame work to specify a
+    // different version set on server side to test that.
     auto connection = std::make_unique<EnvoyQuicClientConnection>(
         getNextServerDesignatedConnectionId(), server_addr, conn_helper_, alarm_factory_,
-        supported_versions_, local_addr, *dispatcher_, nullptr);
+        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, supported_versions_, std::move(connection), server_id_, &crypto_config_,
         &push_promise_index_, *dispatcher_, 0);
@@ -69,8 +73,6 @@ public:
     IntegrationCodecClientPtr codec = HttpIntegrationTest::makeRawHttpConnection(std::move(conn));
     ASSERT(!codec->connected());
     dynamic_cast<EnvoyQuicClientSession*>(codec->connection())->cryptoConnect();
-    // Wait for finishing handshake with server.
-    dispatcher_->run(Event::Dispatcher::RunType::Block);
     if (codec->disconnected()) {
       // Connection may get closed during version negotiation or handshake.
       ENVOY_LOG(error, "Fail to connect to server with error: {}",

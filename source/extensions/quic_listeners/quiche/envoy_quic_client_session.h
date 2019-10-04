@@ -59,6 +59,8 @@ public:
 
   // Do version negotiation and crypto handshake. Fail the connection if server
   // doesn't support the one and only supported version.
+  // This call will block till the handshake finished with either success to
+  // failure.
   void cryptoConnect();
 
   using quic::QuicSpdyClientSession::stream_map;

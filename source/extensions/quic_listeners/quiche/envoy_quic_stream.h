@@ -70,6 +70,9 @@ protected:
   }
 
   EnvoyQuicSimulatedWatermarkBuffer& sendBufferSimulation() { return send_buffer_simulation_; }
+  // True once end of stream is propergated to Envoy. Envoy doesn't expect to be
+  // notified more than once about end of stream. So once this is true, no need
+  // to set it in the callback to Envoy stream any more.
   bool end_stream_decoded_{false};
   int32_t read_disable_counter_{0};
   // If true, switchStreamBlockState() should be deferred till this variable
@@ -79,6 +82,10 @@ protected:
 private:
   // Not owned.
   Http::StreamDecoder* decoder_{nullptr};
+  // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
+  // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
+  // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
+  // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer send_buffer_simulation_;
 };
 

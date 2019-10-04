@@ -8,8 +8,8 @@ namespace Envoy {
 namespace Quic {
 
 // A class, together with a stand alone buffer, used to achieve the purpose of WatermarkBuffer.
-// Itself doesn't have buffer or do bookeeping of buffered bytes. But provided buffered_bytes, it
-// re-acts upon crossing high/low watermarks.
+// Itself doesn't have buffer or do bookeeping of buffered bytes. But provided with buffered_bytes,
+// it re-acts upon crossing high/low watermarks.
 class EnvoyQuicSimulatedWatermarkBuffer {
 public:
   EnvoyQuicSimulatedWatermarkBuffer(uint32_t low_watermark, uint32_t high_watermark,
