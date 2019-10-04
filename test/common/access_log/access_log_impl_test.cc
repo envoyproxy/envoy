@@ -751,7 +751,9 @@ filter:
   header_filter:
     header:
       name: test-header
-      regex_match: \d{3}
+      safe_regex_match:
+        google_re2: {}
+        regex: "\\d{3}"
 config:
   path: /dev/null
   )EOF";
