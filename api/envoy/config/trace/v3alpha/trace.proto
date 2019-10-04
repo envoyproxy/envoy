@@ -134,7 +134,6 @@ message DatadogConfig {
 }
 
 // Configuration for the OpenCensus tracer.
-// [#proto-status: experimental]
 message OpenCensusConfig {
   enum TraceContext {
     // No-op default, no trace context is utilized.

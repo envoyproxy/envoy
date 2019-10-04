@@ -507,17 +507,23 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
   }
 }
 
+void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeout) {
+  addConfigModifier(
+      [timeout](
+          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_idle_timeout()->MergeFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
+      });
+}
+
 void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   RELEASE_ASSERT(!finalized_, "");
 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    auto* connect_timeout = cluster->mutable_connect_timeout();
-    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
-    connect_timeout->set_seconds(seconds.count());
-    connect_timeout->set_nanos(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(timeout - seconds).count());
+    cluster->mutable_connect_timeout()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
   }
   connect_timeout_set_ = true;
 }

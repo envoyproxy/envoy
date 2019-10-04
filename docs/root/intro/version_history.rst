@@ -59,11 +59,13 @@ Version history
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
 * router: added new :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy. Retries can now be configured to trigger by arbitrary response header matching.
+* router: added new :ref:`retriable request headers <envoy_api_field_route.RetryPolicy.retriable_request_headers>` to retry policies. Retries can now be configured to only trigger on request header match.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
 * router check tool: add support for outputting missing tests in the detailed coverage report.
+* runtime: allow for the ability to parse boolean values.
 * runtime: allow for the ability to parse integers as double values and vice-versa.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
 * server: added :ref:`per-handler listener stats <config_listener_stats_per_handler>` and

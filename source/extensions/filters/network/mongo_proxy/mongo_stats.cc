@@ -13,7 +13,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-MongoStats::MongoStats(Stats::Scope& scope, const std::string& prefix)
+MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Mongo")),
       prefix_(stat_name_set_->add(prefix)), callsite_(stat_name_set_->add("callsite")),
       cmd_(stat_name_set_->add("cmd")), collection_(stat_name_set_->add("collection")),

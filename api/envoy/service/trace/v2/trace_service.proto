@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-// [#proto-status: draft]
-
 package envoy.service.trace.v2;
 
 option java_outer_classname = "TraceServiceProto";
