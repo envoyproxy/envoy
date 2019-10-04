@@ -1,0 +1,16 @@
+-dontwarn android.support.**
+-dontwarn kotlin.**
+-dontwarn org.jetbrains.annotations.NotNull
+-dontwarn org.jetbrains.annotations.Nullable
+
+-dontnote android.support.**
+-dontnote kotlin.**
+-dontnote com.google.devtools.build.android.**
+
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmCallbackContext {
+   <methods>;
+}
