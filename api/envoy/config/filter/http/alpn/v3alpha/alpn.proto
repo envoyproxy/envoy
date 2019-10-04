@@ -29,4 +29,3 @@ message FilterConfig {
 
   repeated Entry alpn_override = 1 [(validate.rules).repeated = {min_items: 1}];
 }
-
