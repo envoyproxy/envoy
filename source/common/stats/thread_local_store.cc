@@ -25,7 +25,10 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
       null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
-      null_histogram_(alloc.symbolTable()) {}
+      null_histogram_(alloc.symbolTable(), Histogram::Unit::Unspecified),
+      null_histogram_b_(alloc.symbolTable(), Histogram::Unit::Bytes),
+      null_histogram_us_(alloc.symbolTable(), Histogram::Unit::Microseconds),
+      null_histogram_ms_(alloc.symbolTable(), Histogram::Unit::Milliseconds) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_ || !threading_ever_initialized_);
@@ -462,7 +465,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
                                                                   Histogram::Unit unit) {
   if (parent_.rejectsAll()) {
-    return parent_.null_histogram_;
+    return parent_.nullHistogram(unit);
   }
 
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
@@ -487,7 +490,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
     }
     tls_rejected_stats = &entry.rejected_stats_;
     if (tls_rejected_stats->find(final_stat_name) != tls_rejected_stats->end()) {
-      return parent_.null_histogram_;
+      return parent_.nullHistogram(unit);
     }
   }
 
@@ -498,7 +501,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
     central_ref = &iter->second;
   } else if (parent_.checkAndRememberRejection(final_stat_name, central_cache_.rejected_stats_,
                                                tls_rejected_stats)) {
-    return parent_.null_histogram_;
+    return parent_.nullHistogram(unit);
   } else {
     TagExtraction extraction(parent_, final_stat_name);
 

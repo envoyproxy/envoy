@@ -359,6 +359,18 @@ private:
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
   bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
+  NullHistogramImpl& nullHistogram(Histogram::Unit unit) {
+    switch (unit) {
+    case Histogram::Unit::Unspecified:
+      return null_histogram_;
+    case Histogram::Unit::Bytes:
+      return null_histogram_b_;
+    case Histogram::Unit::Microseconds:
+      return null_histogram_us_;
+    case Histogram::Unit::Milliseconds:
+      return null_histogram_ms_;
+    }
+  }
 
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
@@ -377,6 +389,9 @@ private:
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
   NullHistogramImpl null_histogram_;
+  NullHistogramImpl null_histogram_b_;
+  NullHistogramImpl null_histogram_us_;
+  NullHistogramImpl null_histogram_ms_;
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats

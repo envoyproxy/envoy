@@ -100,18 +100,19 @@ private:
  */
 class NullHistogramImpl : public HistogramImplHelper {
 public:
-  explicit NullHistogramImpl(SymbolTable& symbol_table)
-      : HistogramImplHelper(symbol_table), symbol_table_(symbol_table) {}
+  NullHistogramImpl(SymbolTable& symbol_table, Unit unit)
+      : HistogramImplHelper(symbol_table), symbol_table_(symbol_table), unit_(unit) {}
   ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
-  Unit unit() const override { return Unit::Unspecified; }
+  Unit unit() const override { return unit_; };
   void recordValue(uint64_t) override {}
 
 private:
   SymbolTable& symbol_table_;
+  Unit unit_;
 };
 
 } // namespace Stats
