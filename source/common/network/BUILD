@@ -36,6 +36,7 @@ envoy_cc_library(
     srcs = ["application_protocol.cc"],
     hdrs = ["application_protocol.h"],
     deps = [
+        "//include/envoy/http:protocol_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],

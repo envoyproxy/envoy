@@ -546,10 +546,14 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
           Network::ApplicationProtocols::key())) {
     const auto& alpn =
-        callbacks_->streamInfo().filterState().getDataReadOnly<Network::ApplicationProtocols>(
-            Network::ApplicationProtocols::key());
-    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
-        "", std::vector<std::string>{}, std::vector<std::string>{alpn.value()});
+        callbacks_->streamInfo()
+            .filterState()
+            .getDataReadOnly<Network::ApplicationProtocols>(Network::ApplicationProtocols::key())
+            .value();
+    if (alpn.count(protocol)) {
+      transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{alpn.at(protocol)});
+    }
   }
 
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),

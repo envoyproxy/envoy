@@ -4239,16 +4239,19 @@ TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
   EXPECT_EQ(to_return, options);
 }
 
-TEST_F(RouterTest, ApplicationProtocols) {
+TEST_F(RouterTest, AlpnOverride) {
+  Network::ApplicationProtocolOverride alpn_override{{Http::Protocol::Http11, {"foo", "bar"}},
+                                                     {Http::Protocol::Http2, {"baz", "qux"}}};
   callbacks_.streamInfo().filterState().setData(
       Network::ApplicationProtocols::key(),
-      std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
+      std::make_unique<Network::ApplicationProtocols>(alpn_override),
       StreamInfo::FilterState::StateType::ReadOnly);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol protocol,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(protocol, Http::Protocol::Http11);
             Network::TransportSocketOptionsSharedPtr transport_socket_options =
                 context->upstreamTransportSocketOptions();
             EXPECT_NE(transport_socket_options, nullptr);
@@ -4256,6 +4259,83 @@ TEST_F(RouterTest, ApplicationProtocols) {
             EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
             EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
             EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
+            return &cm_.conn_pool_;
+          }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(span_, injectContext(_));
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, AlpnOverrideHttp2Upstream) {
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
+
+  Network::ApplicationProtocolOverride alpn_override{{Http::Protocol::Http11, {"foo", "bar"}},
+                                                     {Http::Protocol::Http2, {"baz", "qux"}}};
+
+  callbacks_.streamInfo().filterState().setData(
+      Network::ApplicationProtocols::key(),
+      std::make_unique<Network::ApplicationProtocols>(alpn_override),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol protocol,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(protocol, Http::Protocol::Http2);
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "baz");
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "qux");
+            return &cm_.conn_pool_;
+          }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(span_, injectContext(_));
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, AlpnOverrideEmptyAlpn) {
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
+
+  Network::ApplicationProtocolOverride alpn_override{{Http::Protocol::Http11, {"foo", "bar"}}};
+
+  callbacks_.streamInfo().filterState().setData(
+      Network::ApplicationProtocols::key(),
+      std::make_unique<Network::ApplicationProtocols>(alpn_override),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol protocol,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            EXPECT_EQ(protocol, Http::Protocol::Http2);
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_EQ(transport_socket_options, nullptr);
             return &cm_.conn_pool_;
           }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
