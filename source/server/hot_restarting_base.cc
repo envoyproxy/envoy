@@ -122,8 +122,8 @@ void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* mes
   }
 }
 
-// While in use, recv_buf_ is always >= max_send_msg_size_. In between messages, it is kept empty, to be
-// grown back to max_send_msg_size_ at the start of the next message.
+// While in use, recv_buf_ is always >= max_send_msg_size_. In between messages, it is kept empty,
+// to be grown back to max_send_msg_size_ at the start of the next message.
 void HotRestartingBase::initRecvBufIfNewMessage() {
   if (recv_buf_.empty()) {
     ASSERT(cur_msg_recvd_bytes_ == 0);
