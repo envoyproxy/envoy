@@ -157,7 +157,7 @@ public:
   Stats::Scope& scope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return validation_visitor_;
   }
   Admin& admin() override { return server_.admin(); }
