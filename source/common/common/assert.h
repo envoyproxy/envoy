@@ -93,8 +93,8 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
 
 // When compiled for debug, ASSERT_DFATAL is simply an ASSERT.
-#define ASSERT_DFATAL(expr) ASSERT(expr)
-#define ASSERT_DFATAL_OR(expr, escape) ASSERT(expr)
+#define ASSERT_DFATAL(expr) ASSERT(expr, "ASSERT_DFATAL()")
+#define ASSERT_DFATAL_OR(expr, escape) ASSERT(expr, "ASSERT_DFATAL_OR(" #escape ")")
 
 #else
 

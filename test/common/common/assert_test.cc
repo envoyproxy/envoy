@@ -32,8 +32,8 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0, ""));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
                       ASSERT(0, "With some logs"));
-  EXPECT_LOG_CONTAINS("critical", "ASSERT_DFATAL(0)", ASSERT_DFATAL(0));
-  expected_counted_failures = 3;
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_DFATAL()", ASSERT_DFATAL(0));
+  expected_counted_failures = 4;
 #else
   EXPECT_NO_LOGS(ASSERT(0));
   EXPECT_NO_LOGS(ASSERT(0, ""));
@@ -49,7 +49,8 @@ TEST(AssertDeathTest, LogDfatalOrReturn) {
 #ifndef NDEBUG
   EXPECT_DEATH({ ASSERT_DFATAL_OR(0, return ); }, ".assert failure: 0*");
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
-  EXPECT_DEATH({ ASSERT_DFATAL_OR(0, return ); }, ".*ASSERT_DFATAL_OR(0, return).*");
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_DFATAL_OR(return)",
+                      ASSERT_DFATAL_OR(0, return ));
 #else
   EXPECT_LOG_CONTAINS("error", "ASSERT_DFATAL_OR(0)", ASSERT_DFATAL_OR(0, return ));
   EXPECT_TRUE(false) << "statement should not be reached due to _OR";
