@@ -19,14 +19,14 @@ StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig
   case envoy::config::metrics::v2::StatsMatcher::kInclusionList:
     // If we have an inclusion list, we are being default-exclusive.
     for (const auto& stats_matcher : config.stats_matcher().inclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcher(stats_matcher));
+      matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher));
     }
     is_inclusive_ = false;
     break;
   case envoy::config::metrics::v2::StatsMatcher::kExclusionList:
     // If we have an exclusion list, we are being default-inclusive.
     for (const auto& stats_matcher : config.stats_matcher().exclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcher(stats_matcher));
+      matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher));
     }
     FALLTHRU;
   default:
@@ -48,7 +48,7 @@ bool StatsMatcherImpl::rejects(const std::string& name) const {
   // This is an XNOR, which can be evaluated by checking for equality.
 
   return (is_inclusive_ == std::any_of(matchers_.begin(), matchers_.end(),
-                                       [&name](auto matcher) { return matcher.match(name); }));
+                                       [&name](auto& matcher) { return matcher.match(name); }));
 }
 
 } // namespace Stats

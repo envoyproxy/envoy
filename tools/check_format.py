@@ -42,42 +42,38 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
 
-# Files matching these directories can use stats by string for now. These should
-# be eliminated but for now we don't want to grow this work. The goal for this
-# whitelist is to eliminate it by making code transformations similar to
-# https://github.com/envoyproxy/envoy/pull/7573 and others.
-#
-# TODO(#4196): Eliminate this list completely and then merge #4980.
-STAT_FROM_STRING_WHITELIST = ("./source/extensions/filters/http/ext_authz/ext_authz.cc",
-                              "./source/extensions/filters/http/fault/fault_filter.cc",
-                              "./source/extensions/filters/http/ip_tagging/ip_tagging_filter.cc",
-                              "./source/extensions/filters/network/mongo_proxy/proxy.cc",
-                              "./source/extensions/filters/network/zookeeper_proxy/filter.cc",
-                              "./source/extensions/stat_sinks/common/statsd/statsd.cc",
-                              "./source/extensions/transport_sockets/tls/context_impl.cc",
-                              "./source/server/guarddog_impl.cc",
-                              "./source/server/overload_manager_impl.cc")
-
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
-                                 "./test/common/grpc/codec_test.cc")
+SERIALIZE_AS_STRING_WHITELIST = (
+    "./source/common/config/version_converter.cc",
+    "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
+    "./test/common/protobuf/utility_test.cc", "./test/common/grpc/codec_test.cc")
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
 
+# Files in these paths can use std::regex
+STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
+                       "./source/common/common/regex.cc",
+                       "./source/common/stats/tag_extractor_impl.h",
+                       "./source/common/stats/tag_extractor_impl.cc",
+                       "./source/common/access_log/access_log_formatter.cc",
+                       "./source/extensions/filters/http/squash/squash_filter.h",
+                       "./source/extensions/filters/http/squash/squash_filter.cc",
+                       "./source/server/http/admin.h", "./source/server/http/admin.cc")
+
+# Only one C++ file should instantiate grpc_init
+GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
-ENVOY_BUILD_FIXER_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
+ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
+                                      "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
-PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
-PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
-PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -102,64 +98,39 @@ LIBCXX_REPLACEMENTS = {
 UNOWNED_EXTENSIONS = {
   "extensions/filters/http/ratelimit",
   "extensions/filters/http/buffer",
-  "extensions/filters/http/grpc_http1_bridge",
   "extensions/filters/http/rbac",
-  "extensions/filters/http/gzip",
   "extensions/filters/http/ip_tagging",
   "extensions/filters/http/tap",
-  "extensions/filters/http/fault",
-  "extensions/filters/http/grpc_json_transcoder",
   "extensions/filters/http/health_check",
-  "extensions/filters/http/router",
   "extensions/filters/http/cors",
   "extensions/filters/http/ext_authz",
   "extensions/filters/http/dynamo",
   "extensions/filters/http/lua",
-  "extensions/filters/http/grpc_web",
   "extensions/filters/http/common",
-  "extensions/filters/http/common/aws",
-  "extensions/filters/http/squash",
   "extensions/filters/common",
   "extensions/filters/common/ratelimit",
   "extensions/filters/common/rbac",
-  "extensions/filters/common/fault",
-  "extensions/filters/common/ext_authz",
   "extensions/filters/common/lua",
-  "extensions/filters/common/original_src",
   "extensions/filters/listener/original_dst",
   "extensions/filters/listener/proxy_protocol",
-  "extensions/filters/listener/tls_inspector",
-  "extensions/grpc_credentials/example",
-  "extensions/grpc_credentials/file_based_metadata",
-  "extensions/stat_sinks/dog_statsd",
-  "extensions/stat_sinks/hystrix",
-  "extensions/stat_sinks/metrics_service",
   "extensions/stat_sinks/statsd",
   "extensions/stat_sinks/common",
   "extensions/stat_sinks/common/statsd",
   "extensions/health_checkers/redis",
-  "extensions/access_loggers/http_grpc",
+  "extensions/access_loggers/grpc",
   "extensions/access_loggers/file",
   "extensions/common/tap",
   "extensions/transport_sockets/raw_buffer",
   "extensions/transport_sockets/tap",
-  "extensions/transport_sockets/tls",
   "extensions/tracers/zipkin",
   "extensions/tracers/dynamic_ot",
   "extensions/tracers/opencensus",
   "extensions/tracers/lightstep",
   "extensions/tracers/common",
   "extensions/tracers/common/ot",
-  "extensions/resource_monitors/injected_resource",
-  "extensions/resource_monitors/fixed_heap",
-  "extensions/resource_monitors/common",
-  "extensions/retry/priority",
-  "extensions/retry/priority/previous_priorities",
-  "extensions/retry/host",
   "extensions/retry/host/previous_hosts",
   "extensions/filters/network/ratelimit",
   "extensions/filters/network/client_ssl_auth",
-  "extensions/filters/network/http_connection_manager",
   "extensions/filters/network/rbac",
   "extensions/filters/network/tcp_proxy",
   "extensions/filters/network/echo",
@@ -255,21 +226,6 @@ def checkNamespace(file_path):
   return []
 
 
-# If the substring is not found in the file, then insert to_add
-def insertProtoOptionIfNotFound(substring, file_path, to_add):
-  text = None
-  with open(file_path) as f:
-    text = f.read()
-
-  if not substring in text:
-
-    def repl(m):
-      return m.group(0).rstrip() + "\n\n" + to_add + "\n"
-
-    with open(file_path, "w") as f:
-      f.write(re.sub(PROTO_PACKAGE_REGEX, repl, text))
-
-
 def packageNameForProto(file_path):
   package_name = None
   error_message = []
@@ -281,32 +237,6 @@ def packageNameForProto(file_path):
       error_message = ["Unable to find package name for proto file: %s" % file_path]
 
   return [package_name, error_message]
-
-
-def fixJavaPackageProtoOption(file_path):
-  package_name = packageNameForProto(file_path)[0]
-  to_add = PROTO_OPTION_JAVA_PACKAGE + "io.envoyproxy.{}\";".format(package_name)
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path, to_add)
-  return []
-
-
-# Add "option java_outer_classname = FooBarProto;" for foo_bar.proto
-def fixJavaOuterClassnameProtoOption(file_path):
-  file_name = os.path.basename(file_path)[:-len(".proto")]
-  if "-" in file_name or "." in file_name or not file_name.islower():
-    return ["Unable to decide java_outer_classname for proto file: %s" % file_path]
-
-  to_add = PROTO_OPTION_JAVA_OUTER_CLASSNAME \
-       + "".join(x.title() for x in file_name.split("_")) \
-       + "Proto\";"
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path, to_add)
-  return []
-
-
-def fixJavaMultipleFilesProtoOption(file_path):
-  to_add = PROTO_OPTION_JAVA_MULTIPLE_FILES + "true;"
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path, to_add)
-  return []
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -332,8 +262,12 @@ def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
-def whitelistedForStatFromString(file_path):
-  return file_path in STAT_FROM_STRING_WHITELIST
+def whitelistedForStdRegex(file_path):
+  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
+
+
+def whitelistedForGrpcInit(file_path):
+  return file_path in GRPC_INIT_WHITELIST
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -504,8 +438,11 @@ def checkSourceLine(line, file_path, reportError):
                   "should be %s" % (invalid_construct, valid_construct))
   for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     if invalid_construct in line:
-      reportError("term %s should be replaced with standard library term %s" % (invalid_construct,
-                                                                                valid_construct))
+      reportError("term %s should be replaced with standard library term %s" %
+                  (invalid_construct, valid_construct))
+  # Do not include the virtual_includes headers.
+  if re.search("#include.*/_virtual_includes/", line):
+    reportError("Don't include the virtual includes headers.")
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
@@ -580,9 +517,23 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
-     not whitelistedForStatFromString(file_path) and \
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
+
+  if not whitelistedForStdRegex(file_path) and "std::regex" in line:
+    reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
+
+  if not whitelistedForGrpcInit(file_path):
+    grpc_init_or_shutdown = line.find("grpc_init()")
+    grpc_shutdown = line.find("grpc_shutdown()")
+    if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
+                                       grpc_shutdown < grpc_init_or_shutdown):
+      grpc_init_or_shutdown = grpc_shutdown
+    if grpc_init_or_shutdown != -1:
+      comment = line.find("// ")
+      if comment == -1 or comment > grpc_init_or_shutdown:
+        reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
+                    "Grpc::GoogleGrpcContext. See #8282")
 
 
 def checkBuildLine(line, file_path, reportError):
@@ -628,6 +579,17 @@ def checkBuildPath(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
+  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+    found = False
+    finput = fileinput.input(file_path)
+    for line in finput:
+      if "api_proto_package(" in line:
+        found = True
+        break
+    finput.close()
+    if not found:
+      error_messages += ["API build file does not provide api_proto_package()"]
+
   command = "%s -mode=diff %s" % (BUILDIFIER_PATH, file_path)
   error_messages += executeCommand(command, "buildifier check failed", file_path)
   error_messages += checkFileContents(file_path, checkBuildLine)
@@ -647,10 +609,6 @@ def fixSourcePath(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-    else:
-      error_messages += fixJavaMultipleFilesProtoOption(file_path)
-      error_messages += fixJavaOuterClassnameProtoOption(file_path)
-      error_messages += fixJavaPackageProtoOption(file_path)
   return error_messages
 
 
@@ -670,13 +628,6 @@ def checkSourcePath(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-    else:
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path,
-                                                "Java proto option 'java_package' not set")
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path,
-                                                "Java proto option 'java_outer_classname' not set")
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path,
-                                                "Java proto option 'java_multiple_files' not set")
   return error_messages
 
 
@@ -813,53 +764,48 @@ def checkErrorMessages(error_messages):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Check or fix file format.")
-  parser.add_argument(
-      "operation_type",
-      type=str,
-      choices=["check", "fix"],
-      help="specify if the run should 'check' or 'fix' format.")
+  parser.add_argument("operation_type",
+                      type=str,
+                      choices=["check", "fix"],
+                      help="specify if the run should 'check' or 'fix' format.")
   parser.add_argument(
       "target_path",
       type=str,
       nargs="?",
       default=".",
       help="specify the root directory for the script to recurse over. Default '.'.")
-  parser.add_argument(
-      "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
-  parser.add_argument(
-      "-j",
-      "--num-workers",
-      type=int,
-      default=multiprocessing.cpu_count(),
-      help="number of worker processes to use; defaults to one per core.")
+  parser.add_argument("--add-excluded-prefixes",
+                      type=str,
+                      nargs="+",
+                      help="exclude additional prefixes.")
+  parser.add_argument("-j",
+                      "--num-workers",
+                      type=int,
+                      default=multiprocessing.cpu_count(),
+                      help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
-  parser.add_argument(
-      "--skip_envoy_build_rule_check",
-      action="store_true",
-      help="skip checking for '@envoy//' prefix in build rules.")
-  parser.add_argument(
-      "--namespace_check",
-      type=str,
-      nargs="?",
-      default="Envoy",
-      help="specify namespace check string. Default 'Envoy'.")
-  parser.add_argument(
-      "--namespace_check_excluded_paths",
-      type=str,
-      nargs="+",
-      default=[],
-      help="exclude paths from the namespace_check.")
-  parser.add_argument(
-      "--build_fixer_check_excluded_paths",
-      type=str,
-      nargs="+",
-      default=[],
-      help="exclude paths from envoy_build_fixer check.")
-  parser.add_argument(
-      "--include_dir_order",
-      type=str,
-      default=",".join(common.includeDirOrder()),
-      help="specify the header block include directory order.")
+  parser.add_argument("--skip_envoy_build_rule_check",
+                      action="store_true",
+                      help="skip checking for '@envoy//' prefix in build rules.")
+  parser.add_argument("--namespace_check",
+                      type=str,
+                      nargs="?",
+                      default="Envoy",
+                      help="specify namespace check string. Default 'Envoy'.")
+  parser.add_argument("--namespace_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from the namespace_check.")
+  parser.add_argument("--build_fixer_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument("--include_dir_order",
+                      type=str,
+                      default=",".join(common.includeDirOrder()),
+                      help="specify the header block include directory order.")
   args = parser.parse_args()
 
   operation_type = args.operation_type

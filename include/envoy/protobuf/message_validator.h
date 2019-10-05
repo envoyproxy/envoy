@@ -25,5 +25,20 @@ public:
   virtual void onUnknownField(absl::string_view description) PURE;
 };
 
+class ValidationContext {
+public:
+  virtual ~ValidationContext() = default;
+
+  /**
+   * @return ValidationVisitor& the validation visitor for static configuration.
+   */
+  virtual ValidationVisitor& staticValidationVisitor() PURE;
+
+  /**
+   * @return ValidationVisitor& the validation visitor for dynamic configuration.
+   */
+  virtual ValidationVisitor& dynamicValidationVisitor() PURE;
+};
+
 } // namespace ProtobufMessage
 } // namespace Envoy

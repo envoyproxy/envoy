@@ -22,6 +22,7 @@ envoy_cc_mock(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:store_impl_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//test/mocks:common_lib",
         "//test/test_common:global_lib",
     ],

@@ -219,7 +219,7 @@ modify different aspects of the server:
         "concurrency": 8,
         "config_path": "config.yaml",
         "config_yaml": "",
-        "allow_unknown_fields": false,
+        "allow_unknown_static_fields": false,
         "admin_address_path": "",
         "local_address_ip_version": "v4",
         "log_level": "info",

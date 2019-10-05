@@ -58,6 +58,7 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         ":codec_lib",
+        ":mongo_stats_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:time_interface",
@@ -78,6 +79,16 @@ envoy_cc_library(
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:mongo_proxy_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "mongo_stats_lib",
+    srcs = ["mongo_stats.cc"],
+    hdrs = ["mongo_stats.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 

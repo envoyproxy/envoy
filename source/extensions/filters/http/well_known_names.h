@@ -54,6 +54,8 @@ public:
   const std::string HeaderToMetadata = "envoy.filters.http.header_to_metadata";
   // Tap filter
   const std::string Tap = "envoy.filters.http.tap";
+  // Adaptive concurrency limit filter
+  const std::string AdaptiveConcurrency = "envoy.filters.http.adaptive_concurrency";
   // Original Src Filter
   const std::string OriginalSrc = "envoy.filters.http.original_src";
   // Dynamic forward proxy filter

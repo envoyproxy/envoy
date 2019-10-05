@@ -1,0 +1,17 @@
+diff --git a/src/dynamic_load_unix.cpp b/src/dynamic_load_unix.cpp
+index 17e08fd..d25e0c8 100644
+--- a/src/dynamic_load_unix.cpp
++++ b/src/dynamic_load_unix.cpp
+@@ -35,7 +35,11 @@ DynamicallyLoadTracingLibrary(const char* shared_library,
+                               std::string& error_message) noexcept try {
+   dlerror();  // Clear any existing error.
+
+-  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL);
++  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL
++#ifdef __SANITIZE_ADDRESS__
++      | RTLD_NODELETE
++#endif
++  );
+   if (handle == nullptr) {
+     error_message = dlerror();
+     return make_unexpected(dynamic_load_failure_error);

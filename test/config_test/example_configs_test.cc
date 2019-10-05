@@ -5,7 +5,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-TEST(ExampleConfigsTest, All) {
+TEST(ExampleConfigsTest, DEPRECATED_FEATURE_TEST(All)) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
 

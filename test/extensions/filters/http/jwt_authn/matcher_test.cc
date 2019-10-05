@@ -55,6 +55,28 @@ TEST_F(MatcherTest, TestMatchRegex) {
   EXPECT_FALSE(matcher->matches(headers));
 }
 
+TEST_F(MatcherTest, TestMatchSafeRegex) {
+  const char config[] = R"(
+match:
+  safe_regex:
+    google_re2: {}
+    regex: "/[^c][au]t")";
+
+  RequirementRule rule;
+  TestUtility::loadFromYaml(config, rule);
+  MatcherConstPtr matcher = Matcher::create(rule);
+  auto headers = TestHeaderMapImpl{{":path", "/but"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/mat?ok=bye"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/maut"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/cut"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/mut/"}};
+  EXPECT_FALSE(matcher->matches(headers));
+}
+
 TEST_F(MatcherTest, TestMatchPath) {
   const char config[] = R"(match:
   path: "/match"

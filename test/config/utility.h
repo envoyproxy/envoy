@@ -91,6 +91,7 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
+  static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
   static envoy::api::v2::Cluster buildCluster(const std::string& name, int port,
                                               const std::string& ip_version);
@@ -109,6 +110,9 @@ public:
 
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
+
+  // Set the idle timeout on downstream connections through the HttpConnectionMananger.
+  void setDownstreamHttpIdleTimeout(std::chrono::milliseconds idle_timeout);
 
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
@@ -149,11 +153,18 @@ public:
   // and write it to the lds file.
   void setLds(absl::string_view version_info);
 
+  // Set limits on pending outbound frames.
+  void setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
+
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
 
   // Allow a finalized configuration to be edited for generating xDS responses
   void applyConfigModifiers();
+
+  // Skip validation that ensures that all upstream ports are referenced by the
+  // configuration generated in ConfigHelper::finalize.
+  void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
@@ -182,6 +193,11 @@ private:
   // Track if the connect timeout has been set (to avoid clobbering a custom setting with the
   // default).
   bool connect_timeout_set_{false};
+
+  // Option to disable port usage validation for cases where the number of
+  // upstream ports created is expected to be larger than the number of
+  // upstreams in the config.
+  bool skip_port_usage_validation_{false};
 
   // A sanity check guard to make sure config is not modified after handing it to Envoy.
   bool finalized_{false};

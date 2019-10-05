@@ -95,13 +95,16 @@ public:
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
+  // wait for at least `length` bytes to be received
+  void waitForData(size_t length);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
   void write(const std::string& data, bool end_stream = false, bool verify = true);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
-  void clearData() { payload_reader_->clearData(); }
+  // clear up to the `count` number of bytes of received data
+  void clearData(size_t count = std::string::npos) { payload_reader_->clearData(count); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -170,6 +173,9 @@ public:
   void setUpstreamProtocol(FakeHttpConnection::Type protocol);
   // Sets fake_upstreams_count_ and alters the upstream protocol in the config_helper_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
+  // Skip validation that ensures that all upstream ports are referenced by the
+  // configuration generated in ConfigHelper::finalize.
+  void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
 
@@ -190,9 +196,13 @@ public:
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
-                                    const std::vector<std::string>& port_names);
+                                    const std::vector<std::string>& port_names,
+                                    bool allow_unknown_static_fields,
+                                    bool reject_unknown_dynamic_fields, bool allow_lds_rejection);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
-                           const std::vector<std::string>& port_names);
+                           const std::vector<std::string>& port_names,
+                           bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                           bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -210,11 +220,14 @@ public:
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
   // compareDiscoveryRequest() and sendDiscoveryResponse(), but the SotW/delta-specific versions are
   // available if you're writing a SotW/delta-specific test.
+  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
+  // it.
   AssertionResult
   compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
                           const std::vector<std::string>& expected_resource_names,
                           const std::vector<std::string>& expected_resource_names_added,
                           const std::vector<std::string>& expected_resource_names_removed,
+                          bool expect_node = true,
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "");
   template <class T>
@@ -245,9 +258,12 @@ public:
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
+
+  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
+  // it.
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = true,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
@@ -260,8 +276,11 @@ public:
     for (const auto& message : messages) {
       discovery_response.add_resources()->PackFrom(message);
     }
+    static int next_nonce_counter = 0;
+    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     xds_stream_->sendGrpcMessage(discovery_response);
   }
+
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
@@ -285,7 +304,8 @@ public:
       resource->mutable_resource()->PackFrom(message);
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-    response.set_nonce("noncense");
+    static int next_nonce_counter = 0;
+    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     stream->sendGrpcMessage(response);
   }
 
@@ -318,6 +338,8 @@ protected:
                               Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
+
+  std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;

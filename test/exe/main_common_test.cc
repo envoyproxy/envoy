@@ -240,7 +240,7 @@ protected:
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -253,7 +253,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
   // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -266,7 +266,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
   // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
   // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGINT);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -335,7 +335,7 @@ TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
   EXPECT_TRUE(admin_handler_was_called);
 
   // This just checks that some stat output was reported. We could pick any stat.
-  EXPECT_THAT(out, HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
 }
 
 // Class to track whether an object has been destroyed, which it does by bumping an atomic.

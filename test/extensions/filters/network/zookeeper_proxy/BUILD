@@ -20,6 +20,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 

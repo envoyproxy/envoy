@@ -7,34 +7,26 @@
 #include "envoy/local_info/local_info.h"
 
 #include "common/common/assert.h"
-#include "common/common/hash.h"
 #include "common/common/logger.h"
+#include "common/config/pausable_ack_queue.h"
 
 namespace Envoy {
 namespace Config {
 
-struct UpdateAck {
-  UpdateAck(absl::string_view nonce) : nonce_(nonce) {}
-  std::string nonce_;
-  ::google::rpc::Status error_detail_;
-};
-
-// Tracks the xDS protocol state of an individual ongoing delta xDS session.
+// Tracks the xDS protocol state of an individual ongoing delta xDS session, i.e. a single type_url.
+// There can be multiple DeltaSubscriptionStates active. They will always all be
+// blissfully unaware of each other's existence, even when their messages are
+// being multiplexed together by ADS.
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
-  DeltaSubscriptionState(const std::string& type_url, const std::set<std::string>& resource_names,
-                         SubscriptionCallbacks& callbacks, const LocalInfo::LocalInfo& local_info,
+  DeltaSubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
+                         const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
-                         Event::Dispatcher& dispatcher, SubscriptionStats& stats);
-
-  void setInitFetchTimeout(Event::Dispatcher& dispatcher);
-
-  void pause();
-  void resume();
-  bool paused() const { return paused_; }
+                         Event::Dispatcher& dispatcher);
 
   // Update which resources we're interested in subscribing to.
-  void updateResourceInterest(const std::set<std::string>& update_to_these_names);
+  void updateSubscriptionInterest(const std::set<std::string>& cur_added,
+                                  const std::set<std::string>& cur_removed);
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const;
@@ -45,7 +37,14 @@ public:
 
   void handleEstablishmentFailure();
 
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequest();
+  // Returns the next gRPC request proto to be sent off to the server, based on this object's
+  // understanding of the current protocol state, and new resources that Envoy wants to request.
+  envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless();
+  // The WithAck version first calls the Ackless version, then adds in the passed-in ack.
+  envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
+
+  DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
+  DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 
 private:
   void handleGoodResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
@@ -86,12 +85,12 @@ private:
   std::set<std::string> resource_names_;
 
   const std::string type_url_;
+  // callbacks_ is expected to be a WatchMap.
   SubscriptionCallbacks& callbacks_;
   const LocalInfo::LocalInfo& local_info_;
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
 
-  bool paused_{};
   bool any_request_sent_yet_in_current_stream_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
@@ -99,8 +98,6 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
-
-  SubscriptionStats& stats_;
 };
 
 } // namespace Config

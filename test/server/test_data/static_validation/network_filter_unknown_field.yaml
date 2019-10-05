@@ -1,0 +1,15 @@
+static_resources:
+  listeners:
+    name: foo
+    address:
+      socket_address:
+        address: {{ ntop_ip_loopback_address }}
+        port_value: 0
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          codec_type: HTTP2
+          stat_prefix: blah
+          route_config: {}
+          foo: bar

@@ -26,8 +26,6 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Property;
-using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
@@ -165,10 +163,8 @@ public:
 };
 
 // Class creates minimally viable server instance for testing.
-class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class ServerInstanceImplTestBase {
 protected:
-  ServerInstanceImplTest() : version_(GetParam()) {}
-
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
@@ -223,21 +219,26 @@ protected:
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
                                     const bool use_intializing_instance) {
     absl::Notification started;
+    absl::Notification post_init;
 
     auto server_thread = Thread::threadFactoryForTest().createThread([&] {
       initialize(bootstrap_path, use_intializing_instance);
       auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
                                                       [&] { started.Notify(); });
+      auto post_init_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit,
+                                                        [&] { post_init.Notify(); });
       auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                                        [&](Event::PostCb) { FAIL(); });
       shutdown_handle = nullptr; // unregister callback
       server_->run();
       startup_handle = nullptr;
+      post_init_handle = nullptr;
       server_ = nullptr;
       thread_local_ = nullptr;
     });
 
     started.WaitForNotification();
+    post_init.WaitForNotification();
     return server_thread;
   }
 
@@ -256,6 +257,12 @@ protected:
   ProcessObject* process_object_ = nullptr;
   std::unique_ptr<ProcessContextImpl> process_context_;
   std::unique_ptr<InstanceImpl> server_;
+};
+
+class ServerInstanceImplTest : public ServerInstanceImplTestBase,
+                               public testing::TestWithParam<Network::Address::IpVersion> {
+protected:
+  ServerInstanceImplTest() { version_ = GetParam(); }
 };
 
 // Custom StatsSink that just increments a counter when flush is called.
@@ -309,6 +316,16 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   server_thread->join();
 }
 
+// Validates that the "server.version" is updated with stats_server_version_override from bootstrap.
+TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
+  auto server_thread = startTestServer("test/server/proxy_version_bootstrap.yaml", true);
+
+  EXPECT_EQ(100012001, TestUtility::findGauge(stats_store_, "server.version")->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -319,8 +336,8 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
-  bool startup = false, shutdown = false, shutdown_with_completion = false;
-  absl::Notification started, shutdown_begin, completion_block, completion_done;
+  bool startup = false, post_init = false, shutdown = false, shutdown_with_completion = false;
+  absl::Notification started, post_init_fired, shutdown_begin, completion_block, completion_done;
 
   // Run the server in a separate thread so we can test different lifecycle stages.
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
@@ -329,11 +346,15 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       startup = true;
       started.Notify();
     });
-    auto handle2 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+    auto handle2 = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit, [&] {
+      post_init = true;
+      post_init_fired.Notify();
+    });
+    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
       shutdown_begin.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
@@ -341,22 +362,27 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                                server_->dispatcher().post(completion_cb);
                                                completion_done.Notify();
                                              });
-    auto handle4 =
+    auto handle5 =
         server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] { FAIL(); });
-    handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    handle5 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                         [&](Event::PostCb) { FAIL(); });
-    handle4 = nullptr;
+    handle5 = nullptr;
 
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
     handle3 = nullptr;
+    handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
   });
 
   started.WaitForNotification();
   EXPECT_TRUE(startup);
+  EXPECT_FALSE(shutdown);
+
+  post_init_fired.WaitForNotification();
+  EXPECT_TRUE(post_init);
   EXPECT_FALSE(shutdown);
 
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -443,6 +469,66 @@ TEST_P(ServerInstanceImplTest, Stats) {
 #endif
 }
 
+// Default validation mode
+TEST_P(ServerInstanceImplTest, ValidationDefault) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
+      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
+// Validation mode with --allow-unknown-static-fields
+TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.allow_unknown_static_fields_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
+// Validation mode with --reject-unknown-dynamic-fields
+TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.reject_unknown_dynamic_fields_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
+      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
+      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
+// Validation mode with --allow-unknown-static-fields --reject-unknown-dynamic-fields
+TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.allow_unknown_static_fields_ = true;
+  options_.reject_unknown_dynamic_fields_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
+      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
 // Validate server localInfo() from bootstrap Node.
 TEST_P(ServerInstanceImplTest, BootstrapNode) {
   initialize("test/server/node_bootstrap.yaml");
@@ -511,6 +597,11 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   EXPECT_EQ("No admin layer specified", response_body);
 }
 
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
+                            EnvoyException, "Invalid runtime entry value for foo");
+}
+
 // Validate invalid runtime in bootstrap is rejected.
 TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
@@ -528,6 +619,12 @@ TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
   EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_duplicate_name.yaml"),
                           EnvoyException, "Duplicate layer name: some_static_laye");
+}
+
+// Validate invalid layered runtime with no layer specifier is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapNoLayerSpecifier) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_no_layer_specifier.yaml"),
+                          EnvoyException, "BootstrapValidationError.LayeredRuntime");
 }
 
 // Regression test for segfault when server initialization fails prior to
@@ -626,7 +723,7 @@ TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
 }
 
 // Custom header bootstrap succeeds.
-TEST_P(ServerInstanceImplTest, CusomHeaderBoostrap) {
+TEST_P(ServerInstanceImplTest, CustomHeaderBootstrap) {
   options_.config_path_ = TestEnvironment::writeStringToFileForTest(
       "custom.yaml", "header_prefix: \"x-envoy\"\nstatic_resources:\n");
   options_.service_cluster_name_ = "some_cluster_name";
@@ -766,13 +863,72 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
 
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
 
-  ProcessContext& context = server_->processContext();
-  auto& object_from_context = dynamic_cast<TestObject&>(context.get());
+  auto context = server_->processContext();
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
   EXPECT_EQ(&object_from_context, &object);
   EXPECT_TRUE(object_from_context.boolean_flag_);
 
   object.boolean_flag_ = false;
   EXPECT_FALSE(object_from_context.boolean_flag_);
+}
+
+// Static configuration validation. We test with both allow/reject settings various aspects of
+// configuration from YAML.
+class StaticValidationTest
+    : public ServerInstanceImplTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+protected:
+  StaticValidationTest() {
+    version_ = std::get<0>(GetParam());
+    options_.service_cluster_name_ = "some_cluster_name";
+    options_.service_node_name_ = "some_node_name";
+    options_.allow_unknown_static_fields_ = std::get<1>(GetParam());
+    // By inverting the static validation value, we can hopefully catch places we may have confused
+    // static/dynamic validation.
+    options_.reject_unknown_dynamic_fields_ = options_.allow_unknown_static_fields_;
+  }
+
+  AssertionResult validate(absl::string_view yaml_filename) {
+    const std::string path =
+        absl::StrCat("test/server/test_data/static_validation/", yaml_filename);
+    try {
+      initialize(path);
+    } catch (EnvoyException&) {
+      return options_.allow_unknown_static_fields_ ? AssertionFailure() : AssertionSuccess();
+    }
+    return options_.allow_unknown_static_fields_ ? AssertionSuccess() : AssertionFailure();
+  }
+};
+
+std::string staticValidationTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return fmt::format(
+      "{}_{}",
+      TestUtility::ipTestParamsToString(
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+      std::get<1>(params.param) ? "with_allow_unknown_static_fields"
+                                : "without_allow_unknown_static_fields");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, StaticValidationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    staticValidationTestParamsToString);
+
+TEST_P(StaticValidationTest, BootstrapUnknownField) {
+  EXPECT_TRUE(validate("bootstrap_unknown_field.yaml"));
+}
+
+TEST_P(StaticValidationTest, ListenerUnknownField) {
+  EXPECT_TRUE(validate("listener_unknown_field.yaml"));
+}
+
+TEST_P(StaticValidationTest, NetworkFilterUnknownField) {
+  EXPECT_TRUE(validate("network_filter_unknown_field.yaml"));
+}
+
+TEST_P(StaticValidationTest, ClusterUnknownField) {
+  EXPECT_TRUE(validate("cluster_unknown_field.yaml"));
 }
 
 } // namespace

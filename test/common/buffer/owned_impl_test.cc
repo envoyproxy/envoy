@@ -96,6 +96,57 @@ TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
+TEST_P(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
+  char input[] = "hello world";
+  const size_t expected_length = sizeof(input) - 1;
+  auto frag = OwnedBufferFragmentImpl::create(
+      {input, expected_length},
+      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  buffer.addBufferFragment(*frag);
+  EXPECT_EQ(expected_length, buffer.length());
+
+  const uint64_t partial_drain_size = 5;
+  buffer.drain(partial_drain_size);
+  EXPECT_EQ(expected_length - partial_drain_size, buffer.length());
+  EXPECT_FALSE(release_callback_called_);
+
+  buffer.drain(expected_length - partial_drain_size);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(release_callback_called_);
+}
+
+// Verify that OwnedBufferFragment work correctly when input buffer is allocated on the heap.
+TEST_P(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
+  char input_stack[] = "hello world";
+  const size_t expected_length = sizeof(input_stack) - 1;
+  char* input = new char[expected_length];
+  std::copy(input_stack, input_stack + expected_length, input);
+
+  auto* frag = OwnedBufferFragmentImpl::create({input, expected_length},
+                                               [this, input](const OwnedBufferFragmentImpl* frag) {
+                                                 release_callback_called_ = true;
+                                                 delete[] input;
+                                                 delete frag;
+                                               })
+                   .release();
+
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  buffer.addBufferFragment(*frag);
+  EXPECT_EQ(expected_length, buffer.length());
+
+  const uint64_t partial_drain_size = 5;
+  buffer.drain(partial_drain_size);
+  EXPECT_EQ(expected_length - partial_drain_size, buffer.length());
+  EXPECT_FALSE(release_callback_called_);
+
+  buffer.drain(expected_length - partial_drain_size);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(release_callback_called_);
+}
+
 TEST_P(OwnedImplTest, Add) {
   const std::string string1 = "Hello, ", string2 = "World!";
   Buffer::OwnedImpl buffer;
@@ -429,6 +480,29 @@ TEST_P(OwnedImplTest, Search) {
   EXPECT_EQ(0, buffer.search("abaaaabaaaaaba", 14, 0));
   EXPECT_EQ(12, buffer.search("ba", 2, 10));
   EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0));
+}
+
+TEST_P(OwnedImplTest, StartsWith) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the startsWith implementation.
+  static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
+
+  EXPECT_FALSE(buffer.startsWith({"abaaaabaaaaabaXXX", 17}));
+  EXPECT_FALSE(buffer.startsWith({"c", 1}));
+  EXPECT_TRUE(buffer.startsWith({"", 0}));
+  EXPECT_TRUE(buffer.startsWith({"a", 1}));
+  EXPECT_TRUE(buffer.startsWith({"ab", 2}));
+  EXPECT_TRUE(buffer.startsWith({"aba", 3}));
+  EXPECT_TRUE(buffer.startsWith({"abaa", 4}));
+  EXPECT_TRUE(buffer.startsWith({"abaaaab", 7}));
+  EXPECT_TRUE(buffer.startsWith({"abaaaabaaaaaba", 14}));
+  EXPECT_FALSE(buffer.startsWith({"ba", 2}));
 }
 
 TEST_P(OwnedImplTest, ToString) {

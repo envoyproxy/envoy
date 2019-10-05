@@ -204,7 +204,7 @@ statistics. For example inside ``frontenvoy`` we can get::
       "concurrency": 4,
       "config_path": "/etc/front-envoy.yaml",
       "config_yaml": "",
-      "allow_unknown_fields": false,
+      "allow_unknown_static_fields": false,
       "admin_address_path": "",
       "local_address_ip_version": "v4",
       "log_level": "info",

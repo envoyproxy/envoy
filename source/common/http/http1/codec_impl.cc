@@ -21,6 +21,15 @@
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
+
+const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
+  CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
+                         Http::Headers::get().ConnectionValues.Upgrade,
+                         Http::Headers::get().ConnectionValues.Http2Settings);
+}
+
+} // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
@@ -326,12 +335,13 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               http_parser_type type, uint32_t max_headers_kb)
+                               http_parser_type type, uint32_t max_request_headers_kb)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb), strict_header_validation_(Runtime::runtimeFeatureEnabled(
-                                           "envoy.reloadable_features.strict_header_validation")) {
+      max_request_headers_kb_(max_request_headers_kb),
+      strict_header_validation_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -452,7 +462,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 
   const uint32_t total =
       current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
-  if (total > (max_headers_kb_ * 1024)) {
+  if (total > (max_request_headers_kb_ * 1024)) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");
@@ -468,8 +478,28 @@ int ConnectionImpl::onHeadersCompleteBase() {
     protocol_ = Protocol::Http10;
   }
   if (Utility::isUpgrade(*current_header_map_)) {
-    ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
-    handling_upgrade_ = true;
+    // Ignore h2c upgrade requests until we support them.
+    // See https://github.com/envoyproxy/envoy/issues/7161 for details.
+    if (current_header_map_->Upgrade() &&
+        absl::EqualsIgnoreCase(current_header_map_->Upgrade()->value().getStringView(),
+                               Http::Headers::get().UpgradeValues.H2c)) {
+      ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
+      current_header_map_->removeUpgrade();
+      if (current_header_map_->Connection()) {
+        const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
+        std::string new_value = StringUtil::removeTokens(
+            current_header_map_->Connection()->value().getStringView(), ",", tokens_to_remove, ",");
+        if (new_value.empty()) {
+          current_header_map_->removeConnection();
+        } else {
+          current_header_map_->Connection()->value(new_value);
+        }
+      }
+      current_header_map_->remove(Headers::get().Http2Settings);
+    } else {
+      ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
+      handling_upgrade_ = true;
+    }
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));

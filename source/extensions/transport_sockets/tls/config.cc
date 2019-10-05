@@ -17,7 +17,8 @@ Network::TransportSocketFactoryPtr UpstreamSslSocketFactory::createTransportSock
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
   auto client_config = std::make_unique<ClientContextConfigImpl>(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::auth::UpstreamTlsContext&>(message),
+      MessageUtil::downcastAndValidate<const envoy::api::v2::auth::UpstreamTlsContext&>(
+          message, context.messageValidationVisitor()),
       context);
   return std::make_unique<ClientSslSocketFactory>(
       std::move(client_config), context.sslContextManager(), context.statsScope());
@@ -34,7 +35,8 @@ Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSo
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
   auto server_config = std::make_unique<ServerContextConfigImpl>(
-      MessageUtil::downcastAndValidate<const envoy::api::v2::auth::DownstreamTlsContext&>(message),
+      MessageUtil::downcastAndValidate<const envoy::api::v2::auth::DownstreamTlsContext&>(
+          message, context.messageValidationVisitor()),
       context);
   return std::make_unique<ServerSslSocketFactory>(
       std::move(server_config), context.sslContextManager(), context.statsScope(), server_names);

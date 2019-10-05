@@ -133,7 +133,7 @@ public:
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
-  std::unique_ptr<SymbolTable> symbol_table_storage_;
+  SymbolTablePtr symbol_table_storage_;
   AllocatorImpl alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;

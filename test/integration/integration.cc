@@ -180,6 +180,15 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
+void IntegrationTcpClient::waitForData(size_t length) {
+  if (payload_reader_->data().size() >= length) {
+    return;
+  }
+
+  payload_reader_->setLengthToWaitFor(length);
+  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+}
+
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
   if (ignore_spurious_events) {
     while (!disconnected_) {
@@ -345,7 +354,7 @@ void BaseIntegrationTest::createEnvoy() {
   for (int i = 0; i < static_resources.listeners_size(); ++i) {
     named_ports.push_back(static_resources.listeners(i).name());
   }
-  createGeneratedApiTestServer(bootstrap_path, named_ports);
+  createGeneratedApiTestServer(bootstrap_path, named_ports, false, true, false);
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
@@ -407,10 +416,14 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
-                                                       const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
-                                               deterministic_, timeSystem(), *api_,
-                                               defer_listener_finalization_, process_object_);
+                                                       const std::vector<std::string>& port_names,
+                                                       bool allow_unknown_static_fields,
+                                                       bool reject_unknown_dynamic_fields,
+                                                       bool allow_lds_rejection) {
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, on_server_init_function_, deterministic_, timeSystem(), *api_,
+      defer_listener_finalization_, process_object_, allow_unknown_static_fields,
+      reject_unknown_dynamic_fields);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -418,15 +431,20 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     // needs to know about the bound listener ports.
     auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
     const char* success = "listener_manager.listener_create_success";
-    const char* failure = "listener_manager.lds.update_rejected";
-    while (test_server_->counter(success) == nullptr ||
-           test_server_->counter(success)->value() == 0) {
+    const char* rejected = "listener_manager.lds.update_rejected";
+    while ((test_server_->counter(success) == nullptr ||
+            test_server_->counter(success)->value() == 0) &&
+           (!allow_lds_rejection || test_server_->counter(rejected) == nullptr ||
+            test_server_->counter(rejected)->value() == 0)) {
       if (time_system_.monotonicTime() >= end_time) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
-      RELEASE_ASSERT(test_server_->counter(failure) == nullptr ||
-                         test_server_->counter(failure)->value() == 0,
-                     "Lds update failed");
+      if (!allow_lds_rejection) {
+        RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
+                           test_server_->counter(rejected)->value() == 0,
+                       "Lds update failed. For details, run test with -l trace and look for "
+                       "\"Error adding/updating listener(s)\" in the logs.");
+      }
       time_system_.sleep(std::chrono::milliseconds(10));
     }
 
@@ -435,7 +453,10 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
-                                              const std::vector<std::string>& port_names) {
+                                              const std::vector<std::string>& port_names,
+                                              bool allow_unknown_static_fields,
+                                              bool reject_unknown_dynamic_fields,
+                                              bool allow_lds_rejection) {
   const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.eds_path_, port_map_, version_);
   const std::string cds_path = TestEnvironment::temporaryFileSubstitute(
@@ -444,11 +465,11 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
       api_filesystem_config.rds_path_, port_map_, version_);
   const std::string lds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.lds_path_, {{"rds_json_path", rds_path}}, port_map_, version_);
-  createGeneratedApiTestServer(TestEnvironment::temporaryFileSubstitute(
-                                   api_filesystem_config.bootstrap_path_,
-                                   {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
-                                   port_map_, version_),
-                               port_names);
+  createGeneratedApiTestServer(
+      TestEnvironment::temporaryFileSubstitute(
+          api_filesystem_config.bootstrap_path_,
+          {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}}, port_map_, version_),
+      port_names, allow_unknown_static_fields, reject_unknown_dynamic_fields, allow_lds_rejection);
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
@@ -504,9 +525,9 @@ void BaseIntegrationTest::createXdsUpstream() {
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
 
-    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
     fake_upstreams_.emplace_back(new FakeUpstream(
         std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
@@ -532,28 +553,32 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
-    const std::vector<std::string>& expected_resource_names_removed,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+    const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expected_error_code, expected_error_message);
+                                       expect_node, expected_error_code, expected_error_substring);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
                                         expected_resource_names_removed, expected_error_code,
-                                        expected_error_message);
+                                        expected_error_substring);
   }
 }
 
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
-    const std::vector<std::string>& expected_resource_names,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+    const std::vector<std::string>& expected_resource_names, bool expect_node,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
   envoy::api::v2::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
-  EXPECT_TRUE(discovery_request.has_node());
-  EXPECT_FALSE(discovery_request.node().id().empty());
-  EXPECT_FALSE(discovery_request.node().cluster().empty());
+  if (expect_node) {
+    EXPECT_TRUE(discovery_request.has_node());
+    EXPECT_FALSE(discovery_request.node().id().empty());
+    EXPECT_FALSE(discovery_request.node().cluster().empty());
+  } else {
+    EXPECT_FALSE(discovery_request.has_node());
+  }
 
   if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
@@ -565,7 +590,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
                                              expected_error_code);
   }
   EXPECT_TRUE(
-      IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
+      IsSubstring("", "", expected_error_substring, discovery_request.error_detail().message()));
   const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
                                                 discovery_request.resource_names().cend());
   if (expected_resource_names != resource_names) {
@@ -583,47 +608,69 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
   return AssertionSuccess();
 }
 
+AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
+                            absl::string_view name) {
+  if (set1 == set2) {
+    return AssertionSuccess();
+  }
+  auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
+  for (const auto& x : set1) {
+    failure << x << ", ";
+  }
+  failure << "}\nActual: {";
+  for (const auto& x : set2) {
+    failure << x << ", ";
+  }
+  return failure << "}";
+}
+
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
   envoy::api::v2::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
-  EXPECT_TRUE(request.has_node());
-  EXPECT_FALSE(request.node().id().empty());
-  EXPECT_FALSE(request.node().cluster().empty());
-
-  if (expected_type_url != request.type_url()) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
+  // Verify all we care about node.
+  if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
+    return AssertionFailure() << "Weird node field";
+  }
+  if (request.type_url() != expected_type_url) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
                                              request.type_url(), expected_type_url);
   }
-  if (!(expected_error_code == request.error_detail().code())) {
-    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
-                                             request.error_detail().code(), expected_error_code);
+  // Sort to ignore ordering.
+  std::set<std::string> expected_sub{expected_resource_subscriptions.begin(),
+                                     expected_resource_subscriptions.end()};
+  std::set<std::string> expected_unsub{expected_resource_unsubscriptions.begin(),
+                                       expected_resource_unsubscriptions.end()};
+  std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
+                                   request.resource_names_subscribe().end()};
+  std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
+                                     request.resource_names_unsubscribe().end()};
+  auto sub_result = compareSets(expected_sub, actual_sub, "expected_resource_subscriptions");
+  if (!sub_result) {
+    return sub_result;
   }
-  EXPECT_TRUE(IsSubstring("", "", expected_error_message, request.error_detail().message()));
+  auto unsub_result =
+      compareSets(expected_unsub, actual_unsub, "expected_resource_unsubscriptions");
+  if (!unsub_result) {
+    return unsub_result;
+  }
+  // (We don't care about response_nonce or initial_resource_versions.)
 
-  const std::vector<std::string> resource_subscriptions(request.resource_names_subscribe().cbegin(),
-                                                        request.resource_names_subscribe().cend());
-  if (expected_resource_subscriptions != resource_subscriptions) {
+  if (request.error_detail().code() != expected_error_code) {
     return AssertionFailure() << fmt::format(
-               "newly subscribed resources {} do not match expected {} in {}",
-               fmt::join(resource_subscriptions.begin(), resource_subscriptions.end(), ","),
-               fmt::join(expected_resource_subscriptions.begin(),
-                         expected_resource_subscriptions.end(), ","),
-               request.DebugString());
+               "error code {} does not match expected {}. (Error message is {}).",
+               request.error_detail().code(), expected_error_code,
+               request.error_detail().message());
   }
-  const std::vector<std::string> resource_unsubscriptions(
-      request.resource_names_unsubscribe().cbegin(), request.resource_names_unsubscribe().cend());
-  if (expected_resource_unsubscriptions != resource_unsubscriptions) {
-    return AssertionFailure() << fmt::format(
-               "newly UNsubscribed resources {} do not match expected {} in {}",
-               fmt::join(resource_unsubscriptions.begin(), resource_unsubscriptions.end(), ","),
-               fmt::join(expected_resource_unsubscriptions.begin(),
-                         expected_resource_unsubscriptions.end(), ","),
-               request.DebugString());
+  if (expected_error_code != Grpc::Status::GrpcStatus::Ok &&
+      request.error_detail().message().find(expected_error_substring) == std::string::npos) {
+    return AssertionFailure() << "\"" << expected_error_substring
+                              << "\" is not a substring of actual error message \""
+                              << request.error_detail().message() << "\"";
   }
   return AssertionSuccess();
 }

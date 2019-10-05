@@ -108,13 +108,12 @@ class SpellChecker:
     aspell_args = [
         "aspell", "pipe", "--run-together", "--lang=en_US", "--encoding=utf-8", "--personal=" + pws
     ]
-    self.aspell = subprocess.Popen(
-        aspell_args,
-        bufsize=4096,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True)
+    self.aspell = subprocess.Popen(aspell_args,
+                                   bufsize=4096,
+                                   stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT,
+                                   universal_newlines=True)
 
     # Read the version line that aspell emits on startup.
     self.aspell.stdout.readline()
@@ -501,8 +500,8 @@ def execute(files, dictionary_file, fix):
 
   checker.stop()
 
-  print("Checked %d file(s) and %d comment(s), found %d error(s)." % (total_files, total_comments,
-                                                                      total_errors))
+  print("Checked %d file(s) and %d comment(s), found %d error(s)." %
+        (total_files, total_comments, total_errors))
 
   return total_errors == 0
 
@@ -511,27 +510,27 @@ if __name__ == "__main__":
   default_dictionary = os.path.join(TOOLS_DIR, 'spelling_dictionary.txt')
 
   parser = argparse.ArgumentParser(description="Check comment spelling.")
-  parser.add_argument(
-      'operation_type',
-      type=str,
-      choices=['check', 'fix'],
-      help="specify if the run should 'check' or 'fix' spelling.")
-  parser.add_argument(
-      'target_paths', type=str, nargs="*", help="specify the files for the script to process.")
+  parser.add_argument('operation_type',
+                      type=str,
+                      choices=['check', 'fix'],
+                      help="specify if the run should 'check' or 'fix' spelling.")
+  parser.add_argument('target_paths',
+                      type=str,
+                      nargs="*",
+                      help="specify the files for the script to process.")
   parser.add_argument('-d', '--debug', action='store_true', help="Debug spell checker subprocess.")
-  parser.add_argument(
-      '--mark', action='store_true', help="Emits extra output to mark misspelled words.")
-  parser.add_argument(
-      '--dictionary',
-      type=str,
-      default=default_dictionary,
-      help="specify a location for Envoy-specific dictionary words")
-  parser.add_argument(
-      '--color',
-      type=str,
-      choices=['on', 'off', 'auto'],
-      default="auto",
-      help="Controls colorized output. Auto limits color to TTY devices.")
+  parser.add_argument('--mark',
+                      action='store_true',
+                      help="Emits extra output to mark misspelled words.")
+  parser.add_argument('--dictionary',
+                      type=str,
+                      default=default_dictionary,
+                      help="specify a location for Envoy-specific dictionary words")
+  parser.add_argument('--color',
+                      type=str,
+                      choices=['on', 'off', 'auto'],
+                      default="auto",
+                      help="Controls colorized output. Auto limits color to TTY devices.")
   args = parser.parse_args()
 
   COLOR = args.color == "on" or (args.color == "auto" and sys.stdout.isatty())

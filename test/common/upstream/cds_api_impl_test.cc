@@ -19,11 +19,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
-using testing::ReturnRef;
 using testing::StrEq;
 using testing::Throw;
 
@@ -35,9 +32,9 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
 protected:
-  void setup() {
+  void setup(bool is_delta = false) {
     envoy::api::v2::core::ConfigSource cds_config;
-    cds_ = CdsApiImpl::create(cds_config, cm_, store_, validation_visitor_);
+    cds_ = CdsApiImpl::create(cds_config, is_delta, cm_, store_, validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
@@ -183,7 +180,7 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
 TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
   {
     InSequence s;
-    setup();
+    setup(true);
   }
   EXPECT_CALL(initialized_, ready());
 
@@ -355,8 +352,8 @@ TEST_F(CdsApiImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(initialized_, ready());
-  cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                       {});
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
   EXPECT_EQ("", cds_->versionInfo());
 }
 

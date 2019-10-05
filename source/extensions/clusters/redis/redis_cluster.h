@@ -90,9 +90,9 @@ namespace Redis {
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::api::v2::Cluster& cluster,
-               const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
+               const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
+               Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
                Server::Configuration::TransportSocketFactoryContext& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api,
@@ -122,7 +122,9 @@ private:
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
-  void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
+  void onClusterSlotUpdate(ClusterSlotsPtr&&);
+
+  void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
   const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
@@ -212,6 +214,14 @@ private:
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+    bool enableCommandStats() const override { return false; }
+    // For any readPolicy other than Master, the RedisClientFactory will send a READONLY command
+    // when establishing a new connection. Since we're only using this for making the "cluster
+    // slots" commands, the READONLY command is not relevant in this context. We're setting it to
+    // Master to avoid the additional READONLY command.
+    Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+    }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
@@ -219,6 +229,9 @@ private:
     // Note: Below callback isn't used in topology updates
     bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
+
+    Network::Address::InstanceConstSharedPtr
+    ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value);
 
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
@@ -231,6 +244,7 @@ private:
     Event::TimerPtr resolve_timer_;
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
     const std::chrono::milliseconds buffer_timeout_;
+    NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   };
 
   Upstream::ClusterManager& cluster_manager_;
@@ -249,8 +263,7 @@ private:
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
 
-  envoy::api::v2::core::DataSource auth_password_datasource_;
-  Api::Api& api_;
+  const std::string auth_password_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

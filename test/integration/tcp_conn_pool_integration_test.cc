@@ -26,7 +26,7 @@ public:
     UNREFERENCED_PARAMETER(end_stream);
 
     Tcp::ConnectionPool::Instance* pool = cluster_manager_.tcpConnPoolForCluster(
-        "cluster_0", Upstream::ResourcePriority::Default, nullptr, nullptr);
+        "cluster_0", Upstream::ResourcePriority::Default, nullptr);
     ASSERT(pool != nullptr);
 
     requests_.emplace_back(*this, data);
@@ -107,6 +107,7 @@ public:
   }
 
   std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
+  bool isTerminalFilter() override { return true; }
 };
 
 } // namespace

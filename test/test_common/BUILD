@@ -118,6 +118,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "test_runtime_lib",
+    hdrs = ["test_runtime.h"],
+    deps = [
+        "//source/common/runtime:runtime_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+    ],
+)
+
+envoy_cc_test_library(
     name = "thread_factory_for_test_lib",
     srcs = ["thread_factory_for_test.cc"],
     hdrs = ["thread_factory_for_test.h"],
@@ -231,6 +246,7 @@ envoy_cc_test(
         ":simulated_time_system_lib",
         ":utility_lib",
         "//source/common/event:libevent_scheduler_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )
 

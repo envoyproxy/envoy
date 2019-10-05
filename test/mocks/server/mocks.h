@@ -7,6 +7,7 @@
 
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -35,6 +36,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
@@ -62,7 +64,8 @@ public:
   MOCK_CONST_METHOD0(configPath, const std::string&());
   MOCK_CONST_METHOD0(configProto, const envoy::config::bootstrap::v2::Bootstrap&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
-  MOCK_CONST_METHOD0(allowUnknownFields, bool());
+  MOCK_CONST_METHOD0(allowUnknownStaticFields, bool());
+  MOCK_CONST_METHOD0(rejectUnknownDynamicFields, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -82,12 +85,15 @@ public:
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
   MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
+  MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
   envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
+  bool allow_unknown_static_fields_{};
+  bool reject_unknown_dynamic_fields_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
@@ -187,7 +193,8 @@ public:
   ~MockGuardDog() override;
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadId));
+  MOCK_METHOD2(createWatchDog,
+               WatchDogSharedPtr(Thread::ThreadId thread_id, const std::string& thread_name));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
@@ -213,7 +220,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::Allocator&());
 
 private:
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::AllocatorImpl stats_allocator_;
@@ -227,11 +234,13 @@ public:
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return LdsApiPtr{createLdsApi_(lds_config)};
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
+                         bool is_delta) override {
+    return LdsApiPtr{createLdsApi_(lds_config, is_delta)};
   }
 
-  MOCK_METHOD1(createLdsApi_, LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config));
+  MOCK_METHOD2(createLdsApi_,
+               LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
   MOCK_METHOD2(createNetworkFilterFactoryList,
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -262,7 +271,8 @@ public:
 
   MOCK_METHOD3(addOrUpdateListener, bool(const envoy::api::v2::Listener& config,
                                          const std::string& version_info, bool modifiable));
-  MOCK_METHOD1(createLdsApi, void(const envoy::api::v2::core::ConfigSource& lds_config));
+  MOCK_METHOD2(createLdsApi,
+               void(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
@@ -287,7 +297,9 @@ public:
   ~MockWorkerFactory() override;
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&) override { return WorkerPtr{createWorker_()}; }
+  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
+    return WorkerPtr{createWorker_()};
+  }
 
   MOCK_METHOD0(createWorker_, Worker*());
 };
@@ -376,11 +388,11 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD0(grpcContext, Grpc::Context&());
   MOCK_METHOD0(httpContext, Http::Context&());
-  MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(processContext, absl::optional<std::reference_wrapper<ProcessContext>>());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
-  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+  MOCK_METHOD0(messageValidationContext, ProtobufMessage::ValidationContext&());
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -410,6 +422,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
 };
 
 namespace Configuration {
@@ -463,7 +476,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(processContext, OptProcessContextRef());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
@@ -539,6 +552,7 @@ public:
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(eventLogger_, Upstream::HealthCheckEventLogger*());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+  MOCK_METHOD0(api, Api::Api&());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }
@@ -548,6 +562,7 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
+  testing::NiceMock<Envoy::Api::MockApi> api_{};
 };
 
 } // namespace Configuration

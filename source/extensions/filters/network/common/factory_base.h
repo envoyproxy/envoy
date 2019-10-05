@@ -25,8 +25,9 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config), context);
+    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                                 proto_config, context.messageValidationVisitor()),
+                                             context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -38,15 +39,19 @@ public:
   }
 
   Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& proto_config) override {
-    return createProtocolOptionsTyped(
-        MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(proto_config));
+  createProtocolOptionsConfig(const Protobuf::Message& proto_config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    return createProtocolOptionsTyped(MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(
+        proto_config, validation_visitor));
   }
 
   std::string name() override { return name_; }
 
+  bool isTerminalFilter() override { return is_terminal_filter_; }
+
 protected:
-  FactoryBase(const std::string& name) : name_(name) {}
+  FactoryBase(const std::string& name, bool is_terminal = false)
+      : name_(name), is_terminal_filter_(is_terminal) {}
 
 private:
   virtual Network::FilterFactoryCb
@@ -59,6 +64,7 @@ private:
   }
 
   const std::string name_;
+  const bool is_terminal_filter_;
 };
 
 } // namespace Common

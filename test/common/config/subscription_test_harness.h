@@ -30,15 +30,16 @@ public:
    * Update cluster names to be delivered via EDS.
    * @param cluster_names cluster names.
    */
-  virtual void updateResources(const std::set<std::string>& cluster_names) PURE;
+  virtual void updateResourceInterest(const std::set<std::string>& cluster_names) PURE;
 
   /**
    * Expect that an update request is sent by the Subscription implementation.
    * @param cluster_names cluster names to expect in the request.
    * @param version version_info to expect in the request.
+   * @param expect_node whether the node information should be expected
    */
   virtual void expectSendMessage(const std::set<std::string>& cluster_names,
-                                 const std::string& version) PURE;
+                                 const std::string& version, bool expect_node) PURE;
 
   /**
    * Deliver a response to the Subscription implementation and validate.
@@ -92,6 +93,8 @@ public:
   virtual void expectDisableInitFetchTimeoutTimer() PURE;
 
   virtual void callInitFetchTimeoutCb() PURE;
+
+  virtual void doSubscriptionTearDown() {}
 
   Stats::IsolatedStoreImpl stats_store_;
   SubscriptionStats stats_;

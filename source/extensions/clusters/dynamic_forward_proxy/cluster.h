@@ -128,6 +128,8 @@ private:
       Stats::ScopePtr&& stats_scope) override;
 };
 
+DECLARE_FACTORY(ClusterFactory);
+
 } // namespace DynamicForwardProxy
 } // namespace Clusters
 } // namespace Extensions

@@ -30,10 +30,9 @@ if __name__ == '__main__':
   test_args[0] = os.path.abspath(test_args[0])
   with open(generated_path, 'w') as f:
     f.write(
-        GDB_RUNNER_SCRIPT.substitute(
-            b64env=str(dict(os.environ)),
-            gdb=gdb,
-            test_args=' '.join(pipes.quote(arg) for arg in test_args)))
+        GDB_RUNNER_SCRIPT.substitute(b64env=str(dict(os.environ)),
+                                     gdb=gdb,
+                                     test_args=' '.join(pipes.quote(arg) for arg in test_args)))
   # To make bazel consider the test a failure we exit non-zero.
   print('Test was not run, instead a gdb wrapper script was produced in %s' % generated_path)
   sys.exit(1)

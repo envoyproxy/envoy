@@ -65,12 +65,3 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
-
-envoy_cc_library(
-    name = "xds_grpc_context_interface",
-    hdrs = ["xds_grpc_context.h"],
-    deps = [
-        ":subscription_interface",
-        "//source/common/protobuf",
-    ],
-)

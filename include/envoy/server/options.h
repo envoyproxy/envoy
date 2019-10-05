@@ -86,9 +86,14 @@ public:
   virtual const envoy::config::bootstrap::v2::Bootstrap& configProto() const PURE;
 
   /**
-   * @return bool allow unknown fields in the configuration?
+   * @return bool allow unknown fields in the static configuration?
    */
-  virtual bool allowUnknownFields() const PURE;
+  virtual bool allowUnknownStaticFields() const PURE;
+
+  /**
+   * @return bool allow unknown fields in the dynamic configuration?
+   */
+  virtual bool rejectUnknownDynamicFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.
@@ -178,6 +183,11 @@ public:
    * @return whether to use the old libevent evbuffer-based Buffer implementation.
    */
   virtual bool libeventBufferEnabled() const PURE;
+
+  /**
+   * @return whether to use the fake symbol table implementation.
+   */
+  virtual bool fakeSymbolTableEnabled() const PURE;
 
   /**
    * @return bool indicating whether cpuset size should determine the number of worker threads.

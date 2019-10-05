@@ -38,7 +38,7 @@ public:
     return SubscriptionFactoryImpl(local_info_, dispatcher_, cm_, random_, validation_visitor_,
                                    *api_)
         .subscriptionFromConfigSource(config, Config::TypeUrl::get().ClusterLoadAssignment,
-                                      stats_store_, callbacks_);
+                                      stats_store_, callbacks_, false);
   }
 
   Upstream::MockClusterManager cm_;
@@ -302,7 +302,8 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
       }));
   EXPECT_CALL(random_, random());
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 

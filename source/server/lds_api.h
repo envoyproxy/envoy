@@ -24,7 +24,7 @@ class LdsApiImpl : public LdsApi,
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
              Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
-             ProtobufMessage::ValidationVisitor& validation_visitor);
+             ProtobufMessage::ValidationVisitor& validation_visitor, bool is_delta);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }
@@ -39,7 +39,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource, validation_visitor_).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
 
   std::unique_ptr<Config::Subscription> subscription_;

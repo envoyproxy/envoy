@@ -19,8 +19,12 @@ namespace Stats {
  * declaration for StatName is in source/common/stats/symbol_table_impl.h
  */
 class StatName;
+using StatNameVec = std::vector<StatName>;
 
 class StatNameList;
+class StatNameSet;
+
+using StatNameSetPtr = std::unique_ptr<StatNameSet>;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -105,7 +109,7 @@ public:
    * @param stat_names the names to join.
    * @return Storage allocated for the joined name.
    */
-  virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
+  virtual StoragePtr join(const StatNameVec& stat_names) const PURE;
 
   /**
    * Populates a StatNameList from a list of encodings. This is not done at
@@ -142,10 +146,19 @@ public:
   virtual void callWithStringView(StatName stat_name,
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 
+  /**
+   * Creates a StatNameSet.
+   *
+   * @param name the name of the set.
+   * @return the set.
+   */
+  virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
+
 private:
   friend struct HeapStatData;
   friend class StatNameStorage;
   friend class StatNameList;
+  friend class StatNameSet;
 
   // The following methods are private, but are called by friend classes
   // StatNameStorage and StatNameList, which must be friendly with SymbolTable
@@ -182,9 +195,16 @@ private:
    *
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
+
+  /**
+   * Called by StatNameSet's destructor.
+   *
+   * @param stat_name_set the set.
+   */
+  virtual void forgetSet(StatNameSet& stat_name_set) PURE;
 };
 
-using SharedSymbolTable = std::shared_ptr<SymbolTable>;
+using SymbolTablePtr = std::unique_ptr<SymbolTable>;
 
 } // namespace Stats
 } // namespace Envoy

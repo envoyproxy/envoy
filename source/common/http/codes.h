@@ -54,16 +54,15 @@ private:
 
   void writeCategory(const ResponseStatInfo& info, Stats::StatName rq_group,
                      Stats::StatName rq_code, Stats::StatName category) const;
-  void incCounter(Stats::Scope& scope, const std::vector<Stats::StatName>& names) const;
+  void incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) const;
   void incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const;
-  void recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
-                       uint64_t count) const;
+  void recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names, uint64_t count) const;
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);
   Stats::StatName upstreamRqGroup(Code response_code) const;
   Stats::StatName upstreamRqStatName(Code response_code) const;
 
-  mutable Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
+  mutable Stats::StatNamePool stat_name_pool_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   Stats::SymbolTable& symbol_table_;
 

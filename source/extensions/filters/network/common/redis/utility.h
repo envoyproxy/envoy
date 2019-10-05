@@ -13,6 +13,12 @@ namespace Utility {
 
 Redis::RespValue makeAuthCommand(const std::string& password);
 
+class ReadOnlyRequest : public Redis::RespValue {
+public:
+  ReadOnlyRequest();
+  static const ReadOnlyRequest& instance();
+};
+
 } // namespace Utility
 } // namespace Redis
 } // namespace Common

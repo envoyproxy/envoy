@@ -120,22 +120,6 @@ envoy_cc_library(
         ":event_impl_base_lib",
         ":libevent_lib",
         "//include/envoy/event:timer_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "dispatched_thread_lib",
-    srcs = ["dispatched_thread.cc"],
-    hdrs = ["dispatched_thread.h"],
-    external_deps = [
-        "event",
-    ],
-    deps = [
-        ":dispatcher_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:thread_lib",
-        "//source/server:guarddog_lib",
+        "//source/common/common:scope_tracker",
     ],
 )

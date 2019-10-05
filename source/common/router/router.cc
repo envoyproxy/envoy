@@ -24,9 +24,12 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/network/application_protocol.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -539,6 +542,16 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
     protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
                                                                    : Http::Protocol::Http11;
   }
+
+  if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
+          Network::ApplicationProtocols::key())) {
+    const auto& alpn =
+        callbacks_->streamInfo().filterState().getDataReadOnly<Network::ApplicationProtocols>(
+            Network::ApplicationProtocols::key());
+    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{alpn.value()});
+  }
+
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
 }
@@ -931,15 +944,14 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
-                                         UpstreamRequest& upstream_request, bool end_stream) {
+void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                         UpstreamRequest& upstream_request, bool end_stream,
+                                         uint64_t grpc_to_http_status) {
   // We need to defer gRPC success until after we have processed grpc-status in
   // the trailers.
   if (grpc_request_) {
     if (end_stream) {
-      absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
-      if (grpc_status &&
-          !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
+      if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
         upstream_request.upstream_host_->stats().rq_success_.inc();
       } else {
         upstream_request.upstream_host_->stats().rq_error_.inc();
@@ -1002,8 +1014,25 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
   modify_headers_(*headers);
+  // When grpc-status appears in response headers, convert grpc-status to HTTP status code
+  // for outlier detection. This does not currently change any stats or logging and does not
+  // handle the case when an error grpc-status is sent as a trailer.
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  uint64_t grpc_to_http_status = 0;
+  if (grpc_request_) {
+    grpc_status = Grpc::Common::getGrpcStatus(*headers);
+    if (grpc_status.has_value()) {
+      grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+    }
+  }
 
-  upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
+  if (grpc_status.has_value() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.outlier_detection_support_for_grpc_status")) {
+    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(grpc_to_http_status);
+  } else {
+    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
+  }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstream_host_->healthChecker().setUnhealthy();
@@ -1090,7 +1119,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
       upstream_request.upstream_host_->canary();
   chargeUpstreamCode(response_code, *headers, upstream_request.upstream_host_, false);
   if (!Http::CodeUtility::is5xx(response_code)) {
-    handleNon5xxResponseHeaders(*headers, upstream_request, end_stream);
+    handleNon5xxResponseHeaders(grpc_status, upstream_request, end_stream, grpc_to_http_status);
   }
 
   // Append routing cookies
@@ -1315,7 +1344,10 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
         parent.timeSource().systemTime());
-    span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+    if (parent.attempt_count_ != 1) {
+      // This is a retry request, add this metadata to span.
+      span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
+    }
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1323,9 +1355,11 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
 Filter::UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
-    // TODO(mattklein123): Add tags based on what happened to this request (retries, reset, etc.).
-    span_->finishSpan();
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
+                                                     upstream_trailers_.get(), stream_info_,
+                                                     Tracing::EgressConfig::get());
   }
+
   if (per_try_timeout_ != nullptr) {
     // Allows for testing.
     per_try_timeout_->disableTimer();
@@ -1464,6 +1498,12 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                             absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
+  if (span_ != nullptr) {
+    // Add tags about reset.
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+  }
+
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -1478,6 +1518,11 @@ void Filter::UpstreamRequest::resetStream() {
   // Don't reset the stream if we're already done with it.
   if (encode_complete_ && decode_complete_) {
     return;
+  }
+
+  if (span_ != nullptr) {
+    // Add tags about the cancellation.
+    span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
   if (conn_pool_stream_handle_) {
@@ -1538,7 +1583,10 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
-                                          Upstream::HostDescriptionConstSharedPtr host) {
+                                          Upstream::HostDescriptionConstSharedPtr host,
+                                          const StreamInfo::StreamInfo& info) {
+  // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
+  ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
@@ -1546,6 +1594,9 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
+  parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
 
   if (parent_.downstream_end_stream_) {
     setupPerTryTimeout();

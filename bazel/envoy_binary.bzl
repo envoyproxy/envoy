@@ -4,6 +4,7 @@ load(
     ":envoy_internal.bzl",
     "envoy_copts",
     "envoy_external_dep_path",
+    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 
@@ -18,13 +19,14 @@ def envoy_cc_binary(
         repository = "",
         stamped = False,
         deps = [],
-        linkopts = []):
+        linkopts = [],
+        tags = []):
     if not linkopts:
         linkopts = _envoy_linkopts()
     if stamped:
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
-    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps]
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
     native.cc_binary(
         name = name,
         srcs = srcs,
@@ -37,6 +39,7 @@ def envoy_cc_binary(
         malloc = tcmalloc_external_dep(repository),
         stamp = 1,
         deps = deps,
+        tags = tags,
     )
 
 # Select the given values if exporting is enabled in the current build.

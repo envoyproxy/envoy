@@ -180,9 +180,10 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return ProcessContext& a reference to the process context.
+   * @return OptProcessContextRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
    */
-  virtual ProcessContext& processContext() PURE;
+  virtual OptProcessContextRef processContext() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
@@ -269,11 +270,14 @@ public:
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException.
    * @param config supplies the protobuf configuration for the filter
+   * @param validation_visitor message validation visitor instance.
    * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
    */
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& config) {
+  createProtocolOptionsConfig(const Protobuf::Message& config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor) {
     UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(validation_visitor);
     return nullptr;
   }
 
@@ -328,6 +332,11 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilter() { return false; }
 };
 
 /**
@@ -428,6 +437,11 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilter() { return false; }
 };
 
 } // namespace Configuration

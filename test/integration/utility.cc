@@ -148,6 +148,11 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
     dispatcher_.exit();
   }
 
+  if (wait_for_length_ && data_.size() >= length_to_wait_for_) {
+    wait_for_length_ = false;
+    dispatcher_.exit();
+  }
+
   return Network::FilterStatus::StopIteration;
 }
 

@@ -65,6 +65,7 @@ public:
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
         }));
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
     // Here we setup runtime to mimic the actual deprecated feature list used in the
     // production code. Note that this test is actually more strict than production because
@@ -81,15 +82,15 @@ public:
         }));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_,
-                                              server_.messageValidationVisitor(), *api_);
+    Server::InstanceUtil::loadBootstrapConfig(
+        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
-        server_.localInfo(), server_.secretManager(), server_.messageValidationVisitor(), *api_,
+        server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
         server_.httpContext(), server_.accessLogManager(), server_.singletonManager(),
         time_system_);
 

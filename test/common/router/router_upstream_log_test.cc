@@ -87,7 +87,7 @@ public:
       current_upstream_log->CopyFrom(upstream_log.value());
     }
 
-    config_.reset(new FilterConfig("prefix", context_, ShadowWriterPtr(new MockShadowWriter()),
+    config_.reset(new FilterConfig("prefix.", context_, ShadowWriterPtr(new MockShadowWriter()),
                                    router_proto));
     router_.reset(new TestFilter(*config_));
     router_->setDecoderFilterCallbacks(callbacks_);
@@ -106,13 +106,13 @@ public:
 
   void expectResponseTimerCreate() {
     response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*response_timeout_, enableTimer(_));
+    EXPECT_CALL(*response_timeout_, enableTimer(_, _));
     EXPECT_CALL(*response_timeout_, disableTimer());
   }
 
   void expectPerTryTimerCreate() {
     per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+    EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
@@ -129,7 +129,8 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
-              callbacks.onPoolReady(encoder, context_.cluster_manager_.conn_pool_.host_);
+              callbacks.onPoolReady(encoder, context_.cluster_manager_.conn_pool_.host_,
+                                    stream_info_);
               return nullptr;
             }));
     expectResponseTimerCreate();
@@ -161,7 +162,8 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
-              callbacks.onPoolReady(encoder1, context_.cluster_manager_.conn_pool_.host_);
+              callbacks.onPoolReady(encoder1, context_.cluster_manager_.conn_pool_.host_,
+                                    stream_info_);
               return nullptr;
             }));
     expectPerTryTimerCreate();
@@ -176,7 +178,7 @@ public:
     router_->retry_state_->expectResetRetry();
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
-    per_try_timeout_->callback_();
+    per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
     NiceMock<Http::MockStreamEncoder> encoder2;
@@ -187,7 +189,8 @@ public:
               response_decoder = &decoder;
               EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                           putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _));
-              callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_);
+              callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_,
+                                    stream_info_);
               return nullptr;
             }));
     expectPerTryTimerCreate();
@@ -214,6 +217,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<TestFilter> router_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(RouterUpstreamLogTest, NoLogConfigured) {

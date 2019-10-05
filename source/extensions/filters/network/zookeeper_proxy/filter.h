@@ -12,6 +12,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/network/zookeeper_proxy/decoder.h"
 
@@ -101,12 +102,30 @@ public:
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
 
+  // Captures the counter used to track total op-code usage, as well as the
+  // StatName under which to collect the latency for that op-code. The
+  // latency-name will be joined with the stat_prefix_, which varies per filter
+  // instance.
+  struct OpCodeInfo {
+    Stats::Counter* counter_;
+    std::string opname_;
+    Stats::StatName latency_name_;
+  };
+
+  absl::flat_hash_map<OpCodes, OpCodeInfo> op_code_map_;
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
-  const std::string stat_prefix_;
   ZooKeeperProxyStats stats_;
+  Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName stat_prefix_;
+  const Stats::StatName auth_;
+  const Stats::StatName connect_latency_;
+  const Stats::StatName unknown_scheme_rq_;
+  const Stats::StatName unknown_opcode_latency_;
 
 private:
+  void initOpCode(OpCodes opcode, Stats::Counter& counter, absl::string_view name);
+
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
@@ -121,7 +140,7 @@ class ZooKeeperFilter : public Network::Filter,
                         DecoderCallbacks,
                         Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config);
+  ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -156,12 +175,14 @@ public:
   void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
   void onResponseBytes(uint64_t bytes) override;
-  void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly) override;
-  void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error) override;
+  void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
+                         const std::chrono::milliseconds& latency) override;
+  void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
+                  const std::chrono::milliseconds& latency) override;
   void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path, int64_t zxid,
                     int32_t error) override;
 
-  DecoderPtr createDecoder(DecoderCallbacks& callbacks);
+  DecoderPtr createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source);
   void setDynamicMetadata(const std::string& key, const std::string& value);
   void setDynamicMetadata(const std::vector<std::pair<const std::string, const std::string>>& data);
   void clearDynamicMetadata();

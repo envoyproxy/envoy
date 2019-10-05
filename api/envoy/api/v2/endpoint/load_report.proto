@@ -13,7 +13,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // These are stats Envoy reports to GLB every so often. Report frequency is
 // defined by

@@ -139,17 +139,17 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
                                                         hand_off_restored_destination_connections)};
 }
 
-Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
-                                                       Network::UdpListenerCallbacks& cb) {
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+                                                          Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, timeSource())};
+  return std::make_unique<Network::UdpListenerImpl>(*this, socket, cb, timeSource());
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   ASSERT(isThreadSafe());
-  return scheduler_->createTimer(cb);
+  return scheduler_->createTimer(cb, *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {

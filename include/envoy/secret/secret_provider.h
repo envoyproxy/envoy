@@ -24,6 +24,16 @@ public:
   virtual const SecretType* secret() const PURE;
 
   /**
+   * Add secret validation callback into secret provider.
+   * It is safe to call this method by main thread and callback is safe to be invoked
+   * on main thread.
+   * @param callback callback that is executed by secret provider.
+   * @return CallbackHandle the handle which can remove that validation callback.
+   */
+  virtual Common::CallbackHandle*
+  addValidationCallback(std::function<void(const SecretType&)> callback) PURE;
+
+  /**
    * Add secret update callback into secret provider.
    * It is safe to call this method by main thread and callback is safe to be invoked
    * on main thread.

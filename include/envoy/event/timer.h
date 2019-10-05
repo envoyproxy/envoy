@@ -8,7 +8,12 @@
 #include "envoy/common/time.h"
 
 namespace Envoy {
+
+class ScopeTrackedObject;
+
 namespace Event {
+
+class Dispatcher;
 
 /**
  * Callback invoked when a timer event fires.
@@ -30,8 +35,12 @@ public:
 
   /**
    * Enable a pending timeout. If a timeout is already pending, it will be reset to the new timeout.
+   *
+   * @param ms supplies the duration of the alarm in milliseconds.
+   * @param object supplies an optional scope for the duration of the alarm.
    */
-  virtual void enableTimer(const std::chrono::milliseconds& d) PURE;
+  virtual void enableTimer(const std::chrono::milliseconds& ms,
+                           const ScopeTrackedObject* object = nullptr) PURE;
 
   /**
    * Return whether the timer is currently armed.
@@ -48,7 +57,7 @@ public:
   /**
    * Creates a timer.
    */
-  virtual TimerPtr createTimer(const TimerCb& cb) PURE;
+  virtual TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) PURE;
 };
 
 using SchedulerPtr = std::unique_ptr<Scheduler>;

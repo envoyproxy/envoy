@@ -18,6 +18,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
+#include "common/http/hash_policy.h"
 #include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
@@ -104,8 +105,9 @@ public:
   CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config, Runtime::Loader& loader);
 
   // Router::CorsPolicy
-  const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
-  const std::list<std::regex>& allowOriginRegexes() const override { return allow_origin_regex_; }
+  const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
+    return allow_origins_;
+  };
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
@@ -131,8 +133,7 @@ public:
 private:
   const envoy::api::v2::route::CorsPolicy config_;
   Runtime::Loader& loader_;
-  std::list<std::string> allow_origin_;
-  std::list<std::regex> allow_origin_regex_;
+  std::vector<Matchers::StringMatcherPtr> allow_origins_;
   const std::string allow_methods_;
   const std::string allow_headers_;
   const std::string expose_headers_;
@@ -182,9 +183,8 @@ private:
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
 
-    const std::regex pattern_;
-    absl::optional<std::string> method_;
     const Stats::StatName stat_name_;
+    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   class CatchAllVirtualCluster : public VirtualCluster {
@@ -240,6 +240,12 @@ public:
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
   }
+  const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
+    return retriable_headers_;
+  }
+  const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
+    return retriable_request_headers_;
+  }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
@@ -256,8 +262,11 @@ private:
   std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
+  ProtobufMessage::ValidationVisitor* validation_visitor_{};
 };
 
 /**
@@ -276,38 +285,6 @@ private:
   std::string cluster_;
   std::string runtime_key_;
   envoy::type::FractionalPercent default_value_;
-};
-
-/**
- * Implementation of HashPolicy that reads from the proto route config and only currently supports
- * hashing on an HTTP header.
- */
-class HashPolicyImpl : public HashPolicy {
-public:
-  explicit HashPolicyImpl(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
-          hash_policy);
-
-  // Router::HashPolicy
-  absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
-                                        const Http::HeaderMap& headers,
-                                        const AddCookieCallback add_cookie) const override;
-
-  class HashMethod {
-  public:
-    virtual ~HashMethod() = default;
-    virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                              const Http::HeaderMap& headers,
-                                              const AddCookieCallback add_cookie) const PURE;
-
-    // If the method is a terminal method, ignore rest of the hash policy chain.
-    virtual bool terminal() const PURE;
-  };
-
-  using HashMethodPtr = std::unique_ptr<HashMethod>;
-
-private:
-  std::vector<HashMethodPtr> hash_impls_;
 };
 
 /**
@@ -411,7 +388,7 @@ public:
                               bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::HeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
-  const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
+  const Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
 
@@ -450,9 +427,8 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-  absl::string_view processRequestHost(const Http::HeaderMap& headers,
-                                       const absl::string_view& new_scheme,
-                                       const absl::string_view& new_port) const;
+  absl::string_view processRequestHost(const Http::HeaderMap& headers, absl::string_view new_scheme,
+                                       absl::string_view new_port) const;
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
@@ -479,7 +455,7 @@ protected:
     return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
   }
 
-  void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
+  void finalizePathHeader(Http::HeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
 
 private:
@@ -510,7 +486,7 @@ private:
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
-    const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
+    const Http::HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     const HedgePolicy& hedgePolicy() const override { return parent_->hedgePolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
@@ -669,13 +645,13 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
-  std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
+  std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   UpgradeMap upgrade_map_;
   const uint64_t total_cluster_weight_;
-  std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
@@ -759,8 +735,10 @@ public:
   void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
 
 private:
-  const std::regex regex_;
-  const std::string regex_str_;
+  absl::string_view pathOnly(const Http::HeaderMap& headers) const;
+
+  Regex::CompiledMatcherPtr regex_;
+  std::string regex_str_;
 };
 
 /**

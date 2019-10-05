@@ -6,6 +6,8 @@
 namespace Envoy {
 namespace {
 
+// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
+//               work restores it here.
 std::string tdsBootstrapConfig(absl::string_view api_type) {
   return fmt::format(R"EOF(
 static_resources:
@@ -36,6 +38,7 @@ layered_runtime:
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
+          set_node_on_first_message_only: false
   - name: some_admin_layer
     admin_layer: {{}}
 admin:
@@ -109,7 +112,8 @@ public:
   uint32_t initial_keys_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest, DELTA_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();
@@ -119,7 +123,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ("", getRuntimeKey("baz"));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
-                                      {"some_rtds_layer"}, {}));
+                                      {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:

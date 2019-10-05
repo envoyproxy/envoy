@@ -77,11 +77,10 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
 
 EngineResult
 RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
-  const auto& engine = config_->engine(mode);
-  if (engine.has_value()) {
+  const auto engine = config_->engine(mode);
+  if (engine != nullptr) {
     std::string effective_policy_id;
-    if (engine->allowed(callbacks_->connection(),
-                        callbacks_->connection().streamInfo().dynamicMetadata(),
+    if (engine->allowed(callbacks_->connection(), callbacks_->connection().streamInfo(),
                         &effective_policy_id)) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed");

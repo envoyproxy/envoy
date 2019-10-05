@@ -50,6 +50,20 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   return {first_available_priority, total_load};
 }
 
+// Returns true if the weights of all the hosts in the HostVector are equal.
+bool hostWeightsAreEqual(const HostVector& hosts) {
+  if (hosts.size() <= 1) {
+    return true;
+  }
+  const uint32_t weight = hosts[0]->weight();
+  for (size_t i = 1; i < hosts.size(); ++i) {
+    if (hosts[i]->weight() != weight) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
@@ -268,7 +282,8 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
       min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
-                                                        min_cluster_size, 6U)) {
+                                                        min_cluster_size, 6U)),
+      fail_traffic_on_panic_(common_config.zone_aware_lb_config().fail_traffic_on_panic()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_set_.addPriorityUpdateCb(
@@ -525,7 +540,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   return i;
 }
 
-ZoneAwareLoadBalancerBase::HostsSource
+absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   auto host_set_and_source = chooseHostSet(context);
 
@@ -535,11 +550,16 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   HostsSource hosts_source;
   hosts_source.priority_ = host_set.priority();
 
-  // If the selected host set has insufficient healthy hosts, return all hosts.
+  // If the selected host set has insufficient healthy hosts, return all hosts (unless we should
+  // fail traffic on panic, in which case return no host).
   if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
-    hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
-    return hosts_source;
+    if (fail_traffic_on_panic_) {
+      return absl::nullopt;
+    } else {
+      hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
+      return hosts_source;
+    }
   }
 
   // If we're doing locality weighted balancing, pick locality.
@@ -572,10 +592,14 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
 
   if (isGlobalPanic(localHostSet())) {
     stats_.lb_local_cluster_not_ok_.inc();
-    // If the local Envoy instances are in global panic, do not do locality
-    // based routing.
-    hosts_source.source_type_ = sourceType(host_availability);
-    return hosts_source;
+    // If the local Envoy instances are in global panic, and we should not fail traffic, do
+    // not do locality based routing.
+    if (fail_traffic_on_panic_) {
+      return absl::nullopt;
+    } else {
+      hosts_source.source_type_ = sourceType(host_availability);
+      return hosts_source;
+    }
   }
 
   hosts_source.source_type_ = localitySourceType(host_availability);
@@ -629,6 +653,16 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
+    // Check if the original host weights are equal and skip EDF creation if they are. When all
+    // original weights are equal we can rely on unweighted host pick to do optimal round robin and
+    // least-loaded host selection with lower memory and CPU overhead.
+    if (hostWeightsAreEqual(hosts)) {
+      // Skip edf creation.
+      return;
+    }
+
+    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>();
+
     // Populate scheduler with host list.
     // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
     // weighted 1. This is because currently we don't refresh host sets if only weights change.
@@ -639,7 +673,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
@@ -647,8 +681,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // refreshes for the weighted case.
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
-        auto host = scheduler.edf_.pick();
-        scheduler.edf_.add(hostWeight(*host), host);
+        auto host = scheduler.edf_->pick();
+        scheduler.edf_->add(hostWeight(*host), host);
       }
     }
   };
@@ -675,8 +709,11 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
-  const HostsSource hosts_source = hostSourceToUse(context);
-  auto scheduler_it = scheduler_.find(hosts_source);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+  auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
   ASSERT(scheduler_it != scheduler_.end());
@@ -684,23 +721,20 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
   // As has been commented in both EdfLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection.
-  // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
-  // host set if any weights change. Additionally, it has the property that if all weights are
-  // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
-  // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
-  if (stats_.max_host_weight_.value() != 1) {
-    auto host = scheduler.edf_.pick();
+  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
+  // of 2 or more hosts differ.
+  if (scheduler.edf_ != nullptr) {
+    auto host = scheduler.edf_->pick();
     if (host != nullptr) {
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
     return host;
   } else {
-    const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
+    const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
     if (hosts_to_use.empty()) {
       return nullptr;
     }
-    return unweightedHostPick(hosts_to_use, hosts_source);
+    return unweightedHostPick(hosts_to_use, *hosts_source);
   }
 }
 
@@ -728,7 +762,12 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
-  const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse(context));
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+
+  const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
   if (hosts_to_use.empty()) {
     return nullptr;
   }

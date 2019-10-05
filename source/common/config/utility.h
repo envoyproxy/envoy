@@ -16,6 +16,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
+#include "common/common/backoff_strategy.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/grpc/common.h"
@@ -291,6 +292,37 @@ public:
    * Return whether v1-style JSON filter config loading is allowed via 'deprecated_v1: true'.
    */
   static bool allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config);
+
+  /**
+   * Verify any any filter designed to be terminal is configured to be terminal, and vice versa.
+   * @param name the name of the filter.
+   * @param name the type of filter.
+   * @param is_terminal_filter true if the filter is designed to be terminal.
+   * @param last_filter_in_current_config true if the filter is last in the configuration.
+   * @throws EnvoyException if there is a mismatch between design and configuration.
+   */
+  static void validateTerminalFilters(const std::string& name, const char* filter_type,
+                                      bool is_terminal_filter, bool last_filter_in_current_config) {
+    if (is_terminal_filter && !last_filter_in_current_config) {
+      throw EnvoyException(
+          fmt::format("Error: {} must be the terminal {} filter.", name, filter_type));
+    } else if (!is_terminal_filter && last_filter_in_current_config) {
+      throw EnvoyException(
+          fmt::format("Error: non-terminal filter {} is the last filter in a {} filter chain.",
+                      name, filter_type));
+    }
+  }
+
+  /**
+   * Prepares the DNS failure refresh backoff strategy given the cluster configuration.
+   * @param cluster the cluster configuration.
+   * @param dns_refresh_rate_ms the default DNS refresh rate.
+   * @param random the random generator.
+   * @return BackOffStrategyPtr for scheduling refreshes.
+   */
+  static BackOffStrategyPtr prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
+                                                      uint64_t dns_refresh_rate_ms,
+                                                      Runtime::RandomGenerator& random);
 };
 
 } // namespace Config

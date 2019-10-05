@@ -5,7 +5,6 @@ package envoy.type.matcher;
 option java_outer_classname = "MetadataProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.matcher";
-option go_package = "matcher";
 
 import "envoy/type/matcher/value.proto";
 
@@ -80,16 +79,16 @@ message MetadataMatcher {
       option (validate.required) = true;
 
       // If specified, use the key to retrieve the value in a Struct.
-      string key = 1 [(validate.rules).string.min_bytes = 1];
+      string key = 1 [(validate.rules).string = {min_bytes: 1}];
     }
   }
 
   // The filter name to retrieve the Struct from the Metadata.
-  string filter = 1 [(validate.rules).string.min_bytes = 1];
+  string filter = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The path to retrieve the Value from the Struct.
-  repeated PathSegment path = 2 [(validate.rules).repeated .min_items = 1];
+  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // The MetadataMatcher is matched if the value retrieved by path is matched to this value.
-  ValueMatcher value = 3 [(validate.rules).message.required = true];
+  ValueMatcher value = 3 [(validate.rules).message = {required: true}];
 }

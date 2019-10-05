@@ -2,9 +2,12 @@
 
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/upstream/upstream.h"
 
+#include "common/common/empty_string.h"
 #include "common/config/datasource.h"
 
 #include "extensions/filters/network/common/factory_base.h"
@@ -29,6 +32,16 @@ public:
     return auth_password_;
   }
 
+  static const std::string auth_password(const Upstream::ClusterInfoConstSharedPtr info,
+                                         Api::Api& api) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->auth_password(api);
+    }
+    return EMPTY_STRING;
+  }
+
 private:
   envoy::api::v2::core::DataSource auth_password_;
 };
@@ -41,7 +54,7 @@ class RedisProxyFilterConfigFactory
           envoy::config::filter::network::redis_proxy::v2::RedisProxy,
           envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions> {
 public:
-  RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RedisProxy) {}
+  RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RedisProxy, true) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb

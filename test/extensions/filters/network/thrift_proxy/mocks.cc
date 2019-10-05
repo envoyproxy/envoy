@@ -12,7 +12,8 @@ using testing::ReturnRef;
 namespace Envoy {
 
 // Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
-template <> void MessageUtil::validate(const ProtobufWkt::Struct&) {}
+template <>
+void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&) {}
 
 namespace Extensions {
 namespace NetworkFilters {

@@ -33,11 +33,7 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AnyNumber;
 using testing::HasSubstr;
-using testing::Invoke;
-using testing::Not;
 
 namespace Envoy {
 
@@ -592,6 +588,36 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
                                                           {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
+  codec_client_->waitForDisconnect();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+  }
+}
+
+// TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":authority", "host"},
+                                                          {"content-length", "-1"}});
+  auto response = std::move(encoder_decoder.second);
+
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
@@ -609,6 +635,34 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":authority", "host"},
+                                                          {"content-length", "3,2"}});
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->waitForDisconnect();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+  }
+}
+
+// TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
+TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -1046,6 +1100,38 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
   ASSERT_EQ(out.size(), 2);
   ASSERT_EQ(out[0], "foo");
   ASSERT_EQ(out[1], "bar");
+}
+
+// Resets the downstream stream immediately and verifies that we clean up everything.
+TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
+  config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+
+  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                        TestUtility::DefaultTimeout,
+                                                        max_request_headers_kb_));
+
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    codec_client_->close();
+  } else {
+    codec_client_->sendReset(encoder_decoder.first);
+  }
+
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+
+  codec_client_->waitForDisconnect();
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

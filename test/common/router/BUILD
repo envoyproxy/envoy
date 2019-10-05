@@ -85,6 +85,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/router:scoped_config_lib",
+        "//test/mocks/router:router_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -96,12 +97,16 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/init:manager_interface",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/server/http:admin_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/init:init_mocks",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
@@ -228,6 +233,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",
+        "//source/common/network:application_protocol_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
@@ -242,6 +248,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

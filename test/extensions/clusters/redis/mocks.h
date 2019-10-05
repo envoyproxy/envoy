@@ -17,7 +17,8 @@ public:
   MockClusterSlotUpdateCallBack();
   ~MockClusterSlotUpdateCallBack() override = default;
 
-  MOCK_METHOD2(onClusterSlotUpdate, bool(const std::vector<ClusterSlot>&, Upstream::HostMap));
+  MOCK_METHOD2(onClusterSlotUpdate, bool(ClusterSlotsPtr&&, Upstream::HostMap));
+  MOCK_METHOD0(onHostHealthUpdate, void());
 };
 
 } // namespace Redis

@@ -2,14 +2,10 @@ from util import get_blob
 from util import true, false
 
 HTTP_CONN_NETWORK_FILTER_BLOB = {
-    "idle_timeout_s":
-    300,
-    "stat_prefix":
-    "router",
-    "use_remote_address":
-    true,
-    "server_name":
-    "envoy-123",
+    "idle_timeout_s": 300,
+    "stat_prefix": "router",
+    "use_remote_address": true,
+    "server_name": "envoy-123",
     "access_log": [],
     "tracing": {
         "request_headers_for_tags": ["x-source"],
@@ -26,10 +22,8 @@ HTTP_CONN_NETWORK_FILTER_BLOB = {
         "name": "router"
     }],
     "route_config": {},
-    "add_user_agent":
-    true,
-    "codec_type":
-    "auto"
+    "add_user_agent": true,
+    "codec_type": "auto"
 }
 
 

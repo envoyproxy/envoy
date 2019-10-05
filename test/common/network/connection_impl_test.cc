@@ -509,6 +509,87 @@ TEST_P(ConnectionImplTest, ReadDisable) {
   disconnect(false);
 }
 
+// The HTTP/1 codec handles pipelined connections by relying on readDisable(false) resulting in the
+// subsequent request being dispatched. Regression test this behavior.
+TEST_P(ConnectionImplTest, ReadEnableDispatches) {
+  setUpBasicConnection();
+  connect();
+
+  std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
+  client_connection_->addReadFilter(client_read_filter);
+
+  {
+    Buffer::OwnedImpl buffer("data");
+    server_connection_->write(buffer, false);
+    EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
+        .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+          dispatcher_->exit();
+          return FilterStatus::StopIteration;
+        }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
+  {
+    client_connection_->readDisable(true);
+    EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+          buffer.drain(buffer.length());
+          dispatcher_->exit();
+          return FilterStatus::StopIteration;
+        }));
+    client_connection_->readDisable(false);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
+  disconnect(true);
+}
+
+// Make sure if we readDisable(true) and schedule a 'kick' and then
+// readDisable(false) the kick doesn't happen.
+TEST_P(ConnectionImplTest, KickUndone) {
+  setUpBasicConnection();
+  connect();
+
+  std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
+  client_connection_->addReadFilter(client_read_filter);
+  Buffer::Instance* connection_buffer = nullptr;
+
+  {
+    Buffer::OwnedImpl buffer("data");
+    server_connection_->write(buffer, false);
+    EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+          dispatcher_->exit();
+          connection_buffer = &buffer;
+          return FilterStatus::StopIteration;
+        }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
+  {
+    // Like ReadEnableDispatches above, read disable and read enable to kick off
+    // an extra read. But then readDisable again and make sure the kick doesn't
+    // happen.
+    client_connection_->readDisable(true);
+    client_connection_->readDisable(false); // Sets dispatch_buffered_data_
+    client_connection_->readDisable(true);
+    EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Now drain the connection's buffer and try to do a read which should _not_
+  // pass up the stack (no data is read)
+  {
+    connection_buffer->drain(connection_buffer->length());
+    client_connection_->readDisable(false);
+    EXPECT_CALL(*client_read_filter, onData(_, _)).Times(0);
+    // Data no longer buffered - even if dispatch_buffered_data_ lingered it should have no effect.
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  disconnect(true);
+}
+
 // Regression test for (at least one failure mode of)
 // https://github.com/envoyproxy/envoy/issues/3639 where readDisable on a close
 // connection caused a crash.
@@ -1224,7 +1305,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   Buffer::OwnedImpl data("data");
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its original
@@ -1234,7 +1315,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         // Partial flush.
         return IoResult{PostIoAction::KeepOpen, 1, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
@@ -1243,11 +1324,11 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         buffer.drain(buffer.length());
         return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Force the delayed close timeout to trigger so the connection is cleaned up.
-  mocks.timer_->callback_();
+  mocks.timer_->invokeCallback();
 }
 
 // Test that tearing down the connection will disable the delayed close timer.
@@ -1277,7 +1358,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
         return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
   server_connection->write(data, false);
-  EXPECT_CALL(*mocks.timer_, enableTimer(_)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
   // Enable the delayed close timer.
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
@@ -1318,19 +1399,12 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
       }));
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(_)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
-  // Copy the callback since mocks.timer will be freed when closeSocket() is called.
-  Event::TimerCb callback = mocks.timer_->callback_;
   // The following close() will call closeSocket() and reset internal data structures such as
   // stats.
   server_connection->close(ConnectionCloseType::NoFlush);
-  // Verify the onDelayedCloseTimeout() callback is resilient to the post closeSocket(), pre
-  // destruction state. This should not actually happen due to the timeout disablement in
-  // closeSocket(), but there is enough complexity in connection handling codepaths that being
-  // extra defensive is valuable.
-  callback();
 }
 
 class FakeReadFilter : public Network::ReadFilter {
@@ -1736,6 +1810,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Closed));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
@@ -1760,6 +1835,10 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
+  // With half-close semantics enabled we will not wait for early close notification.
+  // See the `Envoy::Network::ConnectionImpl::readDisable()' method for more details.
+  EXPECT_CALL(*file_event_, setEnabled(0));
+  connection_->enableHalfClose(true);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().

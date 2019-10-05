@@ -9,13 +9,16 @@ ALPN
 ALS
 AMZ
 API
+ABI
 ASAN
 ASCII
 ASSERTs
 AWS
 BSON
+CAS
 CB
 CBs
+CEL
 CDS
 CHACHA
 CHLO
@@ -85,8 +88,10 @@ EVAL
 EVLOOP
 EVP
 EWOULDBLOCK
+EXPECTs
 EXPR
 FAQ
+FCDS
 FDs
 FFFF
 FIN
@@ -119,6 +124,7 @@ HV
 IAM
 IANA
 IDL
+IETF
 INADDR
 INET
 IO
@@ -148,6 +154,7 @@ LDS
 LEV
 LHS
 LF
+LRS
 MB
 MD
 MGET
@@ -198,7 +205,10 @@ POSTs
 PREBIND
 PRNG
 PROT
+ProcessBufferedChlos
+PSS
 QPS
+QoS
 QUIC
 RAII
 RANLUX
@@ -268,6 +278,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TPM
 TPROXY
 TSAN
 TSI
@@ -290,6 +301,9 @@ VC
 VH
 VHDS
 VLOG
+VM
+WASM
+WAVM
 WKT
 WRR
 WS
@@ -316,9 +330,11 @@ abcd
 absl
 accessor
 accessors
+acks
 acls
 addr
 agg
+alice
 alignas
 alignof
 alloc
@@ -410,14 +426,17 @@ decompressor
 decrement
 decrypt
 decrypting
+decls
 dedup
 dedupe
 deduplicate
+deduplicates
 deflateInit
 deletable
 deleter
 delim
 deque
+deprecations
 dereference
 dereferences
 dereferencing
@@ -447,6 +466,7 @@ dynamodb
 eg
 emplace
 emplaced
+emscripten
 enablement
 encodings
 endian
@@ -468,6 +488,7 @@ evthread
 evwatch
 exe
 execlp
+expectDeltaAndSotwUpdate
 facto
 favicon
 fd
@@ -624,6 +645,8 @@ params
 paren
 parentid
 parsers
+passthroughs
+pausable
 pcall
 pcap
 pclose
@@ -771,6 +794,7 @@ uint
 un
 unacked
 unary
+uncomment
 unconfigurable
 unconfigured
 uncontended
@@ -786,6 +810,7 @@ unescaping
 unindexed
 uninsantiated
 uninstantiated
+uniq
 unix
 unlink
 unlinked
@@ -796,6 +821,7 @@ unordered
 unowned
 unparented
 unpause
+unpaused
 unpopulated
 unprotect
 unref

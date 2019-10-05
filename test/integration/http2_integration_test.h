@@ -1,8 +1,11 @@
 #pragma once
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
+
+using Envoy::Http::Http2::Http2Frame;
 
 namespace Envoy {
 class Http2IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -59,5 +62,23 @@ public:
   void verifyHeadersOnlyTest();
 
   void runHeaderOnlyTest(bool send_request_body, size_t body_size);
+};
+
+class Http2FloodMitigationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                 public HttpIntegrationTest {
+public:
+  Http2FloodMitigationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+
+protected:
+  void startHttp2Session();
+  void floodServer(const Http2Frame& frame, const std::string& flood_stat);
+  void floodServer(absl::string_view host, absl::string_view path,
+                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
+  Http2Frame readFrame();
+  void sendFame(const Http2Frame& frame);
+  void setNetworkConnectionBufferSize();
+  void beginSession();
+
+  IntegrationTcpClientPtr tcp_client_;
 };
 } // namespace Envoy

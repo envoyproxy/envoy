@@ -10,6 +10,16 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "message_validator_impl_test",
+    srcs = ["message_validator_impl_test.cc"],
+    deps = [
+        "//source/common/protobuf:message_validator_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [

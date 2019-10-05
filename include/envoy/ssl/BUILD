@@ -48,6 +48,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "tls_certificate_config_interface",
     hdrs = ["tls_certificate_config.h"],
+    deps = [
+        "//include/envoy/ssl/private_key:private_key_interface",
+    ],
 )
 
 envoy_cc_library(

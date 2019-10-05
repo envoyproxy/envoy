@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 using testing::Invoke;
+using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +29,7 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 
-  Server::Configuration::MockListenerFactoryContext context;
+  NiceMock<Server::Configuration::MockListenerFactoryContext> context;
 
   Network::ListenerFilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, context);

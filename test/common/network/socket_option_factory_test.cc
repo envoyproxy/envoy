@@ -154,20 +154,21 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   EXPECT_TRUE(option_details.has_value());
   EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
   EXPECT_EQ(SO_LINGER, option_details->name_.option());
-  EXPECT_EQ(sizeof(struct linger), option_details->value_.size());
-  const struct linger* linger_ptr =
-      reinterpret_cast<const struct linger*>(option_details->value_.data());
-  EXPECT_EQ(1, linger_ptr->l_onoff);
-  EXPECT_EQ(3456, linger_ptr->l_linger);
+  struct linger expected_linger;
+  expected_linger.l_onoff = 1;
+  expected_linger.l_linger = 3456;
+  absl::string_view linger_bstr{reinterpret_cast<const char*>(&expected_linger),
+                                sizeof(struct linger)};
+  EXPECT_EQ(linger_bstr, option_details->value_);
 
   option_details = socket_options->at(1)->getOptionDetails(
       socket_mock_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   EXPECT_TRUE(option_details.has_value());
   EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
   EXPECT_EQ(SO_KEEPALIVE, option_details->name_.option());
-  EXPECT_EQ(sizeof(int), option_details->value_.size());
-  const int* flag_ptr = reinterpret_cast<const int*>(option_details->value_.data());
-  EXPECT_EQ(1, *flag_ptr);
+  int value = 1;
+  absl::string_view value_bstr{reinterpret_cast<const char*>(&value), sizeof(int)};
+  EXPECT_EQ(value_bstr, option_details->value_);
 }
 
 } // namespace

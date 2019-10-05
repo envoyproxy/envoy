@@ -75,6 +75,15 @@ public:
     signal_handling_enabled_ = signal_handling_enabled;
   }
   void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
+  void setAllowUnkownFields(bool allow_unknown_static_fields) {
+    allow_unknown_static_fields_ = allow_unknown_static_fields;
+  }
+  void setRejectUnknownFieldsDynamic(bool reject_unknown_dynamic_fields) {
+    reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields;
+  }
+  void setFakeSymbolTableEnabled(bool fake_symbol_table_enabled) {
+    fake_symbol_table_enabled_ = fake_symbol_table_enabled;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -84,7 +93,8 @@ public:
     return config_proto_;
   }
   const std::string& configYaml() const override { return config_yaml_; }
-  bool allowUnknownFields() const override { return allow_unknown_fields_; }
+  bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
+  bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -110,6 +120,7 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   bool libeventBufferEnabled() const override { return libevent_buffer_enabled_; }
+  bool fakeSymbolTableEnabled() const override { return fake_symbol_table_enabled_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
@@ -123,7 +134,8 @@ private:
   std::string config_path_;
   envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
-  bool allow_unknown_fields_{false};
+  bool allow_unknown_static_fields_{false};
+  bool reject_unknown_dynamic_fields_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
@@ -144,6 +156,7 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   bool libevent_buffer_enabled_;
+  bool fake_symbol_table_enabled_;
   uint32_t count_;
 };
 

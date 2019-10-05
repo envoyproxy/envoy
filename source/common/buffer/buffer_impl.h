@@ -193,7 +193,8 @@ protected:
 
 using SlicePtr = std::unique_ptr<Slice>;
 
-class OwnedSlice : public Slice, public InlineStorage {
+// OwnedSlice can not be derived from as it has variable sized array as member.
+class OwnedSlice final : public Slice, public InlineStorage {
 public:
   /**
    * Create an empty OwnedSlice.
@@ -502,6 +503,7 @@ public:
   Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start) const override;
+  bool startsWith(absl::string_view data) const override;
   Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   std::string toString() const override;
 
@@ -562,6 +564,47 @@ private:
   /** Used when old_impl_==true */
   Event::Libevent::BufferPtr buffer_;
 };
+
+using BufferFragmentPtr = std::unique_ptr<BufferFragment>;
+
+/**
+ * An implementation of BufferFragment where a releasor callback is called when the data is
+ * no longer needed. Copies data into internal buffer.
+ */
+class OwnedBufferFragmentImpl final : public BufferFragment, public InlineStorage {
+public:
+  using Releasor = std::function<void(const OwnedBufferFragmentImpl*)>;
+
+  /**
+   * Copies the data into internal buffer. The releasor is called when the data has been
+   * fully drained or the buffer that contains this fragment is destroyed.
+   * @param data external data to reference
+   * @param releasor a callback function to be called when data is no longer needed.
+   */
+
+  static BufferFragmentPtr create(absl::string_view data, const Releasor& releasor) {
+    return BufferFragmentPtr(new (sizeof(OwnedBufferFragmentImpl) + data.size())
+                                 OwnedBufferFragmentImpl(data, releasor));
+  }
+
+  // Buffer::BufferFragment
+  const void* data() const override { return data_; }
+  size_t size() const override { return size_; }
+  void done() override { releasor_(this); }
+
+private:
+  OwnedBufferFragmentImpl(absl::string_view data, const Releasor& releasor)
+      : releasor_(releasor), size_(data.size()) {
+    ASSERT(releasor != nullptr);
+    memcpy(data_, data.data(), data.size());
+  }
+
+  const Releasor releasor_;
+  const size_t size_;
+  uint8_t data_[];
+};
+
+using OwnedBufferFragmentImplPtr = std::unique_ptr<OwnedBufferFragmentImpl>;
 
 } // namespace Buffer
 } // namespace Envoy

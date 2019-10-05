@@ -10,7 +10,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnNew;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -23,6 +22,12 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
+  ON_CALL(*this, allowUnknownStaticFields()).WillByDefault(Invoke([this] {
+    return allow_unknown_static_fields_;
+  }));
+  ON_CALL(*this, rejectUnknownDynamicFields()).WillByDefault(Invoke([this] {
+    return reject_unknown_dynamic_fields_;
+  }));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
   ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));
@@ -67,11 +72,11 @@ MockWatchDog::MockWatchDog() = default;
 MockWatchDog::~MockWatchDog() = default;
 
 MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
-  ON_CALL(*this, createWatchDog(_)).WillByDefault(Return(watch_dog_));
+  ON_CALL(*this, createWatchDog(_, _)).WillByDefault(Return(watch_dog_));
 }
 MockGuardDog::~MockGuardDog() = default;
 
-MockHotRestart::MockHotRestart() : stats_allocator_(symbol_table_.get()) {
+MockHotRestart::MockHotRestart() : stats_allocator_(*symbol_table_) {
   ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));
   ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
   ON_CALL(*this, statsAllocator()).WillByDefault(ReturnRef(stats_allocator_));
@@ -152,8 +157,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, mutexTracer()).WillByDefault(Return(nullptr));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
-  ON_CALL(*this, messageValidationVisitor())
-      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+  ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
 }
 
 MockInstance::~MockInstance() = default;
@@ -219,6 +223,7 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
   ON_CALL(*this, eventLogger_()).WillByDefault(Return(event_logger_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;

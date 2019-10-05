@@ -26,6 +26,8 @@ public:
   createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
                       Server::Configuration::FactoryContext& context) override;
 
+  bool isTerminalFilter() override { return true; }
+
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::router::v2::Router& proto_config,

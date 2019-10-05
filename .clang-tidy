@@ -2,10 +2,12 @@ Checks:          'abseil-*,
                   bugprone-*,
                   clang-analyzer-*,
                   clang-diagnostic-*,
+                  misc-unused-using-decls,
                   modernize-*,
                   performance-*,
                   readability-braces-around-statements,
                   readability-container-size-empty,
+                  readability-identifier-naming,
                   readability-redundant-*'
 
 #TODO(lizan): grow this list, fix possible warnings and make more checks as error
@@ -20,6 +22,7 @@ WarningsAsErrors: 'abseil-duration-*,
                    bugprone-unused-raii,
                    bugprone-use-after-move,
                    clang-analyzer-core.DivideZero,
+                   misc-unused-using-decls,
                    modernize-deprecated-headers,
                    modernize-loop-convert,
                    modernize-make-shared,
@@ -40,6 +43,7 @@ WarningsAsErrors: 'abseil-duration-*,
                    performance-unnecessary-copy-initialization,
                    readability-braces-around-statements,
                    readability-container-size-empty,
+                   readability-identifier-naming,
                    readability-redundant-control-flow,
                    readability-redundant-member-init,
                    readability-redundant-smartptr-get,
@@ -54,3 +58,15 @@ CheckOptions:
 
   - key:             modernize-use-auto.MinTypeNameLength
     value:           '10'
+
+  - key:             readability-identifier-naming.ClassCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.EnumCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.ParameterCase
+    value:           'lower_case'
+  
+  - key:             readability-identifier-naming.TypeAliasCase
+    value:           'CamelCase'
