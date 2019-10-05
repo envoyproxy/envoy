@@ -49,7 +49,8 @@ void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
   initialize();
 }
 
-void HttpSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {
+void HttpSubscriptionImpl::updateResourceInterest(
+    const std::set<std::string>& update_to_these_names) {
   Protobuf::RepeatedPtrField<std::string> resources_vector(update_to_these_names.begin(),
                                                            update_to_these_names.end());
   request_.mutable_resource_names()->Swap(&resources_vector);

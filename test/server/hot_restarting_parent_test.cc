@@ -2,10 +2,12 @@
 
 #include "server/hot_restarting_parent.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gtest/gtest.h"
 
+using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -36,6 +38,23 @@ TEST_F(HotRestartingParentTest, getListenSocketsForChildNotFound) {
 
   HotRestartMessage::Request request;
   request.mutable_pass_listen_socket()->set_address("tcp://127.0.0.1:80");
+  HotRestartMessage message = hot_restarting_parent_.getListenSocketsForChild(request);
+  EXPECT_EQ(-1, message.reply().pass_listen_socket().fd());
+}
+
+TEST_F(HotRestartingParentTest, getListenSocketsForChildNotBindPort) {
+  MockListenerManager listener_manager;
+  Network::MockListenerConfig listener_config;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  InSequence s;
+  listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
+  EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, listeners()).WillOnce(Return(listeners));
+  EXPECT_CALL(listener_config, socket()).Times(1);
+  EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(false));
+
+  HotRestartMessage::Request request;
+  request.mutable_pass_listen_socket()->set_address("tcp://0.0.0.0:80");
   HotRestartMessage message = hot_restarting_parent_.getListenSocketsForChild(request);
   EXPECT_EQ(-1, message.reply().pass_listen_socket().fd());
 }

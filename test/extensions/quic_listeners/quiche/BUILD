@@ -34,7 +34,9 @@ envoy_cc_test(
     deps = [
         "//source/common/network:io_socket_error_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_packet_writer_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -59,7 +61,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
-        "//source/extensions/quic_listeners/quiche:envoy_quic_connection_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_server_connection_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_server_stream_lib",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
@@ -75,10 +77,11 @@ envoy_cc_test(
     deps = [
         ":quic_test_utils_for_envoy_lib",
         "//include/envoy/stats:stats_macros",
-        "//source/extensions/quic_listeners/quiche:codec_impl_lib",
+        "//source/extensions/quic_listeners/quiche:codec_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_server_connection_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_server_session_lib",
         "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",

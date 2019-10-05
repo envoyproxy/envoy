@@ -135,13 +135,17 @@ private:
     const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
       return retriable_headers_;
     }
+    const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
+      return retriable_request_headers_;
+    }
     absl::optional<std::chrono::milliseconds> baseInterval() const override {
       return absl::nullopt;
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
 
-    const std::vector<uint32_t> retriable_status_codes_{};
-    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
+    const std::vector<uint32_t> retriable_status_codes_;
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {

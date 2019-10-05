@@ -27,7 +27,7 @@ TEST(RouterFilterConfigTest, RouterFilterInJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -59,7 +59,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(router_config, "stats", context),
+      factory.createFilterFactoryFromProto(router_config, "stats.", context),
       ProtoValidationException,
       "Proto constraint validation failed (RouterValidationError.StrictCheckHeaders[i]: "
       "[\"value must be in list \" ["
@@ -77,7 +77,7 @@ TEST(RouterFilterConfigTest, RouterV2Filter) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -87,7 +87,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
