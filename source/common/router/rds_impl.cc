@@ -70,16 +70,13 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier),
       validation_visitor_(factory_context_.messageValidationVisitor()) {
-  ENVOY_LOG(error, "RdsRouteConfigSubscription body");
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(),
           Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
           *scope_, *this, is_delta);
-  ENVOY_LOG(error, "after subscription");
   config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
       factory_context.timeSource(), factory_context.messageValidationVisitor());
-  ENVOY_LOG(error, "end of subscription");
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
