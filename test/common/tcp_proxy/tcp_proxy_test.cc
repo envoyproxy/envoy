@@ -69,7 +69,7 @@ TEST(ConfigTest, NoRouteConfig) {
   EXPECT_THROW(constructConfigFromYaml(yaml, factory_context), EnvoyException);
 }
 
-TEST(ConfigTest, BadConfig) {
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(BadConfig)) {
   const std::string yaml_string = R"EOF(
   stat_prefix: 1
   cluster: cluster
@@ -82,7 +82,7 @@ TEST(ConfigTest, BadConfig) {
   EXPECT_THROW(constructConfigFromYaml(yaml_string, factory_context), EnvoyException);
 }
 
-TEST(ConfigTest, EmptyRouteConfig) {
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(EmptyRouteConfig)) {
   const std::string yaml = R"EOF(
   stat_prefix: name
   cluster: cluster
@@ -94,7 +94,7 @@ TEST(ConfigTest, EmptyRouteConfig) {
   EXPECT_THROW(constructConfigFromYaml(yaml, factory_context_), EnvoyException);
 }
 
-TEST(ConfigTest, Routes) {
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   const std::string yaml = R"EOF(
   stat_prefix: name
   cluster: cluster
@@ -1131,7 +1131,7 @@ public:
   std::unique_ptr<Filter> filter_;
 };
 
-TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
+TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
 
@@ -1150,7 +1150,7 @@ TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
-TEST_F(TcpProxyRoutingTest, RoutableConnection) {
+TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
 
@@ -1170,7 +1170,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 }
 
 // Test that the tcp proxy uses the cluster from FilterState if set
-TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
+TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionCluster)) {
   setup();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -1189,7 +1189,7 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
 }
 
 // Test that the tcp proxy forwards the requested server name from FilterState if set
-TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
+TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   setup();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
