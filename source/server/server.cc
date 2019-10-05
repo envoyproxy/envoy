@@ -429,7 +429,7 @@ void InstanceImpl::initialize(const Options& options,
         *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
         *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
         *local_info_, *admin_, *singleton_manager_, thread_local_,
-        messageValidationContext().dynamicValidationVisitor(), *api_);
+        dynamic_server_context_.messageValidationVisitor(), *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
