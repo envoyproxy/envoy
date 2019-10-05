@@ -19,14 +19,14 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
       async_client_(std::move(async_client)), dispatcher_(dispatcher), runtime_(runtime),
-      store_stats(stats), ssl_context_manager_(ssl_context_manager), random_(random),
+      store_stats_(stats), ssl_context_manager_(ssl_context_manager), random_(random),
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
       local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager), tls_(tls),
       validation_visitor_(validation_visitor), api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
-                                                                RetryMaxDelayMilliseconds, random_);
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(retry_initial_delay_milliseconds_,
+                                                                retry_max_delay_milliseconds_, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
@@ -148,7 +148,7 @@ void HdsDelegate::processMessage(
 
     // Create HdsCluster
     hds_clusters_.emplace_back(new HdsCluster(admin_, runtime_, cluster_config, bind_config,
-                                              store_stats, ssl_context_manager_, false,
+                                              store_stats_, ssl_context_manager_, false,
                                               info_factory_, cm_, local_info_, dispatcher_, random_,
                                               singleton_manager_, tls_, validation_visitor_, api_));
 

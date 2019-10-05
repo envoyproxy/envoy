@@ -60,7 +60,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
   uint8_t* next_byte_to_send = send_buf.data();
   uint64_t sent = 0;
   while (sent < total_size) {
-    const uint64_t cur_chunk_size = std::min(MaxSendmsgSize, total_size - sent);
+    const uint64_t cur_chunk_size = std::min(max_send_msg_size_, total_size - sent);
     iovec iov[1];
     iov[0].iov_base = next_byte_to_send;
     iov[0].iov_len = cur_chunk_size;
@@ -122,13 +122,13 @@ void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* mes
   }
 }
 
-// While in use, recv_buf_ is always >= MaxSendmsgSize. In between messages, it is kept empty, to be
-// grown back to MaxSendmsgSize at the start of the next message.
+// While in use, recv_buf_ is always >= max_send_msg_size_. In between messages, it is kept empty, to be
+// grown back to max_send_msg_size_ at the start of the next message.
 void HotRestartingBase::initRecvBufIfNewMessage() {
   if (recv_buf_.empty()) {
     ASSERT(cur_msg_recvd_bytes_ == 0);
     ASSERT(!expected_proto_length_.has_value());
-    recv_buf_.resize(MaxSendmsgSize);
+    recv_buf_.resize(max_send_msg_size_);
   }
 }
 
@@ -160,7 +160,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
   std::unique_ptr<HotRestartMessage> ret = nullptr;
   while (!ret) {
     iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
-    iov[0].iov_len = MaxSendmsgSize;
+    iov[0].iov_len = max_send_msg_size_;
 
     // We always setup to receive an FD even though most messages do not pass one.
     memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
@@ -186,7 +186,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
 
       expected_proto_length_ = be64toh(*reinterpret_cast<uint64_t*>(recv_buf_.data()));
       // Expand the buffer from its default 4096 if this message is going to be longer.
-      if (expected_proto_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
+      if (expected_proto_length_.value() > max_send_msg_size_ - sizeof(uint64_t)) {
         recv_buf_.resize(expected_proto_length_.value() + sizeof(uint64_t));
         cur_msg_recvd_bytes_ = recvmsg_rc;
       }

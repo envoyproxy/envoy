@@ -69,7 +69,7 @@ private:
   const uint64_t base_id_;
   int my_domain_socket_{-1};
 
-  const uint64_t MaxSendmsgSize = 4096;
+  const uint64_t max_send_msg_size_ = 4096;
 
   // State for the receiving half of the protocol.
   //
