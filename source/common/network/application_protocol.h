@@ -16,13 +16,25 @@ using ApplicationProtocolOverride = absl::flat_hash_map<Http::Protocol, std::vec
  */
 class ApplicationProtocols : public StreamInfo::FilterState::Object {
 public:
-  explicit ApplicationProtocols(const ApplicationProtocolOverride& application_protocols_override)
-      : application_protocols_override_(application_protocols_override) {}
-  const ApplicationProtocolOverride& value() const { return application_protocols_override_; }
+  ApplicationProtocols(const ApplicationProtocolOverride& http_alpn_override,
+                       const std::vector<std::string>& tcp_alpn_override)
+      : http_alpn_override_(http_alpn_override), tcp_alpn_override_(tcp_alpn_override) {}
+
+  bool hasProtocol(const Http::Protocol& protocol) const {
+    return http_alpn_override_.count(protocol) > 0;
+  }
+
+  const std::vector<std::string>& value(const Http::Protocol& protocol) const {
+    return http_alpn_override_.at(protocol);
+  }
+
+  const std::vector<std::string>& value() const { return tcp_alpn_override_; }
+
   static const std::string& key();
 
 private:
-  const ApplicationProtocolOverride application_protocols_override_;
+  const ApplicationProtocolOverride http_alpn_override_;
+  const std::vector<std::string> tcp_alpn_override_;
 };
 
 } // namespace Network

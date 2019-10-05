@@ -1267,7 +1267,8 @@ TEST_F(TcpProxyRoutingTest, ApplicationProtocols) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filterState().setData(
       Network::ApplicationProtocols::key(),
-      std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
+      std::make_unique<Network::ApplicationProtocols>(Network::ApplicationProtocolOverride{},
+                                                      std::vector<std::string>{"foo", "bar"}),
       StreamInfo::FilterState::StateType::ReadOnly);
 
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));

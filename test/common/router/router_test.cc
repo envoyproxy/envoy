@@ -4244,7 +4244,7 @@ TEST_F(RouterTest, AlpnOverride) {
                                                      {Http::Protocol::Http2, {"baz", "qux"}}};
   callbacks_.streamInfo().filterState().setData(
       Network::ApplicationProtocols::key(),
-      std::make_unique<Network::ApplicationProtocols>(alpn_override),
+      std::make_unique<Network::ApplicationProtocols>(alpn_override, std::vector<std::string>{}),
       StreamInfo::FilterState::StateType::ReadOnly);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -4285,7 +4285,7 @@ TEST_F(RouterTest, AlpnOverrideHttp2Upstream) {
 
   callbacks_.streamInfo().filterState().setData(
       Network::ApplicationProtocols::key(),
-      std::make_unique<Network::ApplicationProtocols>(alpn_override),
+      std::make_unique<Network::ApplicationProtocols>(alpn_override, std::vector<std::string>{}),
       StreamInfo::FilterState::StateType::ReadOnly);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -4325,7 +4325,7 @@ TEST_F(RouterTest, AlpnOverrideEmptyAlpn) {
 
   callbacks_.streamInfo().filterState().setData(
       Network::ApplicationProtocols::key(),
-      std::make_unique<Network::ApplicationProtocols>(alpn_override),
+      std::make_unique<Network::ApplicationProtocols>(alpn_override, std::vector<std::string>{}),
       StreamInfo::FilterState::StateType::ReadOnly);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))

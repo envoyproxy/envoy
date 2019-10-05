@@ -546,13 +546,12 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
           Network::ApplicationProtocols::key())) {
     const auto& alpn =
-        callbacks_->streamInfo()
-            .filterState()
-            .getDataReadOnly<Network::ApplicationProtocols>(Network::ApplicationProtocols::key())
-            .value();
-    if (alpn.count(protocol)) {
+        callbacks_->streamInfo().filterState().getDataReadOnly<Network::ApplicationProtocols>(
+            Network::ApplicationProtocols::key());
+
+    if (alpn.hasProtocol(protocol)) {
       transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
-          "", std::vector<std::string>{}, std::vector<std::string>{alpn.at(protocol)});
+          "", std::vector<std::string>{}, std::vector<std::string>{alpn.value(protocol)});
     }
   }
 
@@ -848,15 +847,15 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
-    callbacks_->sendLocalReply(
-        code, body,
-        [dropped, this](Http::HeaderMap& headers) {
-          if (dropped && !config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-          }
-          modify_headers_(headers);
-        },
-        absl::nullopt, details);
+    callbacks_->sendLocalReply(code, body,
+                               [dropped, this](Http::HeaderMap& headers) {
+                                 if (dropped && !config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                                 modify_headers_(headers);
+                               },
+                               absl::nullopt, details);
   }
 }
 
