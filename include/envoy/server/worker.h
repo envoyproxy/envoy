@@ -78,7 +78,7 @@ public:
    * Stop all listeners from accepting new connections. This is used for server draining.
    * TODO(mattklein123): Same comment about the addition of a completion as stopListener().
    */
-  virtual void stopListeners() PURE;
+  virtual void stopListeners(std::function<void()> completion) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

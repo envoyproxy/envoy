@@ -335,7 +335,7 @@ public:
   MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
   MOCK_METHOD0(stop, void());
   MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
-  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD1(stopListeners, void(std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

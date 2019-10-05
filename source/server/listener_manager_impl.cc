@@ -554,8 +554,17 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
 }
 
 void ListenerManagerImpl::stopListeners() {
+  auto counter = std::make_shared<std::atomic<uint32_t>>(workers_.size());
   for (const auto& worker : workers_) {
-    worker->stopListeners();
+    worker->stopListeners([this, counter]() {
+      if (--(*counter) == 0) {
+        server_.dispatcher().post([this]() {
+          for (const auto& listener : active_listeners_) {
+            listener->socket().close();
+          }
+        });
+      }
+    });
   }
 }
 

@@ -94,9 +94,12 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener) {
   dispatcher_->post([this, listener_tag]() -> void { handler_->stopListeners(listener_tag); });
 }
 
-void WorkerImpl::stopListeners() {
+void WorkerImpl::stopListeners(std::function<void()> completion) {
   ASSERT(thread_);
-  dispatcher_->post([this]() -> void { handler_->stopListeners(); });
+  dispatcher_->post([this, completion]() -> void {
+    handler_->stopListeners();
+    completion();
+  });
 }
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {

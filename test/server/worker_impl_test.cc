@@ -133,6 +133,49 @@ TEST_F(WorkerImplTest, BasicFlow) {
   worker_.stop();
 }
 
+TEST_F(WorkerImplTest, StopListeners) {
+  InSequence s;
+  std::thread::id current_thread_id = std::this_thread::get_id();
+  ConditionalInitializer ci;
+
+  // Before a worker is started adding a listener will be posted and will get added when the
+  // thread starts running.
+  NiceMock<Network::MockListenerConfig> listener;
+  ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
+  EXPECT_CALL(*handler_, addListener(_))
+      .WillOnce(Invoke([current_thread_id](Network::ListenerConfig& config) -> void {
+        EXPECT_EQ(config.listenerTag(), 1UL);
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+      }));
+  worker_.addListener(listener, [&ci](bool success) -> void {
+    EXPECT_TRUE(success);
+    ci.setReady();
+  });
+
+  NiceMock<Stats::MockStore> store;
+  worker_.start(guard_dog_);
+  worker_.initializeStats(store, "test");
+  ci.waitReady();
+
+  // After a worker is started stopping listeners happens on the worker thread.
+  EXPECT_CALL(*handler_, stopListeners())
+      .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() -> void {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        ci.setReady();
+      }));
+
+  ConditionalInitializer ci2;
+  // Verify that callback is called from the other thread.
+  worker_.stopListeners([current_thread_id, &ci2]() {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+    ci2.setReady();
+  });
+  ci.waitReady();
+  ci2.waitReady();
+
+  worker_.stop();
+}
+
 TEST_F(WorkerImplTest, ListenerException) {
   InSequence s;
 

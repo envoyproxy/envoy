@@ -126,6 +126,9 @@ MockWorker::MockWorker() {
             EXPECT_EQ(nullptr, remove_listener_completion_);
             remove_listener_completion_ = completion;
           }));
+
+  ON_CALL(*this, stopListeners(_))
+      .WillByDefault(Invoke([](std::function<void()> completion) -> void { completion(); }));
 }
 MockWorker::~MockWorker() = default;
 
