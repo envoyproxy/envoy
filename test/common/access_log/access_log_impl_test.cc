@@ -1005,7 +1005,8 @@ typed_config:
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
       "\"DC\" \"URX\" \"SI\" \"IH\"]]): name: \"envoy.file_access_log\"\nfilter {\n  "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
-      "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  }\n}\n");
+      "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
+      "}\n}\n");
 }
 
 TEST_F(AccessLogImplTest, ValidateTypedConfig) {
