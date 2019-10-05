@@ -5,7 +5,6 @@
 
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
-
 #include "envoy/event/dispatcher.h"
 
 #include "common/buffer/buffer_impl.h"
