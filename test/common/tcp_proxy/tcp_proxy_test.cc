@@ -1104,7 +1104,7 @@ class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() = default;
 
-  void setupConfig() {
+  void setup() {
     const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fallback_cluster
@@ -1117,7 +1117,7 @@ public:
     config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
   }
 
-  void setupFilter() {
+  void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
     filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
@@ -1134,12 +1134,12 @@ public:
 };
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
-  setupConfig();
+  setup();
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
 
-  setupFilter();
+  initializeFilter();
 
   // Port 10000 is outside the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 10000);
@@ -1155,12 +1155,12 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
 }
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
-  setupConfig();
+  setup();
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
 
-  setupFilter();
+  initializeFilter();
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
@@ -1177,8 +1177,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
 
 // Test that the tcp proxy uses the cluster from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionCluster)) {
-  setupConfig();
-  setupFilter();
+  setup();
+  initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filterState().setData("envoy.tcp_proxy.cluster",
@@ -1197,8 +1197,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
 
 // Test that the tcp proxy forwards the requested server name from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
-  setupConfig();
-  setupFilter();
+  setup();
+  initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filterState().setData("envoy.network.upstream_server_name",
