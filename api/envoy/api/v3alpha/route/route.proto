@@ -6,11 +6,12 @@ option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.route";
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v3alpha/core/base.proto";
-import "envoy/type/matcher/regex.proto";
-import "envoy/type/matcher/string.proto";
-import "envoy/type/percent.proto";
-import "envoy/type/range.proto";
+import "envoy/type/matcher/v3alpha/regex.proto";
+import "envoy/type/matcher/v3alpha/string.proto";
+import "envoy/type/v3alpha/percent.proto";
+import "envoy/type/v3alpha/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -153,7 +154,7 @@ message VirtualHost {
 // .. attention::
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
-//   <envoy_api_msg_route.HeaderMatcher>`.
+//   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
 // [#comment:next free field: 15]
 message Route {
   reserved 6;
@@ -232,10 +233,10 @@ message Route {
   Tracing tracing = 15;
 }
 
-// Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a
-// single upstream cluster as the target of a request, the :ref:`weighted_clusters
-// <envoy_api_field_route.RouteAction.weighted_clusters>` option allows for specification of
-// multiple upstream clusters along with weights that indicate the percentage of
+// Compared to the :ref:`cluster <envoy_api_field_api.v3alpha.route.RouteAction.cluster>` field that
+// specifies a single upstream cluster as the target of a request, the :ref:`weighted_clusters
+// <envoy_api_field_api.v3alpha.route.RouteAction.weighted_clusters>` option allows for
+// specification of multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
 // [#comment:next free field: 11]
@@ -248,16 +249,17 @@ message WeightedCluster {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // An integer between 0 and :ref:`total_weight
-    // <envoy_api_field_route.WeightedCluster.total_weight>`. When a request matches the route,
-    // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, which defaults to 100.
+    // <envoy_api_field_api.v3alpha.route.WeightedCluster.total_weight>`. When a request matches the
+    // route, the choice of an upstream cluster is determined by its weight. The sum of weights
+    // across all entries in the clusters array must add up to the total_weight, which defaults to
+    // 100.
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field will be considered for
     // load balancing. Note that this will be merged with what's provided in :ref:
-    // `RouteAction.MetadataMatch <envoy_api_field_route.RouteAction.metadata_match>`, with values
-    // here taking precedence. The filter name should be specified as *envoy.lb*.
+    // `RouteAction.MetadataMatch <envoy_api_field_api.v3alpha.route.RouteAction.metadata_match>`,
+    // with values here taking precedence. The filter name should be specified as *envoy.lb*.
     core.Metadata metadata_match = 3;
 
     // Specifies a list of headers to be added to requests when this cluster is selected
@@ -352,7 +354,7 @@ message RouteMatch {
     // path_specifier entirely and just rely on a set of header matchers which can already match
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
-    type.matcher.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+    type.matcher.v3alpha.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -405,7 +407,7 @@ message CorsPolicy {
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
-  repeated type.matcher.StringMatcher allow_origin_string_match = 11;
+  repeated type.matcher.v3alpha.StringMatcher allow_origin_string_match = 11;
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;
@@ -431,7 +433,7 @@ message CorsPolicy {
     // .. note::
     //
     //   This field defaults to 100/:ref:`HUNDRED
-    //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+    //   <envoy_api_enum_type.v3alpha.FractionalPercent.DenominatorType>`.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
@@ -444,7 +446,7 @@ message CorsPolicy {
   // .. note::
   //
   //   This field defaults to 100/:ref:`HUNDRED
-  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  //   <envoy_api_enum_type.v3alpha.FractionalPercent.DenominatorType>`.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
@@ -481,8 +483,8 @@ message RouteAction {
     string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // If both :ref:`runtime_key
-    // <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>` and this field are not
-    // specified, all requests to the target cluster will be mirrored.
+    // <envoy_api_field_api.v3alpha.route.RouteAction.RequestMirrorPolicy.runtime_key>` and this
+    // field are not specified, all requests to the target cluster will be mirrored.
     //
     // If specified, this field takes precedence over the `runtime_key` field and requests must also
     // fall under the percentage of matches indicated by this field.
@@ -494,12 +496,12 @@ message RouteAction {
     // .. note::
     //
     //   Parsing this field is implemented such that the runtime key's data may be represented
-    //   as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
-    //   as JSON/YAML and may also be represented as an integer with the assumption that the value
-    //   is an integral percentage out of 100. For instance, a runtime key lookup returning the
-    //   value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
-    //   HUNDRED. This is behaviour is different to that of the deprecated `runtime_key` field,
-    //   where the implicit denominator is 10000.
+    //   as a :ref:`FractionalPercent <envoy_api_msg_type.v3alpha.FractionalPercent>` proto
+    //   represented as JSON/YAML and may also be represented as an integer with the assumption that
+    //   the value is an integral percentage out of 100. For instance, a runtime key lookup
+    //   returning the value "42" would parse as a `FractionalPercent` whose numerator is 42 and
+    //   denominator is HUNDRED. This is behaviour is different to that of the deprecated
+    //   `runtime_key` field, where the implicit denominator is 10000.
     core.RuntimeFractionalPercent runtime_fraction = 3;
   }
 
@@ -634,8 +636,9 @@ message RouteAction {
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
   // in the upstream cluster with metadata matching what's set in this field will be considered
   // for load balancing. If using :ref:`weighted_clusters
-  // <envoy_api_field_route.RouteAction.weighted_clusters>`, metadata will be merged, with values
-  // provided there taking precedence. The filter name should be specified as *envoy.lb*.
+  // <envoy_api_field_api.v3alpha.route.RouteAction.weighted_clusters>`, metadata will be merged,
+  // with values provided there taking precedence. The filter name should be specified as
+  // *envoy.lb*.
   core.Metadata metadata_match = 4;
 
   // Indicates that during forwarding, the matched prefix (or path) should be
@@ -647,10 +650,10 @@ message RouteAction {
   // .. attention::
   //
   //   Pay careful attention to the use of trailing slashes in the
-  //   :ref:`route's match <envoy_api_field_route.Route.match>` prefix value.
+  //   :ref:`route's match <envoy_api_field_api.v3alpha.route.Route.match>` prefix value.
   //   Stripping a prefix from a path requires multiple Routes to handle all cases. For example,
   //   rewriting */prefix* to */* and */prefix/etc* to */etc* cannot be done in a single
-  //   :ref:`Route <envoy_api_msg_route.Route>`, as shown by the below config entries:
+  //   :ref:`Route <envoy_api_msg_api.v3alpha.route.Route>`, as shown by the below config entries:
   //
   //   .. code-block:: yaml
   //
@@ -710,9 +713,9 @@ message RouteAction {
   // connection manager stream idle timeout is configured.
   //
   // The idle timeout is distinct to :ref:`timeout
-  // <envoy_api_field_route.RouteAction.timeout>`, which provides an upper bound
+  // <envoy_api_field_api.v3alpha.route.RouteAction.timeout>`, which provides an upper bound
   // on the upstream response time; :ref:`idle_timeout
-  // <envoy_api_field_route.RouteAction.idle_timeout>` instead bounds the amount
+  // <envoy_api_field_api.v3alpha.route.RouteAction.idle_timeout>` instead bounds the amount
   // of time the request's stream may be idle.
   //
   // After header decoding, the idle timeout will apply on downstream and
@@ -742,8 +745,8 @@ message RouteAction {
 
   // Specifies if the rate limit filter should include the virtual host rate
   // limits. By default, if the route configured rate limits, the virtual host
-  // :ref:`rate_limits <envoy_api_field_route.VirtualHost.rate_limits>` are not applied to the
-  // request.
+  // :ref:`rate_limits <envoy_api_field_api.v3alpha.route.VirtualHost.rate_limits>` are not applied
+  // to the request.
   google.protobuf.BoolValue include_vh_rate_limits = 14;
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
@@ -766,11 +769,11 @@ message RouteAction {
   // If present, and the request is a gRPC request, use the
   // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
   // or its default value (infinity) instead of
-  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>`, but limit the applied timeout
-  // to the maximum value specified here. If configured as 0, the maximum allowed timeout for
-  // gRPC requests is infinity. If not configured at all, the `grpc-timeout` header is not used
+  // :ref:`timeout <envoy_api_field_api.v3alpha.route.RouteAction.timeout>`, but limit the applied
+  // timeout to the maximum value specified here. If configured as 0, the maximum allowed timeout
+  // for gRPC requests is infinity. If not configured at all, the `grpc-timeout` header is not used
   // and gRPC requests time out like any other requests using
-  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` or its default.
+  // :ref:`timeout <envoy_api_field_api.v3alpha.route.RouteAction.timeout>` or its default.
   // This can be used to prevent unexpected upstream request timeouts due to potentially long
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23;
@@ -851,7 +854,7 @@ message RetryPolicy {
   // .. note::
   //
   //   If left unspecified, Envoy will use the global
-  //   :ref:`route timeout <envoy_api_field_route.RouteAction.timeout>` for the request.
+  //   :ref:`route timeout <envoy_api_field_api.v3alpha.route.RouteAction.timeout>` for the request.
   //   Consequently, when using a :ref:`5xx <config_http_filters_router_x-envoy-retry-on>` based
   //   retry policy, a request that times out will not be retried as the total timeout budget
   //   would have been exhausted.
@@ -904,7 +907,7 @@ message HedgePolicy {
   // on top of what is specified by initial_requests.
   // Defaults to 0.
   // [#not-implemented-hide:]
-  type.FractionalPercent additional_request_chance = 2;
+  type.v3alpha.FractionalPercent additional_request_chance = 2;
 
   // Indicates that a hedged request should be sent when the per-try timeout
   // is hit. This will only occur if the retry policy also indicates that a
@@ -912,7 +915,7 @@ message HedgePolicy {
   // Once a timed out request is retried due to per try timeout, the router
   // filter will ensure that it is not retried again even if the returned
   // response headers would otherwise be retried according the specified
-  // :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>`.
+  // :ref:`RetryPolicy <envoy_api_msg_api.v3alpha.route.RetryPolicy>`.
   // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
 }
@@ -965,7 +968,8 @@ message RedirectAction {
     // .. attention::
     //
     //   Pay attention to the use of trailing slashes as mentioned in
-    //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`.
+    //   :ref:`RouteAction's prefix_rewrite
+    //   <envoy_api_field_api.v3alpha.route.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5;
   }
 
@@ -1012,14 +1016,14 @@ message Tracing {
   // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
   // <config_http_conn_man_runtime>`.
   // Default: 100%
-  type.FractionalPercent client_sampling = 1;
+  type.v3alpha.FractionalPercent client_sampling = 1;
 
   // Target percentage of requests managed by this HTTP connection manager that will be randomly
   // selected for trace generation, if not requested by the client or not forced. This field is
   // a direct analog for the runtime variable 'tracing.random_sampling' in the
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
-  type.FractionalPercent random_sampling = 2;
+  type.v3alpha.FractionalPercent random_sampling = 2;
 
   // Target percentage of requests managed by this HTTP connection manager that will be traced
   // after all other sampling checks have been applied (client-directed, force tracing, random
@@ -1029,7 +1033,7 @@ message Tracing {
   // analog for the runtime variable 'tracing.global_enabled' in the
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
-  type.FractionalPercent overall_sampling = 3;
+  type.v3alpha.FractionalPercent overall_sampling = 3;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against
@@ -1085,14 +1089,16 @@ message RateLimit {
     //   ("destination_cluster", "<routed target cluster>")
     //
     // Once a request matches against a route table rule, a routed cluster is determined by one of
-    // the following :ref:`route table configuration <envoy_api_msg_RouteConfiguration>`
+    // the following :ref:`route table configuration <envoy_api_msg_api.v3alpha.RouteConfiguration>`
     // settings:
     //
-    // * :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` indicates the upstream cluster
+    // * :ref:`cluster <envoy_api_field_api.v3alpha.route.RouteAction.cluster>` indicates the
+    // upstream cluster
     //   to route to.
-    // * :ref:`weighted_clusters <envoy_api_field_route.RouteAction.weighted_clusters>`
+    // * :ref:`weighted_clusters <envoy_api_field_api.v3alpha.route.RouteAction.weighted_clusters>`
     //   chooses a cluster randomly from a set of clusters with attributed weight.
-    // * :ref:`cluster_header <envoy_api_field_route.RouteAction.cluster_header>` indicates which
+    // * :ref:`cluster_header <envoy_api_field_api.v3alpha.route.RouteAction.cluster_header>`
+    // indicates which
     //   header in the request contains the target cluster.
     message DestinationCluster {
     }
@@ -1218,9 +1224,9 @@ message RateLimit {
 //
 // .. attention::
 //   In the absence of any header match specifier, match will default to :ref:`present_match
-//   <envoy_api_field_route.HeaderMatcher.present_match>`. i.e, a request that has the :ref:`name
-//   <envoy_api_field_route.HeaderMatcher.name>` header will match, regardless of the header's
-//   value.
+//   <envoy_api_field_api.v3alpha.route.HeaderMatcher.present_match>`. i.e, a request that has the
+//   :ref:`name <envoy_api_field_api.v3alpha.route.HeaderMatcher.name>` header will match,
+//   regardless of the header's value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
 message HeaderMatcher {
@@ -1239,7 +1245,7 @@ message HeaderMatcher {
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex.
-    type.matcher.RegexMatcher safe_regex_match = 11;
+    type.matcher.v3alpha.RegexMatcher safe_regex_match = 11;
 
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
@@ -1252,7 +1258,7 @@ message HeaderMatcher {
     //
     // * For range [-10,0), route will match for header value -1, but not for 0, "somestring", 10.9,
     //   "-1somestring"
-    type.Int64Range range_match = 6;
+    type.v3alpha.Int64Range range_match = 6;
 
     // If specified, header match will be performed based on whether the header is in the
     // request.
@@ -1297,7 +1303,8 @@ message QueryParameterMatcher {
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
-    type.matcher.StringMatcher string_match = 5 [(validate.rules).message = {required: true}];
+    type.matcher.v3alpha.StringMatcher string_match = 5
+        [(validate.rules).message = {required: true}];
 
     // Specifies whether a query parameter should be present.
     bool present_match = 6;

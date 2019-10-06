@@ -13,7 +13,7 @@ api_proto_package(
         "//envoy/api/v3alpha/endpoint:pkg",
         "//envoy/api/v3alpha/listener:pkg",
         "//envoy/api/v3alpha/route:pkg",
-        "//envoy/config/listener/v3alpha:pkg",
-        "//envoy/type:pkg",
+        "//envoy/config/listener/v2:pkg",
+        "//envoy/type/v3alpha:pkg",
     ],
 )
