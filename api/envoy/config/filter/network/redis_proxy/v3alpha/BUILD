@@ -1,19 +1,10 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "api_proto_package")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
-        "//envoy/api/v3alpha/core",
-        "//envoy/type",
-    ],
-)
-
-api_proto_library_internal(
-    name = "redis_proxy",
-    srcs = ["redis_proxy.proto"],
-    deps = [
-        "//envoy/api/v3alpha/core:base",
-        "//envoy/type:percent",
+        "//envoy/api/v3alpha/core:pkg",
+        "//envoy/type:pkg",
     ],
 )

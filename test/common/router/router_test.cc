@@ -7,6 +7,7 @@
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/http/context_impl.h"
+#include "common/network/application_protocol.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
@@ -4236,6 +4237,40 @@ TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
   auto options = router_.upstreamSocketOptions();
 
   EXPECT_EQ(to_return, options);
+}
+
+TEST_F(RouterTest, ApplicationProtocols) {
+  callbacks_.streamInfo().filterState().setData(
+      Network::ApplicationProtocols::key(),
+      std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
+            return &cm_.conn_pool_;
+          }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(span_, injectContext(_));
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
 class WatermarkTest : public RouterTest {

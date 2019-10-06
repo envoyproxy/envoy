@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
+#include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
@@ -1250,6 +1251,42 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
             EXPECT_NE(transport_socket_options, nullptr);
             EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
             EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
+            return nullptr;
+          }));
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
+}
+
+// Test that the tcp proxy override ALPN from FilterState if set
+TEST_F(TcpProxyRoutingTest, ApplicationProtocols) {
+  setup();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData(
+      Network::ApplicationProtocols::key(),
+      std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  // Expect filter to try to open a connection to a cluster with the transport socket options with
+  // override-application-protocol
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
             return nullptr;
           }));
 

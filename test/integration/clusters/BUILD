@@ -16,7 +16,7 @@ envoy_cc_test_library(
         "custom_static_cluster.h",
     ],
     deps = [
-        ":cluster_factory_config_proto_cc",
+        ":cluster_factory_config_proto_cc_proto",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_factory_interface",
