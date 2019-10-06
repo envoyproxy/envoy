@@ -155,25 +155,16 @@ protected:
     if (process_object_ != nullptr) {
       process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
     }
-    if (use_intializing_instance) {
-      server_ = std::make_unique<InstanceImpl>(
-          initialzing_manager_, options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-          std::move(process_context_));
+    init_manager_ = use_intializing_instance ? std::make_unique<InitializingInitManager>("Server")
+                                             : std::make_unique<Init::ManagerImpl>("Server");
 
-    } else {
-      server_ = std::make_unique<InstanceImpl>(
-          init_manager_, options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-          std::move(process_context_));
-    }
-
+    server_ = std::make_unique<InstanceImpl>(
+        *init_manager_, options_, test_time_.timeSystem(),
+        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+        std::move(process_context_));
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
@@ -185,8 +176,9 @@ protected:
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
-        init_manager_, options_, test_time_.timeSystem(),
+        *init_manager_, options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
@@ -235,10 +227,7 @@ protected:
   DangerousDeprecatedTestTime test_time_;
   ProcessObject* process_object_ = nullptr;
   std::unique_ptr<ProcessContextImpl> process_context_;
-
-  // union
-  Init::ManagerImpl init_manager_{"Server"};
-  InitializingInitManager initialzing_manager_{"Server"};
+  std::unique_ptr<Init::Manager> init_manager_;
 
   std::unique_ptr<InstanceImpl> server_;
 };
@@ -767,7 +756,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
-          init_manager_, options_, test_time_.timeSystem(),
+          *init_manager_, options_, test_time_.timeSystem(),
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
