@@ -173,7 +173,7 @@ TEST_F(ClusterTest, InvalidLbContext) {
 }
 
 // Verify that using 'sni' causes a failure.
-TEST_F(ClusterTest, InvalidSNI) {
+TEST_F(ClusterTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -197,7 +197,7 @@ tls_context:
 }
 
 // Verify that using 'verify_subject_alt_name' causes a failure.
-TEST_F(ClusterTest, InvalidVerifySubjectAltName) {
+TEST_F(ClusterTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName)) {
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s

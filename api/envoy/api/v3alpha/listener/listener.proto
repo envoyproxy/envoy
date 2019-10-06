@@ -159,11 +159,12 @@ message FilterChainMatch {
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
 // various other parameters.
 message FilterChain {
+  reserved 2;
+
+  reserved "tls_context";
+
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;
-
-  // The TLS context for this filter chain.
-  auth.DownstreamTlsContext tls_context = 2;
 
   // A list of individual network filters that make up the filter chain for
   // connections established with the listener. Order matters as the filters are

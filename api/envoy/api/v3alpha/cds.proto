@@ -446,7 +446,9 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  reserved 12, 15;
+  reserved 12, 15, 11;
+
+  reserved "tls_context";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket* in the
@@ -575,16 +577,6 @@ message Cluster {
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   cluster.CircuitBreakers circuit_breakers = 10;
-
-  // The TLS configuration for connections to the upstream cluster. If no TLS
-  // configuration is specified, TLS will not be used for new connections.
-  //
-  // .. attention::
-  //
-  //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
-  //   verification.
-  auth.UpstreamTlsContext tls_context = 11;
 
   // Additional options when handling HTTP requests. These options will be applicable to both
   // HTTP1 and HTTP2 requests.
