@@ -17,7 +17,7 @@ envoy_cc_library(
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
-        "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:injected_resource_cc",
+        "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:pkg_cc_proto",
     ],
 )
 
