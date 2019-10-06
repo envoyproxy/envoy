@@ -214,6 +214,13 @@ modify different aspects of the server:
    :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in :ref:`Listener <envoy_api_msg_Listener>` 
    is used to determine whether a listener is inbound or outbound.
 
+.. attention::
+
+   This operation directly stops the listeners on workers. There is a potential race condition, where the listeners that are being 
+   stopped here, might have got updated configuration from management server and there by may be in warming state and that
+   might add them back to workers. As this operation is typically used when an Envoy is terminating, this specific edge case has not
+   been handled.
+
 .. http:get:: /server_info
 
   Outputs a JSON message containing information about the running server.
