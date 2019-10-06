@@ -70,7 +70,7 @@ envoy_cc_fuzz_test(
     srcs = ["codec_impl_fuzz_test.cc"],
     corpus = "codec_impl_corpus",
     deps = [
-        ":codec_impl_fuzz_proto_cc",
+        ":codec_impl_fuzz_proto_cc_proto",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
@@ -143,7 +143,7 @@ envoy_cc_fuzz_test(
     srcs = ["conn_manager_impl_fuzz_test.cc"],
     corpus = "conn_manager_impl_corpus",
     deps = [
-        ":conn_manager_impl_fuzz_proto_cc",
+        ":conn_manager_impl_fuzz_proto_cc_proto",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
@@ -162,7 +162,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 
@@ -271,7 +271,7 @@ envoy_cc_fuzz_test(
     srcs = ["header_map_impl_fuzz_test.cc"],
     corpus = "header_map_impl_corpus",
     deps = [
-        ":header_map_impl_fuzz_proto_cc",
+        ":header_map_impl_fuzz_proto_cc_proto",
         "//source/common/http:header_map_lib",
         "//test/fuzz:utility_lib",
     ],
@@ -308,7 +308,7 @@ envoy_cc_fuzz_test(
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
     deps = [
-        ":utility_fuzz_proto_cc",
+        ":utility_fuzz_proto_cc_proto",
         "//source/common/http:utility_lib",
         "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
@@ -327,7 +327,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:protocol_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

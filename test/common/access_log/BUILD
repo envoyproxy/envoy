@@ -23,7 +23,7 @@ envoy_cc_fuzz_test(
     srcs = ["access_log_formatter_fuzz_test.cc"],
     corpus = "access_log_formatter_corpus",
     deps = [
-        ":access_log_formatter_fuzz_proto_cc",
+        ":access_log_formatter_fuzz_proto_cc_proto",
         "//source/common/access_log:access_log_formatter_lib",
         "//test/fuzz:utility_lib",
     ],

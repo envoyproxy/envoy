@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["extractor.h"],
     deps = [
         "//source/common/http:utility_lib",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -29,7 +29,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -93,7 +93,7 @@ envoy_cc_library(
         ":authenticator_lib",
         ":extractor_lib",
         "//include/envoy/http:header_map_interface",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
