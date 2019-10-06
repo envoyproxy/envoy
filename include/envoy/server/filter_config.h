@@ -312,18 +312,6 @@ public:
   ~NamedNetworkFilterConfigFactory() override = default;
 
   /**
-   * Create a particular network filter factory implementation. If the implementation is unable to
-   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
-   * of general error or a Json::Exception if the json configuration is erroneous. The returned
-   * callback should always be initialized.
-   * @param config supplies the general json configuration for the filter
-   * @param context supplies the filter's context.
-   * @return Network::FilterFactoryCb the factory creation function.
-   */
-  virtual Network::FilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                       FactoryContext& context) PURE;
-
-  /**
    * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
    * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
    */
@@ -389,21 +377,6 @@ public:
 class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   ~NamedHttpFilterConfigFactory() override = default;
-
-  /**
-   * Create a particular http filter factory implementation. If the implementation is unable to
-   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
-   * of
-   * general error or a Json::Exception if the json configuration is erroneous. The returned
-   * callback should always be initialized.
-   * @param config supplies the general json configuration for the filter
-   * @param stat_prefix prefix for stat logging
-   * @param context supplies the filter's context.
-   * @return Http::FilterFactoryCb the factory creation function.
-   */
-  virtual Http::FilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                    const std::string& stat_prefix,
-                                                    FactoryContext& context) PURE;
 
   /**
    * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This

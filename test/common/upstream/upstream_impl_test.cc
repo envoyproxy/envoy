@@ -11,7 +11,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
-#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
@@ -2143,10 +2142,6 @@ public:
   TestNetworkFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
@@ -2171,10 +2166,6 @@ public:
   TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
-                                            Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {

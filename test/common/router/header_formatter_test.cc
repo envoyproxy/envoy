@@ -5,7 +5,6 @@
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"

@@ -5,7 +5,6 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"

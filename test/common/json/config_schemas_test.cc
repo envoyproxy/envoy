@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "common/common/fmt.h"
-#include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/stats/isolated_store_impl.h"
 

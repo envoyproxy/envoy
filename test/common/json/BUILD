@@ -16,7 +16,6 @@ envoy_cc_test(
         "//test/common/json/config_schemas_test_data:generate_test_data",
     ],
     deps = [
-        "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/test_common:environment_lib",
