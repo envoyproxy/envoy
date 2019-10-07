@@ -754,6 +754,7 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 // an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
           *init_manager_, options_, test_time_.timeSystem(),
