@@ -196,7 +196,7 @@ private:
   ListenerList warming_listeners_;
 
   // Stopped listeners are listeners that were stopped by invoking drain listeners admin endpoint.
-  std::list<std::string> stopped_listeners_;
+  std::list<std::string> stopped_listeners_{};
 
   // Draining listeners are listeners that are in the process of being drained and removed. They
   // go through two phases where first the workers stop accepting new connections and existing
