@@ -28,7 +28,7 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
     ],
 )
 

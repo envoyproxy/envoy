@@ -28,7 +28,7 @@ envoy_cc_library(
     deps = [
         ":async_client_interface",
         "//include/envoy/stats:stats_interface",
-        "@envoy_api//envoy/api/v2/core:grpc_service_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -49,7 +49,7 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/api:api_interface",
-        "@envoy_api//envoy/api/v2/core:grpc_service_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
