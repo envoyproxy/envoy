@@ -277,15 +277,10 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   ret.accept_http_10_ = config.accept_http_10();
   ret.default_host_for_http_10_ = config.default_host_for_http_10();
 
-  switch (config.response_header_key_format().header_format()) {
-  case envoy::api::v2::core::Http1ProtocolOptions_HeaderKeyFormat::DEFAULT:
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
-    break;
-  case envoy::api::v2::core::Http1ProtocolOptions_HeaderKeyFormat::TRAIN_CASE:
+  if (config.response_header_key_format().has_train_case()) {
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::TrainCase;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  } else {
+    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
   }
 
   return ret;
