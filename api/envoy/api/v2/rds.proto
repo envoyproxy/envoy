@@ -108,7 +108,7 @@ message RouteConfiguration {
   // routed by the HTTP connection manager.
   repeated string request_headers_to_remove = 8;
 
-  // By default, headers that should be added/removed are evaluated in the following order:
+  // By default, headers that should be added/removed are evaluated from most to least specific:
   //
   // * route level
   // * virtual host level
@@ -118,7 +118,7 @@ message RouteConfiguration {
   // by setting this option to true. Defaults to false.
   //
   // Note: in the v3 API, this will default to true.
-  bool eval_most_specific_header_mutations_first = 10;
+  bool most_specific_header_mutations_wins = 10;
 
   // An optional boolean that specifies whether the clusters that the route
   // table refers to will be validated by the cluster manager. If set to true

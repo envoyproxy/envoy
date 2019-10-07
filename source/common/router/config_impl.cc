@@ -383,14 +383,14 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
-  if (!vhost_.globalRouteConfig().evalMostSpecificHeaderMutationsFirst()) {
-    // Append user-specified request headers in the following order: route-level headers, virtual
-    // host level headers and finally global connection manager level headers.
+  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
+    // Append user-specified request headers from most to least specific: route-level headers,
+    // virtual host level headers and finally global connection manager level headers.
     request_headers_parser_->evaluateHeaders(headers, stream_info);
     vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
     vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
   } else {
-    // Reverse order evaluation.
+    // Most specific mutations take precedence.
     vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
     vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
     request_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -416,14 +416,14 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  if (!vhost_.globalRouteConfig().evalMostSpecificHeaderMutationsFirst()) {
-    // Append user-specified request headers in the following order: route-level headers, virtual
-    // host level headers and finally global connection manager level headers.
+  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
+    // Append user-specified request headers from most to least specific: route-level headers,
+    // virtual host level headers and finally global connection manager level headers.
     response_headers_parser_->evaluateHeaders(headers, stream_info);
     vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
     vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
   } else {
-    // Reverse order evaluation.
+    // Most specific mutations take precedence.
     vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
     vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
     response_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -1085,8 +1085,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
-      uses_vhds_(config.has_vhds()), eval_most_specific_header_mutations_first_(
-                                         config.eval_most_specific_header_mutations_first()) {
+      uses_vhds_(config.has_vhds()),
+      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));

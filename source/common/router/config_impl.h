@@ -804,8 +804,8 @@ public:
 
   bool usesVhds() const override { return uses_vhds_; }
 
-  bool evalMostSpecificHeaderMutationsFirst() const override {
-    return eval_most_specific_header_mutations_first_;
+  bool mostSpecificHeaderMutationsWins() const override {
+    return most_specific_header_mutations_wins_;
   }
 
 private:
@@ -816,7 +816,7 @@ private:
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
   const bool uses_vhds_;
-  const bool eval_most_specific_header_mutations_first_;
+  const bool most_specific_header_mutations_wins_;
 };
 
 /**
@@ -833,7 +833,7 @@ public:
 
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
-  bool evalMostSpecificHeaderMutationsFirst() const override { return false; }
+  bool mostSpecificHeaderMutationsWins() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

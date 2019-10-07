@@ -107,7 +107,7 @@ protected:
     return factory_context_.scope().symbolTable().toString(name);
   }
 
-  std::string responseHeadersConfig(const bool reverse, const bool append) const {
+  std::string responseHeadersConfig(const bool most_specific_wins, const bool append) const {
     const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -187,13 +187,13 @@ response_headers_to_add:
       value: global1
     append: {1}
 response_headers_to_remove: ["x-global-remove"]
-eval_most_specific_header_mutations_first: {0}
+most_specific_header_mutations_wins: {0}
 )EOF";
 
-    return fmt::format(yaml, reverse, append);
+    return fmt::format(yaml, most_specific_wins, append);
   }
 
-  std::string requestHeadersConfig(const bool reverse) {
+  std::string requestHeadersConfig(const bool most_specific_wins) {
     const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -245,10 +245,10 @@ request_headers_to_add:
       value: global
     append: false
 request_headers_to_remove: ["x-global-nope"]
-eval_most_specific_header_mutations_first: {0}
+most_specific_header_mutations_wins: {0}
 )EOF";
 
-    return fmt::format(yaml, reverse);
+    return fmt::format(yaml, most_specific_wins);
   }
 
   Stats::TestSymbolTable symbol_table_;
@@ -1215,7 +1215,7 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
   }
 }
 
-TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseReverse) {
+TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins) {
   const std::string yaml = requestHeadersConfig(true);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
@@ -1332,7 +1332,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
               ContainerEq(config.internalOnlyHeaders()));
 }
 
-TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalseReverse) {
+TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
   const std::string yaml = responseHeadersConfig(true, false);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
@@ -1372,7 +1372,7 @@ response_headers_to_add:
   - header:
       key: cache-control
       value: private
-eval_most_specific_header_mutations_first: true
+most_specific_header_mutations_wins: true
 )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 

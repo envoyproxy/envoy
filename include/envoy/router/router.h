@@ -854,11 +854,11 @@ public:
   virtual bool usesVhds() const PURE;
 
   /**
-   * @return bool whether to reverse the header evaluation order when adding or
-   * removing headers. The default evaluation order is route level, then virtual host
-   * level and finally global connection manager level.
+   * @return bool whether most specific header mutations should take precedence. The default
+   * evaluation order is route level, then virtual host level and finally global connection
+   * manager level.
    */
-  virtual bool evalMostSpecificHeaderMutationsFirst() const PURE;
+  virtual bool mostSpecificHeaderMutationsWins() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
