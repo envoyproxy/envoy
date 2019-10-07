@@ -185,6 +185,12 @@ scope_key_builder:
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
     resources.Add()->PackFrom(TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(
         fmt::format(route_config_tmpl, route_config_name)));
+    std::vector<std::string> subs;
+    for (const auto kv : rds_subscription_by_name_) {
+      subs.push_back(kv.first);
+    }
+    ENVOY_LOG_MISC(error, "push rds {},  subscriptions {}", route_config_name,
+                   absl::StrJoin(subs, ", "));
     rds_subscription_by_name_[route_config_name]->onConfigUpdate(resources, version);
   }
 

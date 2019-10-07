@@ -116,7 +116,7 @@ http_filters:
 
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr rds_;
+  RouteConfigProviderSharedPtr rds_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -286,7 +286,7 @@ public:
 
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr provider_;
+  RouteConfigProviderSharedPtr provider_;
 };
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -425,11 +425,15 @@ virtual_hosts:
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "1");
 
-  RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, mock_factory_context_, "foo_prefix", outer_init_manager_, false);
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds_, mock_factory_context_, "foo_prefix", outer_init_manager_, false);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
+
+  EXPECT_EQ(provider_.get(), provider2.get())
+      << "same rds config provider object should be generate";
 
   // So this means that both provider have same subscription.
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
@@ -439,8 +443,10 @@ virtual_hosts:
   envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
-  RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager(), false);
+
+  RouteConfigProviderSharedPtr provider3 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager(), false);
   EXPECT_NE(provider3, provider_);
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "provider3");

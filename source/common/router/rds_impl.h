@@ -41,10 +41,10 @@ class ScopedRdsConfigSubscription;
 class RouteConfigProviderUtil {
 public:
   /**
-   * @return RouteConfigProviderPtr a new route configuration provider based on the supplied proto
-   *         configuration.
+   * @return RouteConfigProviderSharedPtr a new route configuration provider based on the supplied
+   * proto configuration.
    */
-  static RouteConfigProviderPtr
+  static RouteConfigProviderSharedPtr
   create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
              config,
          Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
@@ -146,7 +146,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
   Init::Manager& init_manager_;
-  Init::TargetImpl init_target_;
+  Init::SharedTargetImpl init_target_;
   Stats::ScopePtr scope_;
   std::string stat_prefix_;
   RdsStats stats_;
@@ -210,7 +210,7 @@ public:
   std::unique_ptr<envoy::admin::v2alpha::RoutesConfigDump> dumpRouteConfigs() const;
 
   // RouteConfigProviderManager
-  RouteConfigProviderPtr createRdsRouteConfigProvider(
+  RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager, bool is_delta) override;
@@ -223,8 +223,8 @@ private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque.
-  std::unordered_map<uint64_t, std::weak_ptr<RdsRouteConfigSubscription>>
-      route_config_subscriptions_;
+  std::unordered_map<uint64_t, std::weak_ptr<RdsRouteConfigProviderImpl>>
+      dynamic_route_config_providers_;
   std::unordered_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
