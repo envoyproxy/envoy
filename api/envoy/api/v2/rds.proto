@@ -116,6 +116,8 @@ message RouteConfiguration {
   //
   // To allow setting overrides at the route or virtual host level, this order can be reversed
   // by setting this option to true. Defaults to false.
+  //
+  // Note: in the v3 API, this will default to true.
   bool eval_most_specific_header_mutations_first = 10;
 
   // An optional boolean that specifies whether the clusters that the route
