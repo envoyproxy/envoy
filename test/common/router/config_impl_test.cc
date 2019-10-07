@@ -1219,9 +1219,7 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
   const std::string yaml = requestHeadersConfig(true);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
-
-  TestConfigImpl config(route_config, factory_context_, true);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
   // Route overrides vhost and global.
   {
