@@ -143,9 +143,10 @@ public:
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
 
-	static void trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry);
+  static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+                                  TimeoutData& timeout);
 
-	/**
+  /**
    * Determine the final hedging settings after applying randomized behavior.
    * @param route supplies the request route.
    * @param request_headers supplies the request headers.
