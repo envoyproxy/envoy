@@ -51,13 +51,11 @@ envoy_cmake_external(
     cache_entries = {
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
-        "CARES_MSVC_STATIC_RUNTIME": "on",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
-    copy_pdb = True,
+    # copy_pdb = True,
     defines = ["CARES_STATICLIB"],
     lib_source = "@com_github_c_ares_c_ares//:all",
-    pdb_name = "c-ares",
+    # pdb_name = "c-ares",
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
@@ -71,13 +69,11 @@ envoy_cmake_external(
         "BUILD_CURL_EXE": "off",
         "BUILD_TESTING": "off",
         "BUILD_SHARED_LIBS": "off",
-        "CURL_STATIC_CRT": "on",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CMAKE_USE_LIBSSH2": "off",
         "CURL_BROTLI": "off",
         "CMAKE_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_INSTALL_LIBDIR": "lib",
         # C-Ares.
         "ENABLE_ARES": "on",
@@ -96,12 +92,13 @@ envoy_cmake_external(
         "CURL_ZLIB": "on",
         "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
+#       "CMAKE_CXX_COMPILER_FORCED": "on",
     },
+    # copt = ["-DNGHTTP2_STATICLIB"],
+    defines = ["CURL_STATICLIB"],
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
-        "//bazel:windows_dbg_build": ["libcurl-d.lib"],
-        "//bazel:windows_opt_build": ["libcurl.lib"],
-        "//bazel:windows_fastbuild_build": ["libcurl.lib"],
+        "//bazel:windows_x86_64": ["libcurl.lib"],
         "//conditions:default": ["libcurl.a"],
     }),
     deps = [
@@ -119,7 +116,6 @@ envoy_cmake_external(
         "EVENT__DISABLE_REGRESS": "on",
         "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",
-        "CMAKE_BUILD_TYPE": "Release",
         # Force _GNU_SOURCE on for Android builds. This would be contained in
         # a 'select' but the downstream macro uses a select on all of these
         # options, and they cannot be nested.
@@ -128,11 +124,15 @@ envoy_cmake_external(
         # More details https://github.com/lyft/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
-    copy_pdb = True,
+    # copy_pdb = True,
     lib_source = "@com_github_libevent_libevent//:all",
-    pdb_name = "event_static",
+    # pdb_name = "event_static",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["event.lib"],
+        "//bazel:windows_x86_64": [
+            "event.lib",
+            "event_core.lib",
+            "event_extra.lib",
+        ],
         "//conditions:default": [
             "libevent.a",
             "libevent_pthreads.a",
@@ -146,20 +146,18 @@ envoy_cmake_external(
         "ENABLE_LIB_ONLY": "on",
         "ENABLE_SHARED_LIB": "off",
         "ENABLE_STATIC_LIB": "on",
-        "ENABLE_STATIC_CRT": "on",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
+#       "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
-    copy_pdb = True,
+    # copy_pdb = True,
     debug_cache_entries = {"ENABLE_DEBUG": "on"},
     defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
-    pdb_name = "nghttp2_static",
+    # pdb_name = "nghttp2",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["nghttp2_static.lib"],
-        "//conditions:default": ["libnghttp2_static.a"],
+        "//bazel:windows_x86_64": ["nghttp2.lib"],
+        "//conditions:default": ["libnghttp2.a"],
     }),
 )
 
@@ -168,15 +166,10 @@ envoy_cmake_external(
     cache_entries = {
         "YAML_CPP_BUILD_TESTS": "off",
         "YAML_CPP_BUILD_TOOLS": "off",
-        "MSVC_SHARED_RT": "off",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
     static_libraries = select({
-        "//bazel:windows_dbg_build": ["libyaml-cppmtd.lib"],
-        "//bazel:windows_fastbuild_build": ["libyaml-cppmt.lib"],
-        "//bazel:windows_opt_build": ["libyaml-cppmt.lib"],
+        "//bazel:windows_x86_64": ["libyaml-cpp.lib"],
         "//conditions:default": ["libyaml-cpp.a"],
     }),
 )
@@ -184,17 +177,13 @@ envoy_cmake_external(
 envoy_cmake_external(
     name = "zlib",
     cache_entries = {
-        "ENABLE_STATIC_CRT": "on",
         "BUILD_SHARED_LIBS": "off",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
-    copy_pdb = True,
+    # copy_pdb = True,
     lib_source = "@net_zlib//:all",
-    pdb_name = "zlibstatic",
+    # pdb_name = "zlibstatic",
     static_libraries = select({
-        "//bazel:windows_dbg_build": ["zlibstaticd.lib"],
-        "//bazel:windows_fastbuild_build": ["zlibstatic.lib"],
-        "//bazel:windows_opt_build": ["zlibstatic.lib"],
+        "//bazel:windows_x86_64": ["zlibstatic.lib"],
         "//conditions:default": ["libz.a"],
     }),
 )
