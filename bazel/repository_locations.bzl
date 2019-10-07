@@ -64,10 +64,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
-        sha256 = "77876fa31d3132c8c22b81cb219eac5b1f035637d5ca48bad617380043e21ffd",
-        strip_prefix = "xxHash-6137bfc606e08c791fccab835928de7e5ed41308",
-        # 2019-07-11
-        urls = ["https://github.com/Cyan4973/xxHash/archive/6137bfc606e08c791fccab835928de7e5ed41308.tar.gz"],
+        sha256 = "afa29766cfc0448ff4a1fd9f2c47e02c48d50be5b79749925d15d545008c3f81",
+        strip_prefix = "xxHash-v0.7.1",
+        urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.1.tar.gz"],
     ),
     com_github_envoyproxy_sqlparser = dict(
         sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
