@@ -87,8 +87,7 @@ public:
         envoy_quic_session_(quic_config_, quic_version_,
                             std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
-                            &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ 1024 * 1024),
+                            &compressed_certs_cache_, *dispatcher_),
         read_filter_(new Network::MockReadFilter()) {
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
@@ -103,7 +102,7 @@ public:
   bool installReadFilter() {
     // Setup read filter.
     envoy_quic_session_.addReadFilter(read_filter_);
-    EXPECT_EQ(Http::Protocol::Http3,
+    EXPECT_EQ(Http::Protocol::Http2,
               read_filter_->callbacks_->connection().streamInfo().protocol().value());
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
@@ -115,7 +114,7 @@ public:
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
                                                                         http_connection_callbacks_);
-      EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
+      EXPECT_EQ(Http::Protocol::Http2, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
     }));
@@ -315,6 +314,7 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   // Not verifying dummy implementation, just to have coverage.
   EXPECT_DEATH(envoy_quic_session_.enableHalfClose(true), "");
   EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
+  EXPECT_DEATH(envoy_quic_session_.aboveHighWatermark(), "");
   EXPECT_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
   http_connection_->shutdownNotice();
 }
@@ -362,8 +362,6 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
                                                            Network::FilterManager& filter_manager) {
     filter_manager.addReadFilter(read_filter_);
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
-    read_filter_->callbacks_->connection().setConnectionStats(
-        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
   }};
   EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(*read_filter_, onNewConnection())

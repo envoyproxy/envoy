@@ -20,11 +20,7 @@ public:
   EnvoyQuicAlarm(Event::Dispatcher& dispatcher, const quic::QuicClock& clock,
                  quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate);
 
-  ~EnvoyQuicAlarm() override {
-    if (IsSet()) {
-      Cancel();
-    }
-  };
+  ~EnvoyQuicAlarm() override { ASSERT(!IsSet()); };
 
   // quic::QuicAlarm
   void CancelImpl() override;

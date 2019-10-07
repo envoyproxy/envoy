@@ -25,8 +25,6 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 
-#include "extensions/quic_listeners/quiche/codec_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -410,10 +408,8 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::HTTP3:
-    // TODO(danzh) same as client side. This enforce dependency on QUICHE. Is there a
-    // better way to aoivd such dependency in case QUICHE breaks this extension.
-    return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
+    // TODO(danzh) create QUIC specific codec.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
                                                            context_.scope(), http1_settings_,

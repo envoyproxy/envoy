@@ -44,8 +44,7 @@ quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
       listener_stats_);
   auto quic_session = new EnvoyQuicServerSession(
       config(), quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
-      session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
-      listener_config_.perConnectionBufferLimitBytes());
+      session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_);
   quic_session->Initialize();
   // Filter chain can't be retrieved here as self address is unknown at this
   // point.
