@@ -1223,36 +1223,34 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
 
   TestConfigImpl config(route_config, factory_context_, true);
 
+  // Route overrides vhost and global.
   {
-    // Route overrides vhost and global.
-    {
-      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
-      const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, stream_info, true);
-      // Added headers.
-      EXPECT_EQ("route-endpoint", headers.get_("x-global-header"));
-      EXPECT_EQ("route-endpoint", headers.get_("x-vhost-header"));
-      EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
-      // Removed headers.
-      EXPECT_FALSE(headers.has("x-global-nope"));
-      EXPECT_FALSE(headers.has("x-vhost-nope"));
-      EXPECT_FALSE(headers.has("x-route-nope"));
-    }
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    // Added headers.
+    EXPECT_EQ("route-endpoint", headers.get_("x-global-header"));
+    EXPECT_EQ("route-endpoint", headers.get_("x-vhost-header"));
+    EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
+    // Removed headers.
+    EXPECT_FALSE(headers.has("x-global-nope"));
+    EXPECT_FALSE(headers.has("x-vhost-nope"));
+    EXPECT_FALSE(headers.has("x-route-nope"));
+  }
 
-    // Virtual overrides global.
-    {
-      Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
-      const RouteEntry* route = config.route(headers, 0)->routeEntry();
-      route->finalizeRequestHeaders(headers, stream_info, true);
-      // Added headers.
-      EXPECT_EQ("vhost-www2", headers.get_("x-global-header"));
-      EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
-      EXPECT_FALSE(headers.has("x-route-header"));
-      // Removed headers.
-      EXPECT_FALSE(headers.has("x-global-nope"));
-      EXPECT_FALSE(headers.has("x-vhost-nope"));
-      EXPECT_TRUE(headers.has("x-route-nope"));
-    }
+  // Virtual overrides global.
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    // Added headers.
+    EXPECT_EQ("vhost-www2", headers.get_("x-global-header"));
+    EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
+    EXPECT_FALSE(headers.has("x-route-header"));
+    // Removed headers.
+    EXPECT_FALSE(headers.has("x-global-nope"));
+    EXPECT_FALSE(headers.has("x-vhost-nope"));
+    EXPECT_TRUE(headers.has("x-route-nope"));
   }
 }
 
@@ -1318,18 +1316,13 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
-  {
-    Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
-    const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
-    Http::TestHeaderMapImpl headers;
-    route->finalizeResponseHeaders(headers, stream_info);
-    EXPECT_EQ("global1", headers.get_("x-global-header1"));
-    EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
-    EXPECT_EQ("route-override", headers.get_("x-route-header"));
-  }
-
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
-              ContainerEq(config.internalOnlyHeaders()));
+  Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+  const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+  Http::TestHeaderMapImpl headers;
+  route->finalizeResponseHeaders(headers, stream_info);
+  EXPECT_EQ("global1", headers.get_("x-global-header1"));
+  EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
+  EXPECT_EQ("route-override", headers.get_("x-route-header"));
 }
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
@@ -1338,18 +1331,13 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
-  {
-    Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
-    const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
-    Http::TestHeaderMapImpl headers;
-    route->finalizeResponseHeaders(headers, stream_info);
-    EXPECT_EQ("route-override", headers.get_("x-global-header1"));
-    EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
-    EXPECT_EQ("route-override", headers.get_("x-route-header"));
-  }
-
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
-              ContainerEq(config.internalOnlyHeaders()));
+  Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+  const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+  Http::TestHeaderMapImpl headers;
+  route->finalizeResponseHeaders(headers, stream_info);
+  EXPECT_EQ("route-override", headers.get_("x-global-header1"));
+  EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+  EXPECT_EQ("route-override", headers.get_("x-route-header"));
 }
 
 TEST_F(RouteMatcherTest, TestAddGlobalResponseHeaderRemoveFromRoute) {
