@@ -12,6 +12,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
+#include "common/runtime/runtime_features.h"
 
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -32,25 +33,14 @@ public:
       Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
 
-  // Returns whether the filter is enabled or should operate as a pass-through for a request.
-  bool filterEnabled() const {
-    // RuntimeFeatureFlag proto validates that the runtime key must have at least a single
-    // character. If the key is empty, the field was never specified.
-    if (enabled_runtime_key_.empty()) {
-      return true;
-    }
-
-    return runtime_.snapshot().getBoolean(enabled_runtime_key_, enabled_default_value_);
-  }
-
+  bool filterEnabled() const { return adaptive_concurrency_feature_.enabled(); }
   TimeSource& timeSource() const { return time_source_; }
 
 private:
   const std::string stats_prefix_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
-  const std::string enabled_runtime_key_;
-  const bool enabled_default_value_;
+  Runtime::FeatureFlag adaptive_concurrency_feature_;
 };
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =

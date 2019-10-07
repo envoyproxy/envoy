@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/runtime/runtime.h"
+
 #include "common/singleton/const_singleton.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -34,6 +36,20 @@ private:
 };
 
 using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
+
+// Helper class for runtime-derived boolean feature flags.
+class FeatureFlag {
+public:
+  FeatureFlag(std::string runtime_key, bool default_value, Runtime::Loader& runtime)
+      : runtime_key_(std::move(runtime_key)), default_value_(default_value), runtime_(runtime) {}
+
+  bool enabled() const { return runtime_.snapshot().getBoolean(runtime_key_, default_value_); }
+
+private:
+  std::string runtime_key_;
+  bool default_value_;
+  Runtime::Loader& runtime_;
+};
 
 } // namespace Runtime
 } // namespace Envoy
