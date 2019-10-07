@@ -86,6 +86,8 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
+  // Higher layers expect calling resetStream() to immediately raise reset callbacks.
+  runResetCallbacks(reason);
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
     // of propagating original reset reason.
