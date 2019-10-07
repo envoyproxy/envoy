@@ -173,6 +173,10 @@ def envoy_dependencies(skip_targets = []):
             "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
         },
     )
+    native.bind(
+        name = "bazel_runfiles",
+        actual = "@bazel_tools//tools/cpp/runfiles",
+    )
 
 def _boringssl():
     _repository_impl("boringssl")
