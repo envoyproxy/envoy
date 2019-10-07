@@ -162,27 +162,21 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     Http::HeaderEntry* header_expected_timeout_entry =
         request_headers.EnvoyExpectedRequestTimeoutMs();
     if (header_expected_timeout_entry) {
-      if (absl::SimpleAtoi(header_expected_timeout_entry->value().getStringView(),
-                           &header_timeout)) {
-        timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
-      }
+			trySetGlobalTimeout(header_expected_timeout_entry);
     } else {
       Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
-      if (header_timeout_entry) {
-        if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
-          timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
-        }
-        request_headers.removeEnvoyUpstreamRequestTimeoutMs();
-      }
+
+			if (trySetGlobalTimeout(header_timeout_entry)) {
+				request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+			}
+
     }
   } else {
     Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
-    if (header_timeout_entry) {
-      if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
-        timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
-      }
-      request_headers.removeEnvoyUpstreamRequestTimeoutMs();
-    }
+		 if (trySetGlobalTimeout(header_timeout_entry)) {
+			 request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+		 }
+
   }
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
@@ -221,6 +215,17 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
 
   return timeout;
+}
+
+bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry) {
+	if (header_timeout_entry) {
+		uint64_t header_timeout;
+		if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
+			timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
+			return true;
+		}
+	}
+	return false;
 }
 
 FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
