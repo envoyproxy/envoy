@@ -308,5 +308,22 @@ bool Utility::allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Obje
   return true;
 }
 
+BackOffStrategyPtr Utility::prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
+                                                      const uint64_t dns_refresh_rate_ms,
+                                                      Runtime::RandomGenerator& random) {
+  if (cluster.has_dns_failure_refresh_rate()) {
+    uint64_t base_interval_ms =
+        PROTOBUF_GET_MS_REQUIRED(cluster.dns_failure_refresh_rate(), base_interval);
+    uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(cluster.dns_failure_refresh_rate(),
+                                                          max_interval, base_interval_ms * 10);
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("cluster.dns_failure_refresh_rate must have max_interval greater than "
+                           "or equal to the base_interval");
+    }
+    return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+  }
+  return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
+}
+
 } // namespace Config
 } // namespace Envoy

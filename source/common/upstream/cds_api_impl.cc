@@ -15,19 +15,22 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
+// TODO(fredlas) the is_delta argument can be removed upon delta+SotW ADS Envoy code unification. It
+// is only actually needed to choose the grpc_method, which is irrelevant if ADS is used.
+CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                              ClusterManager& cm, Stats::Scope& scope,
                              ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
+  return CdsApiPtr{new CdsApiImpl(cds_config, is_delta, cm, scope, validation_visitor)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
+CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+                       ClusterManager& cm, Stats::Scope& scope,
+                       ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
       cds_config, Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      *scope_, *this);
+      *scope_, *this, is_delta);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -56,8 +59,12 @@ void CdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
-  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+  std::unique_ptr<Cleanup> maybe_eds_resume;
+  if (cm_.adsMux()) {
+    cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
+    maybe_eds_resume = std::make_unique<Cleanup>(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+  }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
             removed_resources.size());

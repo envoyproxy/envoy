@@ -39,6 +39,7 @@ using testing::_;
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
@@ -235,6 +236,9 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
     connect_timeout: 0.25s
     type: strict_dns
     dns_refresh_rate: 4s
+    dns_failure_refresh_rate:
+      base_interval: 7s
+      max_interval: 10s
     lb_policy: round_robin
     circuit_breakers:
       thresholds:
@@ -348,6 +352,26 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
     EXPECT_EQ(cluster.info().get(), &host->cluster());
   }
+
+  // Empty response.
+  resolver1.expectResolve(*dns_resolver_);
+  resolver1.timer_->invokeCallback();
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(membership_updated, ready());
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({}));
+  EXPECT_THAT(
+      std::list<std::string>({"10.0.0.1:11002"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  resolver2.expectResolve(*dns_resolver_);
+  resolver2.timer_->invokeCallback();
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(8000), _));
+  EXPECT_CALL(membership_updated, ready());
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({}));
+  EXPECT_THAT(
+      std::list<std::string>({}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   // Make sure we cancel.
   resolver1.expectResolve(*dns_resolver_);
@@ -496,6 +520,9 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
     dns_lookup_family: V4_ONLY
     connect_timeout: 0.25s
     dns_refresh_rate: 4s
+    dns_failure_refresh_rate:
+      base_interval: 7s
+      max_interval: 10s
 
     lb_policy: ROUND_ROBIN
 
@@ -702,11 +729,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
         }
       });
 
-  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(1000), _));
   EXPECT_CALL(membership_updated, ready());
   resolver2.dns_callback_(TestUtility::makeDnsResponse({}));
 
-  EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(8000), _));
   EXPECT_CALL(membership_updated, ready());
   resolver3.dns_callback_(TestUtility::makeDnsResponse({}));
 

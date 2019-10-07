@@ -49,6 +49,13 @@ message GradientControllerConfig {
     // The number of requests to aggregate/sample during the minRTT recalculation window before
     // updating. Defaults to 50.
     google.protobuf.UInt32Value request_count = 2 [(validate.rules).uint32.gt = 0];
+
+    // Randomized time delta that will be introduced to the start of the minRTT calculation window.
+    // This is represented as a percentage of the interval duration. Defaults to 15%.
+    //
+    // Example: If the interval is 10s and the jitter is 15%, the next window will begin
+    // somewhere in the range (10s - 11.5s).
+    envoy.type.Percent jitter = 3;
   };
   MinimumRTTCalculationParams min_rtt_calc_params = 3 [(validate.rules).message.required = true];
 }

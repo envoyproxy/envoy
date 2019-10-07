@@ -19,7 +19,7 @@ envoy_cc_library(
         "//source/common/compressor:compressor_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/common/compressor:compressor_lib",
-        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
+        "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
     ],
 )
 

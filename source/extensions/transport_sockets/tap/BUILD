@@ -27,7 +27,7 @@ envoy_cc_library(
         ":tap_config_interface",
         "//source/common/network:utility_lib",
         "//source/extensions/common/tap:tap_config_base",
-        "@envoy_api//envoy/data/tap/v2alpha:wrapper_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -40,7 +40,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:extension_config_base",
-        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",
+        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -57,6 +57,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",
+        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:pkg_cc_proto",
     ],
 )

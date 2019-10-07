@@ -569,7 +569,7 @@ struct HeterogeneousStatNameHash {
   // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
   // official reference, and https://abseil.io/tips/144 for a description of
   // using it in the context of absl.
-  using is_transparent = void;
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
 
   size_t operator()(StatName a) const { return a.hash(); }
   size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
@@ -577,7 +577,7 @@ struct HeterogeneousStatNameHash {
 
 struct HeterogeneousStatNameEqual {
   // See description for HeterogeneousStatNameHash::is_transparent.
-  using is_transparent = void;
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
 
   size_t operator()(StatName a, StatName b) const { return a == b; }
   size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
@@ -598,7 +598,7 @@ class StatNameStorageSet {
 public:
   using HashSet =
       absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
-  using iterator = HashSet::iterator;
+  using Iterator = HashSet::iterator;
 
   ~StatNameStorageSet();
 
@@ -620,12 +620,12 @@ public:
    * @param stat_name The stat_name to find.
    * @return the iterator pointing to the stat_name, or end() if not found.
    */
-  iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+  Iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
 
   /**
    * @return the end-marker.
    */
-  iterator end() { return hash_set_.end(); }
+  Iterator end() { return hash_set_.end(); }
 
   /**
    * @param set the storage set to swap with.

@@ -69,6 +69,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
     : retriable_headers_(
           Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
+      retriable_request_headers_(
+          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_request_headers())),
       validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
@@ -445,11 +447,14 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,
-                                                         const absl::string_view& new_scheme,
-                                                         const absl::string_view& new_port) const {
+                                                         absl::string_view new_scheme,
+                                                         absl::string_view new_port) const {
 
   absl::string_view request_host = headers.Host()->value().getStringView();
   size_t host_end;
+  if (request_host.empty()) {
+    return request_host;
+  }
   // Detect if IPv6 URI
   if (request_host[0] == '[') {
     host_end = request_host.rfind("]:");
