@@ -96,6 +96,14 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 // is similar in principle to Chromium's LOG(DFATAL):
 // https://chromium.googlesource.com/chromium/src/+/master/base/logging.h#149
 #define ASSERT_OR_LOG(expr) ASSERT(expr, "ASSERT_OR_LOG()")
+
+// Variant of ASSERT_OR_LOG where the call-site can specify an action to
+// take after logging, when compiled for optimization. The action might
+// be something like:
+//   - return from function
+//   - throw an exception
+//   - increment a stat counter
+//   - break out of a loop.
 #define ASSERT_OR_LOG_AND(expr, escape) ASSERT(expr, "ASSERT_OR_LOG_AND(" #escape ")")
 
 #else
@@ -108,13 +116,14 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
     (void)__assert_dummy_variable;                                                                 \
   } while (false)
 
-// When compiled for optimization, ASSERT_OR_LOG logs an error.
+// When compiled for optimization, ASSERT_OR_LOG logs an error. See above for doc.
 #define ASSERT_OR_LOG(expr) ENVOY_LOG_MISC(error, "ASSERT_OR_LOG({})", #expr)
 
 // Note that ASSERT_OR_LOG_AND's multi-line definition is not wrapped in a
 // do/while because it's possible the caller may want to use 'break' as the
-// escape. This is OK because Envoy style is to use braces for all conditionals,
-// so there can be no mistaken binding of a trailing else.
+// escape. This is safe because Envoy's enforced style is to use braces for all
+// conditionals, so there can be no mistaken binding of a trailing else. See
+// above for doc.
 #define ASSERT_OR_LOG_AND(expr, escape)                                                            \
   if (!(expr)) {                                                                                   \
     ENVOY_LOG_MISC(error, "ASSERT_OR_LOG_AND({}, {})", #expr, #escape);                            \
