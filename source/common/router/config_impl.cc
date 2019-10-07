@@ -383,7 +383,7 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
-  if (!vhost_.globalRouteConfig().reverseHeaderEvaluationOrder()) {
+  if (!vhost_.globalRouteConfig().evalMostSpecificHeaderMutationsFirst()) {
     // Append user-specified request headers in the following order: route-level headers, virtual
     // host level headers and finally global connection manager level headers.
     request_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -416,7 +416,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  if (!vhost_.globalRouteConfig().reverseHeaderEvaluationOrder()) {
+  if (!vhost_.globalRouteConfig().evalMostSpecificHeaderMutationsFirst()) {
     // Append user-specified request headers in the following order: route-level headers, virtual
     // host level headers and finally global connection manager level headers.
     response_headers_parser_->evaluateHeaders(headers, stream_info);
@@ -1086,7 +1086,7 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
       uses_vhds_(config.has_vhds()),
-      reverse_header_evaluation_order_(config.reverse_header_evaluation_order()) {
+      eval_most_specific_header_mutations_first_(config.eval_most_specific_header_mutations_first()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));

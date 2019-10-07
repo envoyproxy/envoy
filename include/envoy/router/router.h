@@ -858,7 +858,7 @@ public:
    * removing headers. The default evaluation order is route level, then virtual host
    * level and finally global connection manager level.
    */
-  virtual bool reverseHeaderEvaluationOrder() const PURE;
+  virtual bool evalMostSpecificHeaderMutationsFirst() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

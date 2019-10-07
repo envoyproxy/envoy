@@ -187,7 +187,7 @@ response_headers_to_add:
       value: global1
     append: {1}
 response_headers_to_remove: ["x-global-remove"]
-reverse_header_evaluation_order: {0}
+eval_most_specific_header_mutations_first: {0}
 )EOF";
 
     return fmt::format(yaml, reverse, append);
@@ -245,7 +245,7 @@ request_headers_to_add:
       value: global
     append: false
 request_headers_to_remove: ["x-global-nope"]
-reverse_header_evaluation_order: {0}
+eval_most_specific_header_mutations_first: {0}
 )EOF";
 
     return fmt::format(yaml, reverse);
@@ -1372,7 +1372,7 @@ response_headers_to_add:
   - header:
       key: cache-control
       value: private
-reverse_header_evaluation_order: true
+eval_most_specific_header_mutations_first: true
 )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 

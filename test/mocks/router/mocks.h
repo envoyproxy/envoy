@@ -386,7 +386,7 @@ public:
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(usesVhds, bool());
-  MOCK_CONST_METHOD0(reverseHeaderEvaluationOrder, bool());
+  MOCK_CONST_METHOD0(evalMostSpecificHeaderMutationsFirst, bool());
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
