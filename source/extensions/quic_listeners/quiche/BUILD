@@ -104,21 +104,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_server_stream_lib",
-    srcs = ["envoy_quic_server_stream.cc"],
-    hdrs = ["envoy_quic_server_stream.h"],
-    tags = ["nofips"],
-    deps = [
-        ":envoy_quic_stream_lib",
-        ":envoy_quic_utils_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/http:header_map_lib",
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -170,13 +155,6 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_storage_impl_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "envoy_quic_client_stream_lib",
-    tags = ["nofips"],
-    deps = [
     ],
 )
 
