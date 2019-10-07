@@ -804,7 +804,9 @@ public:
 
   bool usesVhds() const override { return uses_vhds_; }
 
-  bool evalMostSpecificHeaderMutationsFirst() const override { return eval_most_specific_header_mutations_first_; }
+  bool evalMostSpecificHeaderMutationsFirst() const override {
+    return eval_most_specific_header_mutations_first_;
+  }
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;

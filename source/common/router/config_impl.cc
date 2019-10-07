@@ -1085,8 +1085,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
-      uses_vhds_(config.has_vhds()),
-      eval_most_specific_header_mutations_first_(config.eval_most_specific_header_mutations_first()) {
+      uses_vhds_(config.has_vhds()), eval_most_specific_header_mutations_first_(
+                                         config.eval_most_specific_header_mutations_first()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
