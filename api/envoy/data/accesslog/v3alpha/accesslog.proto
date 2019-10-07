@@ -230,6 +230,9 @@ message ResponseFlags {
   // Indicates that the request was rejected because an envoy request header failed strict
   // validation.
   bool invalid_envoy_request_headers = 18;
+
+  // Indicates there was an HTTP protocol error on the downstream request.
+  bool downstream_protocol_error = 19;
 }
 
 // Properties of a negotiated TLS connection.
