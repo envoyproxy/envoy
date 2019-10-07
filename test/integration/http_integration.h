@@ -122,18 +122,21 @@ protected:
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
-  IntegrationStreamDecoderPtr
-  sendRequestAndWaitForResponse(const Http::TestHeaderMapImpl& request_headers,
-                                uint32_t request_body_size,
-                                const Http::TestHeaderMapImpl& response_headers,
-                                uint32_t response_body_size, int upstream_index = 0);
+  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
+      const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
+      const Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size,
+      int upstream_index = 0, std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   // In cases where the upstream that will receive the request is not deterministic, a second
   // upstream index may be provided, in which case both upstreams will be checked for requests.
-  uint64_t waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices);
-  void waitForNextUpstreamRequest(uint64_t upstream_index = 0);
+  uint64_t waitForNextUpstreamRequest(
+      const std::vector<uint64_t>& upstream_indices,
+      std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
+  void waitForNextUpstreamRequest(
+      uint64_t upstream_index = 0,
+      std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
@@ -185,7 +188,11 @@ protected:
   void testRouterUpstreamResponseBeforeRequestComplete();
 
   void testTwoRequests(bool force_network_backup = false);
+  void testLargeHeaders(Http::TestHeaderMapImpl request_headers,
+                        Http::TestHeaderMapImpl request_trailers, uint32_t size, uint32_t max_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t max_size = 60);
+  void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
+  void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
   void testAddEncodedTrailers();
   void testRetry();

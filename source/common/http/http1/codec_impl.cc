@@ -460,8 +460,10 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
 
-  const uint32_t total =
-      current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
+  // Verify that the cached value in byte size exists.
+  ASSERT(current_header_map_->byteSize().has_value());
+  const uint32_t total = current_header_field_.size() + current_header_value_.size() +
+                         current_header_map_->byteSize().value();
   if (total > (max_request_headers_kb_ * 1024)) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
@@ -472,6 +474,10 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 int ConnectionImpl::onHeadersCompleteBase() {
   ENVOY_CONN_LOG(trace, "headers complete", connection_);
   completeLastHeader();
+  // Validate that the completed HeaderMap's cached byte size exists and is correct.
+  // This assert iterates over the HeaderMap.
+  ASSERT(current_header_map_->byteSize().has_value() &&
+         current_header_map_->byteSize() == current_header_map_->byteSizeInternal());
   if (!(parser_.http_major == 1 && parser_.http_minor == 1)) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.

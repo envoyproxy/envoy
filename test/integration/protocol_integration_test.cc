@@ -576,6 +576,46 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
+TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"content-length", "0"}};
+  std::vector<std::string> cookie_pieces;
+  for (int i = 0; i < 7000; i++) {
+    cookie_pieces.push_back(fmt::sprintf("a%x=b", i));
+  }
+  request_headers.addCopy("cookie", absl::StrJoin(cookie_pieces, "; "));
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// Validate that lots of tiny cookies doesn't cause a DoS (many cookie headers).
+TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"content-length", "0"}};
+  for (int i = 0; i < 2000; i++) {
+    request_headers.addCopy("cookie", fmt::sprintf("a%x=b", i));
+  }
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
   initialize();
 
@@ -848,6 +888,48 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   testLargeRequestHeaders(95, 96);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
+  // Set timeout for 5 seconds, and ensure that a request with 20k+ headers can be sent.
+  testManyRequestHeaders(std::chrono::milliseconds(5000));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
+  testLargeRequestTrailers(60, 96);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
+  testLargeRequestTrailers(66, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.mutable_max_request_headers_kb()->set_value(96); });
+
+  Http::TestHeaderMapImpl request_trailers{};
+  for (int i = 0; i < 20000; i++) {
+    request_trailers.addCopy(std::to_string(i), "");
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
