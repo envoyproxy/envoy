@@ -1069,6 +1069,7 @@ filter_chains:
   checkStats(2, 1, 2, 0, 0, 0);
 }
 
+// Validates that StopListener functionality works correctly.
 TEST_F(ListenerManagerImplTest, StopListener) {
   InSequence s;
 
@@ -1100,6 +1101,73 @@ filter_chains:
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListener(manager_->listeners()[0]);
+
+  // Validate that add listener returns false once it is stopped.
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+
+  // Validate that stopped listener can not be removed.
+  EXPECT_FALSE(manager_->removeListener("foo"));
+}
+
+// Validates that a listener is not added back to workers when stopped while it is warming.
+TEST_F(ListenerManagerImplTest, StopWarmingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  checkStats(1, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: fake
+    config: {}
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(1, 1, 0, 1, 1, 0);
+
+  // Stop the listener
+  EXPECT_CALL(*worker_, stopListener(_));
+  manager_->stopListener(manager_->listeners()[0]);
+
+  // Finish warming and validate listener is not added back.
+  EXPECT_CALL(*worker_, addListener(_, _)).Times(0);
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+  listener_foo_update1->target_.ready();
+  EXPECT_EQ(1UL, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {

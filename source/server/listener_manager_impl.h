@@ -168,6 +168,11 @@ private:
     stats_.total_listeners_active_.set(active_listeners_.size());
   }
 
+  bool listenerStopped(const std::string& name) {
+    return (std::find(stopped_listeners_.begin(), stopped_listeners_.end(), name) !=
+            stopped_listeners_.end());
+  }
+
   /**
    * Mark a listener for draining. The listener will no longer be considered active but will remain
    * present to allow connection draining.
@@ -189,6 +194,10 @@ private:
   // manager. For example, RDS, or in the future KDS. Once a listener is done warming it will
   // be transitioned to active.
   ListenerList warming_listeners_;
+
+  // Stopped listeners are listeners that were stopped by invoking drain listeners admin endpoint.
+  std::list<std::string> stopped_listeners_;
+
   // Draining listeners are listeners that are in the process of being drained and removed. They
   // go through two phases where first the workers stop accepting new connections and existing
   // connections are drained. Then after that time period the listener is removed from all workers
