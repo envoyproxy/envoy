@@ -65,7 +65,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_cyan4973_xxhash = dict(
         sha256 = "afa29766cfc0448ff4a1fd9f2c47e02c48d50be5b79749925d15d545008c3f81",
-        strip_prefix = "xxHash-v0.7.1",
+        strip_prefix = "xxHash-0.7.1",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.1.tar.gz"],
     ),
     com_github_envoyproxy_sqlparser = dict(
