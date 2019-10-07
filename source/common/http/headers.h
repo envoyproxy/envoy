@@ -125,6 +125,7 @@ public:
   const LowerCaseString GrpcStatus{"grpc-status"};
   const LowerCaseString GrpcTimeout{"grpc-timeout"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString GrpcStatusDetailsBin{"grpc-status-details-bin"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
   const LowerCaseString Http2Settings{"http2-settings"};

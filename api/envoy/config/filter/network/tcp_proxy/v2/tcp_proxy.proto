@@ -6,9 +6,9 @@ option java_outer_classname = "TcpProxyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.tcp_proxy.v2";
 
-import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
+import "envoy/config/filter/accesslog/v2/accesslog.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -19,9 +19,81 @@ import "validate/validate.proto";
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 
 message TcpProxy {
+  // [#not-implemented-hide:] Deprecated.
+  // TCP Proxy filter configuration using V1 format.
+  message DeprecatedV1 {
+    // A TCP proxy route consists of a set of optional L4 criteria and the
+    // name of a cluster. If a downstream connection matches all the
+    // specified criteria, the cluster in the route is used for the
+    // corresponding upstream connection. Routes are tried in the order
+    // specified until a match is found. If no match is found, the connection
+    // is closed. A route with no criteria is valid and always produces a
+    // match.
+    message TCPRoute {
+      // The cluster to connect to when a the downstream network connection
+      // matches the specified criteria.
+      string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // An optional list of IP address subnets in the form
+      // “ip_address/xx”. The criteria is satisfied if the destination IP
+      // address of the downstream connection is contained in at least one of
+      // the specified subnets. If the parameter is not specified or the list
+      // is empty, the destination IP address is ignored. The destination IP
+      // address of the downstream connection might be different from the
+      // addresses on which the proxy is listening if the connection has been
+      // redirected.
+      repeated api.v2.core.CidrRange destination_ip_list = 2;
+
+      // An optional string containing a comma-separated list of port numbers
+      // or ranges. The criteria is satisfied if the destination port of the
+      // downstream connection is contained in at least one of the specified
+      // ranges. If the parameter is not specified, the destination port is
+      // ignored. The destination port address of the downstream connection
+      // might be different from the port on which the proxy is listening if
+      // the connection has been redirected.
+      string destination_ports = 3;
+
+      // An optional list of IP address subnets in the form
+      // “ip_address/xx”. The criteria is satisfied if the source IP address
+      // of the downstream connection is contained in at least one of the
+      // specified subnets. If the parameter is not specified or the list is
+      // empty, the source IP address is ignored.
+      repeated api.v2.core.CidrRange source_ip_list = 4;
+
+      // An optional string containing a comma-separated list of port numbers
+      // or ranges. The criteria is satisfied if the source port of the
+      // downstream connection is contained in at least one of the specified
+      // ranges. If the parameter is not specified, the source port is
+      // ignored.
+      string source_ports = 5;
+    }
+
+    // The route table for the filter. All filter instances must have a route
+    // table, even if it is empty.
+    repeated TCPRoute routes = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // Allows for specification of multiple upstream clusters along with weights
+  // that indicate the percentage of traffic to be forwarded to each cluster.
+  // The router selects an upstream cluster based on these weights.
+  message WeightedCluster {
+    message ClusterWeight {
+      // Name of the upstream cluster.
+      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // When a request matches the route, the choice of an upstream cluster is
+      // determined by its weight. The sum of weights across all entries in the
+      // clusters array determines the total weight.
+      uint32 weight = 2 [(validate.rules).uint32 = {gte: 1}];
+    }
+
+    // Specifies one or more upstream clusters associated with the route.
+    repeated ClusterWeight clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_tcp_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -39,13 +111,13 @@ message TcpProxy {
   // Optional endpoint metadata match criteria. Only endpoints in the upstream
   // cluster with metadata matching that set in metadata_match will be
   // considered. The filter name should be specified as *envoy.lb*.
-  envoy.api.v2.core.Metadata metadata_match = 9;
+  api.v2.core.Metadata metadata_match = 9;
 
   // The idle timeout for connections managed by the TCP proxy filter. The idle timeout
   // is defined as the period in which there are no bytes sent or received on either
   // the upstream or downstream connection. If not set, connections will never be closed
   // by the TCP proxy due to being idle.
-  google.protobuf.Duration idle_timeout = 8 [(validate.rules).duration.gt = {}];
+  google.protobuf.Duration idle_timeout = 8 [(validate.rules).duration = {gt {}}];
 
   // [#not-implemented-hide:] The idle timeout for connections managed by the TCP proxy
   // filter. The idle timeout is defined as the period in which there is no
@@ -60,84 +132,12 @@ message TcpProxy {
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by the this tcp_proxy.
-  repeated envoy.config.filter.accesslog.v2.AccessLog access_log = 5;
-
-  // [#not-implemented-hide:] Deprecated.
-  // TCP Proxy filter configuration using V1 format.
-  message DeprecatedV1 {
-    // A TCP proxy route consists of a set of optional L4 criteria and the
-    // name of a cluster. If a downstream connection matches all the
-    // specified criteria, the cluster in the route is used for the
-    // corresponding upstream connection. Routes are tried in the order
-    // specified until a match is found. If no match is found, the connection
-    // is closed. A route with no criteria is valid and always produces a
-    // match.
-    message TCPRoute {
-      // The cluster to connect to when a the downstream network connection
-      // matches the specified criteria.
-      string cluster = 1 [(validate.rules).string.min_bytes = 1];
-
-      // An optional list of IP address subnets in the form
-      // “ip_address/xx”. The criteria is satisfied if the destination IP
-      // address of the downstream connection is contained in at least one of
-      // the specified subnets. If the parameter is not specified or the list
-      // is empty, the destination IP address is ignored. The destination IP
-      // address of the downstream connection might be different from the
-      // addresses on which the proxy is listening if the connection has been
-      // redirected.
-      repeated envoy.api.v2.core.CidrRange destination_ip_list = 2;
-
-      // An optional string containing a comma-separated list of port numbers
-      // or ranges. The criteria is satisfied if the destination port of the
-      // downstream connection is contained in at least one of the specified
-      // ranges. If the parameter is not specified, the destination port is
-      // ignored. The destination port address of the downstream connection
-      // might be different from the port on which the proxy is listening if
-      // the connection has been redirected.
-      string destination_ports = 3;
-
-      // An optional list of IP address subnets in the form
-      // “ip_address/xx”. The criteria is satisfied if the source IP address
-      // of the downstream connection is contained in at least one of the
-      // specified subnets. If the parameter is not specified or the list is
-      // empty, the source IP address is ignored.
-      repeated envoy.api.v2.core.CidrRange source_ip_list = 4;
-
-      // An optional string containing a comma-separated list of port numbers
-      // or ranges. The criteria is satisfied if the source port of the
-      // downstream connection is contained in at least one of the specified
-      // ranges. If the parameter is not specified, the source port is
-      // ignored.
-      string source_ports = 5;
-    }
-
-    // The route table for the filter. All filter instances must have a route
-    // table, even if it is empty.
-    repeated TCPRoute routes = 1 [(validate.rules).repeated .min_items = 1];
-  }
+  repeated accesslog.v2.AccessLog access_log = 5;
 
   // [#not-implemented-hide:] Deprecated.
   DeprecatedV1 deprecated_v1 = 6 [deprecated = true];
 
   // The maximum number of unsuccessful connection attempts that will be made before
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
-  google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32.gte = 1];
-
-  // Allows for specification of multiple upstream clusters along with weights
-  // that indicate the percentage of traffic to be forwarded to each cluster.
-  // The router selects an upstream cluster based on these weights.
-  message WeightedCluster {
-    message ClusterWeight {
-      // Name of the upstream cluster.
-      string name = 1 [(validate.rules).string.min_bytes = 1];
-
-      // When a request matches the route, the choice of an upstream cluster is
-      // determined by its weight. The sum of weights across all entries in the
-      // clusters array determines the total weight.
-      uint32 weight = 2 [(validate.rules).uint32.gte = 1];
-    }
-
-    // Specifies one or more upstream clusters associated with the route.
-    repeated ClusterWeight clusters = 1 [(validate.rules).repeated .min_items = 1];
-  }
+  google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
 }

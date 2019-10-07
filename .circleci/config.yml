@@ -67,6 +67,7 @@ jobs:
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
+
    filter_example_mirror:
      executor: ubuntu-build
      steps:

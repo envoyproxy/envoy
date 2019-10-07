@@ -342,10 +342,10 @@ message RouteMatch {
     //
     // Examples:
     //
-    // * The regex */b[io]t* matches the path */bit*
-    // * The regex */b[io]t* matches the path */bot*
-    // * The regex */b[io]t* does not match the path */bite*
-    // * The regex */b[io]t* does not match the path */bit/bot*
+    // * The regex ``/b[io]t`` matches the path */bit*
+    // * The regex ``/b[io]t`` matches the path */bot*
+    // * The regex ``/b[io]t`` does not match the path */bite*
+    // * The regex ``/b[io]t`` does not match the path */bit/bot*
     //
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
@@ -1097,9 +1097,9 @@ message VirtualCluster {
   //
   // Examples:
   //
-  // * The regex */rides/\d+* matches the path */rides/0*
-  // * The regex */rides/\d+* matches the path */rides/123*
-  // * The regex */rides/\d+* does not match the path */rides/123/456*
+  // * The regex ``/rides/\d+`` matches the path */rides/0*
+  // * The regex ``/rides/\d+`` matches the path */rides/123*
+  // * The regex ``/rides/\d+`` does not match the path */rides/123/456*
   //
   // .. attention::
   //   This field has been deprecated in favor of `headers` as it is not safe for use with
@@ -1304,9 +1304,9 @@ message HeaderMatcher {
     //
     // Examples:
     //
-    // * The regex *\d{3}* matches the value *123*
-    // * The regex *\d{3}* does not match the value *1234*
-    // * The regex *\d{3}* does not match the value *123.456*
+    // * The regex ``\d{3}`` matches the value *123*
+    // * The regex ``\d{3}`` does not match the value *1234*
+    // * The regex ``\d{3}`` does not match the value *123.456*
     //
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
@@ -1356,7 +1356,7 @@ message HeaderMatcher {
   //
   // Examples:
   //
-  // * The regex *\d{3}* does not match the value *1234*, so it will match when inverted.
+  // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
 }
@@ -1379,7 +1379,7 @@ message QueryParameterMatcher {
   // Specifies whether the query parameter value is a regular expression.
   // Defaults to false. The entire query parameter value (i.e., the part to
   // the right of the equals sign in "key=value") must match the regex.
-  // E.g., the regex "\d+$" will match "123" but not "a123" or "123a".
+  // E.g., the regex ``\d+$`` will match *123* but not *a123* or *123a*.
   //
   // ..attention::
   //   This field is deprecated. Use a `safe_regex` match inside the `string_match` field.

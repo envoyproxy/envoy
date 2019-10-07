@@ -123,7 +123,7 @@ void AccessLogFileImpl::flushThreadFunc() {
 
       // flush_event_ can be woken up either by large enough flush_buffer or by timer.
       // In case it was timer, flush_buffer_ can be empty.
-      while (flush_buffer_.length() == 0 && !flush_thread_exit_) {
+      while (flush_buffer_.length() == 0 && !flush_thread_exit_ && !reopen_file_) {
         // CondVar::wait() does not throw, so it's safe to pass the mutex rather than the guard.
         flush_event_.wait(write_lock_);
       }
@@ -133,7 +133,6 @@ void AccessLogFileImpl::flushThreadFunc() {
       }
 
       flush_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
-      ASSERT(flush_buffer_.length() > 0);
       about_to_write_buffer_.move(flush_buffer_);
       ASSERT(flush_buffer_.length() == 0);
     }

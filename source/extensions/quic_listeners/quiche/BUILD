@@ -234,3 +234,19 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "quic_transport_socket_factory_lib",
+    srcs = ["quic_transport_socket_factory.cc"],
+    hdrs = ["quic_transport_socket_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//include/envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/extensions/transport_sockets:well_known_names",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
+    ],
+)

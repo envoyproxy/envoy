@@ -352,8 +352,8 @@ TEST_F(CdsApiImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(initialized_, ready());
-  cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                       {});
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
   EXPECT_EQ("", cds_->versionInfo());
 }
 

@@ -28,7 +28,9 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
       operation_missing_(stat_name_set_.add("operation_missing")),
       table_(stat_name_set_.add("table")), table_missing_(stat_name_set_.add("table_missing")),
       upstream_rq_time_(stat_name_set_.add("upstream_rq_time")),
-      upstream_rq_total_(stat_name_set_.add("upstream_rq_total")) {
+      upstream_rq_total_(stat_name_set_.add("upstream_rq_total")),
+      unknown_entity_type_(stat_name_set_.add("unknown_entity_type")),
+      unknown_operation_(stat_name_set_.add("unknown_operation")) {
   upstream_rq_total_groups_[0] = stat_name_set_.add("upstream_rq_total_unknown");
   upstream_rq_time_groups_[0] = stat_name_set_.add("upstream_rq_time_unknown");
   for (size_t i = 1; i < DynamoStats::NumGroupEntries; ++i) {
@@ -37,6 +39,11 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
   }
   RequestParser::forEachStatString(
       [this](const std::string& str) { stat_name_set_.rememberBuiltin(str); });
+  for (uint32_t status_code : {200, 400, 403, 502}) {
+    stat_name_set_.rememberBuiltin(absl::StrCat("upstream_rq_time_", status_code));
+    stat_name_set_.rememberBuiltin(absl::StrCat("upstream_rq_total_", status_code));
+  }
+  stat_name_set_.rememberBuiltins({"operation", "table"});
 }
 
 Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const Stats::StatNameVec& names) {
@@ -62,9 +69,9 @@ Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_
                                                        const std::string& partition_id) {
   // Use the last 7 characters of the partition id.
   absl::string_view id_last_7 = absl::string_view(partition_id).substr(partition_id.size() - 7);
-  const Stats::SymbolTable::StoragePtr stat_name_storage =
-      addPrefix({table_, getStatName(table_name), capacity_, getStatName(operation),
-                 getStatName(absl::StrCat("__partition_id=", id_last_7))});
+  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(
+      {table_, getDynamic(table_name), capacity_, getBuiltin(operation, unknown_operation_),
+       getDynamic(absl::StrCat("__partition_id=", id_last_7))});
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 

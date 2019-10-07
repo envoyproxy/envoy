@@ -1,44 +1,80 @@
-#include "test/server/listener_manager_impl_test.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
+#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
-using testing::AtLeast;
+#include "test/server/listener_manager_impl_test.h"
+#include "test/server/utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 namespace Envoy {
 namespace Server {
 namespace {
 
-class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {
-protected:
-  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-};
+class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {};
 
-TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactory) {
-  const std::string proto_text = R"EOF(
-address: {
-  socket_address: {
+TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryAndSslContext) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
     protocol: UDP
-    address: "127.0.0.1"
     port_value: 1234
-  }
-}
-filter_chains: {}
-udp_listener_config: {
+filter_chains:
+- filter_chain_match:
+    transport_protocol: "quic"
+  filters: []
+  transport_socket:
+    name: quic
+    config:
+      common_tls_context:
+        tls_certificates:
+        - certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        validation_context:
+          trusted_ca:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+          verify_subject_alt_name:
+          - localhost
+          - 127.0.0.1
+udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
-  config: {}
-}
-  )EOF";
-  envoy::api::v2::Listener listener_proto;
-  EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
 
+  envoy::api::v2::Listener listener_proto = parseListenerFromV2Yaml(yaml);
   EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_,
-              createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
-  EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
+  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+#ifdef SO_RXQ_OVFL
+                           /* expected_num_options */ 2);
+#else
+                           /* expected_num_options */ 1);
+#endif
+  expectSetsockopt(os_sys_calls_,
+                   /* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef SO_RXQ_OVFL
+  expectSetsockopt(os_sys_calls_,
+                   /* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_RXQ_OVFL,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#endif
+
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
-  EXPECT_NE(nullptr, manager_->listeners()[0].get().udpListenerFactory());
+  EXPECT_FALSE(manager_->listeners()[0].get().udpListenerFactory()->isTransportConnectionless());
+
+  // No filter chain found with non-matching transport protocol.
+  EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));
+
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111);
+  ASSERT_NE(nullptr, filter_chain);
+  auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
+      filter_chain->transportSocketFactory());
+  EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
+  EXPECT_TRUE(quic_socket_factory.serverContextConfig().isReady());
 }
 
 } // namespace
