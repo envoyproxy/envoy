@@ -148,6 +148,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
   stats_.named_.downstream_cx_destroy_.inc();
+
   stats_.named_.downstream_cx_active_.dec();
   if (read_callbacks_->connection().ssl()) {
     stats_.named_.downstream_cx_ssl_active_.dec();

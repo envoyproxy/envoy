@@ -260,6 +260,7 @@ public:
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
+    std::cerr << "======== createCodec codec_ " << codec_ << " protocol_ " << int(codec_->protocol()) << "\n";
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
@@ -4807,6 +4808,24 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, NewConnection) {
+  setup(false, "", true, true);
+
+  filter_callbacks_.connection_.stream_info_.protocol_ = absl::nullopt;
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
+  EXPECT_EQ(Network::FilterStatus::Continue, conn_manager_->onNewConnection());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_total_.value());
+    EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
+
+   filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
+  codec_->protocol_ = Http::Protocol::Http3;
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
+  EXPECT_CALL(*codec_, protocol()).Times(AtLeast(1));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
+    EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
+      EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_active_.value());
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

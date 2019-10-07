@@ -106,7 +106,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
-      codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
+      codec_client_type_(codecClientType(config.http_health_check().codec_client_type())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -160,7 +160,9 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
                                             : parent_.host_value_),
       protocol_(parent_.codec_client_type_ == Http::CodecClient::Type::HTTP1
                     ? Http::Protocol::Http11
-                    : Http::Protocol::Http2),
+                    : (parent_.codec_client_type_ == Http::CodecClient::Type::HTTP2
+                           ? Http::Protocol::Http2
+                           : Http::Protocol::Http3)),
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
@@ -330,11 +332,16 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
-  if (use_http2) {
+Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(const envoy::api::v2::core::HealthCheck::HttpHealthCheck::CodecClientType type) {
+  switch (type) {
+    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::Http3:
+      return Http::CodecClient::Type::HTTP3;
+    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::Http2:
     return Http::CodecClient::Type::HTTP2;
-  } else {
+    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::Http1:
     return Http::CodecClient::Type::HTTP1;
+    default:
+    PANIC(fmt::format("Unknown codec client type {}", type));
   }
 }
 
