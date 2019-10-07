@@ -16,6 +16,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "udpa/type/v1/typed_struct.pb.h"
 
 using testing::_;
 using testing::Ref;
@@ -293,6 +294,74 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
                             "cluster.dns_failure_refresh_rate must have max_interval greater than "
                             "or equal to the base_interval");
   }
+}
+
+void PackIntoTypedStruct(udpa::type::v1::TypedStruct& typed_struct,
+                         const ProtobufWkt::Message& inner) {
+  (*typed_struct.mutable_type_url()) =
+      std::string("type.googleapis.com/") + inner.GetDescriptor()->full_name();
+  MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
+}
+
+TEST(UtilityTest, TypedStructToStruct) {
+  ProtobufWkt::Any typed_config;
+  udpa::type::v1::TypedStruct typed_struct;
+  ProtobufWkt::Struct untyped_struct;
+  (*untyped_struct.mutable_fields())["foo"].set_string_value("bar");
+  PackIntoTypedStruct(typed_struct, untyped_struct);
+  typed_config.PackFrom(typed_struct);
+
+  ProtobufWkt::Struct out;
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                 ProtobufMessage::getStrictValidationVisitor(), out);
+
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(out, untyped_struct));
+}
+
+TEST(UtilityTest, TypedStructToBootstrap) {
+  ProtobufWkt::Any typed_config;
+  udpa::type::v1::TypedStruct typed_struct;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+
+  std::string yaml = R"EOF(
+    admin:
+      access_log_path: /dev/null
+      address:
+        pipe:
+          path: "/"
+  )EOF";
+  TestUtility::loadFromYaml(yaml, bootstrap);
+
+  PackIntoTypedStruct(typed_struct, bootstrap);
+  typed_config.PackFrom(typed_struct);
+
+  envoy::config::bootstrap::v2::Bootstrap out;
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(out, bootstrap));
+}
+
+TEST(UtilityTest, TypedStructToInvalidType) {
+  ProtobufWkt::Any typed_config;
+  udpa::type::v1::TypedStruct typed_struct;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+
+  std::string yaml = R"EOF(
+    admin:
+      access_log_path: /dev/null
+      address:
+        pipe:
+          path: "/"
+  )EOF";
+  TestUtility::loadFromYaml(yaml, bootstrap);
+
+  PackIntoTypedStruct(typed_struct, bootstrap);
+  typed_config.PackFrom(typed_struct);
+
+  ProtobufWkt::Any out;
+  EXPECT_THROW(Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                              ProtobufMessage::getStrictValidationVisitor(), out),
+               EnvoyException);
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
