@@ -10,19 +10,16 @@ import string
 import subprocess
 import sys
 
-# This maps from .proto import directive path to the Bazel dependency path for
-# external dependencies. Since BUILD files are generated, this is the canonical
-# place to define this mapping.
-EXTERNAL_PROTO_DEPS = {
-    'google/api/expr/v1alpha1/syntax.proto':
-        '@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto',
-    'metrics.proto':
-        '@prometheus_metrics_model//:client_model',
-    'opencensus/proto/trace/v1/trace.proto':
-        '@opencensus_proto//opencensus/proto/trace/v1:trace_proto',
-    'opencensus/proto/trace/v1/trace_config.proto':
-        '@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto',
-}
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
+
+# api/bazel/external_protos_deps.bzl must have a .bzl suffix for Starlark
+# import, so we are forced to this workaround.
+_external_proto_deps_spec = spec_from_loader(
+    'external_proto_deps',
+    SourceFileLoader('external_proto_deps', 'api/bazel/external_proto_deps.bzl'))
+external_proto_deps = module_from_spec(_external_proto_deps_spec)
+_external_proto_deps_spec.loader.exec_module(external_proto_deps)
 
 # These .proto import direct path prefixes are already handled by
 # api_proto_package() as implicit dependencies.
@@ -150,8 +147,8 @@ def GetImportDeps(proto_path):
         if any(import_path.startswith(p) for p in API_BUILD_SYSTEM_IMPORT_PREFIXES):
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
-        if import_path in EXTERNAL_PROTO_DEPS:
-          imports.append(EXTERNAL_PROTO_DEPS[import_path])
+        if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
+          imports.append(external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
         elif import_path.startswith('envoy/'):
           # Ignore package internal imports.
           if os.path.dirname(os.path.join('api', import_path)) == os.path.dirname(proto_path):
