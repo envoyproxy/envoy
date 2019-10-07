@@ -29,8 +29,8 @@ GradientControllerConfig::GradientControllerConfig(
     : runtime_(runtime),
       min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
-      sample_rtt_calc_interval_(DurationUtil::durationToMilliseconds(
-          proto_config.concurrency_limit_params().concurrency_update_interval())),
+      sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+          proto_config.concurrency_limit_params().concurrency_update_interval()))),
       jitter_pct_(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), jitter, 15)),
       max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -114,7 +114,7 @@ std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseco
     return interval;
   }
 
-  const uint32_t jitter_range_ms = interval.count() * jitter_pct / 100;
+  const uint32_t jitter_range_ms = interval.count() * jitter_pct;
   return std::chrono::milliseconds(interval.count() + (random_.random() % jitter_range_ms));
 }
 
@@ -133,7 +133,7 @@ void GradientController::resetSampleWindow() {
 }
 
 std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
-  const std::array<double, 1> quantile{config_.sampleAggregatePercentile() / 100.0};
+  const std::array<double, 1> quantile{config_.sampleAggregatePercentile()};
   std::array<double, 1> calculated_quantile;
   hist_approx_quantile(latency_sample_hist_.get(), quantile.data(), 1, calculated_quantile.data());
   hist_clear(latency_sample_hist_.get());

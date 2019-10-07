@@ -55,7 +55,7 @@ public:
 
   std::chrono::milliseconds sampleRTTCalcInterval() const {
     const auto ms = runtime_.snapshot().getInteger(RuntimeKeys::get().SampleRTTCalcIntervalKey,
-                                                   sample_rtt_calc_interval_);
+                                                   sample_rtt_calc_interval_.count());
     return std::chrono::milliseconds(ms);
   }
 
@@ -73,13 +73,16 @@ public:
     return runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_);
   }
 
+  // The percentage is normalized to the range [0.0, 1.0].
   double sampleAggregatePercentile() const {
     return runtime_.snapshot().getDouble(RuntimeKeys::get().SampleAggregatePercentileKey,
-                                         sample_aggregate_percentile_);
+                                         sample_aggregate_percentile_) /
+           100.0;
   }
 
+  // The percentage is normalized to the range [0.0, 1.0].
   double jitterPercent() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
+    return runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_) / 100.0;
   }
 
 private:
@@ -107,7 +110,7 @@ private:
   const std::chrono::milliseconds min_rtt_calc_interval_;
 
   // The measured sample round-trip milliseconds from the previous time window.
-  const uint32_t sample_rtt_calc_interval_;
+  const std::chrono::milliseconds sample_rtt_calc_interval_;
 
   // Randomized time delta added to the start of the minRTT calculation window.
   const double jitter_pct_;

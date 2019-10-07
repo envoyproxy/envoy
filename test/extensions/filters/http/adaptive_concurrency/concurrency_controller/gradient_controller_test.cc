@@ -115,8 +115,8 @@ min_rtt_calc_params:
   EXPECT_EQ(config.maxConcurrencyLimit(), 1337);
   EXPECT_EQ(config.minRTTAggregateRequestCount(), 52);
   EXPECT_EQ(config.maxGradient(), 2.1);
-  EXPECT_EQ(config.sampleAggregatePercentile(), 42.5);
-  EXPECT_EQ(config.jitterPercent(), 13.2);
+  EXPECT_EQ(config.sampleAggregatePercentile(), .425);
+  EXPECT_EQ(config.jitterPercent(), .132);
 }
 
 TEST_F(GradientControllerConfigTest, BasicTestOverrides) {
@@ -154,10 +154,10 @@ min_rtt_calc_params:
   EXPECT_EQ(config.maxGradient(), 12.3);
 
   EXPECT_CALL(runtime_.snapshot_, getDouble(_, 42.5)).WillOnce(Return(66.0));
-  EXPECT_EQ(config.sampleAggregatePercentile(), 66.0);
+  EXPECT_EQ(config.sampleAggregatePercentile(), .66);
 
   EXPECT_CALL(runtime_.snapshot_, getDouble(_, 13.2)).WillOnce(Return(15.5));
-  EXPECT_EQ(config.jitterPercent(), 15.5);
+  EXPECT_EQ(config.jitterPercent(), .155);
 }
 
 TEST_F(GradientControllerConfigTest, DefaultValuesTest) {
@@ -175,8 +175,8 @@ min_rtt_calc_params:
   EXPECT_EQ(config.maxConcurrencyLimit(), 1000);
   EXPECT_EQ(config.minRTTAggregateRequestCount(), 50);
   EXPECT_EQ(config.maxGradient(), 2.0);
-  EXPECT_EQ(config.sampleAggregatePercentile(), 50.0);
-  EXPECT_EQ(config.jitterPercent(), 15.0);
+  EXPECT_EQ(config.sampleAggregatePercentile(), .5);
+  EXPECT_EQ(config.jitterPercent(), .15);
 }
 
 TEST_F(GradientControllerTest, MinRTTLogicTest) {

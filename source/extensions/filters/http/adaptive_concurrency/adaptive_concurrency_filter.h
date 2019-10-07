@@ -38,7 +38,6 @@ public:
 
 private:
   const std::string stats_prefix_;
-  Runtime::Loader& runtime_;
   TimeSource& time_source_;
   Runtime::FeatureFlag adaptive_concurrency_feature_;
 };
