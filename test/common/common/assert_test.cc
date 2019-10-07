@@ -65,7 +65,7 @@ TEST(AssertDeathTest, LogDfatalOrBreak) {
 #ifndef NDEBUG
     EXPECT_DEATH({ ASSERT_OR_LOG_AND(0, break); }, ".assert failure: 0*");
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
-    EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_OR_LOG_AND(return)",
+    EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_OR_LOG_AND(break)",
                         ASSERT_OR_LOG_AND(0, break));
 #else
     EXPECT_LOG_CONTAINS("error", "ASSERT_OR_LOG_AND(0)", ASSERT_OR_LOG_AND(0, return ));
