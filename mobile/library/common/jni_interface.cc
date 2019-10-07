@@ -18,10 +18,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     return -1;
   }
 
-  // c-ares jvm init is necessary in order to let c-ares perform DNS resolution in Envoy.
-  // More information can be found at:
-  // https://c-ares.haxx.se/ares_library_init_android.html
-  ares_library_init_jvm(vm);
   return JNI_VERSION;
 }
 
@@ -57,6 +53,11 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_initialize(JNIEnv* env,
                                                                    jclass, // class
                                                                    jobject connectivity_manager) {
   // See note above about c-ares.
+  // c-ares jvm init is necessary in order to let c-ares perform DNS resolution in Envoy.
+  // More information can be found at:
+  // https://c-ares.haxx.se/ares_library_init_android.html
+  ares_library_init_jvm(static_jvm);
+
   return ares_library_init_android(connectivity_manager);
 }
 
