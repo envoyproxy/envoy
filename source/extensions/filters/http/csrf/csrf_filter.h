@@ -37,7 +37,7 @@ public:
   CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
              Runtime::Loader& runtime)
       : policy_(policy), runtime_(runtime) {
-    for (const auto& additional_origin : policy.additionalOrigins()) {
+    for (const auto& additional_origin : policy.additional_origins()) {
       additional_origins_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl>(additional_origin));
     }
