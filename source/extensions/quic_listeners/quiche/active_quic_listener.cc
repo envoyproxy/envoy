@@ -43,6 +43,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       quic::QuicRandom::GetInstance(), std::make_unique<EnvoyQuicFakeProofSource>(),
       quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
+  crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
+                                   quic::QuicCryptoServerConfig::ConfigOptions());
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
@@ -51,6 +53,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       dispatcher);
   quic_dispatcher_->InitializeWithWriter(writer.release());
 }
+
+ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
 
 void ActiveQuicListener::onListenerShutdown() {
   ENVOY_LOG(info, "Quic listener {} shutdown.", config_.name());
@@ -63,7 +67,7 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
       envoyAddressInstanceToQuicSocketAddress(data.local_address_));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
-      quic::QuicTime::Delta::FromMilliseconds(std::chrono::duration_cast<std::chrono::milliseconds>(
+      quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(
                                                   data.receive_time_.time_since_epoch())
                                                   .count());
   uint64_t num_slice = data.buffer_->getRawSlices(nullptr, 0);

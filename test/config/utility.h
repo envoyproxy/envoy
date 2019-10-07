@@ -78,7 +78,8 @@ public:
   static const std::string TCP_PROXY_CONFIG;
   // A basic configuration for L7 proxying.
   static const std::string HTTP_PROXY_CONFIG;
-
+  // A basic configuration for L7 proxying with QUIC transport.
+  static const std::string QUIC_HTTP_PROXY_CONFIG;
   // A string for a basic buffer filter, which can be used with addFilter()
   static const std::string DEFAULT_BUFFER_FILTER;
   // A string for a small buffer filter, which can be used with addFilter()
