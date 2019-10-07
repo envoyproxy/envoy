@@ -149,15 +149,16 @@ def GetImportDeps(proto_path):
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
           imports.append(external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
-        elif import_path.startswith('envoy/'):
+          continue
+        if import_path.startswith('envoy/'):
           # Ignore package internal imports.
           if os.path.dirname(os.path.join('api', import_path)) == os.path.dirname(proto_path):
             continue
           imports.append('//%s:pkg' % os.path.dirname(import_path))
-        else:
-          raise ProtoSyncError(
-              'Unknown import path mapping for %s, please update the mappings in tools/proto_sync.py.\n'
-              % import_path)
+          continue
+        raise ProtoSyncError(
+            'Unknown import path mapping for %s, please update the mappings in tools/proto_sync.py.\n'
+            % import_path)
   return imports
 
 
