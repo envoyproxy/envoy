@@ -20,11 +20,11 @@ import "validate/validate.proto";
 // A failed check will cause this filter to close the TCP connection.
 message ExtAuthz {
   // The prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The external authorization gRPC service configuration.
   // The default timeout is set to 200ms by this filter.
-  envoy.api.v3alpha.core.GrpcService grpc_service = 2;
+  api.v3alpha.core.GrpcService grpc_service = 2;
 
   // The filter's behaviour in case the external authorization service does
   // not respond back. When it is set to true, Envoy will also allow traffic in case of

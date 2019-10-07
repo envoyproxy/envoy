@@ -376,36 +376,18 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
         host_status.set_hostname(host->hostname());
-        std::vector<Stats::CounterSharedPtr> sorted_counters;
-        for (const Stats::CounterSharedPtr& counter : host->counters()) {
-          sorted_counters.push_back(counter);
-        }
-        std::sort(
-            sorted_counters.begin(), sorted_counters.end(),
-            [](const Stats::CounterSharedPtr& counter1, const Stats::CounterSharedPtr& counter2) {
-              return counter1->name() < counter2->name();
-            });
 
-        for (const Stats::CounterSharedPtr& counter : sorted_counters) {
+        for (const auto& named_counter : host->counters()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(counter->name());
-          metric.set_value(counter->value());
+          metric.set_name(std::string(named_counter.first));
+          metric.set_value(named_counter.second.get().value());
           metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
         }
 
-        std::vector<Stats::GaugeSharedPtr> sorted_gauges;
-        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-          sorted_gauges.push_back(gauge);
-        }
-        std::sort(sorted_gauges.begin(), sorted_gauges.end(),
-                  [](const Stats::GaugeSharedPtr& gauge1, const Stats::GaugeSharedPtr& gauge2) {
-                    return gauge1->name() < gauge2->name();
-                  });
-
-        for (const Stats::GaugeSharedPtr& gauge : sorted_gauges) {
+        for (const auto& named_gauge : host->gauges()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(gauge->name());
-          metric.set_value(gauge->value());
+          metric.set_name(std::string(named_gauge.first));
+          metric.set_value(named_gauge.second.get().value());
           metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
         }
 
@@ -455,13 +437,13 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
                              cluster.second.get().info()->addedViaApi()));
     for (auto& host_set : cluster.second.get().prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
-        std::map<std::string, uint64_t> all_stats;
-        for (const Stats::CounterSharedPtr& counter : host->counters()) {
-          all_stats[counter->name()] = counter->value();
+        std::map<absl::string_view, uint64_t> all_stats;
+        for (const auto& counter : host->counters()) {
+          all_stats[counter.first] = counter.second.get().value();
         }
 
-        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-          all_stats[gauge->name()] = gauge->value();
+        for (const auto& gauge : host->gauges()) {
+          all_stats[gauge.first] = gauge.second.get().value();
         }
 
         for (const auto& stat : all_stats) {
@@ -833,11 +815,11 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return StringUtil::join(buf, ",");
 }
 
-std::string PrometheusStatsFormatter::metricName(const std::string& extractedName) {
+std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return sanitizeName(fmt::format("envoy_{0}", extractedName));
+  return sanitizeName(fmt::format("envoy_{0}", extracted_name));
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(

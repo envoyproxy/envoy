@@ -89,7 +89,7 @@ public:
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
@@ -213,13 +213,15 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
         .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
-          EXPECT_TRUE(IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse",
-                                  e->what()));
+          EXPECT_TRUE(IsSubstring(
+              "", "", "bar does not match the message-wide type URL foo in DiscoveryResponse",
+              e->what()));
         }));
 
-    expectSendMessage("foo", {"x", "y"}, "", false, "", Grpc::Status::GrpcStatus::Internal,
-                      fmt::format("bar does not match foo type URL in DiscoveryResponse {}",
-                                  invalid_response->DebugString()));
+    expectSendMessage(
+        "foo", {"x", "y"}, "", false, "", Grpc::Status::GrpcStatus::Internal,
+        fmt::format("bar does not match the message-wide type URL foo in DiscoveryResponse {}",
+                    invalid_response->DebugString()));
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(invalid_response));
   }
   expectSendMessage("foo", {}, "");
@@ -580,6 +582,9 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   response->set_version_info("1");
   response->set_type_url(type_url);
 
+  // TODO(fredlas) the expectation of no discovery request here is against the xDS spec.
+  // The upcoming xDS overhaul (part of/followup to PR7293) will fix this.
+  //
   // This contains zero resources. No discovery request should be sent.
   grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
 

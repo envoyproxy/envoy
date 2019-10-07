@@ -41,7 +41,7 @@ message AttributeContext {
   message Peer {
     // The address of the peer, this is typically the IP address.
     // It can also be UDS path, or others.
-    envoy.api.v2.core.Address address = 1;
+    api.v2.core.Address address = 1;
 
     // The canonical service name of the peer.
     // It should be set to :ref:`the HTTP x-envoy-downstream-service-cluster
@@ -144,5 +144,5 @@ message AttributeContext {
   map<string, string> context_extensions = 10;
 
   // Dynamic metadata associated with the request.
-  envoy.api.v2.core.Metadata metadata_context = 11;
+  api.v2.core.Metadata metadata_context = 11;
 }

@@ -91,6 +91,7 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
+  static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
   static envoy::api::v2::Cluster buildCluster(const std::string& name, int port,
                                               const std::string& ip_version);
@@ -109,6 +110,9 @@ public:
 
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
+
+  // Set the idle timeout on downstream connections through the HttpConnectionMananger.
+  void setDownstreamHttpIdleTimeout(std::chrono::milliseconds idle_timeout);
 
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);

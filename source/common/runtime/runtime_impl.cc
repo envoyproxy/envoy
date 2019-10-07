@@ -19,6 +19,7 @@
 #include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "openssl/rand.h"
 
 namespace Envoy {
@@ -171,14 +172,11 @@ std::string RandomGeneratorImpl::uuid() {
 }
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
-  bool allowed = false;
+  const bool default_allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
+
   // If the value is not explicitly set as a runtime boolean, the default value is based on
   // disallowedByDefault.
-  if (!getBoolean(key, allowed)) {
-    allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
-  }
-
-  if (!allowed) {
+  if (!getBoolean(key, default_allowed)) {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
@@ -194,14 +192,9 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
 }
 
 bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
-  bool enabled = false;
   // If the value is not explicitly set as a runtime boolean, the default value is based on
-  // disallowedByDefault.
-  if (!getBoolean(key, enabled)) {
-    enabled = RuntimeFeaturesDefaults::get().enabledByDefault(key);
-  }
-
-  return enabled;
+  // enabledByDefault.
+  return getBoolean(key, RuntimeFeaturesDefaults::get().enabledByDefault(key));
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
@@ -276,13 +269,22 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
-bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
+double SnapshotImpl::getDouble(const std::string& key, double default_value) const {
   auto entry = values_.find(key);
-  if (entry != values_.end() && entry->second.bool_value_.has_value()) {
-    value = entry->second.bool_value_.value();
-    return true;
+  if (entry == values_.end() || !entry->second.double_value_) {
+    return default_value;
+  } else {
+    return entry->second.double_value_.value();
   }
-  return false;
+}
+
+bool SnapshotImpl::getBoolean(absl::string_view key, bool default_value) const {
+  auto entry = values_.find(key);
+  if (entry == values_.end() || !entry->second.bool_value_.has_value()) {
+    return default_value;
+  } else {
+    return entry->second.bool_value_.value();
+  }
 }
 
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
@@ -332,10 +334,10 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   return false;
 }
 
-bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
-  uint64_t converted_uint64;
-  if (absl::SimpleAtoi(entry.raw_string_value_, &converted_uint64)) {
-    entry.uint_value_ = converted_uint64;
+bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
+  double converted_double;
+  if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {
+    entry.double_value_ = converted_double;
     return true;
   }
   return false;
@@ -558,7 +560,7 @@ void RtdsSubscription::start() {
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_,
       Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
-      store_, *this);
+      store_, *this, /*is_delta=*/false);
   subscription_->start({resource_name_});
 }
 

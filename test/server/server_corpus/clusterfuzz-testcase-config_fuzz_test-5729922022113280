@@ -1,0 +1,251 @@
+static_resources {
+  clusters {
+    name: "i?aress_http"
+    type: LOGICAL_DNS
+    connect_timeout {
+      seconds: 2304
+      nanos: 707406378
+    }
+    tls_context {
+      common_tls_context {
+        alpn_protocols: ""
+        alpn_protocols: ""
+        combined_validation_context {
+          default_validation_context {
+            trusted_ca {
+              inline_bytes: "\302\000\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\000\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302"
+            }
+            require_signed_certificate_timestamp {
+            }
+          }
+          validation_context_sds_secret_config {
+          }
+        }
+      }
+      sni: "mane"
+    }
+    alt_stat_name: "["
+  }
+  clusters {
+    name: "i?aress_http"
+    type: LOGICAL_DNS
+    connect_timeout {
+      nanos: 538970747
+    }
+    hosts {
+      pipe {
+        path: "\000\000\000\000`"
+      }
+    }
+    hosts {
+      pipe {
+        path: "2"
+      }
+    }
+    hosts {
+      pipe {
+        path: "`"
+      }
+    }
+    hosts {
+      pipe {
+        path: "2"
+      }
+    }
+    tls_context {
+      common_tls_context {
+        combined_validation_context {
+          default_validation_context {
+            trusted_ca {
+              inline_bytes: "\302\000\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\000\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302"
+            }
+            require_signed_certificate_timestamp {
+            }
+          }
+          validation_context_sds_secret_config {
+            sds_config {
+              api_config_source {
+                refresh_delay {
+                  seconds: 8391050737688276324
+                  nanos: 64
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    http_protocol_options {
+      allow_absolute_url {
+        value: true
+      }
+    }
+    alt_stat_name: "["
+    upstream_connection_options {
+      tcp_keepalive {
+        keepalive_probes {
+          value: 589824
+        }
+      }
+    }
+  }
+  clusters {
+    name: "p`ne"
+    type: STRICT_DNS
+    connect_timeout {
+      nanos: 707406378
+    }
+    hosts {
+      pipe {
+        path: "2"
+      }
+    }
+    hosts {
+      pipe {
+        path: "`"
+      }
+    }
+    tls_context {
+      common_tls_context {
+        alpn_protocols: ""
+        alpn_protocols: ""
+        combined_validation_context {
+          default_validation_context {
+            trusted_ca {
+              inline_bytes: "\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302\302"
+            }
+            require_signed_certificate_timestamp {
+            }
+          }
+          validation_context_sds_secret_config {
+            sds_config {
+              api_config_source {
+                refresh_delay {
+                  seconds: 8391050737688276324
+                  nanos: 64
+                }
+              }
+            }
+          }
+        }
+      }
+      sni: "mane"
+    }
+    http_protocol_options {
+      allow_absolute_url {
+        value: true
+      }
+    }
+    alt_stat_name: "["
+  }
+  secrets {
+    validation_context {
+    }
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "2"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "Z"
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "type.googleapis.com/envoy.api.v2.route.Route"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\nJ1"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\022*J.:*static\'_resourc\022es {(\n  cluster`s"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "type.googleapis.com/envoy.api.v2.route.Route"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "type.googleapis.com/envoy.api.v2.route.Route"
+  }
+}
+stats_sinks {
+  name: "]"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "type.googleatis.com/google.protobuf.Value"
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\022*J.:*static_resourc\001es {(\n  cluster`s"
+  }
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\022*J :2222622222222222222222221\022"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "\013"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\nJ1"
+  }
+}
+stats_sinks {
+}

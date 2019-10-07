@@ -69,18 +69,7 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   Returns:
     A string with additional RST from annotations.
   """
-  s = annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
-  if annotations.NOT_IMPLEMENTED_WARN_ANNOTATION in comment.annotations:
-    s += '\n.. WARNING::\n  Not implemented yet\n'
-  if type_name == 'message' or type_name == 'enum':
-    if annotations.PROTO_STATUS_ANNOTATION in comment.annotations:
-      status = comment.annotations[annotations.PROTO_STATUS_ANNOTATION]
-      if status not in ['frozen', 'draft', 'experimental']:
-        raise ProtodocError('Unknown proto status: %s' % status)
-      if status == 'draft' or status == 'experimental':
-        s += ('\n.. WARNING::\n This %s type has :ref:`%s '
-              '<config_overview_v2_status>` status.\n' % (type_name, status))
-  return s
+  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
 
 
 def MapLines(f, s):
@@ -490,7 +479,7 @@ class RstFormatVisitor(visitor.Visitor):
         type_context, msg_proto) + FormatMessageAsDefinitionList(
             type_context, msg_proto) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
-  def VisitFile(self, file_proto, type_context, msgs, enums):
+  def VisitFile(self, file_proto, type_context, services, msgs, enums):
     # Find the earliest detached comment, attribute it to file level.
     # Also extract file level titles if any.
     header, comment = FormatHeaderFromFile('=', type_context.source_code_info, file_proto.name)
@@ -499,7 +488,7 @@ class RstFormatVisitor(visitor.Visitor):
 
 
 def Main():
-  plugin.Plugin('.rst', RstFormatVisitor())
+  plugin.Plugin([plugin.DirectOutputDescriptor('.rst', RstFormatVisitor())])
 
 
 if __name__ == '__main__':

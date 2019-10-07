@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
@@ -76,6 +77,11 @@ public:
    * Returns the set of socket options which should be applied on upstream connections
    */
   virtual Network::Socket::OptionsSharedPtr upstreamSocketOptions() const PURE;
+
+  /**
+   * Returns the transport socket options which should be applied on upstream connections
+   */
+  virtual Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const PURE;
 };
 
 /**

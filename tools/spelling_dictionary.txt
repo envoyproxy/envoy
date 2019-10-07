@@ -330,9 +330,11 @@ abcd
 absl
 accessor
 accessors
+acks
 acls
 addr
 agg
+alice
 alignas
 alignof
 alloc
@@ -434,6 +436,7 @@ deletable
 deleter
 delim
 deque
+deprecations
 dereference
 dereferences
 dereferencing
@@ -643,6 +646,7 @@ paren
 parentid
 parsers
 passthroughs
+pausable
 pcall
 pcap
 pclose
@@ -817,6 +821,7 @@ unordered
 unowned
 unparented
 unpause
+unpaused
 unpopulated
 unprotect
 unref

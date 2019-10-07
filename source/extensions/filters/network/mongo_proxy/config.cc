@@ -20,7 +20,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
 
   ASSERT(!proto_config.stat_prefix().empty());
 
-  const std::string stat_prefix = fmt::format("mongo.{}.", proto_config.stat_prefix());
+  const std::string stat_prefix = fmt::format("mongo.{}", proto_config.stat_prefix());
   AccessLogSharedPtr access_log;
   if (!proto_config.access_log().empty()) {
     access_log.reset(new AccessLog(proto_config.access_log(), context.accessLogManager(),

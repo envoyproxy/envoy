@@ -12,6 +12,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
+#include "common/grpc/google_grpc_context.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -83,6 +84,14 @@ public:
 
 private:
   void completionThread();
+
+  // There is blanket google-grpc initialization in MainCommonBase, but that
+  // doesn't cover unit tests. However, putting blanket coverage in ProcessWide
+  // causes background threaded memory allocation in all unit tests making it
+  // hard to measure memory. Thus we also initialize grpc using our idempotent
+  // wrapper-class in classes that need it. See
+  // https://github.com/envoyproxy/envoy/issues/8282 for details.
+  GoogleGrpcContext google_grpc_context_;
 
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.
@@ -286,7 +295,7 @@ private:
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
   std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
-      completed_ops_ GUARDED_BY(completed_ops_lock_);
+      completed_ops_ ABSL_GUARDED_BY(completed_ops_lock_);
   Thread::MutexBasicLockable completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;

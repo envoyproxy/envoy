@@ -26,7 +26,7 @@ envoy_cc_test_library(
     hdrs = ["test_utils.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
 )
 

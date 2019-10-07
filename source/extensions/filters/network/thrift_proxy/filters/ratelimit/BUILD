@@ -22,7 +22,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_interface",
-        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:rate_limit_cc",
+        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg_cc_proto",
     ],
 )
 

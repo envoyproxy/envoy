@@ -24,6 +24,8 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/network/application_protocol.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -570,6 +572,16 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
     protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
                                                                    : Http::Protocol::Http11;
   }
+
+  if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
+          Network::ApplicationProtocols::key())) {
+    const auto& alpn =
+        callbacks_->streamInfo().filterState().getDataReadOnly<Network::ApplicationProtocols>(
+            Network::ApplicationProtocols::key());
+    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{alpn.value()});
+  }
+
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
 }
@@ -1362,7 +1374,10 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
         parent.timeSource().systemTime());
-    span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+    if (parent.attempt_count_ != 1) {
+      // This is a retry request, add this metadata to span.
+      span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
+    }
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1370,9 +1385,11 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
 Filter::UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
-    // TODO(mattklein123): Add tags based on what happened to this request (retries, reset, etc.).
-    span_->finishSpan();
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
+                                                     upstream_trailers_.get(), stream_info_,
+                                                     Tracing::EgressConfig::get());
   }
+
   if (per_try_timeout_ != nullptr) {
     // Allows for testing.
     per_try_timeout_->disableTimer();
@@ -1511,6 +1528,12 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                             absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
+  if (span_ != nullptr) {
+    // Add tags about reset.
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+  }
+
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -1525,6 +1548,11 @@ void Filter::UpstreamRequest::resetStream() {
   // Don't reset the stream if we're already done with it.
   if (encode_complete_ && decode_complete_) {
     return;
+  }
+
+  if (span_ != nullptr) {
+    // Add tags about the cancellation.
+    span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
   if (conn_pool_stream_handle_) {

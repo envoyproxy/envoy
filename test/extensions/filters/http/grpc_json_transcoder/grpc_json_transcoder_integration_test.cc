@@ -60,7 +60,8 @@ protected:
                        const std::vector<std::string>& grpc_request_messages,
                        const std::vector<std::string>& grpc_response_messages,
                        const Status& grpc_status, Http::HeaderMap&& response_headers,
-                       const std::string& response_body, bool full_response = true) {
+                       const std::string& response_body, bool full_response = true,
+                       bool always_send_trailers = false) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response;
@@ -98,7 +99,7 @@ protected:
       Http::TestHeaderMapImpl response_headers;
       response_headers.insertStatus().value(200);
       response_headers.insertContentType().value(std::string("application/grpc"));
-      if (grpc_response_messages.empty()) {
+      if (grpc_response_messages.empty() && !always_send_trailers) {
         response_headers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
         response_headers.insertGrpcMessage().value(absl::string_view(
             grpc_status.error_message().data(), grpc_status.error_message().size()));
@@ -375,6 +376,54 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
       R"({"code":5,"message":"Shelf 100 Not Found"})");
 }
 
+// Upstream sends headers (e.g. sends metadata), and then sends trailer with an error.
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
+  const std::string filter =
+      R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor: "{}"
+              services: "bookstore.Bookstore"
+              convert_grpc_status: true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/100"}, {":authority", "host"}},
+      "", {"shelf: 100"}, {}, Status(Code::NOT_FOUND, "Shelf 100 Not Found"),
+      Http::TestHeaderMapImpl{{":status", "404"},
+                              {"content-type", "application/json"},
+                              {"grpc-status", UnexpectedHeaderValue},
+                              {"grpc-message", UnexpectedHeaderValue}},
+      R"({"code":5,"message":"Shelf 100 Not Found"})", true, true);
+}
+
+// Streaming backend returns an error in a trailer-only response.
+TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
+  const std::string filter =
+      R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor: "{}"
+              services: "bookstore.Bookstore"
+              convert_grpc_status: true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/37/books"}, {":authority", "host"}},
+      "", {"shelf: 37"}, {}, Status(Code::NOT_FOUND, "Shelf 37 Not Found"),
+      Http::TestHeaderMapImpl{{":status", "404"},
+                              {"content-type", "application/json"},
+                              {"grpc-status", UnexpectedHeaderValue},
+                              {"grpc-message", UnexpectedHeaderValue}},
+      R"({"code":5,"message":"Shelf 37 Not Found"})");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::DeleteBookRequest, Empty>(
@@ -430,6 +479,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, BindingAndBody) {
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
   HttpIntegrationTest::initialize();
+
+  // 1: Normal streaming get
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -439,6 +490,22 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
       Status(), Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})"
       R"(,{"id":"2","author":"George R.R. Martin","title":"A Game of Thrones"}])");
+
+  // 2: Empty response (trailers only) from streaming backend.
+  // Response type is a valid JSON, so content type should be application/json.
+  // Regression test for github.com/envoyproxy/envoy#5011
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/2/books"}, {":authority", "host"}},
+      "", {"shelf: 2"}, {}, Status(),
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}}, "[]");
+
+  // 3: Empty response (trailers only) from streaming backend, with a gRPC error.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/37/books"}, {":authority", "host"}},
+      "", {"shelf: 37"}, {}, Status(Code::NOT_FOUND, "Shelf 37 not found"),
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}}, "[]");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
@@ -553,6 +620,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
 
   // The valid deep struct is parsed successfully.
   // Since we didn't set the response, it return 503.
+  // Response body is empty (not a valid JSON), so content type should be application/grpc.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
       Http::TestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},

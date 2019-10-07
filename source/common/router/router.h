@@ -92,10 +92,10 @@ public:
 
   private:
     static HeaderCheckResult hasValidRetryFields(Http::HeaderEntry* header_entry,
-                                                 const ParseRetryFlagsFunc& parseFn) {
+                                                 const ParseRetryFlagsFunc& parse_fn) {
       HeaderCheckResult r;
       if (header_entry) {
-        const auto flags_and_validity = parseFn(header_entry->value().getStringView());
+        const auto flags_and_validity = parse_fn(header_entry->value().getStringView());
         r.valid_ = flags_and_validity.second;
         r.entry_ = header_entry;
       }
@@ -330,6 +330,10 @@ public:
 
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
     return callbacks_->getUpstreamSocketOptions();
+  }
+
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return transport_socket_options_;
   }
 
   /**
@@ -583,6 +587,8 @@ private:
   bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
+
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 };
 
 class ProdFilter : public Filter {

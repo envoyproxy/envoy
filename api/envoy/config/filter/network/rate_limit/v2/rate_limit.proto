@@ -18,14 +18,14 @@ import "validate/validate.proto";
 
 message RateLimit {
   // The prefix to use when emitting :ref:`statistics <config_network_filters_rate_limit_stats>`.
-  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The rate limit domain to use in the rate limit service request.
-  string domain = 2 [(validate.rules).string.min_bytes = 1];
+  string domain = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // The rate limit descriptor list to use in the rate limit service request.
-  repeated envoy.api.v2.ratelimit.RateLimitDescriptor descriptors = 3
-      [(validate.rules).repeated .min_items = 1];
+  repeated api.v2.ratelimit.RateLimitDescriptor descriptors = 3
+      [(validate.rules).repeated = {min_items: 1}];
 
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
@@ -40,6 +40,6 @@ message RateLimit {
   // Configuration for an external rate limit service provider. If not
   // specified, any calls to the rate limit service will immediately return
   // success.
-  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 6
-      [(validate.rules).message.required = true];
+  ratelimit.v2.RateLimitServiceConfig rate_limit_service = 6
+      [(validate.rules).message = {required: true}];
 }
