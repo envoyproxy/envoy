@@ -4,6 +4,7 @@ Checks:          'abseil-*,
                   clang-diagnostic-*,
                   misc-unused-using-decls,
                   modernize-*,
+                  -modernize-use-trailing-return-type,
                   performance-*,
                   readability-braces-around-statements,
                   readability-container-size-empty,
@@ -58,6 +59,9 @@ CheckOptions:
 
   - key:             modernize-use-auto.MinTypeNameLength
     value:           '10'
+
+  - key:             readability-identifier-naming.ClassCase
+    value:           'CamelCase'
 
   - key:             readability-identifier-naming.EnumCase
     value:           'CamelCase'

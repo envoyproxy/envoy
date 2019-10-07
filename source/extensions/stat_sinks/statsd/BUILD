@@ -21,6 +21,6 @@ envoy_cc_library(
         "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/common/statsd:statsd_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )

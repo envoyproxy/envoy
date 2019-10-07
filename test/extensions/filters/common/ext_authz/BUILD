@@ -62,6 +62,6 @@ envoy_cc_mock(
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
