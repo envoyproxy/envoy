@@ -488,6 +488,8 @@ min_rtt_calc_params:
   // random value > 10% of the interval.
   EXPECT_CALL(random_, random()).WillOnce(Return(15000));
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(105000), _));
+  // Verify the sample timer is reset after the minRTT calculation occurs.
+  EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
   for (int i = 0; i < 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
@@ -525,6 +527,8 @@ min_rtt_calc_params:
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));
+  // Verify the sample timer is reset after the minRTT calculation occurs.
+  EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
   for (int i = 0; i < 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
