@@ -203,7 +203,7 @@ message OpenCensusConfig {
 message XRayConfig {
   // The endpoint of the X-Ray Daemon where the spans will be sent. Since by default daemon
   // listens to localhost:2000, so the default value is 127.0.0.1:2000.
-  string daemon_endpoint = 1 [(validate.rules).string.min_bytes = 1];
+  string daemon_endpoint = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The custom name to name a X-Ray segment. By default will use cluster name.
   string segment_name = 2;
