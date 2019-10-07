@@ -117,7 +117,7 @@ http_filters:
 
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr rds_;
+  RouteConfigProviderSharedPtr rds_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -331,7 +331,7 @@ public:
 
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr provider_;
+  RouteConfigProviderSharedPtr provider_;
 };
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -475,6 +475,9 @@ virtual_hosts:
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
+
+  EXPECT_EQ(provider_.get(), provider2.get())
+      << "same rds config provider object should be generate";
 
   // So this means that both provider have same subscription.
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
