@@ -92,9 +92,11 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
 
-// When compiled for debug, ASSERT_DFATAL is simply an ASSERT.
-#define ASSERT_DFATAL(expr) ASSERT(expr, "ASSERT_DFATAL()")
-#define ASSERT_DFATAL_OR(expr, escape) ASSERT(expr, "ASSERT_DFATAL_OR(" #escape ")")
+// When compiled for debug, ASSERT_OR_LOG is simply an ASSERT. This
+// is similar in principle to Chromium's LOG(DFATAL):
+// https://chromium.googlesource.com/chromium/src/+/master/base/logging.h#149
+#define ASSERT_OR_LOG(expr) ASSERT(expr, "ASSERT_OR_LOG()")
+#define ASSERT_OR_LOG_AND(expr, escape) ASSERT(expr, "ASSERT_OR_LOG_AND(" #escape ")")
 
 #else
 
@@ -106,16 +108,16 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
     (void)__assert_dummy_variable;                                                                 \
   } while (false)
 
-// When compiled for optimization, ASSERT_DFATAL works like ENVOY_LOG_MISC_(error, ...)
-#define ASSERT_DFATAL(expr) ENVOY_LOG_MISC(error, "ASSERT_DFATAL({})", #expr)
+// When compiled for optimization, ASSERT_OR_LOG logs an error.
+#define ASSERT_OR_LOG(expr) ENVOY_LOG_MISC(error, "ASSERT_OR_LOG({})", #expr)
 
-// Note that ASSERT_DFATAL_OR's multi-line definition is not wrapped in a
+// Note that ASSERT_OR_LOG_AND's multi-line definition is not wrapped in a
 // do/while because it's possible the caller may want to use 'break' as the
 // escape. This is OK because Envoy style is to use braces for all conditionals,
 // so there can be no mistaken binding of a trailing else.
-#define ASSERT_DFATAL_OR(expr, escape)                                                             \
+#define ASSERT_OR_LOG_AND(expr, escape)                                                            \
   if (!(expr)) {                                                                                   \
-    ENVOY_LOG_MISC(error, "ASSERT_DFATAL_OR({}, {})", #expr, #escape);                             \
+    ENVOY_LOG_MISC(error, "ASSERT_OR_LOG_AND({}, {})", #expr, #escape);                            \
     escape;                                                                                        \
   }
 

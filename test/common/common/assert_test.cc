@@ -25,20 +25,20 @@ TEST(AssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ ASSERT(0); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, ""); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ ASSERT(0, "With some logs"); }, ".*assert failure: 0. Details: With some logs.*");
-  EXPECT_DEATH({ ASSERT_DFATAL(0); }, ".assert failure: 0*");
+  EXPECT_DEATH({ ASSERT_OR_LOG(0); }, ".assert failure: 0*");
   expected_counted_failures = 0;
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0", ASSERT(0, ""));
   EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: With some logs",
                       ASSERT(0, "With some logs"));
-  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_DFATAL()", ASSERT_DFATAL(0));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_OR_LOG()", ASSERT_OR_LOG(0));
   expected_counted_failures = 4;
 #else
   EXPECT_NO_LOGS(ASSERT(0));
   EXPECT_NO_LOGS(ASSERT(0, ""));
   EXPECT_NO_LOGS(ASSERT(0, "With some logs"));
-  EXPECT_LOG_CONTAINS("error", "ASSERT_DFATAL(0)", ASSERT_DFATAL(0));
+  EXPECT_LOG_CONTAINS("error", "ASSERT_OR_LOG(0)", ASSERT_OR_LOG(0));
   expected_counted_failures = 0;
 #endif
 
@@ -47,13 +47,41 @@ TEST(AssertDeathTest, VariousLogs) {
 
 TEST(AssertDeathTest, LogDfatalOrReturn) {
 #ifndef NDEBUG
-  EXPECT_DEATH({ ASSERT_DFATAL_OR(0, return ); }, ".assert failure: 0*");
+  EXPECT_DEATH({ ASSERT_OR_LOG_AND(0, return ); }, ".assert failure: 0*");
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
-  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_DFATAL_OR(return)",
-                      ASSERT_DFATAL_OR(0, return ));
+  EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_OR_LOG_AND(return)",
+                      ASSERT_OR_LOG_AND(0, return ));
 #else
-  EXPECT_LOG_CONTAINS("error", "ASSERT_DFATAL_OR(0)", ASSERT_DFATAL_OR(0, return ));
+  EXPECT_LOG_CONTAINS("error", "ASSERT_OR_LOG_AND(0)", ASSERT_OR_LOG_AND(0, return ));
   EXPECT_TRUE(false) << "statement should not be reached due to _OR";
+#endif
+}
+
+TEST(AssertDeathTest, LogDfatalOrBreak) {
+  uint32_t count = 0;
+  const uint32_t iters = 10;
+  for (uint32_t i = 0; i < iters; ++i) {
+    ++count;
+#ifndef NDEBUG
+    EXPECT_DEATH({ ASSERT_OR_LOG_AND(0, break); }, ".assert failure: 0*");
+#elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+    EXPECT_LOG_CONTAINS("critical", "assert failure: 0. Details: ASSERT_OR_LOG_AND(return)",
+                        ASSERT_OR_LOG_AND(0, break));
+#else
+    EXPECT_LOG_CONTAINS("error", "ASSERT_OR_LOG_AND(0)", ASSERT_OR_LOG_AND(0, return ));
+    EXPECT_TRUE(false) << "statement should not be reached due to _OR";
+#endif
+  }
+
+#ifndef NDEBUG
+  // For debug death-tests, the break will not occur, there will be an assertion
+  // which is trapped by the EXPECT_DEATH macro.
+  EXPECT_EQ(iters, count);
+#elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
+  EXPECT_EQ(iters, count);
+#else
+  // For debug builds, the break occurs, so the loop only runs once.
+  EXPECT_EQ(1, count);
 #endif
 }
 
