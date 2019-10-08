@@ -8,7 +8,7 @@ import re
 ANNOTATION_REGEX = re.compile('\[#([\w-]+?):(.*?)\]\s?', re.DOTALL)
 ANNOTATION_LINE_REGEX_FORMAT = '[^\S\r\n]*\[#%s:.*?\][^\S\r\n]*\n?'
 
-ANNOTATION_COMMENT_FORMAT = ' [#%s:%s]'
+ANNOTATION_LINE_FORMAT = ' [#%s:%s]\n'
 
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'
@@ -17,9 +17,8 @@ DOC_TITLE_ANNOTATION = 'protodoc-title'
 # field.
 NOT_IMPLEMENTED_HIDE_ANNOTATION = 'not-implemented-hide'
 
-# For large protos, place a comment at the top that specifies the next free field number
+# For large protos, place a comment at the top that specifies the next free field number.
 NEXT_FREE_FIELD_ANNOTATION = 'next-free-field'
-NEXT_FREE_FIELD_MIN = 5
 
 # Comment that allows for easy searching for things that need cleaning up in the next major
 # API version.
@@ -77,7 +76,7 @@ def ExtractAnnotations(s, inherited_annotations=None):
 
 
 def FormatAnnotation(annotation, content):
-  return ANNOTATION_COMMENT_FORMAT % (annotation, content)
+  return ANNOTATION_LINE_FORMAT % (annotation, content)
 
 
 def WithoutAnnotation(s, annotation):
@@ -87,7 +86,3 @@ def WithoutAnnotation(s, annotation):
 
 def WithoutAnnotations(s):
   return re.sub(ANNOTATION_REGEX, '', s)
-
-
-def NextFreeFieldXformer(next_free):
-  return lambda _: next_free if next_free > NEXT_FREE_FIELD_MIN else None
