@@ -19,7 +19,6 @@ namespace XRay {
  * @param text The string to compare against the pattern.
  * @return whether the text matches the pattern.
  */
-
 bool wildcardMatch(absl::string_view pattern, absl::string_view input);
 } // namespace XRay
 } // namespace Tracers

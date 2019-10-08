@@ -49,7 +49,7 @@ TEST(XRayWildcardTest, globMatch) {
 TEST(XRayWildcardTest, globMismatch) {
   ASSERT_FALSE(wildcardMatch("foo*", "fo0"));
   ASSERT_FALSE(wildcardMatch("fo*obar", "foobaz"));
-  ASSERT_FALSE(wildcardMatch("mis*spell", "mispell"));
+  ASSERT_FALSE(wildcardMatch("mis*spellx", "mispellx"));
   ASSERT_FALSE(wildcardMatch("f?*", "boo"));
 }
 
