@@ -16,7 +16,7 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
   {
     Buffer::OwnedImpl buffer;
     GrpcMessageCounter counter;
-    EXPECT_FALSE(IncrementMessageCounter(buffer, &counter));
+    EXPECT_EQ(0, IncrementMessageCounter(buffer, &counter));
     EXPECT_EQ(counter.state, GrpcMessageCounter::GrpcReadState::ExpectByte0);
     EXPECT_EQ(counter.count, 0);
   }
@@ -25,7 +25,7 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
     Buffer::OwnedImpl buffer;
     GrpcMessageCounter counter;
     Buffer::addSeq(buffer, {0});
-    EXPECT_TRUE(IncrementMessageCounter(buffer, &counter));
+    EXPECT_EQ(1, IncrementMessageCounter(buffer, &counter));
     EXPECT_EQ(counter.state, GrpcMessageCounter::GrpcReadState::ExpectByte1);
     EXPECT_EQ(counter.count, 1);
   }
@@ -34,7 +34,7 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
     Buffer::OwnedImpl buffer;
     GrpcMessageCounter counter;
     Buffer::addSeq(buffer, {1, 0, 0, 0, 1, 0xFF});
-    EXPECT_TRUE(IncrementMessageCounter(buffer, &counter));
+    EXPECT_EQ(1, IncrementMessageCounter(buffer, &counter));
     EXPECT_EQ(counter.state, GrpcMessageCounter::GrpcReadState::ExpectByte0);
     EXPECT_EQ(counter.count, 1);
   }
@@ -43,12 +43,12 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
     GrpcMessageCounter counter;
     Buffer::OwnedImpl buffer1;
     Buffer::addSeq(buffer1, {1, 0, 0, 0});
-    EXPECT_TRUE(IncrementMessageCounter(buffer1, &counter));
+    EXPECT_EQ(1, IncrementMessageCounter(buffer1, &counter));
     EXPECT_EQ(counter.state, GrpcMessageCounter::GrpcReadState::ExpectByte4);
     EXPECT_EQ(counter.count, 1);
     Buffer::OwnedImpl buffer2;
     Buffer::addSeq(buffer2, {1, 0xFF});
-    EXPECT_FALSE(IncrementMessageCounter(buffer2, &counter));
+    EXPECT_EQ(0, IncrementMessageCounter(buffer2, &counter));
     EXPECT_EQ(counter.count, 1);
   }
 
@@ -57,7 +57,7 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
     GrpcMessageCounter counter;
     Buffer::addSeq(buffer, {1, 0, 0, 0, 1, 0xFF});
     Buffer::addSeq(buffer, {0, 0, 0, 0, 2, 0xFF, 0xFF});
-    EXPECT_TRUE(IncrementMessageCounter(buffer, &counter));
+    EXPECT_EQ(2, IncrementMessageCounter(buffer, &counter));
     EXPECT_EQ(counter.state, GrpcMessageCounter::GrpcReadState::ExpectByte0);
     EXPECT_EQ(counter.count, 2);
   }
@@ -69,8 +69,8 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
     // message spans two buffers
     Buffer::addSeq(buffer1, {1, 0, 0, 0, 2, 0xFF});
     Buffer::addSeq(buffer2, {0xFF, 0, 0, 0, 0, 2, 0xFF, 0xFF});
-    EXPECT_TRUE(IncrementMessageCounter(buffer1, &counter));
-    EXPECT_TRUE(IncrementMessageCounter(buffer2, &counter));
+    EXPECT_EQ(1, IncrementMessageCounter(buffer1, &counter));
+    EXPECT_EQ(1, IncrementMessageCounter(buffer2, &counter));
     EXPECT_EQ(counter.state, GrpcMessageCounter::GrpcReadState::ExpectByte0);
     EXPECT_EQ(counter.count, 2);
   }
@@ -83,7 +83,7 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
     Buffer::addRepeated(buffer, 1 << 8, 0xFF);
     // Start second message
     Buffer::addSeq(buffer, {0});
-    EXPECT_TRUE(IncrementMessageCounter(buffer, &counter));
+    EXPECT_EQ(2, IncrementMessageCounter(buffer, &counter));
     EXPECT_EQ(counter.state, GrpcMessageCounter::GrpcReadState::ExpectByte1);
     EXPECT_EQ(counter.count, 2);
   }
@@ -93,7 +93,7 @@ TEST(MessageCounterTest, IncrementMessageCounter) {
     Buffer::OwnedImpl buffer;
     GrpcMessageCounter counter;
     Buffer::addRepeated(buffer, 10, 0);
-    EXPECT_TRUE(IncrementMessageCounter(buffer, &counter));
+    EXPECT_EQ(2, IncrementMessageCounter(buffer, &counter));
     EXPECT_EQ(counter.count, 2);
   }
 }

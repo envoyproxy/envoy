@@ -30,6 +30,10 @@ public:
                   const RequestNames& request_names, bool success) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
                   bool success) override;
+  void chargeRequestStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
+                         uint64_t amount) override;
+  void chargeResponseStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
+                          uint64_t amount) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
@@ -64,6 +68,8 @@ private:
   const Stats::StatName failure_;
   const Stats::StatName total_;
   const Stats::StatName zero_;
+  const Stats::StatName request_count_;
+  const Stats::StatName response_count_;
 };
 
 } // namespace Grpc

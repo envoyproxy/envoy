@@ -5,16 +5,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcStreaming {
 
-bool IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* counter) {
+uint64_t IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* counter) {
   uint64_t pos = 0;
   uint8_t byte = 0;
-  bool updated = false;
+  uint64_t delta = 0;
   while (pos < data.length()) {
     switch (counter->state) {
     case GrpcMessageCounter::ExpectByte0:
       // skip compress flag, increment message count
       counter->count += 1;
-      updated = true;
+      delta += 1;
       counter->current_size = 0;
       pos += 1;
       counter->state = GrpcMessageCounter::ExpectByte1;
@@ -41,7 +41,7 @@ bool IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* counter
       break;
     }
   }
-  return updated;
+  return delta;
 }
 
 } // namespace GrpcStreaming

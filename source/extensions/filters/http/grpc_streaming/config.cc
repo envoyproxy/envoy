@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 
 #include "extensions/filters/http/grpc_streaming/message_counter.h"
 
@@ -16,7 +17,7 @@ namespace {
 
 class GrpcStreamingFilter : public Http::StreamFilter {
 public:
-  GrpcStreamingFilter() { maybeWriteState(true, true); }
+  explicit GrpcStreamingFilter(Grpc::Context& context) : context_(context) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -24,12 +25,22 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
     grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+    if (grpc_request_ && decoder_callbacks_) {
+      cluster_ = decoder_callbacks_->clusterInfo();
+      if (cluster_) {
+        request_names_ = context_.resolveServiceAndMethod(headers.Path());
+      }
+    }
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     if (grpc_request_) {
-      if (IncrementMessageCounter(data, &request_counter_)) {
+      uint64_t delta = IncrementMessageCounter(data, &request_counter_);
+      if (delta > 0) {
         maybeWriteState(true, false);
+        if (cluster_ && request_names_) {
+          context_.chargeRequestStat(*cluster_, *request_names_, delta);
+        }
       }
     }
     return Http::FilterDataStatus::Continue;
@@ -37,8 +48,8 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& decoder_callbacks) override {
-    filter_state_ = &decoder_callbacks.streamInfo().filterState();
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
   }
 
   // Http::StreamEncoderFilter
@@ -51,8 +62,12 @@ public:
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool) override {
     if (grpc_response_) {
-      if (IncrementMessageCounter(data, &response_counter_)) {
+      uint64_t delta = IncrementMessageCounter(data, &response_counter_);
+      if (delta > 0) {
         maybeWriteState(false, true);
+        if (cluster_ && request_names_) {
+          context_.chargeResponseStat(*cluster_, *request_names_, delta);
+        }
       }
     }
     return Http::FilterDataStatus::Continue;
@@ -66,17 +81,18 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
   void maybeWriteState(bool update_request, bool update_response) {
-    if (filter_state_ == nullptr) {
+    if (decoder_callbacks_ == nullptr) {
       return;
     }
-    if (!filter_state_->hasDataWithName(HttpFilterNames::get().GrpcStreaming)) {
-      filter_state_->setData(HttpFilterNames::get().GrpcStreaming,
-                             std::make_unique<GrpcMessageCounterObject>(),
-                             StreamInfo::FilterState::StateType::Mutable);
+    auto& filter_state = decoder_callbacks_->streamInfo().filterState();
+    if (!filter_state.hasDataWithName(HttpFilterNames::get().GrpcStreaming)) {
+      filter_state.setData(HttpFilterNames::get().GrpcStreaming,
+                           std::make_unique<GrpcMessageCounterObject>(),
+                           StreamInfo::FilterState::StateType::Mutable);
     }
 
-    auto& data = filter_state_->getDataMutable<GrpcMessageCounterObject>(
-        HttpFilterNames::get().GrpcStreaming);
+    auto& data =
+        filter_state.getDataMutable<GrpcMessageCounterObject>(HttpFilterNames::get().GrpcStreaming);
     if (update_request) {
       data.request_message_count = request_counter_.count;
     }
@@ -86,20 +102,23 @@ public:
   }
 
 private:
-  StreamInfo::FilterState* filter_state_{nullptr};
+  Grpc::Context& context_;
   bool grpc_request_{false};
   bool grpc_response_{false};
   GrpcMessageCounter request_counter_;
   GrpcMessageCounter response_counter_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+  absl::optional<Grpc::Context::RequestNames> request_names_;
 };
 
 } // namespace
 
 Http::FilterFactoryCb
 GrpcStreamingFilterConfig::createFilter(const std::string&,
-                                        Server::Configuration::FactoryContext&) {
-  return [](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<GrpcStreamingFilter>());
+                                        Server::Configuration::FactoryContext& factory_context) {
+  return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
+    callbacks.addStreamFilter(std::make_shared<GrpcStreamingFilter>(factory_context.grpcContext()));
   };
 }
 

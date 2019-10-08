@@ -28,6 +28,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/grpc:common_lib",
+        "//source/common/grpc:context_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
     ],

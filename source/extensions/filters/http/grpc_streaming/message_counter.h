@@ -9,8 +9,6 @@ namespace GrpcStreaming {
 
 // The struct to store gRPC message counter state.
 struct GrpcMessageCounter {
-  GrpcMessageCounter() : state(ExpectByte0), current_size(0), count(0){};
-
   // gRPC uses 5 byte header to encode subsequent message length
   enum GrpcReadState {
     ExpectByte0 = 0,
@@ -22,20 +20,20 @@ struct GrpcMessageCounter {
   };
 
   // current read state
-  GrpcReadState state;
+  GrpcReadState state{ExpectByte0};
 
   // current message size
-  uint64_t current_size;
+  uint64_t current_size{0};
 
   // message count
-  uint64_t count;
+  uint64_t count{0};
 };
 
 // Detect gRPC message boundaries and increment the counters on a message
 // start: each message is prefixed by 5 bytes length-prefix
-// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md. Returns true
-// if the message count is updated.
-bool IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* counter);
+// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md. Returns the delta
+// increment.
+uint64_t IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* counter);
 
 } // namespace GrpcStreaming
 } // namespace HttpFilters

@@ -35,7 +35,8 @@ TEST(GrpcStreamingFilterConfigTest, FilterFactory) {
   ON_CALL(callbacks, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
   filter->setDecoderFilterCallbacks(callbacks);
 
-  Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc+proto"}};
+  Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc+proto"},
+                                          {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
 
   ProtobufWkt::Value v1;
@@ -49,8 +50,16 @@ TEST(GrpcStreamingFilterConfigTest, FilterFactory) {
 
   auto& data = stream_info.filterState().getDataMutable<GrpcMessageCounterObject>(
       HttpFilterNames::get().GrpcStreaming);
-  EXPECT_EQ(2, data.request_message_count);
-  EXPECT_EQ(0, data.response_message_count);
+  EXPECT_EQ(2U, data.request_message_count);
+  EXPECT_EQ(0U, data.response_message_count);
+  EXPECT_EQ(2U, callbacks.clusterInfo()
+                    ->statsScope()
+                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.request_count")
+                    .value());
+  EXPECT_EQ(0U, callbacks.clusterInfo()
+                    ->statsScope()
+                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_count")
+                    .value());
 
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc+proto"},
                                            {":status", "200"}};
@@ -59,12 +68,33 @@ TEST(GrpcStreamingFilterConfigTest, FilterFactory) {
   Buffer::OwnedImpl buffer;
   buffer.add(*b1);
   buffer.add(*b2);
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->encodeData(buffer, true));
-
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->encodeData(buffer, false));
   data = stream_info.filterState().getDataMutable<GrpcMessageCounterObject>(
       HttpFilterNames::get().GrpcStreaming);
-  EXPECT_EQ(2, data.request_message_count);
-  EXPECT_EQ(2, data.response_message_count);
+  EXPECT_EQ(2U, data.request_message_count);
+  EXPECT_EQ(2U, data.response_message_count);
+  EXPECT_EQ(2U, callbacks.clusterInfo()
+                    ->statsScope()
+                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.request_count")
+                    .value());
+  EXPECT_EQ(2U, callbacks.clusterInfo()
+                    ->statsScope()
+                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_count")
+                    .value());
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->encodeData(*b1, true));
+  data = stream_info.filterState().getDataMutable<GrpcMessageCounterObject>(
+      HttpFilterNames::get().GrpcStreaming);
+  EXPECT_EQ(2U, data.request_message_count);
+  EXPECT_EQ(3U, data.response_message_count);
+  EXPECT_EQ(2U, callbacks.clusterInfo()
+                    ->statsScope()
+                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.request_count")
+                    .value());
+  EXPECT_EQ(3U, callbacks.clusterInfo()
+                    ->statsScope()
+                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_count")
+                    .value());
 }
 
 } // namespace
