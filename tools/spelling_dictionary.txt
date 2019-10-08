@@ -744,6 +744,8 @@ sockaddr
 sockfd
 SotW
 SotwSubscriptionState
+SotwSubscriptionState's
+{Delta,Sotw}SubscriptionStateFactory
 spanid
 spdlog
 splitter
