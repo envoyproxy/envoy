@@ -129,14 +129,14 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
     return false;
   }
 
-  using encPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
-  std::vector<encPair> pairs;
+  using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
+  std::vector<EncPair> pairs;
 
   std::vector<std::string> allowed_compressors(registeredCompressors());
 
   for (const auto token : StringUtil::splitToken(accept_encoding->value().getStringView(), ",",
                                                  false /* keep_empty */)) {
-    encPair pair = std::make_pair(StringUtil::trim(StringUtil::cropRight(token, ";")), 1);
+    EncPair pair = std::make_pair(StringUtil::trim(StringUtil::cropRight(token, ";")), 1);
     const auto params = StringUtil::cropLeft(token, ";");
     if (params != token) {
       const auto q_value = StringUtil::cropLeft(params, "=");
@@ -171,7 +171,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   }
 
   std::sort(pairs.begin(), pairs.end(),
-            [](const encPair& a, const encPair& b) -> bool { return a.second > b.second; });
+            [](const EncPair& a, const EncPair& b) -> bool { return a.second > b.second; });
 
   for (const auto pair : pairs) {
     for (const auto& compr : allowed_compressors) {
