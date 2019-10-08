@@ -17,4 +17,4 @@ the *cluster.<route target cluster>.grpc.* namespace.
   :widths: 1, 1, 2
 
   <grpc service>.<grpc method>.request_count, Counter, Total request message count for service/method calls
-  <grpc service>.<grpc method>.request_count, Counter, Total response message count for service/method calls
+  <grpc service>.<grpc method>.response_count, Counter, Total response message count for service/method calls
