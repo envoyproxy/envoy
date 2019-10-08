@@ -154,7 +154,6 @@ message Cluster {
 
   // TransportSocketMatch specifies what transport socket config will be used
   // when the match conditions are satisfied.
-  // [#comment:next free field: 4]
   message TransportSocketMatch {
     // The name of the match, used in stats generation.
     string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -171,7 +170,6 @@ message Cluster {
   }
 
   // Extended cluster type.
-  // [#comment:next free field: 3]
   message CustomClusterType {
     // The type of the cluster to instantiate. The name must match a supported cluster type.
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -182,7 +180,6 @@ message Cluster {
   }
 
   // Only valid when discovery type is EDS.
-  // [#comment:next free field: 3]
   message EdsClusterConfig {
     // Configuration for the source of EDS updates for this Cluster.
     core.ConfigSource eds_config = 1;
@@ -195,7 +192,6 @@ message Cluster {
 
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
-  // [#comment:next free field: 8]
   message LbSubsetConfig {
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
@@ -209,7 +205,6 @@ message Cluster {
     }
 
     // Specifications for subsets.
-    // [#comment:next free field: 3]
     message LbSubsetSelector {
       // Allows to override top level fallback policy per selector.
       enum LbSubsetSelectorFallbackPolicy {
@@ -309,7 +304,6 @@ message Cluster {
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
-  // [#comment:next free field: 5]
   message RingHashLbConfig {
     // The hash function used to hash hosts onto the ketama ring.
     enum HashFunction {
@@ -357,11 +351,9 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#comment:next free field: 7]
   message CommonLbConfig {
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
-    // [#comment:next free field: 4]
     message ZoneAwareLbConfig {
       // Configures percentage of requests that will be considered for zone aware routing
       // if zone aware routing is configured. If not specified, the default is 100%.
@@ -444,7 +436,6 @@ message Cluster {
     bool close_connections_on_host_set_change = 6;
   }
 
-  // [#comment:next free field: 3]
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
@@ -811,7 +802,6 @@ message Cluster {
 //
 // [#proto-status: experimental]
 message LoadBalancingPolicy {
-  // [#comment:next free field: 4]
   message Policy {
     // Required. The name of the LB policy.
     string name = 1;

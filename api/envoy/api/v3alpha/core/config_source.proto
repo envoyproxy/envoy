@@ -17,7 +17,6 @@ import "validate/validate.proto";
 
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
-// [#comment:next free field: 8]
 message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
@@ -86,7 +85,6 @@ message SelfConfigSource {
 }
 
 // Rate Limit settings to be applied for discovery requests made by Envoy.
-// [#comment:next free field: 3]
 message RateLimitSettings {
   // Maximum number of tokens to be used for rate limiting discovery request calls. If not set, a
   // default value of 100 will be used.

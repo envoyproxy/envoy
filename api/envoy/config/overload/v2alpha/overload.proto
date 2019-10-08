@@ -19,7 +19,6 @@ import "validate/validate.proto";
 // It monitors a configurable set of resources and notifies registered listeners
 // when triggers related to those resources fire.
 
-// [#comment:next free field: 4]
 message ResourceMonitor {
   // The name of the resource monitor to instantiate. Must match a registered
   // resource monitor type. The built-in resource monitors are:
@@ -44,7 +43,6 @@ message ThresholdTrigger {
   double value = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 }
 
-// [#comment:next free field: 3]
 message Trigger {
   // The name of the resource this is a trigger for.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -56,7 +54,6 @@ message Trigger {
   }
 }
 
-// [#comment:next free field: 3]
 message OverloadAction {
   // The name of the overload action. This is just a well-known string that listeners can
   // use for registering callbacks. Custom overload actions should be named using reverse
@@ -69,7 +66,6 @@ message OverloadAction {
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
-// [#comment:next free field: 4]
 message OverloadManager {
   // The interval for refreshing resource usage.
   google.protobuf.Duration refresh_interval = 1;

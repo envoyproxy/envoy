@@ -17,7 +17,6 @@ import "validate/validate.proto";
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 
-// [#comment:next free field: 9]
 message ExtAuthz {
   reserved 4;
 
@@ -83,7 +82,6 @@ message ExtAuthz {
 }
 
 // Configuration for buffering the request data.
-// [#comment:next free field: 3]
 message BufferSettings {
   // Sets the maximum size of a message body that the filter will hold in memory. Envoy will return
   // *HTTP 413* and will *not* initiate the authorization process when buffer reaches the number
@@ -121,7 +119,6 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_api_field_config.filter.http.ext_authz.v3alpha.AuthorizationResponse.allowed_client_headers>`
 // for details.
-// [#comment:next free field: 9]
 message HttpService {
   reserved 3, 4, 5, 6;
 
@@ -138,7 +135,6 @@ message HttpService {
   AuthorizationResponse authorization_response = 8;
 }
 
-// [#comment:next free field: 3]
 message AuthorizationRequest {
   // Authorization request will include the client request headers that have a correspondent match
   // in the :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>`. Note that in addition to the
@@ -156,7 +152,6 @@ message AuthorizationRequest {
   repeated api.v3alpha.core.HeaderValue headers_to_add = 2;
 }
 
-// [#comment:next free field: 3]
 message AuthorizationResponse {
   // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the original client request.
@@ -172,7 +167,6 @@ message AuthorizationResponse {
 }
 
 // Extra settings on a per virtualhost/route/weighted-cluster level.
-// [#comment:next free field: 3]
 message ExtAuthzPerRoute {
   oneof override {
     option (validate.required) = true;

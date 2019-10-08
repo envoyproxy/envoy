@@ -78,7 +78,6 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
-  // [#comment:next free field: 8]
   message Tracing {
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
@@ -176,7 +175,6 @@ message HttpConnectionManager {
   // .. warning::
   //    The current implementation of upgrade headers does not work with HTTP/2
   //    upstreams.
-  // [#comment:next free field: 4]
   message UpgradeConfig {
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
@@ -455,7 +453,6 @@ message HttpConnectionManager {
   bool merge_slashes = 33;
 }
 
-// [#comment:next free field: 3]
 message Rds {
   // Configuration source specifier for RDS.
   api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
@@ -473,7 +470,6 @@ message ScopedRouteConfigurationsList {
       [(validate.rules).repeated = {min_items: 1}];
 }
 
-// [#comment:next free field: 6]
 message ScopedRoutes {
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
   // keys are matched against a set of :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>`
@@ -504,10 +500,8 @@ message ScopedRoutes {
       //    \----> <name>
       //
       //    Each 'a=b' key-value pair constitutes an 'element' of the header field.
-      // [#comment:next free field: 5]
       message HeaderValueExtractor {
         // Specifies a header field's key value pair to match on.
-        // [#comment:next free field: 3]
         message KvElement {
           // The separator between key and value (e.g., '=' separates 'k=v;...').
           // If an element is an empty string, the element is ignored.
@@ -588,7 +582,6 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
-// [#comment:next free field: 5]
 message HttpFilter {
   reserved 3;
 

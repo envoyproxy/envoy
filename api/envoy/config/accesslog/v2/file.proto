@@ -15,7 +15,6 @@ import "validate/validate.proto";
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`
 // that writes log entries directly to a file. Configures the built-in *envoy.file_access_log*
 // AccessLog.
-// [#comment:next free field: 4]
 message FileAccessLog {
   // A path to a local file to which to write the access log entries.
   string path = 1 [(validate.rules).string = {min_bytes: 1}];

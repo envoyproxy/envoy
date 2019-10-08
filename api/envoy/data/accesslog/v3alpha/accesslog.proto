@@ -26,7 +26,6 @@ import "validate/validate.proto";
 // Fields describing *upstream* interaction will explicitly include ``upstream``
 // in their name.
 
-// [#comment:next free field: 3]
 message TCPAccessLogEntry {
   // Common properties shared by all Envoy access logs.
   AccessLogCommon common_properties = 1;
@@ -35,7 +34,6 @@ message TCPAccessLogEntry {
   ConnectionProperties connection_properties = 2;
 }
 
-// [#comment:next free field: 5]
 message HTTPAccessLogEntry {
   // HTTP version
   enum HTTPVersion {
@@ -58,7 +56,6 @@ message HTTPAccessLogEntry {
 }
 
 // Defines fields for a connection
-// [#comment:next free field: 3]
 message ConnectionProperties {
   // Number of bytes received from downstream.
   uint64 received_bytes = 1;
@@ -68,7 +65,6 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#comment:next free field: 21]
 message AccessLogCommon {
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.
@@ -167,7 +163,6 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#comment:next free field: 19]
 message ResponseFlags {
   message Unauthorized {
     // Reasons why the request was unauthorized
@@ -238,7 +233,6 @@ message ResponseFlags {
 }
 
 // Properties of a negotiated TLS connection.
-// [#comment:next free field: 7]
 message TLSProperties {
   enum TLSVersion {
     VERSION_UNSPECIFIED = 0;
@@ -248,9 +242,7 @@ message TLSProperties {
     TLSv1_3 = 4;
   }
 
-  // [#comment:next free field: 3]
   message CertificateProperties {
-    // [#comment:next free field: 3]
     message SubjectAltName {
       oneof san {
         string uri = 1;
@@ -290,7 +282,6 @@ message TLSProperties {
   string tls_session_id = 6;
 }
 
-// [#comment:next free field: 14]
 message HTTPRequestProperties {
   // The request method (RFC 7231/2616).
   // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
@@ -345,7 +336,6 @@ message HTTPRequestProperties {
   map<string, string> request_headers = 13;
 }
 
-// [#comment:next free field: 7]
 message HTTPResponseProperties {
   // The HTTP response code returned by Envoy.
   google.protobuf.UInt32Value response_code = 1;

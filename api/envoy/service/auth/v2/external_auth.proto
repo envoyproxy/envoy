@@ -35,7 +35,6 @@ message CheckRequest {
 }
 
 // HTTP attributes for a denied response.
-// [#comment:next free field: 4]
 message DeniedHttpResponse {
   // This field allows the authorization service to send a HTTP response status
   // code to the downstream client other than 403 (Forbidden).
@@ -51,7 +50,6 @@ message DeniedHttpResponse {
 }
 
 // HTTP attributes for an ok response.
-// [#comment:next free field: 3]
 message OkHttpResponse {
   // HTTP entity headers in addition to the original request headers. This allows the authorization
   // service to append, to add or to override headers from the original request before
@@ -63,7 +61,6 @@ message OkHttpResponse {
 }
 
 // Intended for gRPC and Network Authorization servers `only`.
-// [#comment:next free field: 4]
 message CheckResponse {
   // Status `OK` allows the request. Any other status indicates the request should be denied.
   google.rpc.Status status = 1;

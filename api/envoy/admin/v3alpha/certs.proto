@@ -18,7 +18,6 @@ message Certificates {
   repeated Certificate certificates = 1;
 }
 
-// [#comment:next free field: 3]
 message Certificate {
   // Details of CA certificate.
   repeated CertificateDetails ca_cert = 1;
@@ -27,7 +26,6 @@ message Certificate {
   repeated CertificateDetails cert_chain = 2;
 }
 
-// [#comment:next free field: 7]
 message CertificateDetails {
   // Path of the certificate.
   string path = 1;
@@ -48,7 +46,6 @@ message CertificateDetails {
   google.protobuf.Timestamp expiration_time = 6;
 }
 
-// [#comment:next free field: 3]
 message SubjectAlternateName {
   // Subject Alternate Name.
   oneof name {

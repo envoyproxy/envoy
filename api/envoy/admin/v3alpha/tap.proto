@@ -11,7 +11,6 @@ import "envoy/service/tap/v3alpha/common.proto";
 import "validate/validate.proto";
 
 // The /tap admin request body that is used to configure an active tap session.
-// [#comment:next free field: 3]
 message TapRequest {
   // The opaque configuration ID used to match the configuration to a loaded extension.
   // A tap extension configures a similar opaque ID that is used to match.

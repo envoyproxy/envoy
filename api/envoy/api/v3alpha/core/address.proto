@@ -22,7 +22,6 @@ message Pipe {
   string path = 1 [(validate.rules).string = {min_bytes: 1}];
 }
 
-// [#comment:next free field: 7]
 message SocketAddress {
   enum Protocol {
     TCP = 0;
@@ -71,7 +70,6 @@ message SocketAddress {
   bool ipv4_compat = 6;
 }
 
-// [#comment:next free field: 4]
 message TcpKeepalive {
   // Maximum number of keepalive probes to send without response before deciding
   // the connection is dead. Default is to use the OS level configuration (unless
@@ -88,7 +86,6 @@ message TcpKeepalive {
   google.protobuf.UInt32Value keepalive_interval = 3;
 }
 
-// [#comment:next free field: 4]
 message BindConfig {
   // The address to bind to when creating a socket.
   SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
@@ -110,7 +107,6 @@ message BindConfig {
 // Addresses specify either a logical or physical address and port, which are
 // used to tell Envoy where to bind/listen, connect to upstream and find
 // management servers.
-// [#comment:next free field: 3]
 message Address {
   oneof address {
     option (validate.required) = true;
@@ -123,7 +119,6 @@ message Address {
 
 // CidrRange specifies an IP Address and a prefix length to construct
 // the subnet mask for a `CIDR <https://tools.ietf.org/html/rfc4632>`_ range.
-// [#comment:next free field: 3]
 message CidrRange {
   // IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
   string address_prefix = 1 [(validate.rules).string = {min_bytes: 1}];

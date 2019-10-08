@@ -17,7 +17,6 @@ import "validate/validate.proto";
 //
 // Header should not be used in rules/shadow_rules in RBAC network filter as
 // this information is only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
-// [#comment:next free field: 5]
 message RBAC {
   enum EnforcementType {
     // Apply RBAC policies when the first byte of data arrives on the connection.

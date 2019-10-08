@@ -17,7 +17,6 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Common TLS configuration]
 
-// [#comment:next free field: 5]
 message TlsParameters {
   enum TlsProtocol {
     // Envoy will choose the optimal TLS version.
@@ -104,7 +103,6 @@ message TlsParameters {
 // BoringSSL private key method configuration. The private key methods are used for external
 // (potentially asynchronous) signing and decryption operations. Some use cases for private key
 // methods would be TPM support and TLS acceleration.
-// [#comment:next free field: 4]
 message PrivateKeyProvider {
   // Private key method provider name. The name must match a
   // supported private key method provider type.
@@ -118,7 +116,6 @@ message PrivateKeyProvider {
   }
 }
 
-// [#comment:next free field: 7]
 message TlsCertificate {
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
@@ -173,7 +170,6 @@ message TlsSessionTicketKeys {
   repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
-// [#comment:next free field: 9]
 message CertificateValidationContext {
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
@@ -286,9 +282,7 @@ message CertificateValidationContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#comment:next free field: 9]
 message CommonTlsContext {
-  // [#comment:next free field: 3]
   message CombinedCertificateValidationContext {
     // How to validate peer certificates.
     CertificateValidationContext default_validation_context = 1
@@ -346,7 +340,6 @@ message CommonTlsContext {
   repeated string alpn_protocols = 4;
 }
 
-// [#comment:next free field: 5]
 message UpstreamTlsContext {
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
@@ -368,7 +361,6 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#comment:next free field: 6]
 message DownstreamTlsContext {
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
@@ -391,7 +383,6 @@ message DownstreamTlsContext {
 }
 
 // [#proto-status: experimental]
-// [#comment:next free field: 3]
 message SdsSecretConfig {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via SDS.
@@ -403,7 +394,6 @@ message SdsSecretConfig {
 }
 
 // [#proto-status: experimental]
-// [#comment:next free field: 5]
 message Secret {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;

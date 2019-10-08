@@ -52,7 +52,6 @@ import "validate/validate.proto";
 // The idea behind the API is that (1)/(2)/(3) and (4)/(5) can be sent in 1 request if desired.
 // This enables building complex application scenarios with a generic backend.
 message RateLimitDescriptor {
-  // [#comment:next free field: 3]
   message Entry {
     // Descriptor key.
     string key = 1 [(validate.rules).string = {min_bytes: 1}];

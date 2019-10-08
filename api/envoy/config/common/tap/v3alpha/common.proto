@@ -14,10 +14,8 @@ import "validate/validate.proto";
 // [#protodoc-title: Common tap extension configuration]
 
 // Common configuration for all tap extensions.
-// [#comment:next free field: 4]
 message CommonExtensionConfig {
   // [#not-implemented-hide:]
-  // [#comment:next free field: 3]
   message TapDSConfig {
     // Configuration for the source of TapDS updates for this Cluster.
     api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];

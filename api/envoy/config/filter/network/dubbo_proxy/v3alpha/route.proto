@@ -73,10 +73,9 @@ message RouteAction {
   }
 }
 
-// [#comment:next free field: 3]
+// [#comment:next free field: 5]
 message MethodMatch {
   // The parameter matching type.
-  // [#comment:next free field: 5]
   message ParameterMatchSpecifier {
     oneof parameter_match_specifier {
       // If specified, header match will be performed based on the value of the header.

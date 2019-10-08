@@ -25,7 +25,6 @@ message HttpProtocolOptions {
   google.protobuf.Duration idle_timeout = 1;
 }
 
-// [#comment:next free field: 4]
 message Http1ProtocolOptions {
   // Handle HTTP requests with absolute URLs in the requests. These requests
   // are generally sent by clients to forward/explicit proxies. This allows clients to configure

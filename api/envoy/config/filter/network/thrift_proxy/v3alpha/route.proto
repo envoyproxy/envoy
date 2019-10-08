@@ -105,7 +105,6 @@ message RouteAction {
 // percentage of traffic to be forwarded to each cluster. The router selects an upstream cluster
 // based on these weights.
 message WeightedCluster {
-  // [#comment:next free field: 4]
   message ClusterWeight {
     // Name of the upstream cluster.
     string name = 1 [(validate.rules).string = {min_bytes: 1}];

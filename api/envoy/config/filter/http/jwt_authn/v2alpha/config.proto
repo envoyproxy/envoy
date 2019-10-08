@@ -47,7 +47,6 @@ import "validate/validate.proto";
 //       cache_duration:
 //         seconds: 300
 //
-// [#comment:next free field: 10]
 message JwtProvider {
   // Specify the `principal <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ that issued
   // the JWT, usually a URL or an email address.
@@ -186,7 +185,6 @@ message JwtProvider {
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
-// [#comment:next free field: 3]
 message RemoteJwks {
   // The HTTP URI to fetch the JWKS. For example:
   //
@@ -204,7 +202,6 @@ message RemoteJwks {
 }
 
 // This message specifies a header location to extract JWT token.
-// [#comment:next free field: 3]
 message JwtHeader {
   // The HTTP header name.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -216,7 +213,6 @@ message JwtHeader {
 }
 
 // Specify a required provider with audiences.
-// [#comment:next free field: 3]
 message ProviderWithAudiences {
   // Specify a required provider name.
   string provider_name = 1;
@@ -265,7 +261,6 @@ message ProviderWithAudiences {
 //          - provider_name: provider-B
 //          - provider_name: provider-C
 //
-// [#comment:next free field: 6]
 message JwtRequirement {
   oneof requires_type {
     // Specify a required provider name.
@@ -325,7 +320,6 @@ message JwtRequirementAndList {
 //
 // In above example, all requests matched the path prefix require jwt authentication
 // from "provider-A".
-// [#comment:next free field: 3]
 message RequirementRule {
   // The route matching parameter. Only when the match is satisfied, the "requires" field will
   // apply.
@@ -360,7 +354,6 @@ message RequirementRule {
 //
 // If a filter set "jwt_selector" with "issuer_1" to FilterState for a request,
 // jwt_authn filter will use JwtRequirement{"provider_name": "issuer1"} to verify.
-// [#comment:next free field: 4]
 message FilterStateRule {
   // The filter state name to retrieve the `Router::StringAccessor` object.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -411,7 +404,6 @@ message FilterStateRule {
 //              - provider_name: provider1
 //              - provider_name: provider2
 //
-// [#comment:next free field: 4]
 message JwtAuthentication {
   // Map of provider names to JwtProviders.
   //

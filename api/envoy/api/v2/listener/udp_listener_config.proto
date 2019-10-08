@@ -14,7 +14,6 @@ import "google/protobuf/struct.proto";
 // [#protodoc-title: Udp Listener Config]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#comment:next free field: 4]
 message UdpListenerConfig {
   // Used to look up UDP listener factory, matches "raw_udp_listener" or
   // "quic_listener" to create a specific udp listener.

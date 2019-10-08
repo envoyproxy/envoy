@@ -27,7 +27,6 @@ service RateLimitService {
 // are provided, the server will limit on *ALL* of them and return an OVER_LIMIT response if any
 // of them are over limit. This enables more complex application level rate limiting scenarios
 // if desired.
-// [#comment:next free field: 4]
 message RateLimitRequest {
   // All rate limit requests must specify a domain. This enables the configuration to be per
   // application without fear of overlap. E.g., "envoy".
@@ -44,7 +43,6 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
-// [#comment:next free field: 4]
 message RateLimitResponse {
   enum Code {
     // The response code is not known.
@@ -58,7 +56,6 @@ message RateLimitResponse {
   }
 
   // Defines an actual rate limit in terms of requests per unit of time and the unit itself.
-  // [#comment:next free field: 3]
   message RateLimit {
     enum Unit {
       // The time unit is not known.
@@ -84,7 +81,6 @@ message RateLimitResponse {
     Unit unit = 2;
   }
 
-  // [#comment:next free field: 4]
   message DescriptorStatus {
     // The response code for an individual descriptor.
     Code code = 1;

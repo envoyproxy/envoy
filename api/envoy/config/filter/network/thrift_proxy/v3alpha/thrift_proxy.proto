@@ -78,7 +78,7 @@ message ThriftProxy {
 }
 
 // ThriftFilter configures a Thrift filter.
-// [#comment:next free field: 4]
+// [#comment:next free field: 3]
 message ThriftFilter {
   // The name of the filter to instantiate. The name must match a supported
   // filter. The built-in filters are:

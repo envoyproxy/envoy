@@ -10,7 +10,6 @@ option java_package = "io.envoyproxy.envoy.type";
 
 // Specifies the int64 start and end of the range using half-open interval semantics [start,
 // end).
-// [#comment:next free field: 3]
 message Int64Range {
   // start of the range (inclusive)
   int64 start = 1;
@@ -21,7 +20,6 @@ message Int64Range {
 
 // Specifies the double start and end of the range using half-open interval semantics [start,
 // end).
-// [#comment:next free field: 3]
 message DoubleRange {
   // start of the range (inclusive)
   double start = 1;
