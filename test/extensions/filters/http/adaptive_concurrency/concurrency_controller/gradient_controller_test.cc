@@ -470,8 +470,8 @@ min_rtt_calc_params:
 
   // Verify the configuration affects the timers that are kicked off.
   NiceMock<Event::MockDispatcher> fake_dispatcher;
-  auto sample_timer = new NiceMock<Event::MockTimer>;
-  auto rtt_timer = new NiceMock<Event::MockTimer>;
+  auto sample_timer = new Event::MockTimer();
+  auto rtt_timer = new Event::MockTimer();
 
   // Expect the sample timer to trigger start immediately upon controller creation.
   EXPECT_CALL(fake_dispatcher, createTimer_(_))
@@ -513,8 +513,8 @@ min_rtt_calc_params:
 
   // Verify the configuration affects the timers that are kicked off.
   NiceMock<Event::MockDispatcher> fake_dispatcher;
-  auto sample_timer = new NiceMock<Event::MockTimer>;
-  auto rtt_timer = new NiceMock<Event::MockTimer>;
+  auto sample_timer = new Event::MockTimer;
+  auto rtt_timer = new Event::MockTimer;
 
   // Expect the sample timer to trigger start immediately upon controller creation.
   EXPECT_CALL(fake_dispatcher, createTimer_(_))
