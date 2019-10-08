@@ -377,9 +377,12 @@ DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& 
 
 void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
                               Api::Api& api) {
+  // Maximum recursion depth for walkDirectory().
+  static constexpr uint32_t MaxWalkDepth = 16;
+
   ENVOY_LOG(debug, "walking directory: {}", path);
-  if (depth > MAX_WALK_DEPTH) {
-    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MAX_WALK_DEPTH));
+  if (depth > MaxWalkDepth) {
+    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {

@@ -8,6 +8,8 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+static constexpr uint64_t MaxSendmsgSize = 4096;
+
 void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));
   address->sun_family = AF_UNIX;
@@ -16,8 +18,8 @@ void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
 sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std::string& role) {
   // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the third
   // starts up it will kill the oldest parent.
-  const uint64_t MAX_CONCURRENT_PROCESSES = 3;
-  id = id % MAX_CONCURRENT_PROCESSES;
+  static constexpr uint64_t MaxConcurrentProcesses = 3;
+  id = id % MaxConcurrentProcesses;
 
   // This creates an anonymous domain socket name (where the first byte of the name of \0).
   sockaddr_un address;
@@ -60,7 +62,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
   uint8_t* next_byte_to_send = send_buf.data();
   uint64_t sent = 0;
   while (sent < total_size) {
-    const uint64_t cur_chunk_size = std::min(MAX_SEND_MSG_SIZE, total_size - sent);
+    const uint64_t cur_chunk_size = std::min(MaxSendmsgSize, total_size - sent);
     iovec iov[1];
     iov[0].iov_base = next_byte_to_send;
     iov[0].iov_len = cur_chunk_size;
@@ -122,13 +124,13 @@ void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* mes
   }
 }
 
-// While in use, recv_buf_ is always >= MAX_SEND_MSG_SIZE. In between messages, it is kept empty,
-// to be grown back to MAX_SEND_MSG_SIZE at the start of the next message.
+// While in use, recv_buf_ is always >= MaxSendmsgSize. In between messages, it is kept empty,
+// to be grown back to MaxSendmsgSize at the start of the next message.
 void HotRestartingBase::initRecvBufIfNewMessage() {
   if (recv_buf_.empty()) {
     ASSERT(cur_msg_recvd_bytes_ == 0);
     ASSERT(!expected_proto_length_.has_value());
-    recv_buf_.resize(MAX_SEND_MSG_SIZE);
+    recv_buf_.resize(MaxSendmsgSize);
   }
 }
 
@@ -160,7 +162,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
   std::unique_ptr<HotRestartMessage> ret = nullptr;
   while (!ret) {
     iov[0].iov_base = recv_buf_.data() + cur_msg_recvd_bytes_;
-    iov[0].iov_len = MAX_SEND_MSG_SIZE;
+    iov[0].iov_len = MaxSendmsgSize;
 
     // We always setup to receive an FD even though most messages do not pass one.
     memset(control_buffer, 0, CMSG_SPACE(sizeof(int)));
@@ -186,7 +188,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
 
       expected_proto_length_ = be64toh(*reinterpret_cast<uint64_t*>(recv_buf_.data()));
       // Expand the buffer from its default 4096 if this message is going to be longer.
-      if (expected_proto_length_.value() > MAX_SEND_MSG_SIZE - sizeof(uint64_t)) {
+      if (expected_proto_length_.value() > MaxSendmsgSize - sizeof(uint64_t)) {
         recv_buf_.resize(expected_proto_length_.value() + sizeof(uint64_t));
         cur_msg_recvd_bytes_ = recvmsg_rc;
       }

@@ -7,6 +7,16 @@
 namespace Envoy {
 namespace Upstream {
 
+/**
+   * TODO(lilika): Add API knob for RetryInitialDelayMilliseconds
+   * and RetryMaxDelayMilliseconds, instead of hardcoding them.
+   *
+   * Parameters of the jittered backoff strategy that defines how often
+   * we retry to establish a stream to the management server
+   */
+static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
+static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
+
 HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
@@ -26,7 +36,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(
-      RETRY_INITIAL_DELAY_MILLISECONDS, RETRY_MAX_DELAY_MILLISECONDS, random_);
+      RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
@@ -126,9 +136,9 @@ void HdsDelegate::processMessage(
     envoy::api::v2::Cluster cluster_config;
 
     cluster_config.set_name(cluster_health_check.cluster_name());
-    cluster_config.mutable_connect_timeout()->set_seconds(CLUSTER_TIMEOUT_SECONDS);
+    cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
     cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
-        CLUSTER_CONNECTION_BUFFER_LIMIT_BYTES);
+        ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
     for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
