@@ -26,7 +26,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(
-      RETRY_INITIAL_DELAY_MILLISECONDS, retry_max_delay_milliseconds_, random_);
+      RETRY_INITIAL_DELAY_MILLISECONDS, RETRY_MAX_DELAY_MILLISECONDS, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
