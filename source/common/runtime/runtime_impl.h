@@ -182,7 +182,7 @@ private:
 
   const std::string path_;
   // Maximum recursion depth for walkDirectory().
-  const uint32_t max_walk_depth_ = 16;
+  static constexpr uint32_t MAX_WALK_DEPTH = 16;
   const Filesystem::WatcherPtr watcher_;
 };
 

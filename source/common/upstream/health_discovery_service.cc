@@ -26,7 +26,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(
-      retry_initial_delay_milliseconds_, retry_max_delay_milliseconds_, random_);
+      RETRY_INITIAL_DELAY_MILLISECONDS, retry_max_delay_milliseconds_, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
@@ -126,9 +126,9 @@ void HdsDelegate::processMessage(
     envoy::api::v2::Cluster cluster_config;
 
     cluster_config.set_name(cluster_health_check.cluster_name());
-    cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
+    cluster_config.mutable_connect_timeout()->set_seconds(CLUSTER_TIMEOUT_SECONDS);
     cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
-        ClusterConnectionBufferLimitBytes);
+        CLUSTER_CONNECTION_BUFFER_LIMIT_BYTES);
 
     // Add endpoints to cluster
     for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {

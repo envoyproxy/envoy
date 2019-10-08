@@ -182,16 +182,16 @@ private:
    * Parameters of the jittered backoff strategy that defines how often
    * we retry to establish a stream to the management server
    */
-  const uint32_t retry_initial_delay_milliseconds_ = 1000;
-  const uint32_t retry_max_delay_milliseconds_ = 30000;
+  static constexpr uint32_t RETRY_INITIAL_DELAY_MILLISECONDS = 1000;
+  static constexpr uint32_t RETRY_MAX_DELAY_MILLISECONDS = 30000;
 
   // Soft limit on size of the cluster’s connections read and write buffers.
-  static constexpr uint32_t ClusterConnectionBufferLimitBytes = 32768;
+  static constexpr uint32_t CLUSTER_CONNECTION_BUFFER_LIMIT_BYTES = 32768;
 
-  // TODO(lilika): Add API knob for ClusterTimeoutSeconds, instead of
+  // TODO(lilika): Add API knob for CLUSTER_TIMEOUT_SECONDS, instead of
   // hardcoding it.
   // The timeout for new network connections to hosts in the cluster.
-  static constexpr uint32_t ClusterTimeoutSeconds = 1;
+  static constexpr uint32_t CLUSTER_TIMEOUT_SECONDS = 1;
 
   // How often envoy reports the healthcheck results to the server
   uint32_t server_response_ms_ = 0;
