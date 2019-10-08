@@ -216,8 +216,10 @@ modify different aspects of the server:
 
 .. attention::
 
-   This operation directly stops the matched listeners on workers. Once a listener is stopped, any further operations
-   like update/remove are not allowed on the listener.
+   This operation directly stops the matched listeners on workers. There is a potential race condition, where the listeners that are being 
+   stopped here, might have got updated configuration from management server and there by may be in warming state and that
+   might add them back to workers. As this operation is typically used when an Envoy is terminating, this specific edge case has not
+   been handled.
 
 .. http:get:: /server_info
 

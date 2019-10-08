@@ -155,8 +155,13 @@ public:
 
   /*
    * Stops a listener from accepting new connections without actually removing it. This is
-   * used by /drain_listeners admin endpoint. This method directly stops the listeners on workers.
-   * Any further operations like update/removal are not allowed on the stopped listeners.
+   * used by /drain_listeners admin endpoint. This methods directly stops the listeners on workers.
+   * There is a potential race condition, where the listener that is being stopped here, might have
+   * got updated configuration from management server and there by may be in warming state and that
+   * might add listeners back to workers. Given that this API is intended to be used from admin
+   * endpoint which is typically used when an Envoy is terminating, this is considered an edge case.
+   * The complexity of handling warmed listeners and preventing them being added back by name is not
+   * worth the usecase of this API.
    * @param name supplies the listener config to stop.
    */
   virtual void stopListener(Network::ListenerConfig& listener) PURE;

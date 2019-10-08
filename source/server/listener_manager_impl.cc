@@ -524,11 +524,6 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   } else {
     name = server_.random().uuid();
   }
-  // If listener is stopped, we can not allow it to add back.
-  if (listenerStopped(name)) {
-    ENVOY_LOG(debug, "listner {} already stopped. so can not proceed with adding", name);
-    return false;
-  }
   const uint64_t hash = MessageUtil::hash(config);
   ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
 
@@ -743,16 +738,6 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
-  auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
-
-  // Check if listener is already stopped, if so skip warming.
-  if (listenerStopped(listener.name())) {
-    ENVOY_LOG(debug, "listner {} already stopped. so can not proceed with warming",
-              listener.name());
-    warming_listeners_.erase(existing_warming_listener);
-    return;
-  }
-
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
@@ -760,6 +745,8 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
+  auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+
   (*existing_warming_listener)->debugLog("warm complete. updating active listener");
   if (existing_active_listener != active_listeners_.end()) {
     drainListener(std::move(*existing_active_listener));
@@ -784,19 +771,11 @@ uint64_t ListenerManagerImpl::numConnections() {
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener) {
   ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
   for (const auto& worker : workers_) {
-    if (!listenerStopped(listener.name())) {
-      stopped_listeners_.push_back(listener.name());
-      worker->stopListener(listener);
-    }
+    worker->stopListener(listener);
   }
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
-  // If listener is stopped, we should stop removing.
-  if (listenerStopped(name)) {
-    ENVOY_LOG(debug, "listner {} already stopped. so can not proceed with removal", name);
-    return false;
-  }
   ENVOY_LOG(debug, "begin remove listener: name={}", name);
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
