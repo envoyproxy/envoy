@@ -51,11 +51,10 @@ envoy_cmake_external(
     cache_entries = {
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
     },
-    # copy_pdb = True,
     defines = ["CARES_STATICLIB"],
     lib_source = "@com_github_c_ares_c_ares//:all",
-    # pdb_name = "c-ares",
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
         "//conditions:default": ["libcares.a"],
@@ -64,7 +63,6 @@ envoy_cmake_external(
 
 envoy_cmake_external(
     name = "curl",
-    # Options from https://github.com/curl/curl/blob/master/CMakeLists.txt.
     cache_entries = {
         "BUILD_CURL_EXE": "off",
         "BUILD_TESTING": "off",
@@ -79,8 +77,9 @@ envoy_cmake_external(
         "ENABLE_ARES": "on",
         "CARES_LIBRARY": "$EXT_BUILD_DEPS/ares",
         "CARES_INCLUDE_DIR": "$EXT_BUILD_DEPS/ares/include",
-        # SSL (via Envoy's SSL dependency) is disabled, curl's CMake uses FindOpenSSL.cmake which fails at what looks like
-        # version parsing (the libraries are found ok).
+        # SSL (via Envoy's SSL dependency) is disabled, curl's CMake uses
+        # FindOpenSSL.cmake which fails at what looks like version parsing
+        # (the libraries are found ok).
         "CURL_CA_PATH": "none",
         "CMAKE_USE_OPENSSL": "off",
         "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
@@ -92,9 +91,8 @@ envoy_cmake_external(
         "CURL_ZLIB": "on",
         "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
-        #       "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
     },
-    # copt = ["-DNGHTTP2_STATICLIB"],
     defines = ["CURL_STATICLIB"],
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
@@ -124,9 +122,7 @@ envoy_cmake_external(
         # More details https://github.com/lyft/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
-    # copy_pdb = True,
     lib_source = "@com_github_libevent_libevent//:all",
-    # pdb_name = "event_static",
     static_libraries = select({
         "//bazel:windows_x86_64": [
             "event.lib",
@@ -147,14 +143,12 @@ envoy_cmake_external(
         "ENABLE_SHARED_LIB": "off",
         "ENABLE_STATIC_LIB": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        #       "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
-    # copy_pdb = True,
     debug_cache_entries = {"ENABLE_DEBUG": "on"},
     defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
-    # pdb_name = "nghttp2",
     static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2.lib"],
         "//conditions:default": ["libnghttp2.a"],
@@ -178,10 +172,9 @@ envoy_cmake_external(
     name = "zlib",
     cache_entries = {
         "BUILD_SHARED_LIBS": "off",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
     },
-    # copy_pdb = True,
     lib_source = "@net_zlib//:all",
-    # pdb_name = "zlibstatic",
     static_libraries = select({
         "//bazel:windows_x86_64": ["zlibstatic.lib"],
         "//conditions:default": ["libz.a"],

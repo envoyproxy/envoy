@@ -19,3 +19,4 @@ build --experimental_enable_runfiles
 build --features=compiler_param_file
 build --features=fully_static_link
 build --features=static_link_msvcrt
+build --dynamic_mode=off

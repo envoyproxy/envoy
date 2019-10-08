@@ -75,7 +75,8 @@ def envoy_cmake_external(
 
     pf = ""
     if copy_pdb:
-        # TODO(Pivotal): Add iterator for list of pdb_name files
+        # TODO: Add iterator of the first list presented of these options;
+        # static_libraries[.pdb], pdb_names, name[.pdb] files
         if pdb_name == "":
             pdb_name = name
 
