@@ -20,7 +20,7 @@ namespace XRay {
  * @return whether the text matches the pattern.
  */
 
-bool WildcardMatch(absl::string_view pattern, absl::string_view input);
+bool wildcardMatch(absl::string_view pattern, absl::string_view input);
 } // namespace XRay
 } // namespace Tracers
 } // namespace Extensions

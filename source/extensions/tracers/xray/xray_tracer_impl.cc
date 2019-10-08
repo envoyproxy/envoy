@@ -5,11 +5,11 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-static const char DEFAULT_DAEMON_ENDPOINT[] = "127.0.0.1:2000";
+static const char DefaultDaemonEndpoint[] = "127.0.0.1:2000";
 Driver::Driver(const XRayConfiguration& config, Server::Instance& server) : xray_config_(config) {
 
   const std::string daemon_endpoint =
-      config.daemon_endpoint_.empty() ? DEFAULT_DAEMON_ENDPOINT : config.daemon_endpoint_;
+      config.daemon_endpoint_.empty() ? DefaultDaemonEndpoint : config.daemon_endpoint_;
 
   ENVOY_LOG(debug, "send X-Ray generated segments to daemon address on {}", daemon_endpoint);
   std::string span_name =
