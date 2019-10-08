@@ -46,7 +46,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ByRef;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
