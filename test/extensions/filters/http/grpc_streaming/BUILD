@@ -22,3 +22,16 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.http.grpc_streaming",
+    deps = [
+        "//source/common/grpc:common_lib",
+        "//source/extensions/filters/http/grpc_streaming:config",
+        "//test/common/buffer:utility_lib",
+        "//test/common/stream_info:test_util",
+        "//test/mocks/server:server_mocks",
+    ],
+)

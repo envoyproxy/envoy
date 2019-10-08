@@ -23,9 +23,7 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
-    if (Grpc::Common::hasGrpcContentType(headers)) {
-      grpc_request_ = true;
-    }
+    grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
@@ -48,9 +46,7 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    if (Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
-      grpc_response_ = true;
-    }
+    grpc_response_ = Grpc::Common::isGrpcResponseHeader(headers, end_stream);
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool) override {
