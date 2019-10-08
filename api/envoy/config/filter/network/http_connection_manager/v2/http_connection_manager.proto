@@ -241,7 +241,7 @@ message HttpConnectionManager {
 
   // Additional settings for HTTP requests handled by the connection manager. These will be
   // applicable to both HTTP1 and HTTP2 requests.
-  envoy.api.v2.core.HttpProtocolOptions common_http_protocol_options = 35;
+  api.v2.core.HttpProtocolOptions common_http_protocol_options = 35;
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
   api.v2.core.Http1ProtocolOptions http_protocol_options = 8;
