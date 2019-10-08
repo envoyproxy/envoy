@@ -17,7 +17,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2/core:address_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -27,7 +27,7 @@ envoy_cc_library(
     hdrs = ["base_json.h"],
     deps = [
         "//include/envoy/json:json_object_interface",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -61,8 +61,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/api/v2/core:http_uri_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -99,7 +98,7 @@ envoy_cc_library(
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -155,21 +154,21 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/config/accesslog/v2:file_cc",
-        "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
-        "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
-        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
-        "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
-        "@envoy_api//envoy/config/filter/http/lua/v2:lua_cc",
-        "@envoy_api//envoy/config/filter/http/rate_limit/v2:rate_limit_cc",
-        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
-        "@envoy_api//envoy/config/filter/http/squash/v2:squash_cc",
-        "@envoy_api//envoy/config/filter/http/transcoder/v2:transcoder_cc",
-        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:client_ssl_auth_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
-        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:mongo_proxy_cc",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/health_check/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/lua/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/squash/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )
 
@@ -200,7 +199,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -213,7 +212,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -248,7 +247,7 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -271,7 +270,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -281,7 +280,7 @@ envoy_cc_library(
     hdrs = ["pausable_ack_queue.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -289,10 +288,8 @@ envoy_cc_library(
     name = "protobuf_link_hacks",
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
-        "@envoy_api//envoy/service/discovery/v2:ads_cc",
-        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
-        "@envoy_api//envoy/service/discovery/v2:sds_cc",
-        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
     ],
 )
 
@@ -303,7 +300,7 @@ envoy_cc_library(
     deps = [
         ":json_utility_lib",
         "//include/envoy/json:json_object_interface",
-        "@envoy_api//envoy/api/v2/core:protocol_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -320,7 +317,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/json:config_schemas_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -334,7 +331,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:utility_lib",
-        "@envoy_api//envoy/api/v2/core:http_uri_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -348,7 +345,7 @@ envoy_cc_library(
     name = "runtime_utility_lib",
     srcs = ["runtime_utility.cc"],
     hdrs = ["runtime_utility.h"],
-    deps = ["@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc"],
+    deps = ["@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto"],
 )
 
 envoy_cc_library(
@@ -367,7 +364,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -378,12 +375,8 @@ envoy_cc_library(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/api/v2:lds_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/api/v2:srds_cc",
-        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -412,8 +405,8 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 

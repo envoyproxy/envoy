@@ -69,7 +69,7 @@ envoy_cc_library(
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 
@@ -103,7 +103,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
-        "@envoy_api//envoy/admin/v2alpha:certs_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 

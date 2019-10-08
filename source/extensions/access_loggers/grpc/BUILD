@@ -36,9 +36,9 @@ envoy_cc_library(
         "//source/common/grpc:async_client_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/extensions/access_loggers/common:access_log_base",
-        "@envoy_api//envoy/config/accesslog/v2:als_cc",
-        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
-        "@envoy_api//envoy/service/accesslog/v2:als_cc",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -51,7 +51,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",
-        "@envoy_api//envoy/data/accesslog/v2:accesslog_cc",
+        "@envoy_api//envoy/data/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -82,7 +82,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/service/accesslog/v2:als_cc",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 

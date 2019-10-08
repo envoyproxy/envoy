@@ -16,7 +16,7 @@ envoy_cc_library(
         "//include/envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
-        "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:fixed_heap_cc",
+        "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg_cc_proto",
     ],
 )
 

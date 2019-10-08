@@ -80,7 +80,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/thread:thread_interface",
-        "//source/server:hot_restart_cc",
+        "//source/server:hot_restart_cc_proto",
     ],
 )
 
@@ -118,8 +118,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_interface",
-        "@envoy_api//envoy/admin/v2alpha:server_info_cc",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 
@@ -168,7 +168,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -191,7 +191,7 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/ssl:context_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/listener:listener_cc",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
 
@@ -253,7 +253,7 @@ envoy_cc_library(
     deps = [
         ":instance_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/trace/v2:trace_cc",
+        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
 
