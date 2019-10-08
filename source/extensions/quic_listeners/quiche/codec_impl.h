@@ -14,7 +14,7 @@ namespace Quic {
 class QuicHttpConnectionImplBase : public virtual Http::Connection,
                                    protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicHttpConnectionImplBase(EnvoyQuicServerSession& quic_session) : quic_session_(quic_session) {}
+  QuicHttpConnectionImplBase(quic::QuicSpdySession& quic_session) : quic_session_(quic_session) {}
 
   // Http::Connection
   void dispatch(Buffer::Instance& /*data*/) override {
@@ -27,7 +27,6 @@ public:
     // TODO(danzh) add Http3 enum value for QUIC.
     return Http::Protocol::Http2;
   }
-  void goAway() override;
   // Returns true if the session has data to send but queued in connection or
   // stream send buffer.
   bool wantsToWrite() override;
@@ -35,7 +34,7 @@ public:
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
 protected:
-  EnvoyQuicServerSession& quic_session_;
+  quic::QuicSpdySession& quic_session_;
 };
 
 class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
@@ -43,15 +42,19 @@ class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
 public:
   QuicHttpServerConnectionImpl(EnvoyQuicServerSession& quic_session,
                                Http::ServerConnectionCallbacks& callbacks)
-      : QuicHttpConnectionImplBase(quic_session) {
+      : QuicHttpConnectionImplBase(quic_session), quic_server_session_(quic_session) {
     quic_session.setHttpConnectionCallbacks(callbacks);
   }
 
   // Http::Connection
+  void goAway() override;
   void shutdownNotice() override {
     // TODO(danzh): Add double-GOAWAY support in QUIC.
-    ENVOY_CONN_LOG(error, "Shutdown notice is not propagated to QUIC.", quic_session_);
+    ENVOY_CONN_LOG(error, "Shutdown notice is not propagated to QUIC.", quic_server_session_);
   }
+
+private:
+  EnvoyQuicServerSession& quic_server_session_;
 };
 
 } // namespace Quic

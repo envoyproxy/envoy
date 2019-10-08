@@ -12,6 +12,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/hash_policy.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -103,6 +104,10 @@ public:
   const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
     return retriable_headers_;
   }
+  const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
+    return retriable_request_headers_;
+  }
+
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
@@ -112,6 +117,7 @@ public:
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_{};
   absl::optional<std::chrono::milliseconds> max_interval_{};
 };
@@ -237,12 +243,12 @@ public:
   TestCorsPolicy cors_policy_;
 };
 
-class MockHashPolicy : public HashPolicy {
+class MockHashPolicy : public Http::HashPolicy {
 public:
   MockHashPolicy();
   ~MockHashPolicy() override;
 
-  // Router::HashPolicy
+  // Http::HashPolicy
   MOCK_CONST_METHOD3(generateHash,
                      absl::optional<uint64_t>(const Network::Address::Instance* downstream_address,
                                               const Http::HeaderMap& headers,
@@ -286,7 +292,7 @@ public:
                           bool insert_envoy_original_path));
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
-  MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
+  MOCK_CONST_METHOD0(hashPolicy, const Http::HashPolicy*());
   MOCK_CONST_METHOD0(hedgePolicy, const HedgePolicy&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
@@ -405,11 +411,11 @@ public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager() override;
 
-  MOCK_METHOD4(createRdsRouteConfigProvider,
+  MOCK_METHOD5(createRdsRouteConfigProvider,
                RouteConfigProviderPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, Init::Manager& init_manager));
+                   const std::string& stat_prefix, Init::Manager& init_manager, bool is_delta));
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));

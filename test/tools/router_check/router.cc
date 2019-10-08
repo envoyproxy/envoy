@@ -66,7 +66,7 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
-                                        const bool disableDeprecationCheck) {
+                                        const bool disable_deprecation_check) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   envoy::api::v2::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
@@ -76,7 +76,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
-  if (!disableDeprecationCheck) {
+  if (!disable_deprecation_check) {
     MessageUtil::checkForUnexpectedFields(route_config,
                                           ProtobufMessage::getStrictValidationVisitor(),
                                           &factory_context->runtime_loader_);
@@ -119,8 +119,8 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     std::string test_name = check_config->getString("test_name", "");
     tests_.emplace_back(test_name, std::vector<std::string>{});
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
-    using checkerFunc = std::function<bool(ToolConfig&, const std::string&)>;
-    const std::unordered_map<std::string, checkerFunc> checkers = {
+    using CheckerFunc = std::function<bool(ToolConfig&, const std::string&)>;
+    const std::unordered_map<std::string, CheckerFunc> checkers = {
         {"cluster_name",
          [this](auto&... params) -> bool { return this->compareCluster(params...); }},
         {"virtual_cluster_name",
@@ -189,9 +189,9 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tests_.emplace_back(test_name, std::vector<std::string>{});
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
-    using checkerFunc =
+    using CheckerFunc =
         std::function<bool(ToolConfig&, const envoy::RouterCheckToolSchema::ValidationAssert&)>;
-    checkerFunc checkers[] = {
+    CheckerFunc checkers[] = {
         [this](auto&... params) -> bool { return this->compareCluster(params...); },
         [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); },
         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); },

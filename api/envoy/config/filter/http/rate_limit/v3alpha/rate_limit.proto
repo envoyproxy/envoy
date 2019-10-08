@@ -17,7 +17,7 @@ import "validate/validate.proto";
 
 message RateLimit {
   // The rate limit domain to use when calling the rate limit service.
-  string domain = 1 [(validate.rules).string.min_bytes = 1];
+  string domain = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Specifies the rate limit configurations to be applied with the same
   // stage number. If not set, the default stage number is 0.
@@ -25,7 +25,7 @@ message RateLimit {
   // .. note::
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
-  uint32 stage = 2 [(validate.rules).uint32.lte = 10];
+  uint32 stage = 2 [(validate.rules).uint32 = {lte: 10}];
 
   // The type of requests the filter should apply to. The supported
   // types are *internal*, *external* or *both*. A request is considered internal if
@@ -53,6 +53,6 @@ message RateLimit {
   // Configuration for an external rate limit service provider. If not
   // specified, any calls to the rate limit service will immediately return
   // success.
-  envoy.config.ratelimit.v3alpha.RateLimitServiceConfig rate_limit_service = 7
-      [(validate.rules).message.required = true];
+  ratelimit.v3alpha.RateLimitServiceConfig rate_limit_service = 7
+      [(validate.rules).message = {required: true}];
 }

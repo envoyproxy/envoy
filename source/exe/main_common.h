@@ -5,6 +5,7 @@
 
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
+#include "common/grpc/google_grpc_context.h"
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -65,7 +66,11 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
-  ProcessWide process_wide_; // Process-wide state setup/teardown.
+  ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
+  // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having
+  // an ifdef in a header file exposed in a C++ library. It is too easy to have
+  // the ifdef be inconsistent across build-system boundaries.
+  Grpc::GoogleGrpcContext google_grpc_context_;
   const Envoy::OptionsImpl& options_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
@@ -77,6 +82,7 @@ protected:
   std::unique_ptr<Server::HotRestart> restarter_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
   std::unique_ptr<Logger::Context> logging_context_;
+  std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::InstanceImpl> server_;
 
 private:

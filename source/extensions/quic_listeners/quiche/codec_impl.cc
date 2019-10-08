@@ -3,10 +3,6 @@
 namespace Envoy {
 namespace Quic {
 
-void QuicHttpConnectionImplBase::goAway() {
-  quic_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
-}
-
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
 
 // TODO(danzh): modify QUIC stack to react based on aggregated bytes across all
@@ -17,6 +13,10 @@ void QuicHttpConnectionImplBase::onUnderlyingConnectionAboveWriteBufferHighWater
 
 void QuicHttpConnectionImplBase::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
+void QuicHttpServerConnectionImpl::goAway() {
+  quic_server_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
 }
 
 } // namespace Quic

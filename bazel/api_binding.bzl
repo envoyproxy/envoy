@@ -10,12 +10,12 @@ def _default_envoy_api_impl(ctx):
         "tools",
     ]
     for d in api_dirs:
-        ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
+        ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child("api").get_child(d), d)
 
 _default_envoy_api = repository_rule(
     implementation = _default_envoy_api_impl,
     attrs = {
-        "api": attr.label(default = "@envoy//api:BUILD"),
+        "envoy_root": attr.label(default = "@envoy//:BUILD"),
     },
 )
 

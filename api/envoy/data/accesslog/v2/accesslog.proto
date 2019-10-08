@@ -38,11 +38,8 @@ message HTTPAccessLogEntry {
   // HTTP version
   enum HTTPVersion {
     PROTOCOL_UNSPECIFIED = 0;
-
     HTTP10 = 1;
-
     HTTP11 = 2;
-
     HTTP2 = 3;
   }
 
@@ -239,13 +236,9 @@ message ResponseFlags {
 message TLSProperties {
   enum TLSVersion {
     VERSION_UNSPECIFIED = 0;
-
     TLSv1 = 1;
-
     TLSv1_1 = 2;
-
     TLSv1_2 = 3;
-
     TLSv1_3 = 4;
   }
 

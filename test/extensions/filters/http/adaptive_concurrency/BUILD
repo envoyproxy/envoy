@@ -26,3 +26,18 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "adaptive_concurrency_integration_test",
+    srcs = [
+        "adaptive_concurrency_filter_integration_test.cc",
+        "adaptive_concurrency_filter_integration_test.h",
+    ],
+    extension_name = "envoy.filters.http.adaptive_concurrency",
+    deps = [
+        "//source/extensions/filters/http/adaptive_concurrency:config",
+        "//source/extensions/filters/http/fault:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

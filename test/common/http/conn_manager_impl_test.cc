@@ -268,6 +268,7 @@ public:
   bool generateRequestId() override { return true; }
   bool preserveExternalRequestId() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
+  uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -339,6 +340,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   absl::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
+  uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
@@ -855,8 +857,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(4);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
-      .WillOnce(
-          Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
+      .WillOnce(Invoke(
+          [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
@@ -918,8 +920,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   route_config_provider_.route_config_->route_->decorator_.operation_ = "initOp";
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(4);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
-      .WillOnce(
-          Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
+      .WillOnce(Invoke(
+          [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
@@ -997,8 +999,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(4);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
-      .WillOnce(
-          Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
+      .WillOnce(Invoke(
+          [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
@@ -1076,8 +1078,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   route_config_provider_.route_config_->route_->decorator_.operation_ = "initOp";
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(4);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
-      .WillOnce(
-          Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
+      .WillOnce(Invoke(
+          [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
@@ -2917,6 +2919,130 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
       HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
 }
 
+// Don't send data frames, only headers and trailers.
+TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_NoDataFrames) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+    decoder->decodeTrailers(std::move(trailers));
+  }));
+
+  setupFilterChain(2, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  Buffer::OwnedImpl trailers_data("hello");
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
+        decoder_filters_[0]->callbacks_->addDecodedData(trailers_data, false);
+        return FilterTrailersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
+        encoder_filters_[0]->callbacks_->addEncodedData(trailers_data, false);
+        return FilterTrailersStatus::Continue;
+      }));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(response_encoder_, encodeData(_, false));
+  EXPECT_CALL(response_encoder_, encodeTrailers(_));
+  expectOnDestroy();
+
+  decoder_filters_[0]->callbacks_->encodeTrailers(
+      HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+}
+
+// Don't send data frames, only headers and trailers.
+TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_ContinueAfterCallback) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+    decoder->decodeTrailers(std::move(trailers));
+  }));
+
+  setupFilterChain(2, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  Buffer::OwnedImpl trailers_data("hello");
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
+        decoder_filters_[0]->callbacks_->addDecodedData(trailers_data, false);
+        return FilterTrailersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  decoder_filters_[0]->callbacks_->continueDecoding();
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
+        encoder_filters_[0]->callbacks_->addEncodedData(trailers_data, false);
+        return FilterTrailersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+
+  decoder_filters_[0]->callbacks_->encodeTrailers(
+      HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(response_encoder_, encodeData(_, false));
+  EXPECT_CALL(response_encoder_, encodeTrailers(_));
+  expectOnDestroy();
+
+  encoder_filters_[0]->callbacks_->continueEncoding();
+}
+
 // Add*Data during the *Data callbacks.
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
   InSequence s;
@@ -4283,51 +4409,6 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
-}
-
-TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersRejected) {
-  setup(false, "");
-
-  std::string response_code;
-  std::string response_body;
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-    HeaderMapPtr headers{
-        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    headers->addCopy(LowerCaseString("Foo"), std::string(60 * 1024, 'a'));
-
-    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-        .WillOnce(Invoke([&response_code](const HeaderMap& headers, bool) -> void {
-          response_code = std::string(headers.Status()->value().getStringView());
-        }));
-    decoder->decodeHeaders(std::move(headers), true);
-    conn_manager_->newStream(response_encoder_);
-  }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false); // kick off request
-
-  EXPECT_EQ("431", response_code);
-  EXPECT_EQ("", response_body);
-}
-
-TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
-  max_request_headers_kb_ = 62;
-  setup(false, "");
-
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-    HeaderMapPtr headers{
-        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    headers->addCopy(LowerCaseString("Foo"), std::string(60 * 1024, 'a'));
-
-    EXPECT_CALL(response_encoder_, encodeHeaders(_, _)).Times(0);
-    decoder->decodeHeaders(std::move(headers), true);
-    conn_manager_->newStream(response_encoder_);
-  }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false); // kick off request
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {

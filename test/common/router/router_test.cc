@@ -7,6 +7,7 @@
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
 #include "common/http/context_impl.h"
+#include "common/network/application_protocol.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
@@ -85,7 +86,7 @@ public:
       : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-                std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_),
+                false, std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -116,15 +117,15 @@ public:
   }
 
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error) {
-    if (success != cm_.conn_pool_.host_->stats_store_.counter("rq_success").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_success {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_success").value(), success);
+    if (success != cm_.conn_pool_.host_->stats_.rq_success_.value()) {
+      return AssertionFailure() << fmt::format("rq_success {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_success_.value(),
+                                               success);
     }
-    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_error {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_error").value(), error);
+    if (error != cm_.conn_pool_.host_->stats_.rq_error_.value()) {
+      return AssertionFailure() << fmt::format("rq_error {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_error_.value(),
+                                               error);
     }
     return AssertionSuccess();
   }
@@ -512,7 +513,7 @@ TEST_F(RouterTest, AddCookie) {
   std::string cookie_value;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie) {
         cookie_value = add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
       }));
@@ -560,7 +561,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie) {
         // this should be ignored
         add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
@@ -608,7 +609,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
   std::string choco_c, foo_c;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie) {
         choco_c = add_cookie("choco", "", std::chrono::seconds(15));
         foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
@@ -2116,7 +2117,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
       }));
   response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
-  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_store_.counter("rq_timeout").value());
+  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_.rq_timeout_.value());
   // TODO: Verify hedge stats here once they are implemented.
 }
 
@@ -3703,7 +3704,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers;
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
@@ -3712,7 +3713,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3724,7 +3725,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "bad"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3737,7 +3738,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3751,7 +3752,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3765,7 +3766,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, true);
+        FilterUtility::finalTimeout(route, headers, true, false, true, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3780,7 +3781,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, true);
+        FilterUtility::finalTimeout(route, headers, true, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3794,7 +3795,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(7), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3809,7 +3810,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3823,7 +3824,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("grpc-timeout"));
@@ -3834,7 +3835,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("grpc-timeout"));
@@ -3846,7 +3847,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(1000), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_EQ("1000m", headers.get_("grpc-timeout"));
@@ -3858,7 +3859,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_EQ("999m", headers.get_("grpc-timeout"));
@@ -3869,7 +3870,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "0m"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_EQ("999m", headers.get_("grpc-timeout"));
@@ -3882,7 +3883,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "100m"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(90), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
@@ -3894,7 +3895,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "1m"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(1), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
@@ -3906,7 +3907,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3921,7 +3922,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "bad"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(1000), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3937,7 +3938,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3954,7 +3955,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3971,7 +3972,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(7), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3989,13 +3990,72 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, true, false);
+        FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
     EXPECT_EQ("5", headers.get_("x-envoy-expected-rq-timeout-ms"));
     EXPECT_EQ("5m", headers.get_("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
+    Http::TestHeaderMapImpl headers{{"x-envoy-expected-rq-timeout-ms", "8"}};
+    // Make ingress envoy respect `x-envoy-expected-rq-timeout-ms` header.
+    bool respect_expected_rq_timeout = true;
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(
+        route, headers, true, false, false, respect_expected_rq_timeout);
+    EXPECT_EQ(std::chrono::milliseconds(8), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_EQ("8", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
+    Http::TestHeaderMapImpl headers{{"x-envoy-expected-rq-timeout-ms", "8"},
+                                    {"x-envoy-upstream-rq-per-try-timeout-ms", "4"}};
+    // Make ingress envoy respect `x-envoy-expected-rq-timeout-ms` header.
+    bool respect_expected_rq_timeout = true;
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(
+        route, headers, true, false, false, respect_expected_rq_timeout);
+    EXPECT_EQ(std::chrono::milliseconds(8), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(4), timeout.per_try_timeout_);
+    EXPECT_EQ("4", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
+    Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "8"}};
+    // Test that ingress envoy populates `x-envoy-expected-rq-timeout-ms` header if it has not been
+    // set by egress envoy.
+    bool respect_expected_rq_timeout = true;
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(
+        route, headers, true, false, false, respect_expected_rq_timeout);
+    EXPECT_EQ(std::chrono::milliseconds(8), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+    EXPECT_EQ("8", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
+    Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "8"}};
+    // Make envoy override `x-envoy-expected-rq-timeout-ms` header.
+    // Test that ingress envoy sets `x-envoy-expected-rq-timeout-ms` header.
+    bool respect_expected_rq_timeout = false;
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(
+        route, headers, true, false, false, respect_expected_rq_timeout);
+    EXPECT_EQ(std::chrono::milliseconds(8), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+    EXPECT_EQ("8", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
   }
 }
 
@@ -4005,7 +4065,7 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout =
-        FilterUtility::finalTimeout(route, headers, true, false, false);
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -4238,6 +4298,40 @@ TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
   EXPECT_EQ(to_return, options);
 }
 
+TEST_F(RouterTest, ApplicationProtocols) {
+  callbacks_.streamInfo().filterState().setData(
+      Network::ApplicationProtocols::key(),
+      std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
+            return &cm_.conn_pool_;
+          }));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(span_, injectContext(_));
+  router_.decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 class WatermarkTest : public RouterTest {
 public:
   void sendRequest(bool header_only_request = true, bool pool_ready = true) {
@@ -4400,6 +4494,7 @@ public:
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
+// An upstream request succeeds and a single span is created.
 TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
@@ -4422,16 +4517,22 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 // Make sure child spans start/inject/finish with a reset flow.
+// The upstream responds back to envoy before the reset, so the span has fields that represent a
+// response and reset.
 TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
@@ -4454,15 +4555,136 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
-  EXPECT_CALL(*child_span,
-              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   router_.decodeHeaders(headers, true);
 
+  // Upstream responds back to envoy.
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
+  // The reset occurs after the upstream response, so the span has a valid status code but also an
+  // error.
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
   EXPECT_CALL(*child_span, finishSpan());
   encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+}
+
+// Make sure child spans start/inject/finish with a cancellation flow.
+// An upstream request is created but is then cancelled before. The resulting span has the
+// cancellation fields.
+TEST_F(RouterTestChildSpan, CancelFlow) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        EXPECT_CALL(*child_span, injectContext(_));
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(callbacks_, tracingConfig());
+  router_.decodeHeaders(headers, true);
+
+  // Destroy the router, causing the upstream request to be cancelled.
+  // Response code on span is 0 because the upstream never sent a response.
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span, finishSpan());
+  router_.onDestroy();
+}
+
+// Make sure child spans start/inject/finish with retry flow.
+// The first request will fail because of an upstream reset, so the span will be annotated with the
+// reset reason. The second request will succeed, so the span will be annotated with 200 OK.
+TEST_F(RouterTestChildSpan, ResetRetryFlow) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  Tracing::MockSpan* child_span_1{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*child_span_1, injectContext(_));
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  // Upstream responds back to envoy simulating an upstream reset.
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
+      .WillOnce(Return(child_span_1));
+  EXPECT_CALL(callbacks_, tracingConfig());
+  router_.decodeHeaders(headers, true);
+
+  // The span should be annotated with the reset-related fields.
+  EXPECT_CALL(*child_span_1,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
+      .Times(2);
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+  EXPECT_CALL(*child_span_1, finishSpan());
+
+  router_.retry_state_->expectResetRetry();
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+
+  // We expect this reset to kick off a new request.
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Tracing::MockSpan* child_span_2{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*child_span_2, injectContext(_));
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
+      .WillOnce(Return(child_span_2));
+  EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().RetryCount), Eq("1")));
+
+  router_.retry_state_->callback_();
+
+  // Upstream responds back with a normal response. Span should be annotated as usual.
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*child_span_2,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(*child_span_2, finishSpan());
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::string>& v) {

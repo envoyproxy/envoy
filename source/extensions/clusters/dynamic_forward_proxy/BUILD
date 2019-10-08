@@ -19,6 +19,6 @@ envoy_cc_library(
         "//source/extensions/clusters:well_known_names",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
-        "@envoy_api//envoy/config/cluster/dynamic_forward_proxy/v2alpha:cluster_cc",
+        "@envoy_api//envoy/config/cluster/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )

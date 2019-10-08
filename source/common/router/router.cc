@@ -24,6 +24,8 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/network/application_protocol.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -121,7 +123,8 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
 FilterUtility::TimeoutData
 FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
                             bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
-                            bool per_try_timeout_hedging_enabled) {
+                            bool per_try_timeout_hedging_enabled,
+                            bool respect_expected_rq_timeout) {
   // See if there is a user supplied timeout in a request header. If there is we take that.
   // Otherwise if the request is gRPC and a maximum gRPC timeout is configured we use the timeout
   // in the gRPC headers (or infinity when gRPC headers have no timeout), but cap that timeout to
@@ -151,13 +154,29 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
 
-  Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
-  if (header_timeout_entry) {
-    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
-      timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
+
+  if (respect_expected_rq_timeout) {
+    // Check if there is timeout set by egress Envoy.
+    // If present, use that value as route timeout and don't override
+    // *x-envoy-expected-rq-timeout-ms* header. At this point *x-envoy-upstream-rq-timeout-ms*
+    // header should have been sanitized by egress Envoy.
+    Http::HeaderEntry* header_expected_timeout_entry =
+        request_headers.EnvoyExpectedRequestTimeoutMs();
+    if (header_expected_timeout_entry) {
+      trySetGlobalTimeout(header_expected_timeout_entry, timeout);
+    } else {
+      Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+
+      if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+        request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+      }
     }
-    request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+  } else {
+    Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+    if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+      request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+    }
   }
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
@@ -196,6 +215,18 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
 
   return timeout;
+}
+
+bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+                                        TimeoutData& timeout) {
+  if (header_timeout_entry) {
+    uint64_t header_timeout;
+    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
+      timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
+    }
+    return true;
+  }
+  return false;
 }
 
 FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
@@ -484,7 +515,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
-                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
+                                         config_.respect_expected_rq_timeout_);
 
   // If this header is set with any value, use an alternate response code on timeout
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
@@ -540,6 +572,16 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
     protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
                                                                    : Http::Protocol::Http11;
   }
+
+  if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
+          Network::ApplicationProtocols::key())) {
+    const auto& alpn =
+        callbacks_->streamInfo().filterState().getDataReadOnly<Network::ApplicationProtocols>(
+            Network::ApplicationProtocols::key());
+    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{alpn.value()});
+  }
+
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
 }
@@ -1332,7 +1374,10 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
         parent.timeSource().systemTime());
-    span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+    if (parent.attempt_count_ != 1) {
+      // This is a retry request, add this metadata to span.
+      span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
+    }
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1340,9 +1385,11 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
 Filter::UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
-    // TODO(mattklein123): Add tags based on what happened to this request (retries, reset, etc.).
-    span_->finishSpan();
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
+                                                     upstream_trailers_.get(), stream_info_,
+                                                     Tracing::EgressConfig::get());
   }
+
   if (per_try_timeout_ != nullptr) {
     // Allows for testing.
     per_try_timeout_->disableTimer();
@@ -1351,6 +1398,15 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
+  // Prior to logging, refresh the byte size of the HeaderMaps.
+  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
+  // HeaderMap holds an accurate internal byte size count.
+  if (upstream_headers_ != nullptr) {
+    upstream_headers_->refreshByteSize();
+  }
+  if (upstream_trailers_ != nullptr) {
+    upstream_trailers_->refreshByteSize();
+  }
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);
@@ -1481,6 +1537,12 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                             absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
+  if (span_ != nullptr) {
+    // Add tags about reset.
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+  }
+
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -1495,6 +1557,11 @@ void Filter::UpstreamRequest::resetStream() {
   // Don't reset the stream if we're already done with it.
   if (encode_complete_ && decode_complete_) {
     return;
+  }
+
+  if (span_ != nullptr) {
+    // Add tags about the cancellation.
+    span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
   if (conn_pool_stream_handle_) {

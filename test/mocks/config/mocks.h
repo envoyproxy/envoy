@@ -4,7 +4,6 @@
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/xds_grpc_context.h"
 
 #include "common/config/config_provider_impl.h"
 #include "common/config/resources.h"
@@ -45,7 +44,7 @@ public:
 class MockSubscription : public Subscription {
 public:
   MOCK_METHOD1(start, void(const std::set<std::string>& resources));
-  MOCK_METHOD1(updateResources, void(const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD1(updateResourceInterest, void(const std::set<std::string>& update_to_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -53,10 +52,10 @@ public:
   MockSubscriptionFactory();
   ~MockSubscriptionFactory() override;
 
-  MOCK_METHOD4(subscriptionFromConfigSource,
+  MOCK_METHOD5(subscriptionFromConfigSource,
                SubscriptionPtr(const envoy::api::v2::core::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks));
+                               SubscriptionCallbacks& callbacks, bool is_delta));
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
 
   MockSubscription* subscription_{};
@@ -85,6 +84,19 @@ public:
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));
   MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
+
+  MOCK_METHOD5(addSubscription,
+               void(const std::set<std::string>& resources, const std::string& type_url,
+                    SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
+                    std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD2(updateResourceInterest,
+               void(const std::set<std::string>& resources, const std::string& type_url));
+
+  MOCK_METHOD5(addOrUpdateWatch,
+               Watch*(const std::string& type_url, Watch* watch,
+                      const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
+                      std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {

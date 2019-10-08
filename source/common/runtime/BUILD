@@ -37,8 +37,8 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
