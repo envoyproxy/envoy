@@ -3,6 +3,12 @@ load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load(
+    "//bazel:external_proto_deps.bzl",
+    "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
+    "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
+    "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
+)
 
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
@@ -25,30 +31,6 @@ _COMMON_PROTO_DEPS = [
     "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
 ]
 
-# When we have external proto dependencies, we need to be able to map from the
-# proto_library dependency to the relevant {cc,go,py}_library when generating
-# the respective language library for some target. If you add a new API
-# dependency on some external proto, please provide the mappings here for
-# Go/C++/Python.
-
-_GO_BAZEL_RULE_MAPPING = {
-    "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_go",
-    "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
-    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:cel_go_proto",
-}
-
-_CC_BAZEL_RULE_MAPPING = {
-    "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_cc",
-    "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_cc",
-    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
-}
-
-_PY_BAZEL_RULE_MAPPING = {
-    "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_py",
-    "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto_py",
-    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_py_proto",
-}
-
 def _proto_mapping(dep, proto_dep_map, proto_suffix):
     mapped = proto_dep_map.get(dep)
     if mapped == None:
@@ -57,13 +39,13 @@ def _proto_mapping(dep, proto_dep_map, proto_suffix):
     return mapped
 
 def _go_proto_mapping(dep):
-    return _proto_mapping(dep, _GO_BAZEL_RULE_MAPPING, _GO_PROTO_SUFFIX)
+    return _proto_mapping(dep, EXTERNAL_PROTO_GO_BAZEL_DEP_MAP, _GO_PROTO_SUFFIX)
 
 def _cc_proto_mapping(dep):
-    return _proto_mapping(dep, _CC_BAZEL_RULE_MAPPING, _CC_PROTO_SUFFIX)
+    return _proto_mapping(dep, EXTERNAL_PROTO_CC_BAZEL_DEP_MAP, _CC_PROTO_SUFFIX)
 
 def _py_proto_mapping(dep):
-    return _proto_mapping(dep, _PY_BAZEL_RULE_MAPPING, _PY_PROTO_SUFFIX)
+    return _proto_mapping(dep, EXTERNAL_PROTO_PY_BAZEL_DEP_MAP, _PY_PROTO_SUFFIX)
 
 # TODO(htuch): Convert this to native py_proto_library once
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
