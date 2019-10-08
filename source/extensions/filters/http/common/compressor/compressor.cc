@@ -151,7 +151,12 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
 
     pairs.push_back(pair);
 
-    // Disallow compressors with q=0
+    // Disallow compressors with "q=0".
+    // The reason why we add encodings to "pairs" even with "q=0" is that "pairs" contains
+    // client's expectations and "allowed_compressors" is what the server can handle. Consider
+    // the cases of "Accept-Encoding: gzip;q=0, deflate, *" and "Accept-Encoding: deflate, *"
+    // whereas the server has only "gzip" configured. If we just exclude the encodings with "q=0"
+    // from "pairs" then upon noticing "*" we don't know if "gzip" is acceptable by the client.
     if (!pair.second) {
       allowed_compressors.erase(
           std::remove(allowed_compressors.begin(), allowed_compressors.end(), pair.first),
