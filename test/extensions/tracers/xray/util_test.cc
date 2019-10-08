@@ -60,6 +60,12 @@ TEST(XRayWildcardTest, onlyGlob) {
   ASSERT_TRUE(wildcardMatch("*", "UPPERCASE"));
   ASSERT_TRUE(wildcardMatch("*", "miXEDcaSe"));
 }
+
+TEST(XRayWildcardTest, LengthAtLeastTwo) {
+  EXPECT_FALSE(wildcardMatch("??*", "a"));
+  EXPECT_TRUE(wildcardMatch("??*", "aa"));
+  EXPECT_TRUE(wildcardMatch("??*", "aaa"));
+}
 } // namespace XRay
 } // namespace Tracers
 } // namespace Extensions
