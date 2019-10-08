@@ -45,7 +45,7 @@ public:
    * for LDS or CDS and don't want a flood of updates for RDS or EDS respectively. Discovery
    * requests may later be resumed with resume().
    * @param type_url type URL corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster.
+   * type.googleapis.com/envoy.api.v2.Cluster
    */
   virtual void pause(const std::string& type_url) PURE;
 
@@ -56,10 +56,30 @@ public:
    */
   virtual void resume(const std::string& type_url) PURE;
 
+  /**
+   * Registers a GrpcSubscription with the GrpcMux. 'watch' may be null (meaning this is an add),
+   * or it may be the Watch* previously returned by this function (which makes it an update).
+   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
+   * @param watch the Watch* to be updated, or nullptr to add one.
+   * @param resources the set of resource names for 'watch' to start out interested in. If empty,
+   *                  'watch' is treated as interested in *all* resources (of type type_url).
+   * @param callbacks the callbacks that receive updates for 'resources' when they arrive.
+   * @param init_fetch_timeout how long to wait for this new subscription's first update. Ignored
+   *                           unless the addOrUpdateWatch() call is the first for 'type_url'.
+   * @return Watch* the opaque watch token added or updated, to be used in future addOrUpdateWatch
+   *                calls.
+   */
   virtual Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                   const std::set<std::string>& resources,
                                   SubscriptionCallbacks& callbacks,
                                   std::chrono::milliseconds init_fetch_timeout) PURE;
+
+  /**
+   * Cleanup of a Watch* added by addOrUpdateWatch(). Receiving a Watch* from addOrUpdateWatch()
+   * makes you responsible for eventually invoking this cleanup.
+   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
+   * @param watch the watch to be cleaned up.
+   */
   virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
 
   /**
@@ -70,6 +90,10 @@ public:
    */
   virtual bool paused(const std::string& type_url) const PURE;
 
+  /**
+   * Passes through to all multiplexed SubscriptionStates. To be called when something
+   * definitive happens with the initial fetch: either an update is successfully received,
+   * or some sort of error happened.*/
   virtual void disableInitFetchTimeoutTimer() PURE;
 };
 
