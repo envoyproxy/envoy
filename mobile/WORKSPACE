@@ -128,8 +128,46 @@ http_archive(
     urls = ["https://github.com/cgruber/rules_kotlin/archive/200802f0525af6e3ff4d50985c4f105e0685b883.tar.gz"],
 )
 
+# gRPC java for @rules_proto_grpc
+# The current 0.2.0 uses v1.23.0 of gRPC java which has a buggy version of the grpc_java_repositories
+# where it tries to bind the zlib and errors out
+# The fix went in on this commit:
+# https://github.com/grpc/grpc-java/commit/57e7bd394e92015d2891adc74af0eaf9cd347ea8#diff-515bc54a0cbb4b12fb4a7c465758b011L128-L131
+http_archive(
+    name = "io_grpc_grpc_java",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.24.0.tar.gz"],
+    sha256 = "8b495f58aaf75138b24775600a062bbdaa754d85f7ab2a47b2c9ecb432836dd1",
+    strip_prefix ="grpc-java-1.24.0",
+)
+
+load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
+
+grpc_java_repositories(
+    omit_bazel_skylib = True,
+    omit_com_google_protobuf = True,
+    omit_com_google_protobuf_javalite = True,
+    omit_net_zlib = True,
+)
+
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
 
 kotlin_repositories()
 
 register_toolchains(":kotlin_toolchain")
+
+http_archive(
+    name = "rules_proto_grpc",
+    urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/0.2.0.tar.gz"],
+    sha256 = "1e08cd6c61f893417b14930ca342950f5f22f71f929a38a8c4bbfeae2a80d03e",
+    strip_prefix = "rules_proto_grpc-0.2.0",
+)
+
+load("@rules_proto_grpc//protobuf:repositories.bzl", "protobuf_repos")
+protobuf_repos()
+
+load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
+rules_proto_grpc_toolchains()
+
+load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos="java_repos")
+
+rules_proto_grpc_java_repos()
