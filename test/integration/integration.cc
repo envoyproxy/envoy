@@ -431,6 +431,12 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     // needs to know about the bound listener ports.
     auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
     const char* success = "listener_manager.listener_create_success";
+    // Loading invalid configuration may result in different error counters to be incremented.
+    // Loading invalid configuration using the google.protobuf.Any results in the
+    // "listener_manager.lds.update_failure" incremented. Loading invalid configuration using
+    // google.protobuf.Struct (deprecated in API v2) results in the
+    // "listener_manager.lds.update_rejected" incremented. See FilesystemSubscriptionImpl::refresh()
+    // for more deatils.
     const char* rejected = "listener_manager.lds.update_rejected";
     const char* failed = "listener_manager.lds.update_failure";
     while ((test_server_->counter(success) == nullptr ||
