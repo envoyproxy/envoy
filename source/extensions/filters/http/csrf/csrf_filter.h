@@ -58,7 +58,7 @@ public:
                                               shadow_enabled.default_value());
   }
 
-  const std::vector<Matchers::StringMatcherPtr>& additional_origins() const {
+  const std::vector<Matchers::StringMatcherPtr>& additionalOrigins() const {
     return additional_origins_;
   };
 

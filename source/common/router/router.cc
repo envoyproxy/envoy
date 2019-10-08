@@ -123,7 +123,8 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
 FilterUtility::TimeoutData
 FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
                             bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
-                            bool per_try_timeout_hedging_enabled) {
+                            bool per_try_timeout_hedging_enabled,
+                            bool respect_expected_rq_timeout) {
   // See if there is a user supplied timeout in a request header. If there is we take that.
   // Otherwise if the request is gRPC and a maximum gRPC timeout is configured we use the timeout
   // in the gRPC headers (or infinity when gRPC headers have no timeout), but cap that timeout to
@@ -153,13 +154,29 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
 
-  Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
-  if (header_timeout_entry) {
-    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
-      timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
+
+  if (respect_expected_rq_timeout) {
+    // Check if there is timeout set by egress Envoy.
+    // If present, use that value as route timeout and don't override
+    // *x-envoy-expected-rq-timeout-ms* header. At this point *x-envoy-upstream-rq-timeout-ms*
+    // header should have been sanitized by egress Envoy.
+    Http::HeaderEntry* header_expected_timeout_entry =
+        request_headers.EnvoyExpectedRequestTimeoutMs();
+    if (header_expected_timeout_entry) {
+      trySetGlobalTimeout(header_expected_timeout_entry, timeout);
+    } else {
+      Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+
+      if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+        request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+      }
     }
-    request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+  } else {
+    Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+    if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+      request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+    }
   }
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
@@ -198,6 +215,18 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
 
   return timeout;
+}
+
+bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+                                        TimeoutData& timeout) {
+  if (header_timeout_entry) {
+    uint64_t header_timeout;
+    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
+      timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
+    }
+    return true;
+  }
+  return false;
 }
 
 FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
@@ -486,7 +515,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
-                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
+                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_,
+                                         config_.respect_expected_rq_timeout_);
 
   // If this header is set with any value, use an alternate response code on timeout
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
