@@ -310,7 +310,7 @@ TEST_F(QuicPlatformTest, QuicUint128) {
 }
 
 TEST_F(QuicPlatformTest, QuicPtrUtil) {
-  p = QuicWrapUnique(new std::string("aaa"));
+  auto p = QuicWrapUnique(new std::string("aaa"));
   EXPECT_EQ("aaa", *p);
 }
 
