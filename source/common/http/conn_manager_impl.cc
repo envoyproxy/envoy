@@ -347,6 +347,7 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   // Only QUIC connection's stream_info_ specifies protocol.
   Buffer::OwnedImpl dummy;
   codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
+  ASSERT(codec_->protocol() == Protocol::Http3);
   stats_.named_.downstream_cx_http3_total_.inc();
   stats_.named_.downstream_cx_http3_active_.inc();
   return Network::FilterStatus::StopIteration;

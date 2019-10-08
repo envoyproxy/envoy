@@ -486,7 +486,7 @@ public:
                   new NiceMock<Upstream::MockClusterInfo>()};
               Event::MockDispatcher dispatcher_;
               return new CodecClientForTest(
-                  CodecClient::Type::Http1,
+                  Http::CodecClient::Type::HTTP1,
                   std::move(conn_data.connection_), test_session.codec_, nullptr,
                   Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
             }));
@@ -3067,6 +3067,7 @@ public:
               Event::MockDispatcher dispatcher_;
 
               test_session.codec_client_ = new CodecClientForTest(
+                  Http::CodecClient::Type::HTTP1,
                   std::move(conn_data.connection_), test_session.codec_, nullptr,
                   Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
               return test_session.codec_client_;

@@ -64,9 +64,12 @@ message HealthCheck {
   // [#comment:next free field: 10]
   message HttpHealthCheck {
     enum CodecClientType {
-      Http1 = 0;
-      Http2 = 1;
-      Http3 = 2;
+      HTTP1 = 0;
+      HTTP2 = 1;
+      // QUIC implementation is not production ready yet. Use this enum with
+      // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is
+      // no longer sufficient to distinguish HTTP1 and HTTP2 traffic.
+      HTTP3 = 2;
     }
 
     // The value of the host header in the HTTP health check request. If
@@ -101,7 +104,7 @@ message HealthCheck {
     repeated string request_headers_to_remove = 8;
 
     // If set, health checks will be made using http/2.
-    // Deprecated, use codec_client_type instead.
+    // Deprecated, use :ref:`codec_client_type <envoy_api_field_core.HealthCheck.HttpHealthCheck.codec_client_type>` instead.
     bool use_http2 = 7 [deprecated = true];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
@@ -109,7 +112,10 @@ message HealthCheck {
     // semantics of :ref:`Int64Range <envoy_api_msg_type.Int64Range>`.
     repeated type.Int64Range expected_statuses = 9;
 
-    // Use specified application protocol for health checks.
+    // Use specified application protocol for health checks. This is to replace
+    // :ref:`use_http2
+    // <envoy_api_field_core.HealthCheck.HttpHealthCheck.use_http2>` in light of
+    // HTTP3.
     CodecClientType codec_client_type = 10;
   }
 

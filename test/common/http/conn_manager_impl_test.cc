@@ -260,7 +260,6 @@ public:
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
-    std::cerr << "======== createCodec codec_ " << codec_ << " protocol_ " << int(codec_->protocol()) << "\n";
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
@@ -4774,15 +4773,61 @@ TEST_F(HttpConnectionManagerImplTest, NewConnection) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
   EXPECT_EQ(Network::FilterStatus::Continue, conn_manager_->onNewConnection());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_total_.value());
-    EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
 
-   filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
+  filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
   codec_->protocol_ = Http::Protocol::Http3;
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
   EXPECT_CALL(*codec_, protocol()).Times(AtLeast(1));
   EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_active_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
+  setup(false, "envoy-custom-server", false);
+
+  filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
+  codec_->protocol_ = Http::Protocol::Http3;
+  EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
+
+  // Store the basic request encoder during filter chain setup.
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_NE(nullptr, headers.ForwardedFor());
+        EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  // Pretend to get a new stream and then fire a headers only request into it. Then we respond into the filter.
+    NiceMock<MockStreamEncoder> encoder;
+  StreamDecoder& decoder = conn_manager_->newStream(encoder);
+          HeaderMapPtr headers{
+              new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+          decoder.decodeHeaders(std::move(headers), true);
+
+        HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
     EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
-      EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_active_.value());
+  conn_manager_.reset();
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
+
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

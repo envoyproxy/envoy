@@ -153,16 +153,23 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inRange(uint64_t http_status) con
   return false;
 }
 
+Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_type) {
+  switch (codec_client_type) {
+    case Http::CodecClient::Type::HTTP1:
+      return Http::Protocol::Http11;
+    case Http::CodecClient::Type::HTTP2:
+      return  Http::Protocol::Http2;
+    case Http::CodecClient::Type::HTTP3:
+      return Http::Protocol::Http3;
+  }
+}
+
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
       hostname_(parent_.host_value_.empty() ? parent_.cluster_.info()->name()
                                             : parent_.host_value_),
-      protocol_(parent_.codec_client_type_ == Http::CodecClient::Type::HTTP1
-                    ? Http::Protocol::Http11
-                    : (parent_.codec_client_type_ == Http::CodecClient::Type::HTTP2
-                           ? Http::Protocol::Http2
-                           : Http::Protocol::Http3)),
+      protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
@@ -334,11 +341,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 
 Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(const envoy::api::v2::core::HealthCheck::HttpHealthCheck::CodecClientType type) {
   switch (type) {
-    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::Http3:
+    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP3:
       return Http::CodecClient::Type::HTTP3;
-    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::Http2:
+    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP2:
     return Http::CodecClient::Type::HTTP2;
-    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::Http1:
+    case envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP1:
     return Http::CodecClient::Type::HTTP1;
     default:
     PANIC(fmt::format("Unknown codec client type {}", type));
