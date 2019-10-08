@@ -19,16 +19,18 @@ public:
   }
 
   void createEnvoy() override {
+    createEnvoyServer({
+        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.cds.yaml",
+        "test/config/integration/server_xds.eds.yaml",
+        "test/config/integration/server_xds.lds.yaml",
+        "test/config/integration/server_xds.rds.yaml",
+    });
+  }
+
+  void createEnvoyServer(const ApiFilesystemConfig& api_filesystem_config) {
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer(
-        {
-            "test/config/integration/server_xds.bootstrap.yaml",
-            "test/config/integration/server_xds.cds.yaml",
-            "test/config/integration/server_xds.eds.yaml",
-            "test/config/integration/server_xds.lds.yaml",
-            "test/config/integration/server_xds.rds.yaml",
-        },
-        {"http"}, false, false, false);
+    createApiTestServer(api_filesystem_config, {"http"}, false, false, false);
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
     EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
@@ -44,29 +46,18 @@ TEST_P(XdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-class XdsIntegrationTestTypedStruct : public testing::TestWithParam<Network::Address::IpVersion>,
-                                      public HttpIntegrationTest {
+class XdsIntegrationTestTypedStruct : public XdsIntegrationTest {
 public:
-  XdsIntegrationTestTypedStruct()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  }
+  XdsIntegrationTestTypedStruct() = default;
 
   void createEnvoy() override {
-    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer(
-        {
-            "test/config/integration/server_xds.bootstrap.yaml",
-            "test/config/integration/server_xds.cds.yaml",
-            "test/config/integration/server_xds.eds.yaml",
-            "test/config/integration/server_xds.lds.typed_struct.yaml",
-            "test/config/integration/server_xds.rds.yaml",
-        },
-        {"http"}, false, false, false);
-    EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
-    EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
-    EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
+    createEnvoyServer({
+        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.cds.yaml",
+        "test/config/integration/server_xds.eds.yaml",
+        "test/config/integration/server_xds.lds.typed_struct.yaml",
+        "test/config/integration/server_xds.rds.yaml",
+    });
   }
 };
 

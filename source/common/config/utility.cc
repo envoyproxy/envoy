@@ -256,6 +256,16 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
   return load_assignment;
 }
 
+namespace {
+absl::string_view ProtoTypeUrlToDescriptorFullName(absl::string_view type_url) {
+  size_t pos = type_url.find_last_of('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
+}
+} // namespace
+
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -269,11 +279,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-    absl::string_view type = typed_config.type_url();
-    size_t pos = type.find_last_of('/');
-    if (pos != absl::string_view::npos) {
-      type = type.substr(pos + 1);
-    }
+    absl::string_view type = ProtoTypeUrlToDescriptorFullName(typed_config.type_url());
 
     if (type == typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
@@ -282,11 +288,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       if (out_proto.GetDescriptor()->full_name() == struct_type) {
         out_proto.CopyFrom(typed_struct.value());
       } else {
-        type = typed_struct.type_url();
-        pos = type.find_last_of('/');
-        if (pos != absl::string_view::npos) {
-          type = type.substr(pos + 1);
-        }
+        type = ProtoTypeUrlToDescriptorFullName(typed_struct.type_url());
         if (type != out_proto.GetDescriptor()->full_name()) {
           throw EnvoyException("Invalid proto type.\nExpected " +
                                out_proto.GetDescriptor()->full_name() +

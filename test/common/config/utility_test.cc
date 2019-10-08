@@ -318,20 +318,21 @@ TEST(UtilityTest, TypedStructToStruct) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(out, untyped_struct));
 }
 
+namespace {
+const std::string bootstrap_config_yaml = R"EOF(
+  admin:
+    access_log_path: /dev/null
+    address:
+      pipe:
+        path: "/"
+)EOF";
+} // namespace
+
 TEST(UtilityTest, TypedStructToBootstrap) {
   ProtobufWkt::Any typed_config;
   udpa::type::v1::TypedStruct typed_struct;
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-
-  std::string yaml = R"EOF(
-    admin:
-      access_log_path: /dev/null
-      address:
-        pipe:
-          path: "/"
-  )EOF";
-  TestUtility::loadFromYaml(yaml, bootstrap);
-
+  TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
   PackIntoTypedStruct(typed_struct, bootstrap);
   typed_config.PackFrom(typed_struct);
 
@@ -345,16 +346,7 @@ TEST(UtilityTest, TypedStructToInvalidType) {
   ProtobufWkt::Any typed_config;
   udpa::type::v1::TypedStruct typed_struct;
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-
-  std::string yaml = R"EOF(
-    admin:
-      access_log_path: /dev/null
-      address:
-        pipe:
-          path: "/"
-  )EOF";
-  TestUtility::loadFromYaml(yaml, bootstrap);
-
+  TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
   PackIntoTypedStruct(typed_struct, bootstrap);
   typed_config.PackFrom(typed_struct);
 
