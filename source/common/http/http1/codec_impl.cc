@@ -335,11 +335,12 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               http_parser_type type, uint32_t max_request_headers_kb)
+                               http_parser_type type, uint32_t max_headers_kb,
+                               const uint32_t max_headers_count)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
-      max_request_headers_kb_(max_request_headers_kb),
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
       strict_header_validation_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
@@ -354,6 +355,12 @@ void ConnectionImpl::completeLastHeader() {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
     current_header_map_->addViaMove(std::move(current_header_field_),
                                     std::move(current_header_value_));
+  }
+  // Check if the number of headers exceeds the limit.
+  if (current_header_map_->size() > max_headers_count_) {
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    sendProtocolError();
+    throw CodecProtocolException("headers size exceeds limit");
   }
 
   header_parsing_state_ = HeaderParsingState::Field;
@@ -464,7 +471,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   ASSERT(current_header_map_->byteSize().has_value());
   const uint32_t total = current_header_field_.size() + current_header_value_.size() +
                          current_header_map_->byteSize().value();
-  if (total > (max_request_headers_kb_ * 1024)) {
+  if (total > (max_headers_kb_ * 1024)) {
+
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");
@@ -549,8 +557,10 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings, uint32_t max_request_headers_kb)
-    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb),
+                                           Http1Settings settings, uint32_t max_request_headers_kb,
+                                           const uint32_t max_request_headers_count)
+    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
+                     max_request_headers_count),
       callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
@@ -723,8 +733,10 @@ void ServerConnectionImpl::onBelowLowWatermark() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                                           ConnectionCallbacks&)
-    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
+                                           ConnectionCallbacks&,
+                                           const uint32_t max_response_headers_count)
+    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
+                     max_response_headers_count) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

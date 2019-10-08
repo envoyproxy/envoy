@@ -11,7 +11,11 @@
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -61,12 +65,12 @@ public:
   virtual void initialize() {
     Http2SettingsFromTuple(client_http2settings_, client_settings_);
     Http2SettingsFromTuple(server_http2settings_, server_settings_);
-    client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
-                                                         stats_store_, client_http2settings_,
-                                                         max_request_headers_kb_);
-    server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
-                                                         stats_store_, server_http2settings_,
-                                                         max_request_headers_kb_);
+    client_ = std::make_unique<TestClientConnectionImpl>(
+        client_connection_, client_callbacks_, stats_store_, client_http2settings_,
+        max_request_headers_kb_, max_response_headers_count_);
+    server_ = std::make_unique<TestServerConnectionImpl>(
+        server_connection_, server_callbacks_, stats_store_, server_http2settings_,
+        max_request_headers_kb_, max_request_headers_count_);
 
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -152,6 +156,8 @@ public:
   bool corrupt_metadata_frame_ = false;
 
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
+  uint32_t max_response_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_outbound_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
   uint32_t max_outbound_control_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
   uint32_t max_consecutive_inbound_frames_with_empty_payload_ =
@@ -944,12 +950,12 @@ class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
   Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
-  client_ = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
-                                                       stats_store_, client_http2settings_,
-                                                       max_request_headers_kb_);
-  server_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
-                                                       stats_store_, server_http2settings_,
-                                                       max_request_headers_kb_);
+  client_ = std::make_unique<TestClientConnectionImpl>(
+      client_connection_, client_callbacks_, stats_store_, client_http2settings_,
+      max_request_headers_kb_, max_response_headers_count_);
+  server_ = std::make_unique<TestServerConnectionImpl>(
+      server_connection_, server_callbacks_, stats_store_, server_http2settings_,
+      max_request_headers_kb_, max_request_headers_count_);
 
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -1057,7 +1063,8 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
   }
 }
 
-TEST_P(Http2CodecImplTest, TestLargeRequestHeadersInvokeResetStream) {
+// Tests request headers whose size is larger than the default limit of 60K.
+TEST_P(Http2CodecImplTest, LargeRequestHeadersInvokeResetStream) {
   initialize();
 
   TestHeaderMapImpl request_headers;
@@ -1068,7 +1075,8 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersInvokeResetStream) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAccepted) {
+// Large request headers are accepted when max limit configured.
+TEST_P(Http2CodecImplTest, LargeRequestHeadersAccepted) {
   max_request_headers_kb_ = 64;
   initialize();
 
@@ -1082,7 +1090,53 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAccepted) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtLimitAccepted) {
+// Tests stream reset when the number of request headers exceeds the default maximum of 100.
+TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 100; i++) {
+    request_headers.addCopy(std::to_string(i), "");
+  }
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(1);
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
+// Tests that max number of request headers is configurable.
+TEST_P(Http2CodecImplTest, ManyRequestHeadersAccepted) {
+  max_request_headers_count_ = 150;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  for (int i = 0; i < 145; i++) {
+    request_headers.addCopy(std::to_string(i), "");
+  }
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
+// Tests that max number of response headers is configurable.
+TEST_P(Http2CodecImplTest, ManyResponseHeadersAccepted) {
+  max_response_headers_count_ = 110;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  TestHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
+  for (int i = 0; i < 105; i++) {
+    response_headers.addCopy(std::to_string(i), "");
+  }
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+}
+
+TEST_P(Http2CodecImplTest, LargeRequestHeadersAtLimitAccepted) {
   uint32_t codec_limit_kb = 64;
   max_request_headers_kb_ = codec_limit_kb;
   initialize();
@@ -1107,7 +1161,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtLimitAccepted) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeRequestHeadersOverDefaultCodecLibraryLimit) {
+TEST_P(Http2CodecImplTest, LargeRequestHeadersOverDefaultCodecLibraryLimit) {
   max_request_headers_kb_ = 66;
   initialize();
 
@@ -1121,7 +1175,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersOverDefaultCodecLibraryLimit) 
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeRequestHeadersExceedPerHeaderLimit) {
+TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
   // The name-value pair max is set by NGHTTP2_HD_MAX_NV in lib/nghttp2_hd.h to 64KB, and
   // creates a per-request header limit for us in h2. Note that the nghttp2
   // calculated byte size will differ from envoy due to H2 compression and frames.
@@ -1141,7 +1195,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersExceedPerHeaderLimit) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestManyLargeRequestHeadersUnderPerHeaderLimit) {
+TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
   max_request_headers_kb_ = 81;
   initialize();
 
@@ -1157,7 +1211,7 @@ TEST_P(Http2CodecImplTest, TestManyLargeRequestHeadersUnderPerHeaderLimit) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
+TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
   // Raising the limit past this triggers some unexpected nghttp2 error.
   // Further debugging required to increase past ~96 KiB.
   max_request_headers_kb_ = 96;

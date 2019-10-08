@@ -190,7 +190,8 @@ protected:
   void testTwoRequests(bool force_network_backup = false);
   void testLargeHeaders(Http::TestHeaderMapImpl request_headers,
                         Http::TestHeaderMapImpl request_trailers, uint32_t size, uint32_t max_size);
-  void testLargeRequestHeaders(uint32_t size, uint32_t max_size = 60);
+  void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
+                               uint32_t max_count = 100);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
   void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
@@ -228,6 +229,7 @@ protected:
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
+  uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   std::string access_log_name_;
 };
 } // namespace Envoy
