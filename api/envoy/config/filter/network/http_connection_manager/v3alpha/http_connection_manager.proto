@@ -23,7 +23,7 @@ import "validate/validate.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 35]
+// [#comment:next free field: 36]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -194,7 +194,9 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  reserved 27;
+  reserved 27, 11;
+
+  reserved "idle_timeout";
 
   // Supplies the type of codec that the connection manager should use.
   CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -234,6 +236,10 @@ message HttpConnectionManager {
   // <envoy_api_msg_config.trace.v3alpha.Tracing>`.
   Tracing tracing = 7;
 
+  // Additional settings for HTTP requests handled by the connection manager. These will be
+  // applicable to both HTTP1 and HTTP2 requests.
+  api.v3alpha.core.HttpProtocolOptions common_http_protocol_options = 35;
+
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
   api.v3alpha.core.Http1ProtocolOptions http_protocol_options = 8;
 
@@ -257,15 +263,6 @@ message HttpConnectionManager {
   // constraints.
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32 = {lte: 96 gt: 0}];
-
-  // The idle timeout for connections managed by the connection manager. The
-  // idle timeout is defined as the period in which there are no active
-  // requests. If not set, there is no idle timeout. When the idle timeout is
-  // reached the connection will be closed. If the connection is an HTTP/2
-  // connection a drain sequence will occur prior to closing the connection. See
-  // :ref:`drain_timeout
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.drain_timeout>`.
-  google.protobuf.Duration idle_timeout = 11;
 
   // The stream idle timeout for connections managed by the connection manager.
   // If not specified, this defaults to 5 minutes. The default value was selected

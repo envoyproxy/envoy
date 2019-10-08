@@ -177,6 +177,6 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/listener:quic_config_cc",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
