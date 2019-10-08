@@ -904,7 +904,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268336); // June 30, 2019
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268320); // Oct 3, 2019
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million_);
 }
 
@@ -914,7 +914,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496848); // June 30, 2019
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496832); // Oct 3, 2019
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
 }
 
