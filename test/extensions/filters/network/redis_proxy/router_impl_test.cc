@@ -203,6 +203,8 @@ TEST(MirrorPolicyImplTest, ShouldMirrorDefault) {
 
   EXPECT_EQ(true, policy.shouldMirror("get"));
   EXPECT_EQ(true, policy.shouldMirror("set"));
+  EXPECT_EQ(true, policy.shouldMirror("GET"));
+  EXPECT_EQ(true, policy.shouldMirror("SET"));
 }
 
 TEST(MirrorPolicyImplTest, MissingUpstream) {
@@ -214,6 +216,8 @@ TEST(MirrorPolicyImplTest, MissingUpstream) {
 
   EXPECT_EQ(false, policy.shouldMirror("get"));
   EXPECT_EQ(false, policy.shouldMirror("set"));
+  EXPECT_EQ(false, policy.shouldMirror("GET"));
+  EXPECT_EQ(false, policy.shouldMirror("SET"));
 }
 
 TEST(MirrorPolicyImplTest, ExcludeReadCommands) {
@@ -227,6 +231,8 @@ TEST(MirrorPolicyImplTest, ExcludeReadCommands) {
 
   EXPECT_EQ(false, policy.shouldMirror("get"));
   EXPECT_EQ(true, policy.shouldMirror("set"));
+  EXPECT_EQ(false, policy.shouldMirror("GET"));
+  EXPECT_EQ(true, policy.shouldMirror("SET"));
 }
 
 TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
@@ -245,18 +251,22 @@ TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
   EXPECT_CALL(
       runtime.snapshot_,
       featureEnabled("runtime_key", Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
-      .Times(2)
+      .Times(4)
       .WillRepeatedly(Return(true));
   EXPECT_EQ(true, policy.shouldMirror("get"));
   EXPECT_EQ(true, policy.shouldMirror("set"));
+  EXPECT_EQ(true, policy.shouldMirror("GET"));
+  EXPECT_EQ(true, policy.shouldMirror("SET"));
 
   EXPECT_CALL(
       runtime.snapshot_,
       featureEnabled("runtime_key", Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
-      .Times(2)
+      .Times(4)
       .WillRepeatedly(Return(false));
   EXPECT_EQ(false, policy.shouldMirror("get"));
   EXPECT_EQ(false, policy.shouldMirror("set"));
+  EXPECT_EQ(false, policy.shouldMirror("GET"));
+  EXPECT_EQ(false, policy.shouldMirror("SET"));
 }
 
 } // namespace RedisProxy

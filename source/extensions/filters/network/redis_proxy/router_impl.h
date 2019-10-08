@@ -41,6 +41,7 @@ private:
   const bool exclude_read_commands_;
   ConnPool::InstanceSharedPtr upstream_;
   Runtime::Loader& runtime_;
+  const ToLowerTable to_lower_table_;
 };
 
 class Prefix : public Route {
