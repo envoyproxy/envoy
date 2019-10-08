@@ -44,6 +44,40 @@ TEST_P(XdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
+class XdsIntegrationTestTypedStruct : public testing::TestWithParam<Network::Address::IpVersion>,
+                                      public HttpIntegrationTest {
+public:
+  XdsIntegrationTestTypedStruct()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  }
+
+  void createEnvoy() override {
+    registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
+    createApiTestServer(
+        {
+            "test/config/integration/server_xds.bootstrap.yaml",
+            "test/config/integration/server_xds.cds.yaml",
+            "test/config/integration/server_xds.eds.yaml",
+            "test/config/integration/server_xds.lds.typed_struct.yaml",
+            "test/config/integration/server_xds.rds.yaml",
+        },
+        {"http"}, false, false, false);
+    EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, XdsIntegrationTestTypedStruct,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(XdsIntegrationTestTypedStruct, RouterRequestAndResponseWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
 using LdsIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
