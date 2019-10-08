@@ -14,7 +14,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:codes_interface",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/service/auth/v2:external_auth_cc",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
     ],
 )
 
@@ -47,7 +47,7 @@ envoy_cc_library(
         # removed unless v2alpha is fully deprecated, otherwise linker will drop the object file
         # associated with v2alpha/external_auth.pb.cc causing FindMessageTypeByName() to always return
         # nullptr when looking up for envoy.service.auth.v2alpha.Authorization.Check.
-        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
+        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -64,7 +64,7 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http:codes_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
     ],
 )
 
@@ -78,6 +78,6 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/service/auth/v2:external_auth_cc",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
     ],
 )
