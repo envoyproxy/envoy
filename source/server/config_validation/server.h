@@ -50,11 +50,11 @@ bool validateConfig(const Options& options, Network::Address::InstanceConstShare
  * If we finish initialization, and reach the point where an ordinary Envoy run would begin serving
  * requests, the validation is considered successful.
  */
-class ValidationInstance : Logger::Loggable<Logger::Id::main>,
-                           public Instance,
-                           public ListenerComponentFactory,
-                           public ServerLifecycleNotifier,
-                           public WorkerFactory {
+class ValidationInstance final : Logger::Loggable<Logger::Id::main>,
+                                 public Instance,
+                                 public ListenerComponentFactory,
+                                 public ServerLifecycleNotifier,
+                                 public WorkerFactory {
 public:
   ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
