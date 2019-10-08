@@ -32,8 +32,9 @@ bool WildcardMatch(absl::string_view pattern, absl::string_view input) {
     } else if (iStar != input.size()) {
       i = ++iStar;
       p = pStar + 1;
-    } else
+    } else {
       return false;
+    }
   }
 
   while (p < pattern.size() && pattern[p] == glob) {

@@ -20,7 +20,7 @@ XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 Tracing::HttpTracerPtr
 XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2::XRayConfig& proto_config,
                                          Server::Instance& server) {
-  std::string sampling_rule_json;
+  std::string sampling_rules_json;
   try {
     sampling_rules_json = server.api().fileSystem().fileReadToEnd(proto_config.json_file());
   } catch (EnvoyException& e) {
@@ -28,7 +28,7 @@ XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2::XRayCon
               proto_config.json_file(), e.what());
   }
 
-  XRayConfiguration xconfig(proto_config.daemon_endpoint, proto_config.segment_name,
+  XRayConfiguration xconfig(proto_config.daemon_endpoint(), proto_config.segment_name(),
                             sampling_rules_json);
   auto xray_driver = std::make_unique<XRay::Driver>(xconfig, server);
 

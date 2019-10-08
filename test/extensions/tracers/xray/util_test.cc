@@ -8,7 +8,7 @@ namespace Tracers {
 namespace XRay {
 
 TEST(XRayUtilTest, WildcardMatchingInvalidArgs) {
-  const std::string pattern = "";
+  const std::string pattern;
   const std::string text = "whatever";
   ASSERT_FALSE(WildcardMatch(pattern, text));
 }

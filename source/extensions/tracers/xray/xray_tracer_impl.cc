@@ -6,7 +6,6 @@ namespace Tracers {
 namespace XRay {
 
 static const char DEFAULT_DAEMON_ENDPOINT[] = "127.0.0.1:2000";
-static const char ENV_APPMESH_NODE_NAME[] = "APPMESH_VIRTUAL_NODE_NAME";
 Driver::Driver(const XRayConfiguration& config, Server::Instance& server) : xray_config_(config) {
 
   const std::string daemon_endpoint =
