@@ -10,6 +10,23 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
+Version 1.11.2 (October 8, 2019)
+================================
+* The `regex` field in :ref:`StringMatcher <envoy_api_msg_type.matcher.StringMatcher>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `regex` field in :ref:`RouteMatch <envoy_api_msg_route.RouteMatch>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `allow_origin` and `allow_origin_regex` fields in :ref:`CorsPolicy
+  <envoy_api_msg_route.CorsPolicy>` have been deprecated in favor of the
+  `allow_origin_string_match` field.
+* The `pattern` and `method` fields in :ref:`VirtualCluster <envoy_api_msg_route.VirtualCluster>`
+  have been deprecated in favor of the `headers` field.
+* The `regex_match` field in :ref:`HeaderMatcher <envoy_api_msg_route.HeaderMatcher>` has been
+  deprecated in favor of the `safe_regex_match` field.
+* The `value` and `regex` fields in :ref:`QueryParameterMatcher
+  <envoy_api_msg_route.QueryParameterMatcher>` has been deprecated in favor of the `string_match`
+  and `present_match` fields.
+
 Version 1.11.0 (July 11, 2019)
 ==============================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.

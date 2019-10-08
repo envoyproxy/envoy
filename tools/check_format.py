@@ -45,8 +45,18 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
                                  "./test/common/grpc/codec_test.cc")
 
-# Files in these paths can use Protobuf::util::JsonStringToMessage
+#Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
+
+#Files in these paths can use std::regex
+STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
+                       "./source/common/common/regex.cc",
+                       "./source/common/stats/tag_extractor_impl.h",
+                       "./source/common/stats/tag_extractor_impl.cc",
+                       "./source/common/access_log/access_log_formatter.cc",
+                       "./source/extensions/filters/http/squash/squash_filter.h",
+                       "./source/extensions/filters/http/squash/squash_filter.cc",
+                       "./source/server/http/admin.h", "./source/server/http/admin.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -315,6 +325,10 @@ def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
+def whitelistedForStdRegex(file_path):
+  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -544,6 +558,8 @@ def checkSourceLine(line, file_path, reportError):
     # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
+  if not whitelistedForStdRegex(file_path) and "std::regex" in line:
+    reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
 
 def checkBuildLine(line, file_path, reportError):

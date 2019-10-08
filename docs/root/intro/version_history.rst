@@ -4,6 +4,7 @@ Version history
 1.11.2 (October 8, 2019)
 ========================
 * http: fixed CVE-2019-15226 by adding a cached byte size in HeaderMap.
+* regex: introduce new :ref:`RegexMatcher <envoy_api_msg_type.matcher.RegexMatcher>` type that provides a safe regex implementation for untrusted user input. This type is now used in all configuration that processes user provided input. See :ref:`deprecated configuration details <deprecated>` for more information.
 
 1.11.1 (August 13, 2019)
 ========================

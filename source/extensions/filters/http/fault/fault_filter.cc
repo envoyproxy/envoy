@@ -32,7 +32,8 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
+FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault)
+    : fault_filter_headers_(Http::HeaderUtility::buildHeaderDataVector(fault.headers())) {
   if (fault.has_abort()) {
     const auto& abort = fault.abort();
     abort_percentage_ = abort.percentage();
@@ -42,10 +43,6 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
   if (fault.has_delay()) {
     request_delay_config_ =
         std::make_unique<Filters::Common::Fault::FaultDelayConfig>(fault.delay());
-  }
-
-  for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
-    fault_filter_headers_.push_back(header_map);
   }
 
   upstream_cluster_ = fault.upstream_cluster();

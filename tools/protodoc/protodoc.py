@@ -44,6 +44,10 @@ NOT_IMPLEMENTED_WARN_ANNOTATION = 'not-implemented-warn'
 # field.
 NOT_IMPLEMENTED_HIDE_ANNOTATION = 'not-implemented-hide'
 
+# Comment that allows for easy searching for things that need cleaning up in the next major
+# API version.
+NEXT_MAJOR_VERSION_ANNOTATION = 'next-major-version'
+
 # Comment. Just used for adding text that will not go into the docs at all.
 COMMENT_ANNOTATION = 'comment'
 
@@ -58,6 +62,7 @@ VALID_ANNOTATIONS = set([
     NOT_IMPLEMENTED_WARN_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
     V2_API_DIFF_ANNOTATION,
+    NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
     PROTO_STATUS_ANNOTATION,
 ])

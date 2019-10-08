@@ -50,6 +50,8 @@ public:
           }
 
           {
+            // TODO(mattklein123): When deprecated config is removed, remove DEPRECATED_FEATURE_TEST
+            // from all tests below.
             auto* route = virtual_host->add_routes();
             route->mutable_match()->set_prefix("/cors-credentials-allowed");
             route->mutable_route()->set_cluster("cluster_0");
@@ -63,7 +65,10 @@ public:
             route->mutable_match()->set_prefix("/cors-allow-origin-regex");
             route->mutable_route()->set_cluster("cluster_0");
             auto* cors = route->mutable_route()->mutable_cors();
-            cors->add_allow_origin_regex(".*\\.envoyproxy\\.io");
+            auto* safe_regex =
+                cors->mutable_allow_origin_string_match()->Add()->mutable_safe_regex();
+            safe_regex->mutable_google_re2();
+            safe_regex->set_regex(".*\\.envoyproxy\\.io");
           }
 
           {

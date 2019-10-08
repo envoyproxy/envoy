@@ -208,6 +208,8 @@ if __name__ == "__main__":
       "version_history.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")
+  errors += checkUnfixableError(
+      "regex.cc", "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",

@@ -17,12 +17,10 @@ namespace Csrf {
 /**
  * All CSRF filter stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_CSRF_STATS(COUNTER) \
-  COUNTER(missing_source_origin)\
-  COUNTER(request_invalid)      \
-  COUNTER(request_valid)        \
-// clang-format on
+#define ALL_CSRF_STATS(COUNTER)                                                                    \
+  COUNTER(missing_source_origin)                                                                   \
+  COUNTER(request_invalid)                                                                         \
+  COUNTER(request_valid)
 
 /**
  * Struct definition for CSRF stats. @see stats_macros.h
@@ -37,9 +35,11 @@ struct CsrfStats {
 class CsrfPolicy : public Router::RouteSpecificFilterConfig {
 public:
   CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-             Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {
+             Runtime::Loader& runtime)
+      : policy_(policy), runtime_(runtime) {
     for (const auto& additional_origin : policy.additional_origins()) {
-      additional_origins_.emplace_back(Matchers::StringMatcher(additional_origin));
+      additional_origins_.emplace_back(
+          std::make_unique<Matchers::StringMatcherImpl>(additional_origin));
     }
   }
 
@@ -58,14 +58,16 @@ public:
                                               shadow_enabled.default_value());
   }
 
-  const std::vector<Matchers::StringMatcher>& additional_origins() const { return additional_origins_; };
+  const std::vector<Matchers::StringMatcherPtr>& additional_origins() const {
+    return additional_origins_;
+  };
 
 private:
   const envoy::config::filter::http::csrf::v2::CsrfPolicy policy_;
-  std::vector<Matchers::StringMatcher> additional_origins_;
+  std::vector<Matchers::StringMatcherPtr> additional_origins_;
   Runtime::Loader& runtime_;
-
 };
+using CsrfPolicyPtr = std::unique_ptr<CsrfPolicy>;
 
 /**
  * Configuration for the CSRF filter.
@@ -73,15 +75,14 @@ private:
 class CsrfFilterConfig {
 public:
   CsrfFilterConfig(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-                   const std::string& stats_prefix, Stats::Scope& scope,
-                   Runtime::Loader& runtime);
+                   const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   CsrfStats& stats() { return stats_; }
-  const CsrfPolicy* policy() { return &policy_; }
+  const CsrfPolicy* policy() { return policy_.get(); }
 
 private:
   CsrfStats stats_;
-  const CsrfPolicy policy_;
+  const CsrfPolicyPtr policy_;
 };
 using CsrfFilterConfigSharedPtr = std::shared_ptr<CsrfFilterConfig>;
 

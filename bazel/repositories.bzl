@@ -160,6 +160,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_quiche()
+    _repository_impl("com_googlesource_code_re2")
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()

@@ -48,6 +48,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:matchers_interface",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",

@@ -16,6 +16,7 @@
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <regex>
 #include <stdexcept>
 #include <string>
 #include <vector>

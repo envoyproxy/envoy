@@ -251,4 +251,9 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "fcdebf54c89d839ffa7eefae166c8e4b551c765559db13ff15bff98047f344fb",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz"],
     ),
+    com_googlesource_code_re2 = dict(
+        sha256 = "38bc0426ee15b5ed67957017fd18201965df0721327be13f60496f2b356e3e01",
+        strip_prefix = "re2-2019-08-01",
+        urls = ["https://github.com/google/re2/archive/2019-08-01.tar.gz"],
+    ),
 )
