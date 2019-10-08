@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package protos.test;
+
+message EchoServiceRequest {
+  string str = 1;
+}
+message EchoServiceResponse {
+  string str = 1;
+}
+
+service EchoService {
+  rpc stream(stream EchoServiceRequest) returns (stream EchoServiceResponse) {
+  }
+
+  rpc unary(EchoServiceRequest) returns (EchoServiceResponse) {
+  }
+}
