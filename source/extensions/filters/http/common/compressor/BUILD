@@ -18,6 +18,8 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:thread_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/filter/http/compressor/v2:pkg_cc_proto",

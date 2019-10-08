@@ -9,6 +9,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -66,6 +67,7 @@ public:
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
   uint32_t minimumLength() const { return content_length_; }
   const std::string contentEncoding() const { return content_encoding_; };
+  const std::vector<std::string> registeredCompressors() const;
 
   virtual ~CompressorFilterConfig();
 
@@ -83,6 +85,15 @@ private:
   static CompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return CompressorStats{ALL_COMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
+
+  struct CompressorRegistry {
+    Thread::MutexBasicLockable mutex_;
+    std::vector<std::string> compressors_ ABSL_GUARDED_BY(mutex_);
+  };
+
+  static CompressorRegistry& compressorRegistry();
+
+  CompressorRegistry& compressor_registry_;
 
   uint32_t content_length_;
 

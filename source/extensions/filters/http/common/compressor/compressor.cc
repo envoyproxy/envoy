@@ -1,5 +1,6 @@
 #include "extensions/filters/http/common/compressor/compressor.h"
 
+#include "common/common/lock_guard.h"
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {
@@ -21,30 +22,29 @@ const std::vector<std::string>& defaultContentEncoding() {
                           "application/xhtml+xml"});
 }
 
-std::vector<std::string>& registeredCompressors() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::vector<std::string>);
-}
-
 } // namespace
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::config::filter::http::compressor::v2::Compressor& compressor,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     const std::string& content_encoding)
-    : content_length_(contentLengthUint(compressor.content_length().value())),
+    : compressor_registry_(compressorRegistry()),
+      content_length_(contentLengthUint(compressor.content_length().value())),
       content_type_values_(contentTypeSet(compressor.content_type())),
       disable_on_etag_header_(compressor.disable_on_etag_header()),
       remove_accept_encoding_header_(compressor.remove_accept_encoding_header()),
       stats_(generateStats(stats_prefix, scope)), runtime_(runtime),
       content_encoding_(content_encoding) {
-  registeredCompressors().push_back(content_encoding);
+  Thread::LockGuard lock(compressor_registry_.mutex_);
+  compressor_registry_.compressors_.push_back(content_encoding);
 }
 
 CompressorFilterConfig::~CompressorFilterConfig() {
-  auto result =
-      std::find(registeredCompressors().begin(), registeredCompressors().end(), content_encoding_);
-  ASSERT(result != registeredCompressors().end());
-  registeredCompressors().erase(result);
+  Thread::LockGuard lock(compressor_registry_.mutex_);
+  auto result = std::find(compressor_registry_.compressors_.begin(),
+                          compressor_registry_.compressors_.end(), content_encoding_);
+  ASSERT(result != compressor_registry_.compressors_.end());
+  compressor_registry_.compressors_.erase(result);
 }
 
 StringUtil::CaseUnorderedSet
@@ -57,6 +57,15 @@ CompressorFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::str
 
 uint32_t CompressorFilterConfig::contentLengthUint(Protobuf::uint32 length) {
   return length > 0 ? length : DefaultMinimumContentLength;
+}
+
+CompressorFilterConfig::CompressorRegistry& CompressorFilterConfig::compressorRegistry() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(CompressorRegistry);
+}
+
+const std::vector<std::string> CompressorFilterConfig::registeredCompressors() const {
+  Thread::LockGuard lock(compressor_registry_.mutex_);
+  return compressor_registry_.compressors_;
 }
 
 CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
@@ -133,7 +142,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
 
-  std::vector<std::string> allowed_compressors(registeredCompressors());
+  std::vector<std::string> allowed_compressors(config_->registeredCompressors());
 
   for (const auto token : StringUtil::splitToken(accept_encoding->value().getStringView(), ",",
                                                  false /* keep_empty */)) {
