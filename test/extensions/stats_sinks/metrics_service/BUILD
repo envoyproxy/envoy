@@ -42,6 +42,6 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
+        "@envoy_api//envoy/service/metrics/v2:pkg_cc_proto",
     ],
 )

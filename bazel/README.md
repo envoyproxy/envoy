@@ -289,7 +289,8 @@ be installed.
 # Running a single Bazel test under GDB
 
 ```
-tools/bazel-test-gdb //test/common/http:async_client_impl_test -c dbg
+bazel build -c dbg //test/common/http:async_client_impl_test
+gdb bazel-bin/test/common/http/async_client_impl_test
 ```
 
 Without the `-c dbg` Bazel option at the end of the command line the test

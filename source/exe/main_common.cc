@@ -77,9 +77,9 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_system, local_address, listener_hooks, *restarter_, *stats_store_,
-        access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory_,
-        file_system_, std::move(process_context));
+        *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
+        *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
+        thread_factory_, file_system_, std::move(process_context));
 
     break;
   }

@@ -118,7 +118,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy/router:config",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//source/extensions/filters/network/dubbo_proxy/router:router_lib",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -225,6 +225,6 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
         "//source/extensions/filters/network/dubbo_proxy/router:router_interface",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
     ],
 )
