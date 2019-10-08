@@ -12,7 +12,7 @@ envoy_package()
 envoy_proto_library(
     name = "common_proto",
     srcs = ["common.proto"],
-    deps = ["@envoy_api//envoy/api/v2/core:base_export"],
+    deps = ["@envoy_api//envoy/api/v2/core:pkg"],
 )
 
 envoy_cc_test_library(
@@ -48,7 +48,7 @@ envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     deps = [
-        ":common_proto_cc",
+        ":common_proto_cc_proto",
         "//source/common/common:empty_string",
         "//source/common/network:utility_lib",
         "//test/common/stream_info:test_util",

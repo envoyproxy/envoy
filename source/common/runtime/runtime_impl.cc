@@ -172,14 +172,11 @@ std::string RandomGeneratorImpl::uuid() {
 }
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
-  bool allowed = false;
+  const bool default_allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
+
   // If the value is not explicitly set as a runtime boolean, the default value is based on
   // disallowedByDefault.
-  if (!getBoolean(key, allowed)) {
-    allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
-  }
-
-  if (!allowed) {
+  if (!getBoolean(key, default_allowed)) {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
@@ -195,14 +192,9 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
 }
 
 bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
-  bool enabled = false;
   // If the value is not explicitly set as a runtime boolean, the default value is based on
-  // disallowedByDefault.
-  if (!getBoolean(key, enabled)) {
-    enabled = RuntimeFeaturesDefaults::get().enabledByDefault(key);
-  }
-
-  return enabled;
+  // enabledByDefault.
+  return getBoolean(key, RuntimeFeaturesDefaults::get().enabledByDefault(key));
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
@@ -286,13 +278,13 @@ double SnapshotImpl::getDouble(const std::string& key, double default_value) con
   }
 }
 
-bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
+bool SnapshotImpl::getBoolean(absl::string_view key, bool default_value) const {
   auto entry = values_.find(key);
-  if (entry != values_.end() && entry->second.bool_value_.has_value()) {
-    value = entry->second.bool_value_.value();
-    return true;
+  if (entry == values_.end() || !entry->second.bool_value_.has_value()) {
+    return default_value;
+  } else {
+    return entry->second.bool_value_.value();
   }
-  return false;
 }
 
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {

@@ -93,7 +93,7 @@ if [ "$1" != "-nofetch" ]; then
   fi
 
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 1995c1e0eccea84bbb39f64e75ef3e9102d1ae82)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 616ec56fb7a673e285aed278cb0a44f23789806f)
   sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
   cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 fi

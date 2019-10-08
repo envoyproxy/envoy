@@ -364,8 +364,8 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   )EOF";
   std::string response2_json =
       fmt::format(response2_basic,
-                  TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"),
-                  TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
   auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({
