@@ -84,6 +84,8 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
                                           {":authority", "host"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest(0);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   // Invoke drain listeners endpoint and validate that the listener is actually draining.
