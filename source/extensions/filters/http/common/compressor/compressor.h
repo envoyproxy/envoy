@@ -20,15 +20,12 @@ namespace Compressors {
 
 /**
  * All compressor filter stats. @see stats_macros.h
- * "total_uncompressed_bytes" only includes bytes
- * from requests that were marked for compression.
- * If the request was not marked for compression,
- * the filter increments "not_compressed", but does
- * not add to "total_uncompressed_bytes". This way,
- * the user can measure the memory performance of the
- * compression.
- * "header_gzip" is specific to the gzip filter and is
- * deprecated since it duplicates "header_compressor_used".
+ * "total_uncompressed_bytes" only includes bytes from requests that were marked for compression.
+ * If the request was not marked for compression, the filter increments "not_compressed", but does
+ * not add to "total_uncompressed_bytes". This way, the user can measure the memory performance of
+ * the compression.
+ * "header_gzip" is specific to the gzip filter and is deprecated since it duplicates
+ * "header_compressor_used".
  */
 // clang-format off
 #define ALL_COMPRESSOR_STATS(COUNTER)    \
