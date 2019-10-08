@@ -587,6 +587,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
                                           {":authority", "host"},
                                           {"content-length", "0"}};
   std::vector<std::string> cookie_pieces;
+  cookie_pieces.reserve(7000);
   for (int i = 0; i < 7000; i++) {
     cookie_pieces.push_back(fmt::sprintf("a%x=b", i));
   }
