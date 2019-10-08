@@ -125,6 +125,10 @@ public:
 TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   InSequence s;
 
+  // For reasons I did not investigate, the death test below requires this, likely due to forking.
+  // So we just leak the FDs for this test.
+  ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+
   Network::MockListener* listener = new NiceMock<Network::MockListener>();
   Network::ListenerCallbacks* listener_callbacks;
   TestListener* test_listener = addListener(1, true, false, "test_listener");
@@ -145,6 +149,7 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
                           Network::BalancedConnectionHandler& current_handler) {
         // The fact that we are posting the socket to ourselves is not how a real balancer would
         // work, but it's sufficient for this test.
+        current_handler.incNumConnections();
         current_handler.post(std::move(socket));
         return Network::ConnectionBalancer::BalanceConnectionResult::Rebalanced;
       }));
@@ -153,13 +158,23 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
 
-  EXPECT_CALL(*listener, onDestroy());
-  handler_->stopListeners(1);
   EXPECT_CALL(*connection_balancer, unregisterHandler(_));
-  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
-  handler_->removeListeners(1);
 
+  // This also tests the assert in ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener.
+  // See the long comment at the end of that function.
+#ifndef NDEBUG
+  // On debug builds this should crash.
+  EXPECT_DEATH(handler_->removeListeners(1), ".*num_listener_connections_ == 0.*");
+  // The original test continues without the previous line being run. To avoid the same assert
+  // firing during teardown, run the posted callback now.
   post_cb();
+  EXPECT_CALL(*listener, onDestroy());
+#else
+  // On release builds this should be fine.
+  EXPECT_CALL(*listener, onDestroy());
+  handler_->removeListeners(1);
+  post_cb();
+#endif
 }
 
 TEST_F(ConnectionHandlerTest, RemoveListener) {

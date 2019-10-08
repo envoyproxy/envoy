@@ -134,7 +134,9 @@ ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
   // By the time a listener is destroyed, in the common case, there should be no connections.
   // However, this is not always true if there is an in flight rebalanced connection that is
   // being posted. This assert is extremely useful for debugging the common path so we will leave it
-  // for now. If it becomes a problem we can revisit.
+  // for now. If it becomes a problem (developers hitting this assert when using debug builds) we
+  // can revisit. This case, if it happens, should be benign on production builds. This case is
+  // covered in ConnectionHandlerTest::RemoveListenerDuringRebalance.
   ASSERT(num_listener_connections_ == 0);
 }
 
@@ -250,7 +252,7 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
     ASSERT(tcp_listener != nullptr, "ActiveTcpSocket listener is expected to be tcp");
     // Hands off connections redirected by iptables to the listener associated with the
     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
-    // prevent further redirection as well as 'rebalanced' as false since the connection has
+    // prevent further redirection as well as 'rebalanced' as true since the connection has
     // already been balanced if applicable. Note also that we must account for the number of
     // connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
@@ -345,21 +347,16 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
   parent_.dispatcher_.post([socket_to_rebalance, tag = config_.listenerTag(), &parent = parent_]() {
     // TODO(mattklein123): We should probably use a hash table here to lookup the tag instead of
     // iterating through the listener list.
-    auto listener_it = std::find_if(
-        parent.listeners_.begin(), parent.listeners_.end(),
-        [tag](const std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>& p) {
-          return p.second->listener() != nullptr && p.second->listenerTag() == tag;
-        });
-
-    if (listener_it == parent.listeners_.end()) {
-      // It is possible for a listener to be removed while rebalancing.
-      return;
+    for (const auto& listener : parent.listeners_) {
+      if (listener.second->listener() != nullptr && listener.second->listenerTag() == tag) {
+        // TODO(mattklein123): Remove dynamic_cast here in follow up cleanup.
+        ActiveTcpListener& tcp_listener = *dynamic_cast<ActiveTcpListener*>(listener.second.get());
+        tcp_listener.onAcceptWorker(std::move(socket_to_rebalance->socket),
+                                    tcp_listener.config_.handOffRestoredDestinationConnections(),
+                                    true);
+        return;
+      }
     }
-
-    // TODO(mattklein123): Remove dynamic_cast here in follow up cleanup.
-    ActiveTcpListener& listener = *dynamic_cast<ActiveTcpListener*>(listener_it->second.get());
-    listener.onAcceptWorker(std::move(socket_to_rebalance->socket),
-                            listener.config_.handOffRestoredDestinationConnections(), true);
   });
 }
 
@@ -379,7 +376,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept
   // path if there is no configured balancer.
-  listener_.parent_.num_handler_connections_++;
+  ++listener_.parent_.num_handler_connections_;
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {

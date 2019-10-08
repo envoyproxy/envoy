@@ -60,20 +60,20 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   initialize();
 
   // Per-worker listener stats.
-  auto check_listener_stats = [this](uint64_t expected_connections) {
+  auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
     if (GetParam() == Network::Address::IpVersion::v4) {
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active",
-                                   expected_connections);
-      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active",
-                                   expected_connections);
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total", cx_total);
     } else {
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active",
-                                   expected_connections);
-      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active",
-                                   expected_connections);
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx_active);
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx_active);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx_total);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx_total);
     }
   };
-  check_listener_stats(0);
+  check_listener_stats(0, 0);
 
   // Main thread admin listener stats.
   EXPECT_NE(nullptr, test_server_->counter("listener.admin.main_thread.downstream_cx_total"));
@@ -85,11 +85,11 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
-  check_listener_stats(1);
+  check_listener_stats(1, 1);
 
   codec_client_->close();
   codec_client2->close();
-  check_listener_stats(0);
+  check_listener_stats(0, 1);
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {

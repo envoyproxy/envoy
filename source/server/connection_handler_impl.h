@@ -117,7 +117,7 @@ private:
                         bool hand_off_restored_destination_connections, bool rebalanced);
     void decNumConnections() {
       ASSERT(num_listener_connections_ > 0);
-      num_listener_connections_--;
+      --num_listener_connections_;
     }
 
     // Network::ListenerCallbacks
@@ -125,7 +125,7 @@ private:
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
-    void incNumConnections() override { num_listener_connections_++; }
+    void incNumConnections() override { ++num_listener_connections_; }
     void post(Network::ConnectionSocketPtr&& socket) override;
 
     /**
@@ -192,7 +192,7 @@ private:
       accept_filters_.clear();
       listener_.stats_.downstream_pre_cx_active_.dec();
 
-      // If the underlying socket is not longer attached, it means that it has been transferred to
+      // If the underlying socket is no longer attached, it means that it has been transferred to
       // an active connection. In this case, the active connection will decrement the number
       // of listener connections.
       // TODO(mattklein123): In general the way we account for the number of listener connections
