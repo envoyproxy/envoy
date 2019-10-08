@@ -90,8 +90,8 @@ def FormatComments(comments):
   return FormatBlock(comments)
 
 
-def MessageNextFreeFieldIndex(msg_proto):
-  """Return the next free field index of a message
+def MessageNextFreeFieldNumber(msg_proto):
+  """Return the next free field number of a message
 
   Args:
     msg_proto: DescriptorProto for message.
@@ -117,8 +117,7 @@ def FormatTypeContextComments(type_context, annotation_xformers=None):
   Returns:
     Tuple of formatted leading and trailing comment blocks.
   """
-  leading_comment = type_context.pre_processed_leading_comment(
-      annotation_xformers) if annotation_xformers else type_context.leading_comment
+  leading_comment = type_context.pre_processed_leading_comment(annotation_xformers)
   leading = FormatComments(
       list(type_context.leading_detached_comments) + [leading_comment.pre_processed])
   trailing = FormatBlock(FormatComments([type_context.trailing_comment]))
@@ -437,7 +436,7 @@ class ProtoFormatVisitor(visitor.Visitor):
       return ''
     xformers = {
         annotations.NEXT_FREE_FIELD_ANNOTATION:
-            annotations.NextFreeFieldXformer(MessageNextFreeFieldIndex(msg_proto))
+            annotations.NextFreeFieldXformer(MessageNextFreeFieldNumber(msg_proto))
     }
     leading_comment, trailing_comment = FormatTypeContextComments(type_context, xformers)
     formatted_options = FormatOptions(msg_proto.options)
