@@ -8,12 +8,12 @@ namespace Envoy {
 namespace Upstream {
 
 /**
-   * TODO(lilika): Add API knob for RetryInitialDelayMilliseconds
-   * and RetryMaxDelayMilliseconds, instead of hardcoding them.
-   *
-   * Parameters of the jittered backoff strategy that defines how often
-   * we retry to establish a stream to the management server
-   */
+ * TODO(lilika): Add API knob for RetryInitialDelayMilliseconds
+ * and RetryMaxDelayMilliseconds, instead of hardcoding them.
+ *
+ * Parameters of the jittered backoff strategy that defines how often
+ * we retry to establish a stream to the management server
+ */
 static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
 
@@ -35,8 +35,8 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       validation_visitor_(validation_visitor), api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(
-      RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random_);
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
+                                                                RetryMaxDelayMilliseconds, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
