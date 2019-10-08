@@ -18,7 +18,7 @@ namespace Quic {
 class QuicFilterManagerConnectionImpl : public Network::FilterManagerConnection,
                                         protected Logger::Loggable<Logger::Id::connection> {
 public:
-  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
+  QuicFilterManagerConnectionImpl(std::unique_ptr<EnvoyQuicConnection> connection, Event::Dispatcher& dispatcher,
                                   uint32_t send_buffer_limit);
 
   // Network::FilterManager
@@ -106,7 +106,7 @@ protected:
 
   void raiseEvent(Network::ConnectionEvent event);
 
-  EnvoyQuicConnection* quic_connection_{nullptr};
+  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> stats_;
   Event::Dispatcher& dispatcher_;

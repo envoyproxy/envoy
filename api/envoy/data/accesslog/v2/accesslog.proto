@@ -41,7 +41,6 @@ message HTTPAccessLogEntry {
     HTTP10 = 1;
     HTTP11 = 2;
     HTTP2 = 3;
-    HTTP3 = 4;
   }
 
   // Common properties shared by all Envoy access logs.

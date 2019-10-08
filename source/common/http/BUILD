@@ -51,7 +51,6 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
-        "//source/extensions/quic_listeners/quiche:codec_lib",
     ],
 )
 
@@ -189,7 +188,6 @@ envoy_cc_library(
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/quic_listeners/quiche:codec_lib",
     ],
 )
 

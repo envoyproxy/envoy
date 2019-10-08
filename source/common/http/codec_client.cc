@@ -9,8 +9,6 @@
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
 
-#include "extensions/quic_listeners/quiche/codec_impl.h"
-
 namespace Envoy {
 namespace Http {
 
@@ -19,12 +17,9 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
                          Event::Dispatcher& dispatcher)
     : type_(type), connection_(std::move(connection)), host_(host),
       idle_timeout_(host_->cluster().idleTimeout()) {
-  if (type_ != Type::HTTP3) {
-    // Make sure upstream connections process data and then the FIN, rather than processing
-    // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
-    // details)
-    connection_->detectEarlyCloseWhenReadDisabled(false);
-  }
+  // Make sure upstream connections process data and then the FIN, rather than processing
+  // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for details)
+  connection_->detectEarlyCloseWhenReadDisabled(false);
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
@@ -156,19 +151,6 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
         *connection_, *this, host->cluster().statsScope(), host->cluster().http2Settings(),
         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
     break;
-  }
-  case Type::HTTP3: {
-    // TODO(danzh) this enforce dependency from core code to QUICHE. Is there a
-    // better way to aoivd such dependency in case QUICHE breaks Envoy build.
-    // Alternatives:
-    // 1) move codec creation to Network::Connection instance, in
-    // QUIC's case, EnvoyQuicClientSession. This is not ideal as
-    // Network::Connection is not necessart to speak HTTP.
-    // 2) make codec creation in a static registered factory again. It can be
-    // only necessary for QUIC and for HTTP2 and HTTP1 just use the existing
-    // logic.
-    codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_), *this);
   }
   }
 }

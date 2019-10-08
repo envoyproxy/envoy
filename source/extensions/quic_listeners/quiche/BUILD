@@ -109,7 +109,6 @@ envoy_cc_library(
     hdrs = ["codec_impl.h"],
     tags = ["nofips"],
     deps = [
-        ":envoy_quic_client_session_lib",
         ":envoy_quic_server_session_lib",
         "//include/envoy/http:codec_interface",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
@@ -159,30 +158,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_client_session_lib",
-    srcs = [
-        "envoy_quic_client_session.cc",
-        "envoy_quic_client_stream.cc",
-    ],
-    hdrs = [
-        "envoy_quic_client_session.h",
-        "envoy_quic_client_stream.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        ":envoy_quic_client_connection_lib",
-        ":envoy_quic_stream_lib",
-        ":envoy_quic_utils_lib",
-        ":quic_filter_manager_connection_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/http:header_map_lib",
-        "//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_storage_impl_lib",
-        "@com_googlesource_quiche//:quic_core_http_client_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "quic_io_handle_wrapper_lib",
     hdrs = ["quic_io_handle_wrapper.h"],
     deps = [
@@ -214,19 +189,6 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_connection_lib",
         "//source/server:connection_handler_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "envoy_quic_client_connection_lib",
-    srcs = ["envoy_quic_client_connection.cc"],
-    hdrs = ["envoy_quic_client_connection.h"],
-    tags = ["nofips"],
-    deps = [
-        ":envoy_quic_connection_lib",
-        ":envoy_quic_packet_writer_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/network:socket_option_factory_lib",
     ],
 )
 
