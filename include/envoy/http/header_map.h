@@ -456,9 +456,41 @@ public:
   virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
+   * HeaderMap contains an internal byte size count, updated as entries are added, removed, or
+   * modified through the HeaderMap interface. However, HeaderEntries can be accessed and modified
+   * by reference so that the HeaderMap can no longer accurately update the internal byte size
+   * count.
+   *
+   * Calling byteSize before a HeaderEntry is accessed will return the internal byte size count. The
+   * value is cleared when a HeaderEntry is accessed, and the value is updated and set again when
+   * refreshByteSize is called.
+   *
+   * To guarantee an accurate byte size count, call refreshByteSize.
+   *
+   * @return uint64_t the approximate size of the header map in bytes if valid.
+   */
+  virtual absl::optional<uint64_t> byteSize() const PURE;
+
+  /**
+   * This returns the sum of the byte sizes of the keys and values in the HeaderMap. This also
+   * updates and sets the byte size count.
+   *
+   * To guarantee an accurate byte size count, use this. If it is known HeaderEntries have not been
+   * manipulated since a call to refreshByteSize, it is safe to use byteSize.
+   *
    * @return uint64_t the approximate size of the header map in bytes.
    */
-  virtual uint64_t byteSize() const PURE;
+  virtual uint64_t refreshByteSize() PURE;
+
+  /**
+   * This returns the sum of the byte sizes of the keys and values in the HeaderMap.
+   *
+   * This iterates over the HeaderMap to calculate size and should only be called directly when the
+   * user wants an explicit recalculation of the byte size.
+   *
+   * @return uint64_t the approximate size of the header map in bytes.
+   */
+  virtual uint64_t byteSizeInternal() const PURE;
 
   /**
    * Get a header by key.

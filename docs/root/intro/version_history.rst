@@ -1,6 +1,10 @@
 Version history
 ---------------
 
+1.11.2 (October 8, 2019)
+========================
+* http: fixed CVE-2019-15226 by adding a cached byte size in HeaderMap.
+
 1.11.1 (August 13, 2019)
 ========================
 * http: added mitigation of client initiated attacks that result in flooding of the downstream HTTP/2 connections. Those attacks can be logged at the "warning" level when the runtime feature `http.connection_manager.log_flood_exception` is enabled. The runtime setting defaults to disabled to avoid log spam when under attack.

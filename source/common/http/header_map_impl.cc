@@ -296,14 +296,17 @@ struct HeaderMapImpl::StaticLookupTable : public TrieLookupTable<EntryCb> {
   }
 };
 
-void HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data) {
+uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data) {
   if (data.empty()) {
-    return;
+    return 0;
   }
+  uint64_t byte_size = 0;
   if (!header.empty()) {
     header.append(",", 1);
+    byte_size += 1;
   }
   header.append(data.data(), data.size());
+  return data.size() + byte_size;
 }
 
 HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
@@ -317,6 +320,20 @@ HeaderMapImpl::HeaderMapImpl(
     HeaderString value_string;
     value_string.setCopy(value.second.c_str(), value.second.size());
     addViaMove(std::move(key_string), std::move(value_string));
+  }
+}
+
+void HeaderMapImpl::addSize(uint64_t size) {
+  // Adds size to cached_byte_size_ if it exists.
+  if (cached_byte_size_.has_value()) {
+    cached_byte_size_.value() += size;
+  }
+}
+
+void HeaderMapImpl::subtractSize(uint64_t size) {
+  if (cached_byte_size_.has_value()) {
+    ASSERT(cached_byte_size_ >= size);
+    cached_byte_size_.value() -= size;
   }
 }
 
@@ -360,10 +377,13 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*ref_lookup_response.entry_ == nullptr) {
       maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
     } else {
-      appendToHeader((*ref_lookup_response.entry_)->value(), value.getStringView());
+      const uint64_t added_size =
+          appendToHeader((*ref_lookup_response.entry_)->value(), value.getStringView());
+      addSize(added_size);
       value.clear();
     }
   } else {
+    addSize(key.size() + value.size());
     std::list<HeaderEntryImpl>::iterator i = headers_.insert(std::move(key), std::move(value));
     i->entry_ = i;
   }
@@ -374,7 +394,8 @@ void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   // the existing value.
   auto* entry = getExistingInline(key.getStringView());
   if (entry != nullptr) {
-    appendToHeader(entry->value(), value.getStringView());
+    const uint64_t added_size = appendToHeader(entry->value(), value.getStringView());
+    addSize(added_size);
     key.clear();
     value.clear();
   } else {
@@ -409,7 +430,8 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
   if (entry != nullptr) {
     char buf[32];
     StringUtil::itoa(buf, sizeof(buf), value);
-    appendToHeader(entry->value(), buf);
+    const uint64_t added_size = appendToHeader(entry->value(), buf);
+    addSize(added_size);
     return;
   }
   HeaderString new_key;
@@ -424,7 +446,8 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
 void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value) {
   auto* entry = getExistingInline(key.get());
   if (entry != nullptr) {
-    appendToHeader(entry->value(), value);
+    const uint64_t added_size = appendToHeader(entry->value(), value);
+    addSize(added_size);
     return;
   }
   HeaderString new_key;
@@ -452,13 +475,24 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::strin
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
-uint64_t HeaderMapImpl::byteSize() const {
+absl::optional<uint64_t> HeaderMapImpl::byteSize() const { return cached_byte_size_; }
+
+uint64_t HeaderMapImpl::refreshByteSize() {
+  if (!cached_byte_size_.has_value()) {
+    // In this case, the cached byte size is not valid, and the byte size is computed via an
+    // iteration over the HeaderMap. The cached byte size is updated.
+    cached_byte_size_ = byteSizeInternal();
+  }
+  return cached_byte_size_.value();
+}
+
+uint64_t HeaderMapImpl::byteSizeInternal() const {
+  // Computes the total byte size by summing the byte size of the keys and values.
   uint64_t byte_size = 0;
   for (const HeaderEntryImpl& header : headers_) {
     byte_size += header.key().size();
     byte_size += header.value().size();
   }
-
   return byte_size;
 }
 
@@ -475,6 +509,7 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
 HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) {
   for (HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
+      cached_byte_size_.reset();
       return &header;
     }
   }
@@ -529,6 +564,7 @@ void HeaderMapImpl::remove(const LowerCaseString& key) {
   } else {
     for (auto i = headers_.begin(); i != headers_.end();) {
       if (i->key() == key.get().c_str()) {
+        subtractSize(i->key().size() + i->value().size());
         i = headers_.erase(i);
       } else {
         ++i;
@@ -538,7 +574,7 @@ void HeaderMapImpl::remove(const LowerCaseString& key) {
 }
 
 void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
-  headers_.remove_if([&](const HeaderEntryImpl& entry) {
+  headers_.remove_if([&prefix, this](const HeaderEntryImpl& entry) {
     bool to_remove = absl::StartsWith(entry.key().getStringView(), prefix.get());
     if (to_remove) {
       // If this header should be removed, make sure any references in the
@@ -547,8 +583,13 @@ void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
       if (cb) {
         StaticLookupResponse ref_lookup_response = cb(*this);
         if (ref_lookup_response.entry_) {
+          const uint32_t key_value_size = (*ref_lookup_response.entry_)->key().size() +
+                                          (*ref_lookup_response.entry_)->value().size();
+          subtractSize(key_value_size);
           *ref_lookup_response.entry_ = nullptr;
         }
+      } else {
+        subtractSize(entry.key().size() + entry.value().size());
       }
     }
     return to_remove;
@@ -571,6 +612,7 @@ void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
 
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,
                                                                  const LowerCaseString& key) {
+  cached_byte_size_.reset();
   if (*entry) {
     return **entry;
   }
@@ -589,6 +631,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
     return **entry;
   }
 
+  addSize(key.get().size() + value.size());
   std::list<HeaderEntryImpl>::iterator i = headers_.insert(key, std::move(value));
   i->entry_ = i;
   *entry = &(*i);
@@ -610,6 +653,8 @@ void HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   }
 
   HeaderEntryImpl* entry = *ptr_to_entry;
+  const uint64_t size_to_subtract = entry->entry_->key().size() + entry->entry_->value().size();
+  subtractSize(size_to_subtract);
   *ptr_to_entry = nullptr;
   headers_.erase(entry->entry_);
 }
