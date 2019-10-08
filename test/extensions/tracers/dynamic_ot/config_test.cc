@@ -24,15 +24,16 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   ON_CALL(*server.cluster_manager_.thread_local_cluster_.cluster_.info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  const std::string yaml_string = fmt::sprintf(R"EOF(
+  const std::string yaml_string = fmt::sprintf(
+      R"EOF(
   http:
     name: envoy.dynamic.ot
     config:
-      library: %s/external/io_opentracing_cpp/mocktracer/libmocktracer_plugin.so
+      library: %s
       config:
         output_file: fake_file
   )EOF",
-                                               TestEnvironment::runfilesDirectory());
+      TestEnvironment::runfilesPath("mocktracer/libmocktracer_plugin.so", "io_opentracing_cpp"));
   envoy::config::trace::v2::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 

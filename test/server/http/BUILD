@@ -29,7 +29,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:memory_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 

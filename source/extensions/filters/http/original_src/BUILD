@@ -15,7 +15,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
+        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -42,6 +42,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
+        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:pkg_cc_proto",
     ],
 )
