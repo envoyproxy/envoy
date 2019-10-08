@@ -65,6 +65,11 @@ do
       fi
 
       echo "  Checking spelling for $i"
+      "$SCRIPT_DIR"/check_spelling.sh check $i
+      if [[ $? -ne 0 ]]; then
+        exit 1
+      fi
+
       "$SCRIPT_DIR"/check_spelling_pedantic.py check $i
       if [[ $? -ne 0 ]]; then
         exit 1
