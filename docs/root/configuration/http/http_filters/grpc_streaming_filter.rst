@@ -9,7 +9,7 @@ gRPC Streaming
 
 This is a filter which enables telemetry of gRPC streaming calls. The filter
 detects message boundaries in the streaming gRPC calls and emits the message
-counts for boths the request and the response.  The filter emits statistics in
+counts for both the request and the response.  The filter emits statistics in
 the *cluster.<route target cluster>.grpc.* namespace.
 
 .. csv-table::
