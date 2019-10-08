@@ -298,6 +298,7 @@ public:
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
+  MOCK_CONST_METHOD0(retryShadowBufferLimit, uint32_t());
   MOCK_CONST_METHOD0(shadowPolicy, const ShadowPolicy&());
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());

@@ -230,6 +230,11 @@ message Route {
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
   Tracing tracing = 15;
+
+  // The maximum bytes which will be buffered for retries and shadowing.
+  // The bytes actually buffered will be the minimum value of this and the
+  // listener per_connection_buffer_limit_bytes.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a

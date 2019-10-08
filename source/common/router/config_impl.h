@@ -398,6 +398,7 @@ public:
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
+  uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
     return vhost_.virtualClusterFromEntries(headers);
@@ -491,6 +492,7 @@ private:
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
+    uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
@@ -655,6 +657,7 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   envoy::api::v2::core::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
