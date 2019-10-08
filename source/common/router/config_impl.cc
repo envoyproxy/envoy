@@ -678,7 +678,7 @@ RouteEntryImplBase::perFilterConfig(const std::string& name) const {
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
-    const RouteEntryImplBase* parent, const std::string runtime_key,
+    const RouteEntryImplBase* parent, const std::string& runtime_key,
     Server::Configuration::ServerFactoryContext& factory_context,
     const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster)
     : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),

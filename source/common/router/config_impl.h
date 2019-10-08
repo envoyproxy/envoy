@@ -557,7 +557,7 @@ private:
    */
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string rutime_key,
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
                          Server::Configuration::ServerFactoryContext& factory_context,
                          const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster);
 

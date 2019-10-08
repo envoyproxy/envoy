@@ -10,8 +10,9 @@ namespace LocalInfo {
 class LocalInfoImpl : public LocalInfo {
 public:
   LocalInfoImpl(const envoy::api::v2::core::Node& node,
-                Network::Address::InstanceConstSharedPtr address, const std::string zone_name,
-                const std::string cluster_name, const std::string node_name)
+                const Network::Address::InstanceConstSharedPtr& address,
+                const std::string zone_name, const std::string cluster_name,
+                const std::string node_name)
       : node_(node), address_(address) {
     if (!zone_name.empty()) {
       node_.mutable_locality()->set_zone(zone_name);

@@ -34,7 +34,8 @@ namespace Server {
  * validateConfig() takes over from main() for a config-validation run of Envoy. It returns true if
  * the config is valid, false if invalid.
  */
-bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+bool validateConfig(const Options& options,
+                    const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                     Filesystem::Instance& file_system);
 
@@ -57,7 +58,7 @@ class ValidationInstance final : Logger::Loggable<Logger::Id::main>,
                                  public WorkerFactory {
 public:
   ValidationInstance(const Options& options, Event::TimeSystem& time_system,
-                     Network::Address::InstanceConstSharedPtr local_address,
+                     const Network::Address::InstanceConstSharedPtr& local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                      Filesystem::Instance& file_system);
@@ -163,7 +164,8 @@ public:
   }
 
 private:
-  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options,
+                  const Network::Address::InstanceConstSharedPtr& local_address,
                   ComponentFactory& component_factory);
 
   // init_manager_ must come before any member that participates in initialization, and destructed
