@@ -45,7 +45,7 @@ can be specified independently for each xDS API, pointing at an upstream
 cluster corresponding to a management server. This will initiate an
 independent bidirectional gRPC stream for each xDS resource type,
 potentially to distinct management servers. API delivery is eventually
-consistent. See <Aggregated Discovery Service>`
+consistent. See :ref:`Aggregated Discovery Service <xds_protocol_ads>`
 below for situations in which explicit control of sequencing is required.
 
 Type URLs
