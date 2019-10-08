@@ -1,7 +1,7 @@
-.. _config_http_filters_grpc_web:
+.. _config_http_filters_grpc_streaming:
 
 gRPC Streaming
-========
+==============
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
 * :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
