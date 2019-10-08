@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/common/time.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "extensions/tracers/xray/sampling_strategy.h"
 
