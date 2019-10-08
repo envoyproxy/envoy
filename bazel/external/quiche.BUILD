@@ -1993,6 +1993,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_alarm_interface_lib",
         ":quic_core_crypto_encryption_lib",

@@ -5,17 +5,17 @@
 namespace Envoy {
 namespace Quic {
 
-QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(std::unique_ptr<EnvoyQuicConnection> connection,
+QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection,
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
-    : quic_connection_(std::move(connection)), dispatcher_(dispatcher), filter_manager_(*this),
+    : quic_connection_(&connection), dispatcher_(dispatcher), filter_manager_(*this),
       // QUIC connection id can be 18 bytes. It's easier to use hash value instead
       // of trying to map it into a 64-bit space.
       stream_info_(dispatcher.timeSource()), id_(quic_connection_->connection_id().Hash()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
-  stream_info_.protocol(Http::Protocol::Http2);
+  stream_info_.protocol(Http::Protocol::Http3);
 }
 
 void QuicFilterManagerConnectionImpl::addWriteFilter(Network::WriteFilterSharedPtr filter) {

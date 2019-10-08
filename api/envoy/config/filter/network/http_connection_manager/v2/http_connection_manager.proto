@@ -40,6 +40,7 @@ message HttpConnectionManager {
     // (Envoy does not require HTTP/2 to take place over TLS or to use ALPN.
     // Prior knowledge is allowed).
     HTTP2 = 2;
+    HTTP3 = 3;
   }
 
   enum ServerHeaderTransformation {
