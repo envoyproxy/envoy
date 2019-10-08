@@ -5,7 +5,7 @@ from collections import namedtuple
 from tools.api_proto_plugin import annotations
 
 # A comment is a (raw comment, annotation map) pair.
-Comment = namedtuple('Comment', ['raw', 'annotations'])
+Comment = namedtuple('Comment', ['raw', 'pre_processed', 'annotations'])
 
 
 class SourceCodeInfo(object):
@@ -60,22 +60,33 @@ class SourceCodeInfo(object):
 
   # TODO(htuch): consider integrating comment lookup with overall
   # FileDescriptorProto, perhaps via two passes.
-  def LeadingCommentPathLookup(self, path):
+  def LeadingCommentPathLookup(self, path, annotation_xformers=None):
     """Lookup leading comment by path in SourceCodeInfo.
 
     Args:
       path: a list of path indexes as per
         https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
+      annotation_xformers: a dict of transformers to process annotation extracted
 
     Returns:
       Comment object.
     """
     location = self.LocationPathLookup(path)
-    if location is not None:
-      return Comment(
-          location.leading_comments,
-          annotations.ExtractAnnotations(location.leading_comments, self.file_level_annotations))
-    return Comment('', {})
+    if location is None:
+      return Comment('', '', {})
+    raw = pre_processed = location.leading_comments
+    anno_extracted = annotations.ExtractAnnotations(raw, self.file_level_annotations)
+    if annotation_xformers:
+      anno_xformed = []
+      for annotation, xformer in sorted(annotation_xformers.items()):
+        pre_processed = annotations.WithoutAnnotation(pre_processed, annotation)
+        xformed = xformer(anno_extracted.get(annotation))
+        if xformed is not None:
+          anno_extracted[annotation] = xformed
+          anno_xformed.append(annotations.FormatAnnotation(annotation, xformed))
+      if anno_xformed:
+        pre_processed += '\n'.join(anno_xformed) + '\n'
+    return Comment(raw, pre_processed, anno_extracted)
 
   def LeadingDetachedCommentsPathLookup(self, path):
     """Lookup leading detached comments by path in SourceCodeInfo.
@@ -241,6 +252,9 @@ class TypeContext(object):
   def leading_comment(self):
     """Leading comment for type context."""
     return self.source_code_info.LeadingCommentPathLookup(self.path)
+
+  def pre_processed_leading_comment(self, transformers):
+    return self.source_code_info.LeadingCommentPathLookup(self.path, transformers)
 
   @property
   def leading_detached_comments(self):

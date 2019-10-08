@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 
+from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 from tools.protoxform import migrate
@@ -26,11 +27,6 @@ from validate import validate_pb2
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
                       'AllowShortFunctionsOnASingleLine: false}')
-
-NEXT_FREE_FIELD_MIN = 3
-NEXT_FREE_FIELD_ANNOTATION_FORMAT = " [#comment:next free field: %d]\n"
-NEXT_FREE_FIELD_ANNOTATION_REGEX = re.compile(
-    '[^\S\r\n]*\[#comment:\s*next\s+free\s+field:[^\]]*\][^\S\r\n]*\n?')
 
 
 class ProtoXformError(Exception):
@@ -107,42 +103,24 @@ def MessageNextFreeFieldIndex(msg_proto):
       sum([
           [f.number + 1 for f in msg_proto.field],
           [rr.end for rr in msg_proto.reserved_range],
-          [ex.end + 1 for ex in msg_proto.extension_range],
+          [ex.end for ex in msg_proto.extension_range],
       ], [1]))
 
 
-def FormatTypeContextNextFreeFieldComment(type_context, next_free):
-  """Format the next free field comments in a given TypeContext.
-
-  Args:
-    type_context: contextual information for message/enum/field.
-    next_free: expected next free field index.
-
-  Returns:
-    Formatted leading comment with next free field annotation if needed
-  """
-  leading_comment = type_context.leading_comment.raw
-  if next_free < 0:
-    return leading_comment
-  leading_comment = re.sub(NEXT_FREE_FIELD_ANNOTATION_REGEX, '', leading_comment)
-  if next_free >= NEXT_FREE_FIELD_MIN:
-    leading_comment += NEXT_FREE_FIELD_ANNOTATION_FORMAT % (next_free)
-  return leading_comment
-
-
-def FormatTypeContextComments(type_context, next_free=-1):
+def FormatTypeContextComments(type_context, annotation_xformers=None):
   """Format the leading/trailing comments in a given TypeContext.
 
   Args:
     type_context: contextual information for message/enum/field.
-    next_free: format next free field index annotation if greater than 0.
+    annotation_xformers: a dict of transformers for annotations in leading comment.
 
   Returns:
     Tuple of formatted leading and trailing comment blocks.
   """
-  leading_comment = FormatTypeContextNextFreeFieldComment(
-      type_context, next_free) if next_free > 0 else type_context.leading_comment.raw
-  leading = FormatComments(list(type_context.leading_detached_comments) + [leading_comment])
+  leading_comment = type_context.pre_processed_leading_comment(
+      annotation_xformers) if annotation_xformers else type_context.leading_comment
+  leading = FormatComments(
+      list(type_context.leading_detached_comments) + [leading_comment.pre_processed])
   trailing = FormatBlock(FormatComments([type_context.trailing_comment]))
   return leading, trailing
 
@@ -457,8 +435,11 @@ class ProtoFormatVisitor(visitor.Visitor):
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
     if options.HasHideOption(msg_proto.options):
       return ''
-    next_free = MessageNextFreeFieldIndex(msg_proto)
-    leading_comment, trailing_comment = FormatTypeContextComments(type_context, next_free)
+    xformers = {
+        annotations.NEXT_FREE_FIELD_ANNOTATION:
+            annotations.NextFreeFieldXformer(MessageNextFreeFieldIndex(msg_proto))
+    }
+    leading_comment, trailing_comment = FormatTypeContextComments(type_context, xformers)
     formatted_options = FormatOptions(msg_proto.options)
     formatted_enums = FormatBlock('\n'.join(nested_enums))
     formatted_msgs = FormatBlock('\n'.join(nested_msgs))

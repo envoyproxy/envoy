@@ -6,6 +6,9 @@ import re
 
 # Key-value annotation regex.
 ANNOTATION_REGEX = re.compile('\[#([\w-]+?):(.*?)\]\s?', re.DOTALL)
+ANNOTATION_LINE_REGEX_FORMAT = '[^\S\r\n]*\[#%s:.*?\][^\S\r\n]*\n?'
+
+ANNOTATION_COMMENT_FORMAT = ' [#%s:%s]'
 
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'
@@ -13,6 +16,10 @@ DOC_TITLE_ANNOTATION = 'protodoc-title'
 # Not implemented yet annotation on leading comments, leading to hiding of
 # field.
 NOT_IMPLEMENTED_HIDE_ANNOTATION = 'not-implemented-hide'
+
+# For large protos, place a comment at the top that specifies the next free field number
+NEXT_FREE_FIELD_ANNOTATION = 'next-free-field'
+NEXT_FREE_FIELD_MIN = 5
 
 # Comment that allows for easy searching for things that need cleaning up in the next major
 # API version.
@@ -24,9 +31,15 @@ COMMENT_ANNOTATION = 'comment'
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
+    NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
 ])
+
+VALID_ANNOTATIONS_LINE_REGEX = {
+    annotation: re.compile(ANNOTATION_LINE_REGEX_FORMAT % annotation, re.DOTALL)
+    for annotation in VALID_ANNOTATIONS
+}
 
 # These can propagate from file scope to message/enum scope (and be overridden).
 INHERITED_ANNOTATIONS = set([
@@ -63,5 +76,18 @@ def ExtractAnnotations(s, inherited_annotations=None):
   return annotations
 
 
+def FormatAnnotation(annotation, content):
+  return ANNOTATION_COMMENT_FORMAT % (annotation, content)
+
+
+def WithoutAnnotation(s, annotation):
+  return re.sub(VALID_ANNOTATIONS_LINE_REGEX[annotation], '',
+                s) if annotation in VALID_ANNOTATIONS_LINE_REGEX else s
+
+
 def WithoutAnnotations(s):
   return re.sub(ANNOTATION_REGEX, '', s)
+
+
+def NextFreeFieldXformer(next_free):
+  return lambda _: next_free if next_free > NEXT_FREE_FIELD_MIN else None
