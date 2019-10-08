@@ -373,4 +373,67 @@ config:
   EXPECT_TRUE(response->complete());
 }
 
+// Tests the default limit for the number of response headers is 100. Results in a stream reset if
+// exceeds.
+TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
+  // Default limit for response headers is 100.
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl many_headers(default_response_headers_);
+  for (int i = 0; i < 100; i++) {
+    many_headers.addCopy("many", std::string(1, 'a'));
+  }
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(many_headers, true);
+  response->waitForEndStream();
+  // Upstream stream reset triggered.
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+// Tests bootstrap configuration of max response headers.
+TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
+  // Set max response header count to 200.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_count()->set_value(200);
+  });
+  Http::TestHeaderMapImpl response_headers(default_response_headers_);
+  for (int i = 0; i < 150; i++) {
+    response_headers.addCopy(std::to_string(i), std::string(1, 'a'));
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+}
+
+// Tests that HTTP/2 response headers over 60 kB are rejected and result in a stream reset.
+TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl large_headers(default_response_headers_);
+  large_headers.addCopy("large", std::string(60 * 1024, 'a'));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(large_headers, true);
+  response->waitForEndStream();
+  // Upstream stream reset.
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
 } // namespace Envoy

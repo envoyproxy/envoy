@@ -26,6 +26,7 @@ Version 1.11.2 (October 8, 2019)
 * The `value` and `regex` fields in :ref:`QueryParameterMatcher
   <envoy_api_msg_route.QueryParameterMatcher>` has been deprecated in favor of the `string_match`
   and `present_match` fields.
+* Use of :ref:`idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>` is deprecated. Use :ref:`idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>` instead.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

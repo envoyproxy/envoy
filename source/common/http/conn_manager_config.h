@@ -229,6 +229,11 @@ public:
   virtual uint32_t maxRequestHeadersKb() const PURE;
 
   /**
+   * @return maximum number of request headers the codecs will accept.
+   */
+  virtual uint32_t maxRequestHeadersCount() const PURE;
+
+  /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a
    *         disabled idle timeout.
    */

@@ -765,6 +765,12 @@ public:
   virtual uint64_t maxRequestsPerConnection() const PURE;
 
   /**
+   * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
+   * reset if the number of headers exceeds this value.
+   */
+  virtual uint32_t maxResponseHeadersCount() const PURE;
+
+  /**
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
