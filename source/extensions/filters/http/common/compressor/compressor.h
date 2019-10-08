@@ -69,7 +69,6 @@ public:
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
   uint32_t minimumLength() const { return content_length_; }
   const std::string contentEncoding() const { return content_encoding_; };
-  const std::vector<std::string> registeredCompressors() const { return registered_compressors_; }
 
   virtual ~CompressorFilterConfig();
 
@@ -96,7 +95,6 @@ private:
   CompressorStats stats_;
   Runtime::Loader& runtime_;
   std::string content_encoding_;
-  static std::vector<std::string> registered_compressors_;
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 

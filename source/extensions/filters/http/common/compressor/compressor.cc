@@ -21,9 +21,11 @@ const std::vector<std::string>& defaultContentEncoding() {
                           "application/xhtml+xml"});
 }
 
-} // namespace
+std::vector<std::string>& registeredCompressors() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::vector<std::string>);
+}
 
-std::vector<std::string> CompressorFilterConfig::registered_compressors_ = {};
+} // namespace
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::config::filter::http::compressor::v2::Compressor& compressor,
@@ -35,14 +37,14 @@ CompressorFilterConfig::CompressorFilterConfig(
       remove_accept_encoding_header_(compressor.remove_accept_encoding_header()),
       stats_(generateStats(stats_prefix, scope)), runtime_(runtime),
       content_encoding_(content_encoding) {
-  registered_compressors_.push_back(content_encoding);
+  registeredCompressors().push_back(content_encoding);
 }
 
 CompressorFilterConfig::~CompressorFilterConfig() {
   auto result =
-      std::find(registered_compressors_.begin(), registered_compressors_.end(), content_encoding_);
-  ASSERT(result != registered_compressors_.end());
-  registered_compressors_.erase(result);
+      std::find(registeredCompressors().begin(), registeredCompressors().end(), content_encoding_);
+  ASSERT(result != registeredCompressors().end());
+  registeredCompressors().erase(result);
 }
 
 StringUtil::CaseUnorderedSet
@@ -130,7 +132,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   using encPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<encPair> pairs;
 
-  std::vector<std::string> allowed_compressors = config_->registeredCompressors();
+  std::vector<std::string> allowed_compressors(registeredCompressors());
 
   for (const auto token : StringUtil::splitToken(accept_encoding->value().getStringView(), ",",
                                                  false /* keep_empty */)) {
