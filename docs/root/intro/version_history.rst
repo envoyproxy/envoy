@@ -92,7 +92,7 @@ Version history
 * upstream: runtime feature `envoy.reloadable_features.max_response_headers_count` overrides the default limit for upstream :ref:`max headers count <envoy_api_field_Cluster.common_http_protocol_options>`
 * http: added :ref:`common_http_protocol_options <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
   Runtime feature `envoy.reloadable_features.max_request_headers_count` overrides the default limit for downstream :ref:`max headers count <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
-* Backported safe regex matcher fix for CVE-2019-15225.
+* regex: backported safe regex matcher fix for CVE-2019-15225.
 
 1.11.1 (August 13, 2019)
 ========================
