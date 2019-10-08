@@ -21,9 +21,7 @@ AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
         proto_config,
     Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
     : stats_prefix_(std::move(stats_prefix)), time_source_(time_source),
-      adaptive_concurrency_feature_(
-          proto_config.enabled().runtime_key(),
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.enabled(), default_value, true), runtime) {}
+      adaptive_concurrency_feature_(proto_config.enabled(), runtime) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)

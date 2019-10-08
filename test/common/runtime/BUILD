@@ -32,6 +32,7 @@ envoy_cc_test(
     deps = [
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
