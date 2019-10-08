@@ -65,7 +65,7 @@ public:
    * Charge a request message stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param request_names supplies the request names.
-   * @param amount supplies the number of reques messages.
+   * @param amount supplies the number of the request messages.
    */
   virtual void chargeRequestStat(const Upstream::ClusterInfo& cluster,
                                  const RequestNames& request_names, uint64_t amount) PURE;
@@ -74,7 +74,7 @@ public:
    * Charge a response message stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param request_names supplies the request names.
-   * @param amount supplies the number of reques messages.
+   * @param amount supplies the number of the response messages.
    */
   virtual void chargeResponseStat(const Upstream::ClusterInfo& cluster,
                                   const RequestNames& request_names, uint64_t amount) PURE;
