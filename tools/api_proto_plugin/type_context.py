@@ -78,13 +78,14 @@ class SourceCodeInfo(object):
     annotation_map = annotations.ExtractAnnotations(raw, self.file_level_annotations)
     if annotation_xforms:
       for annotation, xform in sorted(annotation_xforms.items()):
-        if annotation in annotation_map:
+        original_annotation = annotation_map.get(annotation)
+        xformed_annotation = xform(original_annotation)
+        if original_annotation is not None:
           xformed = annotations.WithoutAnnotation(xformed, annotation)
           del annotation_map[annotation]
-        xformed_annotation = xform(annotation_map.get(annotation))
         if xformed_annotation is not None:
-          annotation_map[annotation] = xformed_annotation
           xformed += annotations.FormatAnnotation(annotation, xformed_annotation)
+          annotation_map[annotation] = xformed_annotation
 
     return Comment(raw, xformed, annotation_map)
 
