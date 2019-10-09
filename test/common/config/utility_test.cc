@@ -296,20 +296,19 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   }
 }
 
-void PackIntoTypedStruct(udpa::type::v1::TypedStruct& typed_struct,
-                         const ProtobufWkt::Message& inner) {
+void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const ProtobufWkt::Message& inner) {
+  udpa::type::v1::TypedStruct typed_struct;
   (*typed_struct.mutable_type_url()) =
       std::string("type.googleapis.com/") + inner.GetDescriptor()->full_name();
   MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
+  typed_config.PackFrom(typed_struct);
 }
 
 TEST(UtilityTest, TypedStructToStruct) {
   ProtobufWkt::Any typed_config;
-  udpa::type::v1::TypedStruct typed_struct;
   ProtobufWkt::Struct untyped_struct;
   (*untyped_struct.mutable_fields())["foo"].set_string_value("bar");
-  PackIntoTypedStruct(typed_struct, untyped_struct);
-  typed_config.PackFrom(typed_struct);
+  packTypedStructIntoAny(typed_config, untyped_struct);
 
   ProtobufWkt::Struct out;
   Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
@@ -318,23 +317,18 @@ TEST(UtilityTest, TypedStructToStruct) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(out, untyped_struct));
 }
 
-namespace {
-const std::string bootstrap_config_yaml = R"EOF(
-  admin:
-    access_log_path: /dev/null
-    address:
-      pipe:
-        path: "/"
-)EOF";
-} // namespace
-
 TEST(UtilityTest, TypedStructToBootstrap) {
   ProtobufWkt::Any typed_config;
-  udpa::type::v1::TypedStruct typed_struct;
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  const std::string bootstrap_config_yaml = R"EOF(
+    admin:
+      access_log_path: /dev/null
+      address:
+        pipe:
+          path: "/"
+  )EOF";
   TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
-  PackIntoTypedStruct(typed_struct, bootstrap);
-  typed_config.PackFrom(typed_struct);
+  packTypedStructIntoAny(typed_config, bootstrap);
 
   envoy::config::bootstrap::v2::Bootstrap out;
   Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
@@ -344,11 +338,16 @@ TEST(UtilityTest, TypedStructToBootstrap) {
 
 TEST(UtilityTest, TypedStructToInvalidType) {
   ProtobufWkt::Any typed_config;
-  udpa::type::v1::TypedStruct typed_struct;
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  const std::string bootstrap_config_yaml = R"EOF(
+    admin:
+      access_log_path: /dev/null
+      address:
+        pipe:
+          path: "/"
+  )EOF";
   TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
-  PackIntoTypedStruct(typed_struct, bootstrap);
-  typed_config.PackFrom(typed_struct);
+  packTypedStructIntoAny(typed_config, bootstrap);
 
   ProtobufWkt::Any out;
   EXPECT_THROW(Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
