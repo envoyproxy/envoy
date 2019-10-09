@@ -1,5 +1,7 @@
 #include "extensions/filters/network/common/redis/redis_command_stats.h"
 
+#include "common/stats/timespan_impl.h"
+
 #include "extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
@@ -48,14 +50,14 @@ Stats::Histogram& RedisCommandStats::histogram(Stats::Scope& scope,
 Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,
                                                          Stats::StatName command,
                                                          Envoy::TimeSource& time_source) {
-  return std::make_unique<Stats::Timespan>(
+  return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       histogram(scope, {prefix_, command, latency_}, Stats::Histogram::Unit::Microseconds),
       time_source);
 }
 
 Stats::TimespanPtr RedisCommandStats::createAggregateTimer(Stats::Scope& scope,
                                                            Envoy::TimeSource& time_source) {
-  return std::make_unique<Stats::Timespan>(
+  return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       histogram(scope, {prefix_, upstream_rq_time_}, Stats::Histogram::Unit::Microseconds),
       time_source);
 }

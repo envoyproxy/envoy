@@ -13,6 +13,7 @@
 #include "common/common/to_lower_table.h"
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
+#include "common/stats/timespan_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
@@ -83,7 +84,8 @@ protected:
 
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source)
       : command_stats_(command_stats) {
-    command_latency_ = std::make_unique<Stats::Timespan>(command_stats_.latency_, time_source);
+    command_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+        command_stats_.latency_, time_source);
   }
   CommandStats& command_stats_;
   Stats::TimespanPtr command_latency_;

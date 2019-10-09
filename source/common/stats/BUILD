@@ -237,8 +237,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "timespan_lib",
+    srcs = ["timespan_impl.cc"],
+    hdrs = ["timespan_impl.h"],
+    deps = [
+        "//include/envoy/stats:timespan_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = [":symbol_table_lib"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+    ],
 )

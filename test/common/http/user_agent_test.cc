@@ -22,7 +22,7 @@ TEST(UserAgentTest, All) {
   NiceMock<Stats::MockHistogram> original_histogram;
   original_histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
   Event::SimulatedTimeSystem time_system;
-  Stats::Timespan span(original_histogram, time_system);
+  Stats::HistogramCompletableTimespanImpl span(original_histogram, time_system);
 
   EXPECT_CALL(stat_store.counter_, inc()).Times(5);
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_total"));

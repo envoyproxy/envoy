@@ -32,23 +32,7 @@ public:
 class HistogramCompletableTimespan : public CompletableTimespan {
 public:
   HistogramCompletableTimespan(Histogram& histogram, TimeSource& time_source)
-      : time_source_(time_source), histogram_(histogram), start_(time_source.monotonicTime()) {
-    switch (histogram.unit()) {
-    case Histogram::Unit::Unspecified:
-    case Histogram::Unit::Bytes:
-      ASSERT(0);
-    case Histogram::Unit::Microseconds:
-    case Histogram::Unit::Milliseconds:
-      return;
-    }
-
-    ASSERT(0);
-  }
-
-  /**
-   * Complete the timespan and send the time to the histogram.
-   */
-  void complete() override { histogram_.recordValue(tickCount()); }
+      : time_source_(time_source), histogram_(histogram), start_(time_source.monotonicTime()) {}
 
   /**
    * Get duration in the time unit since the creation of the span.
@@ -57,22 +41,7 @@ public:
     return std::chrono::duration_cast<TimeUnit>(time_source_.monotonicTime() - start_);
   }
 
-private:
-  uint64_t tickCount() {
-    switch (histogram_.unit()) {
-    case Histogram::Unit::Unspecified:
-    case Histogram::Unit::Bytes:
-      // Unreachable, asserted to measure time on construction.
-      return 0;
-    case Histogram::Unit::Microseconds:
-      return getRawDuration<std::chrono::microseconds>().count();
-    case Histogram::Unit::Milliseconds:
-      return getRawDuration<std::chrono::milliseconds>().count();
-    }
-
-    return 0;
-  }
-
+protected:
   TimeSource& time_source_;
   Histogram& histogram_;
   const MonotonicTime start_;
@@ -80,7 +49,6 @@ private:
 
 using Timespan = HistogramCompletableTimespan;
 using TimespanPtr = std::unique_ptr<Timespan>;
-using CompletableTimespanPtr = std::unique_ptr<CompletableTimespan>;
 
 } // namespace Stats
 } // namespace Envoy
