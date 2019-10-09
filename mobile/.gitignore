@@ -1,11 +1,13 @@
 /bazel-*
 /build_*
-/dist/envoy.aar
+/dist/*pom.xml
+/dist/*.aar
 /dist/Envoy.framework
 .DS_Store
 /generated
 .idea
 .ijwb
+.aswb
 *.pyc
 tags
 /tmp
