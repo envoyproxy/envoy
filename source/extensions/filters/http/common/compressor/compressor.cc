@@ -49,8 +49,9 @@ CompressorFilterConfig::~CompressorFilterConfig() {
 
 StringUtil::CaseUnorderedSet
 CompressorFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types) {
-  return types.empty() ? StringUtil::CaseUnorderedSet(defaultContentEncoding().begin(),
-                                                      defaultContentEncoding().end())
+  const auto& default_content_encodings = defaultContentEncoding();
+  return types.empty() ? StringUtil::CaseUnorderedSet(default_content_encodings.begin(),
+                                                      default_content_encodings.end())
                        : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
 }
 
