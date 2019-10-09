@@ -24,9 +24,7 @@ MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
 
 MockServerConnection::MockServerConnection() {
-  ON_CALL(*this, protocol()).WillByDefault(Invoke([this](){
-    return protocol_;
-  }));
+  ON_CALL(*this, protocol()).WillByDefault(Invoke([this]() { return protocol_; }));
 }
 
 MockServerConnection::~MockServerConnection() = default;

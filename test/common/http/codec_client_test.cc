@@ -55,9 +55,8 @@ public:
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1,
-                                                   std::move(connection), codec_, nullptr, host_,
-                                                   dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
+                                                   codec_, nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
@@ -77,8 +76,7 @@ public:
 };
 
 TEST_F(CodecClientTest, NotCallDetectEearlyCloseWhenReadDiabledUsingHttp3) {
-  auto connection =
-      std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
 
   EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
@@ -298,9 +296,9 @@ public:
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1,
-                                                   std::move(client_connection), codec_, nullptr,
-                                                   host_, *dispatcher_);
+    client_ =
+        std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
+                                             codec_, nullptr, host_, *dispatcher_);
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {

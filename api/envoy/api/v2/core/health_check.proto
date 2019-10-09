@@ -104,7 +104,8 @@ message HealthCheck {
     repeated string request_headers_to_remove = 8;
 
     // If set, health checks will be made using http/2.
-    // Deprecated, use :ref:`codec_client_type <envoy_api_field_core.HealthCheck.HttpHealthCheck.codec_client_type>` instead.
+    // Deprecated, use :ref:`codec_client_type
+    // <envoy_api_field_core.HealthCheck.HttpHealthCheck.codec_client_type>` instead.
     bool use_http2 = 7 [deprecated = true];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default

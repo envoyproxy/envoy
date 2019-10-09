@@ -4810,24 +4810,24 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
-  // Pretend to get a new stream and then fire a headers only request into it. Then we respond into the filter.
-    NiceMock<MockStreamEncoder> encoder;
+  // Pretend to get a new stream and then fire a headers only request into it. Then we respond into
+  // the filter.
+  NiceMock<MockStreamEncoder> encoder;
   StreamDecoder& decoder = conn_manager_->newStream(encoder);
-          HeaderMapPtr headers{
-              new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-          decoder.decodeHeaders(std::move(headers), true);
+  HeaderMapPtr headers{
+      new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  decoder.decodeHeaders(std::move(headers), true);
 
-        HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
-    EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
   conn_manager_.reset();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
-
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {
