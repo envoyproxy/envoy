@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Upstream {
-namespace Outlier { // TODO: remove this?
+namespace Outlier {
 
 using testing::NiceMock;
 
