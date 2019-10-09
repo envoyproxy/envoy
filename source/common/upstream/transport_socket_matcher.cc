@@ -7,46 +7,42 @@
 namespace Envoy {
 namespace Upstream {
 
-TransportSocketMatcher::TransportSocketMatcher(
+TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Network::TransportSocketFactory& default_factory, Stats::Scope& stats_scope)
-    : default_socket_factory_(default_factory), stats_scope_(stats_scope) {
+    Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope)
+    : stats_scope_(stats_scope),
+      default_match_("default", std::move(default_factory), generateStats("default")) {
   for (const auto& socket_match : socket_matches) {
-    FactoryMatch factory_match(socket_match.name(), generateStats(socket_match.name() + "."));
-    for (const auto& kv : socket_match.match().fields()) {
-      factory_match.label_set.emplace_back(kv.first, kv.second);
-    }
     const auto& socket_config = socket_match.transport_socket();
     auto& config_factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config.name());
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         socket_config, factory_context.messageValidationVisitor(), config_factory);
-    factory_match.factory = config_factory.createTransportSocketFactory(*message, factory_context);
+    FactoryMatch factory_match(
+        socket_match.name(), config_factory.createTransportSocketFactory(*message, factory_context),
+        generateStats(socket_match.name() + "."));
+    for (const auto& kv : socket_match.match().fields()) {
+      factory_match.label_set.emplace_back(kv.first, kv.second);
+    }
     matches_.emplace_back(std::move(factory_match));
   }
 }
 
-TransportSocketMatchStats TransportSocketMatcher::generateStats(const std::string& prefix) {
-  return {ALL_TRANSPORT_SOCKET_MATCHER_STATS(POOL_COUNTER_PREFIX(stats_scope_, prefix))};
+TransportSocketMatchStats TransportSocketMatcherImpl::generateStats(const std::string& prefix) {
+  return {ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_scope_, prefix))};
 }
 
-Network::TransportSocketFactory&
-TransportSocketMatcher::resolve(const std::string& endpoint_addr,
-                                const envoy::api::v2::core::Metadata& metadata) {
-  for (const auto& socket_factory_match : matches_) {
+TransportSocketMatcher::MatchData
+TransportSocketMatcherImpl::resolve(const envoy::api::v2::core::Metadata& metadata) const {
+  for (const auto& match : matches_) {
     if (Config::Metadata::metadataLabelMatch(
-            socket_factory_match.label_set, metadata,
+            match.label_set, metadata,
             Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, false)) {
-      socket_factory_match.stats.total_match_count_.inc();
-      ENVOY_LOG(debug, "transport socket match found: name {}, metadata {}, address {}",
-                socket_factory_match.name, metadata.DebugString(), endpoint_addr);
-      return *socket_factory_match.factory;
+      return MatchData(*match.factory, match.stats);
     }
   }
-  ENVOY_LOG(debug, "transport socket match, no match, return default: metadata {}, address {}",
-            metadata.DebugString(), endpoint_addr);
-  return default_socket_factory_;
+  return MatchData(*default_match_.factory, default_match_.stats);
 }
 
 } // namespace Upstream

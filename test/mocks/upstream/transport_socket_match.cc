@@ -1,0 +1,24 @@
+#include "test/mocks/upstream/transport_socket_match.h"
+
+#include "common/network/raw_buffer_socket.h"
+
+using testing::_;
+using testing::Invoke;
+using testing::Return;
+
+namespace Envoy {
+namespace Upstream {
+namespace Outlier {
+
+MockTransportSocketMatcher::MockTransportSocketMatcher()
+    : socket_factory_(new Network::RawBufferSocketFactory),
+      stats_({ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_store_, "test"))}) {
+  ON_CALL(*this, resolve(_))
+      .WillByDefault(Return(TransportSocketMatcher::MatchData(*socket_factory_, stats_)));
+}
+
+MockTransportSocketMatcher::~MockTransportSocketMatcher() = default;
+
+} // namespace Outlier
+} // namespace Upstream
+} // namespace Envoy

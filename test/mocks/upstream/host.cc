@@ -1,5 +1,6 @@
 #include "test/mocks/upstream/host.h"
 
+#include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
 using testing::_;

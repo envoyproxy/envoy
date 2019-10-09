@@ -90,6 +90,7 @@ public:
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
   MOCK_CONST_METHOD0(priority, uint32_t());
@@ -170,6 +171,7 @@ public:
   MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
   MOCK_CONST_METHOD0(health, Host::Health());
   MOCK_CONST_METHOD0(hostname, const std::string&());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));
   MOCK_METHOD1(setOutlierDetector_, void(Outlier::DetectorHostMonitorPtr& outlier_detector));

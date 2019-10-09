@@ -2,6 +2,7 @@
 
 #include <limits>
 
+#include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
@@ -35,7 +36,6 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
 MockClusterInfo::MockClusterInfo()
     : stats_(ClusterInfoImpl::generateStats(stats_store_)),
-      transport_socket_factory_(new Network::RawBufferSocketFactory),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
@@ -54,10 +54,9 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
   // TODO(mattklein123): The following is a hack because it's not possible to directly embed
   // a mock transport socket factory due to circular dependencies. Fix this up in a follow up.
-  ON_CALL(*this, transportSocketFactory(_))
+  ON_CALL(*this, transportSocketMatcher())
       .WillByDefault(
-          Invoke([this](absl::optional<ClusterInfo::TransportSocketFactoryOption>)
-                     -> Network::TransportSocketFactory& { return *transport_socket_factory_; }));
+          Invoke([this]() -> TransportSocketMatcher& { return transport_socket_matcher_; }));
   ON_CALL(*this, loadReportStats()).WillByDefault(ReturnRef(load_report_stats_));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, resourceManager(_))

@@ -134,7 +134,6 @@ public:
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
-  MOCK_CONST_METHOD0(isSecureTransport, bool());
 };
 
 /**

@@ -235,7 +235,6 @@ public:
 
   // Network::ClientConnection
   void connect() override;
-  bool isSecureTransport() const override;
 };
 
 } // namespace Network

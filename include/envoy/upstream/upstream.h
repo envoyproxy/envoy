@@ -778,21 +778,11 @@ public:
    */
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
-  // Configuration to determine the transport socket factory to use.
-  struct TransportSocketFactoryOption {
-    // upstream networking address trying to connect to, for debugging purpose only.
-    const std::string address_;
-    // the metadata associated with upstream endpoint.
-    const envoy::api::v2::core::Metadata metadata_;
-  };
-
   /**
-   * @param option supplies the options used to select a transport socket factory.
-   * @return Network::TransportSocketFactory& the factory of transport socket to use when
-   *         communicating with the cluster.
+   * @return TransportSocketMatcher& the transport socket matcher associated
+   * factory.
    */
-  virtual Network::TransportSocketFactory&
-  transportSocketFactory(absl::optional<TransportSocketFactoryOption> option) const PURE;
+  virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.

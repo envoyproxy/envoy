@@ -16,6 +16,7 @@
 #include "envoy/config/typed_metadata.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/logger.h"
@@ -26,43 +27,32 @@
 namespace Envoy {
 namespace Upstream {
 
-#define ALL_TRANSPORT_SOCKET_MATCHER_STATS(COUNTER) COUNTER(total_match_count)
-
-struct TransportSocketMatchStats {
-  ALL_TRANSPORT_SOCKET_MATCHER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-class TransportSocketMatcher;
-
-using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
-using TransportSocketFactoryMap = std::map<std::string, Network::TransportSocketFactoryPtr>;
-using TransportSocketFactoryMapPtr = std::unique_ptr<TransportSocketFactoryMap>;
-
-class TransportSocketMatcher : Logger::Loggable<Logger::Id::upstream> {
+class TransportSocketMatcherImpl : public Logger::Loggable<Logger::Id::upstream>,
+                                   public TransportSocketMatcher {
 public:
-  TransportSocketMatcher(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>&
-          socket_matches,
-      Server::Configuration::TransportSocketFactoryContext& factory_context,
-      Network::TransportSocketFactory& default_factory, Stats::Scope& stats_scope);
-
-  Network::TransportSocketFactory& resolve(const std::string& endpoint_addr,
-                                           const envoy::api::v2::core::Metadata& metadata);
-
-protected:
   struct FactoryMatch {
-    FactoryMatch(std::string match_name, TransportSocketMatchStats match_stats)
-        : name(std::move(match_name)), stats(match_stats) {}
+    FactoryMatch(std::string match_name, Network::TransportSocketFactoryPtr socket_factory,
+                 TransportSocketMatchStats match_stats)
+        : name(std::move(match_name)), factory(std::move(socket_factory)), stats(match_stats) {}
     std::string name;
     Network::TransportSocketFactoryPtr factory;
     Config::Metadata::LabelSet label_set;
-    TransportSocketMatchStats stats;
+    mutable TransportSocketMatchStats stats; // TODO: why?
   };
 
+  TransportSocketMatcherImpl(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>&
+          socket_matches,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
+
+  MatchData resolve(const envoy::api::v2::core::Metadata& metadata) const override;
+
+protected:
   TransportSocketMatchStats generateStats(const std::string& prefix);
-  Network::TransportSocketFactory& default_socket_factory_;
-  std::vector<FactoryMatch> matches_;
   Stats::Scope& stats_scope_;
+  FactoryMatch default_match_;
+  std::vector<FactoryMatch> matches_;
 };
 
 } // namespace Upstream

@@ -13,6 +13,7 @@ envoy_cc_mock(
     srcs = ["cluster_info.cc"],
     hdrs = ["cluster_info.h"],
     deps = [
+        ":transport_socket_match_mocks",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:metadata_lib",
@@ -33,6 +34,17 @@ envoy_cc_mock(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "transport_socket_match_mocks",
+    srcs = ["transport_socket_match.cc"],
+    hdrs = ["transport_socket_match.h"],
+    deps = [
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/stats:isolated_store_lib",
     ],
 )
 

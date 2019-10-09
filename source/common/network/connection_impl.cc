@@ -734,10 +734,5 @@ void ClientConnectionImpl::connect() {
     socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
   }
 }
-
-bool ClientConnectionImpl::isSecureTransport() const {
-  return transport_socket_->implementsSecureTransport();
-}
-
 } // namespace Network
 } // namespace Envoy
