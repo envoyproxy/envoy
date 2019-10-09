@@ -67,7 +67,7 @@ public:
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
   uint32_t minimumLength() const { return content_length_; }
   const std::string contentEncoding() const { return content_encoding_; };
-  const std::vector<std::string> registeredCompressors() const;
+  const std::map<std::string, uint32_t> registeredCompressors() const;
 
   virtual ~CompressorFilterConfig();
 
@@ -88,7 +88,8 @@ private:
 
   struct CompressorRegistry {
     Thread::MutexBasicLockable mutex_;
-    std::vector<std::string> compressors_ ABSL_GUARDED_BY(mutex_);
+    std::map<CompressorFilterConfig*, uint32_t> compressors_ ABSL_GUARDED_BY(mutex_);
+    uint32_t registration_count_ ABSL_GUARDED_BY(mutex_){0};
   };
 
   static CompressorRegistry& compressorRegistry();

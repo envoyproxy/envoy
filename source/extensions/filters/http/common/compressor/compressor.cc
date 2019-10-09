@@ -36,15 +36,14 @@ CompressorFilterConfig::CompressorFilterConfig(
       stats_(generateStats(stats_prefix, scope)), runtime_(runtime),
       content_encoding_(content_encoding) {
   Thread::LockGuard lock(compressor_registry_.mutex_);
-  compressor_registry_.compressors_.push_back(content_encoding);
+  compressor_registry_.compressors_.insert({this, compressor_registry_.registration_count_});
+  compressor_registry_.registration_count_++;
 }
 
 CompressorFilterConfig::~CompressorFilterConfig() {
   Thread::LockGuard lock(compressor_registry_.mutex_);
-  auto result = std::find(compressor_registry_.compressors_.begin(),
-                          compressor_registry_.compressors_.end(), content_encoding_);
-  ASSERT(result != compressor_registry_.compressors_.end());
-  compressor_registry_.compressors_.erase(result);
+  ASSERT(compressor_registry_.compressors_.count(this) > 0);
+  compressor_registry_.compressors_.erase(this);
 }
 
 StringUtil::CaseUnorderedSet
@@ -63,9 +62,32 @@ CompressorFilterConfig::CompressorRegistry& CompressorFilterConfig::compressorRe
   MUTABLE_CONSTRUCT_ON_FIRST_USE(CompressorRegistry);
 }
 
-const std::vector<std::string> CompressorFilterConfig::registeredCompressors() const {
-  Thread::LockGuard lock(compressor_registry_.mutex_);
-  return compressor_registry_.compressors_;
+const std::map<std::string, uint32_t> CompressorFilterConfig::registeredCompressors() const {
+  std::map<std::string, uint32_t> encodings;
+  std::vector<std::pair<std::string, uint32_t>> temp;
+
+  {
+    // Make a temp copy to release the lock earlier.
+    Thread::LockGuard lock(compressor_registry_.mutex_);
+    for (const auto& item : compressor_registry_.compressors_) {
+      temp.push_back({item.first->contentEncoding(), item.second});
+    }
+  }
+
+  // There could be many compressors registered for the same content encoding, e.g. consider a case
+  // when there are two gzip filters using different compression levels for different content sizes.
+  // In such case we ignore duplicates (or different filters for the same encoding) registered last.
+  for (const auto& item : temp) {
+    if (encodings.count(item.first)) {
+      if (encodings.at(item.first) > item.second) {
+        encodings[item.first] = item.second;
+      }
+    } else {
+      encodings.insert({item.first, item.second});
+    }
+  }
+
+  return encodings;
 }
 
 CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
@@ -142,7 +164,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
 
-  std::vector<std::string> allowed_compressors(config_->registeredCompressors());
+  std::map<std::string, uint32_t> allowed_compressors(config_->registeredCompressors());
 
   for (const auto token : StringUtil::splitToken(accept_encoding->value().getStringView(), ",",
                                                  false /* keep_empty */)) {
@@ -168,9 +190,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
     // whereas the server has only "gzip" configured. If we just exclude the encodings with "q=0"
     // from "pairs" then upon noticing "*" we don't know if "gzip" is acceptable by the client.
     if (!pair.second) {
-      allowed_compressors.erase(
-          std::remove(allowed_compressors.begin(), allowed_compressors.end(), pair.first),
-          allowed_compressors.end());
+      allowed_compressors.erase(std::string(pair.first));
     }
   }
 
@@ -181,24 +201,29 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   }
 
   std::sort(pairs.begin(), pairs.end(),
-            [](const EncPair& a, const EncPair& b) -> bool { return a.second > b.second; });
+            [&allowed_compressors](const EncPair& a, const EncPair& b) -> bool {
+              if (a.second == b.second && allowed_compressors.count(std::string(a.first)) &&
+                  allowed_compressors.count(std::string(b.first))) {
+                // In case a user specified more than one encodings with the same quality value
+                // select the one which is registered first in Envoy's config.
+                return allowed_compressors[std::string(a.first)] <
+                       allowed_compressors[std::string(b.first)];
+              }
+              return a.second > b.second;
+            });
 
   for (const auto pair : pairs) {
-    for (const auto& compr : allowed_compressors) {
-      if (StringUtil::caseCompare(pair.first, compr)) {
-        // In case a user specified more than one encodings with the same quality value
-        // select the one which is registered first in Envoy's config.
-        if (StringUtil::caseCompare(config_->contentEncoding(), compr)) {
-          config_->stats().header_compressor_used_.inc();
-          // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
-          if (StringUtil::caseCompare("gzip", compr)) {
-            config_->stats().header_gzip_.inc();
-          }
-          return true;
-        } else {
-          config_->stats().header_compressor_overshadowed_.inc();
-          return false;
+    if (allowed_compressors.count(std::string(pair.first))) {
+      if (StringUtil::caseCompare(config_->contentEncoding(), pair.first)) {
+        config_->stats().header_compressor_used_.inc();
+        // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
+        if (StringUtil::caseCompare("gzip", pair.first)) {
+          config_->stats().header_gzip_.inc();
         }
+        return true;
+      } else {
+        config_->stats().header_compressor_overshadowed_.inc();
+        return false;
       }
     }
 
@@ -216,7 +241,11 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
     if (pair.first == Http::Headers::get().AcceptEncodingValues.Wildcard) {
       if (pair.second > 0 && !allowed_compressors.empty()) {
         config_->stats().header_wildcard_.inc();
-        return StringUtil::caseCompare(config_->contentEncoding(), allowed_compressors[0]);
+        auto first_registered = std::min_element(
+            allowed_compressors.begin(), allowed_compressors.end(),
+            [](const std::pair<std::string, uint32_t>& a,
+               const std::pair<std::string, uint32_t>& b) -> bool { return a.second < b.second; });
+        return StringUtil::caseCompare(config_->contentEncoding(), first_registered->first);
       } else {
         config_->stats().header_not_valid_.inc();
         return false;
