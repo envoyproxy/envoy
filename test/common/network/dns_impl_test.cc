@@ -55,7 +55,7 @@ class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
                      const CNameMap& cnames, const std::chrono::seconds& record_ttl)
-      : connection_(std::move(connection)), hosts_A_(hosts_a), hosts_AAAA_(hosts_aaaa),
+      : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
         cnames_(cnames), record_ttl_(record_ttl) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
@@ -119,8 +119,8 @@ private:
         long name_len;
         // Get host name from query and use the name to lookup a record
         // in a host map. If the query type is of type A, then perform the lookup in
-        // the hosts_A_ host map. If the query type is of type AAAA, then perform the
-        // lookup in the hosts_AAAA_ host map.
+        // the hosts_a_ host map. If the query type is of type AAAA, then perform the
+        // lookup in the hosts_aaaa_ host map.
         char* name;
         ASSERT_EQ(ARES_SUCCESS, ares_expand_name(question, request, size_, &name, &name_len));
         const std::list<std::string>* ips = nullptr;
@@ -147,13 +147,13 @@ private:
         }
         ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
         if (q_type == T_A) {
-          auto it = parent_.hosts_A_.find(hostLookup);
-          if (it != parent_.hosts_A_.end()) {
+          auto it = parent_.hosts_a_.find(hostLookup);
+          if (it != parent_.hosts_a_.end()) {
             ips = &it->second;
           }
         } else {
-          auto it = parent_.hosts_AAAA_.find(hostLookup);
-          if (it != parent_.hosts_AAAA_.end()) {
+          auto it = parent_.hosts_aaaa_.find(hostLookup);
+          if (it != parent_.hosts_aaaa_.end()) {
             ips = &it->second;
           }
         }
@@ -248,8 +248,8 @@ private:
 
 private:
   ConnectionPtr connection_;
-  const HostMap& hosts_A_;
-  const HostMap& hosts_AAAA_;
+  const HostMap& hosts_a_;
+  const HostMap& hosts_aaaa_;
   const CNameMap& cnames_;
   const std::chrono::seconds& record_ttl_;
 };
@@ -265,16 +265,16 @@ public:
   }
 
   void onNewConnection(ConnectionPtr&& new_connection) override {
-    TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_A_,
-                                                       hosts_AAAA_, cnames_, record_ttl_);
+    TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_a_,
+                                                       hosts_aaaa_, cnames_, record_ttl_);
     queries_.emplace_back(query);
   }
 
   void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
     if (type == RecordType::A) {
-      hosts_A_[hostname] = ip;
+      hosts_a_[hostname] = ip;
     } else if (type == RecordType::AAAA) {
-      hosts_AAAA_[hostname] = ip;
+      hosts_aaaa_[hostname] = ip;
     }
   }
 
@@ -287,8 +287,8 @@ public:
 private:
   Event::Dispatcher& dispatcher_;
 
-  HostMap hosts_A_;
-  HostMap hosts_AAAA_;
+  HostMap hosts_a_;
+  HostMap hosts_aaaa_;
   CNameMap cnames_;
   std::chrono::seconds record_ttl_;
   // All queries are tracked so we can do resource reclamation when the test is
