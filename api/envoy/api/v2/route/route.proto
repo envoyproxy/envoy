@@ -325,7 +325,7 @@ message RouteMatch {
   message GrpcRouteMatchOptions {
   }
 
-  message CredentialMatchOptions {
+  message TlsContextMatchOptions {
     // If specified, the route will match against whether or not a certificate is presented.
     google.protobuf.BoolValue presented = 1;
 
@@ -421,9 +421,9 @@ message RouteMatch {
   // application/grpc+ values.
   GrpcRouteMatchOptions grpc = 8;
 
-  // If specified, the client credentials will be matched against the defined
-  // credential match options.
-  CredentialMatchOptions credentials = 11;
+  // If specified, the client tls context will be matched against the defined
+  // match options.
+  TlsContextMatchOptions tls_context = 11;
 }
 
 // [#comment:next free field: 11]

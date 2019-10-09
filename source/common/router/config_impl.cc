@@ -323,9 +323,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy());
   }
 
-  if (route.match().has_credentials()) {
-    credential_match_criteria_ =
-        std::make_unique<CredentialMatchCriteriaImpl>(route.match().credentials());
+  if (route.match().has_tls_context()) {
+    tls_context_match_criteria_ =
+        std::make_unique<TlsContextMatchCriteriaImpl>(route.match().tls_context());
   }
 
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
@@ -358,14 +358,14 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                        random_value);
 }
 
-bool RouteEntryImplBase::evaluateCredentialMatch(const StreamInfo::StreamInfo& stream_info) const {
+bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const {
   bool matches = true;
 
-  if (!credentialMatchCriteria()) {
+  if (!tlsContextMatchCriteria()) {
     return matches;
   }
 
-  const CredentialMatchCriteria& criteria = *credentialMatchCriteria();
+  const TlsContextMatchCriteria& criteria = *tlsContextMatchCriteria();
 
   if (criteria.presented()) {
     const bool peerPresented = stream_info.downstreamSslConnection() &&
@@ -407,7 +407,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 
-  matches &= evaluateCredentialMatch(stream_info);
+  matches &= evaluateTlsContextMatch(stream_info);
 
   return matches;
 }

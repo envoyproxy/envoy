@@ -502,12 +502,12 @@ public:
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
 
-class CredentialMatchCriteria;
-using CredentialMatchCriteriaConstPtr = std::unique_ptr<const CredentialMatchCriteria>;
+class TlsContextMatchCriteria;
+using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
 
-class CredentialMatchCriteria {
+class TlsContextMatchCriteria {
 public:
-  virtual ~CredentialMatchCriteria() = default;
+  virtual ~TlsContextMatchCriteria() = default;
 
   virtual const absl::optional<bool>& presented() const PURE;
 
@@ -687,9 +687,9 @@ public:
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
-   * @return CredentialMatchCriteria* the credential match criterion for this route.
+   * @return TlsContextMatchCriteria* the tls context match criterion for this route.
    */
-  virtual const CredentialMatchCriteria* credentialMatchCriteria() const PURE;
+  virtual const TlsContextMatchCriteria* tlsContextMatchCriteria() const PURE;
 
   /**
    * @return const PathMatchCriterion& the match criterion for this route.

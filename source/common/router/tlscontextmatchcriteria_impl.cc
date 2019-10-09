@@ -1,10 +1,10 @@
-#include "common/router/credentialmatchcriteria_impl.h"
+#include "common/router/tlscontextmatchcriteria_impl.h"
 
 namespace Envoy {
 namespace Router {
 
-CredentialMatchCriteriaImpl::CredentialMatchCriteriaImpl(
-    const ::envoy::api::v2::route::RouteMatch_CredentialMatchOptions& options) {
+TlsContextMatchCriteriaImpl::TlsContextMatchCriteriaImpl(
+    const ::envoy::api::v2::route::RouteMatch_TlsContextMatchOptions& options) {
 
   if (options.has_presented()) {
     presented_ = options.presented().value();

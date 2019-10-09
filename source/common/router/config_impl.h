@@ -21,7 +21,7 @@
 #include "common/http/hash_policy.h"
 #include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
-#include "common/router/credentialmatchcriteria_impl.h"
+#include "common/router/tlscontextmatchcriteria_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
@@ -395,8 +395,8 @@ public:
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
     return metadata_match_criteria_.get();
   }
-  const CredentialMatchCriteria* credentialMatchCriteria() const override {
-    return credential_match_criteria_.get();
+  const TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
+    return tls_context_match_criteria_.get();
   }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
@@ -509,8 +509,8 @@ private:
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_->metadataMatchCriteria();
     }
-    const CredentialMatchCriteria* credentialMatchCriteria() const override {
-      return parent_->credentialMatchCriteria();
+    const TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
+      return parent_->tlsContextMatchCriteria();
     }
 
     const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
@@ -614,7 +614,7 @@ private:
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
-  bool evaluateCredentialMatch(const StreamInfo::StreamInfo& stream_info) const;
+  bool evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const;
 
   HedgePolicyImpl
   buildHedgePolicy(const absl::optional<envoy::api::v2::route::HedgePolicy>& vhost_hedge_policy,
@@ -662,7 +662,7 @@ private:
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
-  CredentialMatchCriteriaConstPtr credential_match_criteria_;
+  TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;

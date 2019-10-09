@@ -6,13 +6,13 @@
 namespace Envoy {
 namespace Router {
 
-class CredentialMatchCriteriaImpl;
-using CredentialMatchCriteriaImplConstPtr = std::unique_ptr<const CredentialMatchCriteriaImpl>;
+class TlsContextMatchCriteriaImpl;
+using TlsContextMatchCriteriaImplConstPtr = std::unique_ptr<const TlsContextMatchCriteriaImpl>;
 
-class CredentialMatchCriteriaImpl : public CredentialMatchCriteria {
+class TlsContextMatchCriteriaImpl : public TlsContextMatchCriteria {
 public:
-  CredentialMatchCriteriaImpl(
-      const ::envoy::api::v2::route::RouteMatch_CredentialMatchOptions& options);
+  TlsContextMatchCriteriaImpl(
+      const ::envoy::api::v2::route::RouteMatch_TlsContextMatchOptions& options);
 
   const absl::optional<bool>& presented() const override { return presented_; }
 

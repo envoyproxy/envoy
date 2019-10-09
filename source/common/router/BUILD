@@ -18,9 +18,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "credentialmatchcriteria_lib",
-    srcs = ["credentialmatchcriteria_impl.cc"],
-    hdrs = ["credentialmatchcriteria_impl.h"],
+    name = "tlscontextmatchcriteria_lib",
+    srcs = ["tlscontextmatchcriteria_impl.cc"],
+    hdrs = ["tlscontextmatchcriteria_impl.h"],
     deps = [
         "//include/envoy/router:router_interface",
     ],
@@ -33,7 +33,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":config_utility_lib",
-        ":credentialmatchcriteria_lib",
+        ":tlscontextmatchcriteria_lib",
         ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
