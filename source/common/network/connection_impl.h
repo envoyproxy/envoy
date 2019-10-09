@@ -174,7 +174,6 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
-  std::chrono::milliseconds delayedCloseTimeout() const;
   // Callback issued when a delayed close timeout triggers.
   void onDelayedCloseTimeout();
 
