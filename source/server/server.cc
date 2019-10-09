@@ -587,6 +587,9 @@ void InstanceImpl::terminate() {
   if (config_.clusterManager() != nullptr) {
     config_.clusterManager()->shutdown();
   }
+  if (ssl_context_manager_ != nullptr) {
+    ssl_context_manager_->shutdown();
+  }
   handler_.reset();
   thread_local_.shutdownThread();
   restarter_.shutdown();

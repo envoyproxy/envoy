@@ -46,6 +46,12 @@ public:
    * context manager.
    */
   virtual PrivateKeyMethodManager& privateKeyMethodManager() PURE;
+
+  /**
+   * Remove any contexts in the context manager on shutdown.
+   *
+   */
+  virtual void shutdown() PURE;
 };
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;

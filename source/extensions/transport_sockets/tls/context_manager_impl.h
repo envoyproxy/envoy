@@ -39,6 +39,7 @@ public:
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
     return private_key_method_manager_;
   };
+  void shutdown() override;
 
 private:
   void removeEmptyContexts();

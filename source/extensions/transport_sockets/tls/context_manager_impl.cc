@@ -71,6 +71,11 @@ void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Co
   }
 }
 
+void ContextManagerImpl::shutdown() {
+  contexts_.clear();
+  ASSERT(contexts_.empty());
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

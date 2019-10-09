@@ -1,0 +1,67 @@
+static_resources {
+  listeners {
+    address {
+      pipe {
+        path: "&"
+      }
+    }
+    filter_chains {
+      tls_context {
+        session_ticket_keys_sds_secret_config {
+          sds_config {
+            api_config_source {
+              refresh_delay {
+                seconds: -1
+                nanos: -348270613
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  clusters {
+    name: "1"
+    type: STRICT_DNS
+    connect_timeout {
+      nanos: 2
+    }
+    lb_policy: RING_HASH
+    hosts {
+      socket_address {
+        address: "1.1.0.1"
+        port_value: 1
+      }
+    }
+    hosts {
+      socket_address {
+        address: "123.0.0.1"
+        named_port: ""
+      }
+    }
+    health_checks {
+      timeout {
+        nanos: 95
+      }
+      interval {
+        nanos: 4
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "N"
+        path: "N"
+      }
+    }
+    tls_context {
+      common_tls_context {
+        tls_params {
+          cipher_suites: "ECDHE-ECDSA-AES256-SHA"
+        }
+      }
+    }
+    alt_stat_name: "google.com"
+  }
+}
