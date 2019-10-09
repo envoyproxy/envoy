@@ -760,10 +760,11 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   EXPECT_CALL(route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster_name));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
-      .WillOnce(Invoke([&](const Http::HeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t) {
-        EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
-        return route;
-      }));
+      .WillOnce(
+          Invoke([&](const Http::HeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t) {
+            EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
+            return route;
+          }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks&) -> void {}));
 
