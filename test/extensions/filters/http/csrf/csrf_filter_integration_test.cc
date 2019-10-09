@@ -157,6 +157,20 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
   EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
 }
 
+TEST_P(CsrfFilterIntegrationTest, TestEnforcesPatch) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  Http::TestHeaderMapImpl headers = {{
+      {":method", "PATCH"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {"origin", "cross-origin"},
+      {"host", "test-origin"},
+  }};
+  const auto& response = sendRequest(headers);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
+}
+
 TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestHeaderMapImpl headers = {{":method", "DELETE"},
