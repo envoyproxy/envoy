@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.type.metadata.v2;
+
+option java_outer_classname = "MetadataProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.type.metadata.v2";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Metadata]
+
+// MetadataLocate provides a general interface using `filter` and `path` to retrieve value from
+// :ref:`Metadata <envoy_api_msg_core.Metadata>`.
+//
+// For example, for the following Metadata:
+//
+// .. code-block:: yaml
+//
+//    filter_metadata:
+//      envoy.filters.http.rbac:
+//        path:
+//          to:
+//            string: pro
+//
+// The following MetadataLocate is matched as the path [path, to, string]
+// will retrieve a string value "pro" from the Metadata.
+//
+// .. code-block:: yaml
+//
+//    filter: envoy.filters.http.rbac
+//    path:
+//    - key: path
+//    - key: to
+//    - key: string
+//
+message MetadataLocate {
+  // Specifies the segment in a path to retrieve value from Metadata.
+  // Note: Currently it's not supported to retrieve a value from a list in Metadata.
+  // This means that if the segment key refers to a list, it has to be the last segment in a path.
+  message PathSegment {
+    oneof segment {
+      option (validate.required) = true;
+
+      // If specified, use the key to retrieve the value in a Struct.
+      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+    }
+  }
+
+  // The filter name to retrieve the Struct from the Metadata.
+  string filter = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // The path to retrieve the Value from the Struct.
+  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+}

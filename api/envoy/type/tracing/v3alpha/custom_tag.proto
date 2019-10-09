@@ -6,7 +6,7 @@ option java_outer_classname = "CustomTagProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.tracing.v3alpha";
 
-import "envoy/type/matcher/metadata.proto";
+import "envoy/type/metadata/v3alpha/metadata.proto";
 
 import "validate/validate.proto";
 
@@ -42,6 +42,19 @@ message CustomTag {
     string default_value = 2;
   }
 
+  // Metadata type custom tag using
+  // :ref:`MetadataLocate <envoy_api_msg_type.metadata.v3alpha.MetadataLocate>` to retrieve tag
+  // value from :ref:`Metadata <envoy_api_msg_core.Metadata>`.
+  message Metadata {
+    // Metadata locate to define the path to retrieve the tag value.
+    metadata.v3alpha.MetadataLocate metadata_locate = 1;
+
+    // When no valid metadata is found,
+    // the tag value would be populated with this default value if specified,
+    // otherwise no tag would be populated.
+    string default_value = 2;
+  }
+
   // Used to populate the tag name.
   string tag = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -58,10 +71,11 @@ message CustomTag {
     // A request header custom tag.
     Header request_header = 4;
 
-    // A metadata custom tag associated with the request.
-    matcher.MetadataMatcher request_metadata = 5;
+    // A custom tag to obtain tag value from the dynamic metadata associated with the request.
+    Metadata request_metadata = 5;
 
-    // A metadata custom tag associated with the route.
-    matcher.MetadataMatcher route_metadata = 6;
+    // A custom tag to obtain tag value from the metadata
+    // provided in the config for :ref:`the route <envoy_api_field_route.Route.metadata>`.
+    Metadata route_metadata = 6;
   }
 }
