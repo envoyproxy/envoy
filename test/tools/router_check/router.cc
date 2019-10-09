@@ -117,7 +117,8 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                   factory_context_->dispatcher().timeSource());
     ToolConfig tool_config = ToolConfig::create(check_config);
-    tool_config.route_ = config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
+    tool_config.route_ =
+        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
     std::string test_name = check_config->getString("test_name", "");
     tests_.emplace_back(test_name, std::vector<std::string>{});
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
@@ -188,7 +189,8 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
                                                   factory_context_->dispatcher().timeSource());
 
     ToolConfig tool_config = ToolConfig::create(check_config);
-    tool_config.route_ = config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
+    tool_config.route_ =
+        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
     tests_.emplace_back(test_name, std::vector<std::string>{});

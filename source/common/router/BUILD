@@ -33,12 +33,12 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":config_utility_lib",
-        ":tlscontextmatchcriteria_lib",
         ":header_formatter_lib",
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
+        ":tlscontextmatchcriteria_lib",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/router:router_interface",

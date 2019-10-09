@@ -389,7 +389,8 @@ public:
   ~MockConfig() override;
 
   // Router::Config
-  MOCK_CONST_METHOD3(route, RouteConstSharedPtr(const Http::HeaderMap&, const Envoy::StreamInfo::StreamInfo&,
+  MOCK_CONST_METHOD3(route, RouteConstSharedPtr(const Http::HeaderMap&,
+                                                const Envoy::StreamInfo::StreamInfo&,
                                                 uint64_t random_value));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(name, const std::string&());
