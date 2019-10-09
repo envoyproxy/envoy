@@ -49,7 +49,7 @@ public:
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
-    const auto* node = dynamic_cast<const envoy::api::v2::core::Node*>(&proto);
+    const auto& node = dynamic_cast<const envoy::api::v2::core::Node&>(proto);
     std::string id = "default-foo";
     if (!node->id().empty()) {
       id = node->id();
@@ -82,7 +82,7 @@ public:
 
   void validate(const envoy::api::v2::core::Metadata& metadata, const std::string& expected) {
     auto& factory = matcher_->resolve(metadata).factory_;
-    const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
+    const auto& config_factory = dynamic_cast<const FakeTransportSocketFactory&>(factory);
     EXPECT_EQ(expected, config_factory->id());
   }
 
