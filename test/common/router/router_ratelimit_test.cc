@@ -109,7 +109,8 @@ virtual_hosts:
 
   setupTest(yaml);
 
-  EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0)
                     ->routeEntry()
                     ->rateLimitPolicy()
                     .getApplicableRateLimit(0)
@@ -131,7 +132,8 @@ virtual_hosts:
 
   setupTest(yaml);
 
-  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0)->routeEntry();
   EXPECT_EQ(0U, route_->rateLimitPolicy().getApplicableRateLimit(0).size());
   EXPECT_TRUE(route_->rateLimitPolicy().empty());
 }
@@ -154,7 +156,8 @@ virtual_hosts:
 
   setupTest(yaml);
 
-  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info, 0)->routeEntry();
   EXPECT_FALSE(route_->rateLimitPolicy().empty());
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->rateLimitPolicy().getApplicableRateLimit(0);
@@ -186,7 +189,8 @@ virtual_hosts:
 
   setupTest(yaml);
 
-  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
@@ -224,7 +228,8 @@ virtual_hosts:
 
   setupTest(yaml);
 
-  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info, 0)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(2U, rate_limits.size());
