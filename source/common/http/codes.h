@@ -78,7 +78,6 @@ private:
   const Stats::StatName upstream_rq_5xx_;
   const Stats::StatName upstream_rq_unknown_;
   const Stats::StatName upstream_rq_completed_;
-  const Stats::StatName upstream_rq_time;
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName vcluster_;
   const Stats::StatName vhost_;
