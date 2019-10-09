@@ -1,7 +1,6 @@
 #include <chrono>
 #include <iostream>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
 
 #include "common/stats/isolated_store_impl.h"
@@ -31,19 +30,18 @@ namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
 namespace {
 
+GradientControllerConfig makeConfig(const std::string& yaml_config,
+                                    NiceMock<Runtime::MockLoader>& runtime) {
+  envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto;
+  TestUtility::loadFromYamlAndValidate(yaml_config, proto);
+  return GradientControllerConfig{proto, runtime};
+}
+
 class GradientControllerConfigTest : public testing::Test {
 public:
   GradientControllerConfigTest() = default;
 
 protected:
-  GradientControllerConfig makeConfig(const std::string& yaml_config) {
-    envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
-        TestUtility::parseYaml<
-            envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
-            yaml_config);
-    return GradientControllerConfig{proto, runtime_};
-  }
-
   NiceMock<Runtime::MockLoader> runtime_;
 };
 
@@ -53,19 +51,11 @@ public:
       : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()) {}
 
   GradientControllerSharedPtr makeController(const std::string& yaml_config) {
-    return std::make_shared<GradientController>(makeConfig(yaml_config), *dispatcher_, runtime_,
-                                                "test_prefix.", stats_, random_);
+    return std::make_shared<GradientController>(makeConfig(yaml_config, runtime_), *dispatcher_,
+                                                runtime_, "test_prefix.", stats_, random_);
   }
 
 protected:
-  GradientControllerConfig makeConfig(const std::string& yaml_config) {
-    envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
-        TestUtility::parseYaml<
-            envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
-            yaml_config);
-    return GradientControllerConfig{proto, runtime_};
-  }
-
   // Helper function that will attempt to pull forwarding decisions.
   void tryForward(const GradientControllerSharedPtr& controller,
                   const bool expect_forward_response) {
@@ -78,7 +68,7 @@ protected:
   void advancePastMinRTTStage(const GradientControllerSharedPtr& controller,
                               const std::string& yaml_config,
                               std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
-    const auto config = makeConfig(yaml_config);
+    const auto config = makeConfig(yaml_config, runtime_);
     for (uint32_t i = 0; i <= config.minRTTAggregateRequestCount(); ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(latency);
@@ -108,7 +98,7 @@ min_rtt_calc_params:
   request_count: 52
 )EOF";
 
-  auto config = makeConfig(yaml);
+  auto config = makeConfig(yaml, runtime_);
 
   EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::seconds(31));
   EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(123));
@@ -136,7 +126,7 @@ min_rtt_calc_params:
   request_count: 52
 )EOF";
 
-  auto config = makeConfig(yaml);
+  auto config = makeConfig(yaml, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger(_, 31000)).WillOnce(Return(60000));
   EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::seconds(60));
@@ -168,7 +158,7 @@ min_rtt_calc_params:
   interval: 31s
 )EOF";
 
-  auto config = makeConfig(yaml);
+  auto config = makeConfig(yaml, runtime_);
 
   EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::seconds(31));
   EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(123));
@@ -523,8 +513,8 @@ min_rtt_calc_params:
       .WillOnce(Return(rtt_timer))
       .WillOnce(Return(sample_timer));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
-  auto controller = std::make_shared<GradientController>(makeConfig(yaml), fake_dispatcher,
-                                                         runtime_, "test_prefix.", stats_, random_);
+  auto controller = std::make_shared<GradientController>(
+      makeConfig(yaml, runtime_), fake_dispatcher, runtime_, "test_prefix.", stats_, random_);
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
 
@@ -566,8 +556,8 @@ min_rtt_calc_params:
       .WillOnce(Return(rtt_timer))
       .WillOnce(Return(sample_timer));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
-  auto controller = std::make_shared<GradientController>(makeConfig(yaml), fake_dispatcher,
-                                                         runtime_, "test_prefix.", stats_, random_);
+  auto controller = std::make_shared<GradientController>(
+      makeConfig(yaml, runtime_), fake_dispatcher, runtime_, "test_prefix.", stats_, random_);
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));

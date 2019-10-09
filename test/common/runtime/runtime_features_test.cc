@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/base.pb.validate.h"
 
 #include "common/runtime/runtime_features.h"
 
@@ -23,10 +23,12 @@ protected:
 };
 
 TEST_F(FeatureFlagTest, BasicTest) {
-  auto feature_flag_proto = TestUtility::parseYaml<envoy::api::v2::core::RuntimeFeatureFlag>(R"EOF(
+  envoy::api::v2::core::RuntimeFeatureFlag feature_flag_proto;
+  std::string yaml(R"EOF(
 runtime_key: "foo.bar"
 default_value: true
 )EOF");
+  TestUtility::loadFromYamlAndValidate(yaml, feature_flag_proto);
   FeatureFlag test_feature(feature_flag_proto, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.bar", true));
@@ -35,10 +37,12 @@ default_value: true
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.bar", true)).WillOnce(Return(false));
   EXPECT_EQ(false, test_feature.enabled());
 
-  auto feature_flag_proto2 = TestUtility::parseYaml<envoy::api::v2::core::RuntimeFeatureFlag>(R"EOF(
+  envoy::api::v2::core::RuntimeFeatureFlag feature_flag_proto2;
+  yaml = R"EOF(
 runtime_key: "bar.foo"
 default_value: false
-)EOF");
+)EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, feature_flag_proto2);
   FeatureFlag test_feature2(feature_flag_proto2, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_, getBoolean("bar.foo", false));
@@ -46,6 +50,14 @@ default_value: false
 
   EXPECT_CALL(runtime_.snapshot_, getBoolean("bar.foo", false)).WillOnce(Return(true));
   EXPECT_EQ(true, test_feature2.enabled());
+}
+
+TEST_F(FeatureFlagTest, EmptyProtoTest) {
+  envoy::api::v2::core::RuntimeFeatureFlag empty_proto;
+  FeatureFlag test(empty_proto, runtime_);
+
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("", true));
+  EXPECT_EQ(true, test.enabled());
 }
 
 } // namespace

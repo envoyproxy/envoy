@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 
@@ -30,19 +32,6 @@ public:
   uint32_t concurrencyLimit() const override { return 0; }
 };
 
-class AdaptiveConcurrencyFilterConfigTest : public testing::Test {
-public:
-  AdaptiveConcurrencyFilterConfigTest() = default;
-
-  envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency
-  makeConfig(const std::string& yaml_config) {
-    auto proto = TestUtility::parseYaml<
-        envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency>(
-        yaml_config);
-    return proto;
-  }
-};
-
 class AdaptiveConcurrencyFilterTest : public testing::Test {
 public:
   AdaptiveConcurrencyFilterTest() = default;
@@ -61,9 +50,8 @@ public:
 
   envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency
   makeConfig(const std::string& yaml_config) {
-    auto proto = TestUtility::parseYaml<
-        envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency>(
-        yaml_config);
+    envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency proto;
+    TestUtility::loadFromYamlAndValidate(yaml_config, proto);
     return proto;
   }
 
@@ -106,9 +94,11 @@ enabled:
 
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(*controller_, forwardingDecision())
-      .WillOnce(Return(RequestForwardingAction::Forward));
-  EXPECT_CALL(*controller_, recordLatencySample(_));
+  // The filter will be disabled when the flag is overridden. Note there is no expected call to
+  // forwardingDecision() or recordLatencySample().
+
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.enabled", true))
+      .WillOnce(Return(false));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
@@ -121,15 +111,6 @@ enabled:
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   filter_->encodeComplete();
-
-  // Request should be blocked when flag is overridden. Note there is no expected call to
-  // forwardingDecision() or recordLatencySample().
-
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.enabled", true))
-      .WillOnce(Return(false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, TestEnableConfiguredInProto) {
