@@ -17,7 +17,7 @@ def envoy_mobile_kt_aar_android_library(name, custom_package, manifest, visibili
         custom_package = custom_package,
         manifest = manifest,
         visibility = ["//visibility:public"],
-        deps = deps,
+        deps = deps + ["@maven//:org_jetbrains_kotlin_kotlin_stdlib_jdk8"],
     )
 
 def envoy_mobile_android_library(name, custom_package, manifest, visibility = None, srcs = [], deps = []):

@@ -15,3 +15,7 @@ kt_jvm_library(
         "@maven//:junit_junit",
     ],
 )
+
+exports_files([
+    "pom_template.xml",
+])

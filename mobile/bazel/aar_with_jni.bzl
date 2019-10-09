@@ -1,3 +1,5 @@
+load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
+
 # This file is based on https://github.com/aj-michael/aar_with_jni which is
 # subject to the following copyright and license:
 
@@ -53,10 +55,18 @@ EOF
         deps = [android_library],
     )
 
+    pom_file(
+        name = name + "_pom",
+        targets = [android_library],
+        template_file = "//bazel:pom_template.xml",
+        visibility = ["//visibility:public"],
+    )
+
     native.genrule(
         name = name,
-        srcs = [android_library + "_kt.jar", android_library + ".aar", archive_name + "_jni_unsigned.apk", proguard_rules],
+        srcs = [android_library + "_kt.jar", android_library + ".aar", archive_name + "_jni_unsigned.apk", name + "_pom.xml", proguard_rules],
         outs = [archive_name + ".aar"],
+        visibility = visibility,
         cmd = """
 cp $(location {proguard_rules}) ./proguard.txt
 cp $(location {android_library}.aar) $(location :{archive_name}.aar)
@@ -69,5 +79,4 @@ cp $$origdir/$(location {android_library}_kt.jar) classes.jar
 cp $$origdir/proguard.txt .
 zip -r $$origdir/$(location :{archive_name}.aar) jni/*/*.so classes.jar proguard.txt
 """.format(android_library = android_library, archive_name = archive_name, proguard_rules = proguard_rules),
-        visibility = visibility,
     )
