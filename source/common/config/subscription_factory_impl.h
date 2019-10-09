@@ -16,10 +16,12 @@ public:
                           Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
+  // TODO(fredlas) remove is_delta once delta and SotW are unified
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config,
                                                absl::string_view type_url, Stats::Scope& scope,
-                                               SubscriptionCallbacks& callbacks) override;
+                                               SubscriptionCallbacks& callbacks,
+                                               bool is_delta) override;
 
 private:
   const LocalInfo::LocalInfo& local_info_;

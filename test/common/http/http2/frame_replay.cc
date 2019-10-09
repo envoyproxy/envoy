@@ -67,9 +67,9 @@ CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
 }
 
 ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("server") {
-  auto client = std::make_unique<TestClientConnectionImpl>(client_connection_, client_callbacks_,
-                                                           stats_store_, settings_,
-                                                           Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+  auto client = std::make_unique<TestClientConnectionImpl>(
+      client_connection_, client_callbacks_, stats_store_, settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   request_encoder_ = &client->newStream(response_decoder_);
   connection_ = std::move(client);
   ON_CALL(client_connection_, write(_, _))
@@ -87,9 +87,9 @@ ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("serve
 }
 
 ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("client") {
-  connection_ = std::make_unique<TestServerConnectionImpl>(server_connection_, server_callbacks_,
-                                                           stats_store_, settings_,
-                                                           Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+  connection_ = std::make_unique<TestServerConnectionImpl>(
+      server_connection_, server_callbacks_, stats_store_, settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   EXPECT_CALL(server_callbacks_, newStream(_, _))
       .WillRepeatedly(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
         encoder.getStream().addCallbacks(server_stream_callbacks_);

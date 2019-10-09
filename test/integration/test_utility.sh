@@ -75,4 +75,4 @@ enableHeapCheck () {
   HEAPCHECK=${SAVED_HEAPCHECK}
 }
 
-[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_RUNDIR}"/source/exe/envoy-static
+[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}"/envoy/source/exe/envoy-static

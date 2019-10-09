@@ -25,7 +25,7 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:stat_names_lib",
-        "@envoy_api//envoy/config/filter/http/rate_limit/v2:rate_limit_cc",
+        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
     ],
 )
 

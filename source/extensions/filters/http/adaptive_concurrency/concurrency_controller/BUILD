@@ -28,6 +28,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:adaptive_concurrency_cc",
+        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:pkg_cc_proto",
     ],
 )

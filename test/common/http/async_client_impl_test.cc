@@ -562,6 +562,77 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   stream->reset();
 }
 
+TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+
+  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  stream->sendHeaders(headers, false);
+
+  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+
+  EXPECT_CALL(stream_encoder_, encodeData(_, _)).Times(0);
+  stream->sendData(*body, true);
+}
+
+TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.addCopy("x-envoy-internal", "true");
+  headers.addCopy("x-forwarded-for", "127.0.0.1");
+  headers.addCopy(":scheme", "http");
+
+  TestHeaderMapImpl trailers;
+  trailers.addCopy("x-test-trailer", "1");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+
+  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  stream->sendHeaders(headers, false);
+
+  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+
+  EXPECT_CALL(stream_encoder_, encodeTrailers(_)).Times(0);
+  stream->sendTrailers(trailers);
+}
+
 // Validate behavior when the stream's onHeaders() callback performs a stream
 // reset.
 TEST_F(AsyncClientImplTest, ResetInOnHeaders) {

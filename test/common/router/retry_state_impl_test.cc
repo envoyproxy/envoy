@@ -642,6 +642,43 @@ TEST_F(RouterRetryStateImplTest, PolicyResetRemoteReset) {
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded, state_->shouldRetryReset(remote_reset_, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher> matchers;
+  auto* matcher = matchers.Add();
+  matcher->set_name(":method");
+  matcher->set_exact_match("GET");
+
+  auto* matcher2 = matchers.Add();
+  matcher2->set_name(":method");
+  matcher2->set_exact_match("HEAD");
+
+  policy_.retriable_request_headers_ = Http::HeaderUtility::buildHeaderMatcherVector(matchers);
+
+  {
+    Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_FALSE(state_->enabled());
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{":method", "HEAD"}, {"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+  }
+
+  {
+    Http::TestHeaderMapImpl request_headers{{":method", "POST"}, {"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_FALSE(state_->enabled());
+  }
+}
+
 TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
   policy_.num_retries_ = 1;
   policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;

@@ -21,8 +21,9 @@ public:
                        Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                        std::chrono::milliseconds init_fetch_timeout, bool skip_subsequent_node)
       : callbacks_(callbacks),
-        grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings, skip_subsequent_node),
+        grpc_mux_(std::make_shared<Config::GrpcMuxImpl>(local_info, std::move(async_client),
+                                                        dispatcher, service_method, random, scope,
+                                                        rate_limit_settings, skip_subsequent_node)),
         grpc_mux_subscription_(grpc_mux_, callbacks_, stats, type_url, dispatcher,
                                init_fetch_timeout) {}
 
@@ -30,18 +31,18 @@ public:
   void start(const std::set<std::string>& resource_names) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
     grpc_mux_subscription_.start(resource_names);
-    grpc_mux_.start();
+    grpc_mux_->start();
   }
 
-  void updateResources(const std::set<std::string>& update_to_these_names) override {
-    grpc_mux_subscription_.updateResources(update_to_these_names);
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override {
+    grpc_mux_subscription_.updateResourceInterest(update_to_these_names);
   }
 
-  GrpcMuxImpl& grpcMux() { return grpc_mux_; }
+  std::shared_ptr<Config::GrpcMuxImpl> grpcMux() { return grpc_mux_; }
 
 private:
   Config::SubscriptionCallbacks& callbacks_;
-  GrpcMuxImpl grpc_mux_;
+  std::shared_ptr<Config::GrpcMuxImpl> grpc_mux_;
   GrpcMuxSubscriptionImpl grpc_mux_subscription_;
 };
 

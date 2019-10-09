@@ -11,6 +11,7 @@ Version history
 * admin: added config dump support for Secret Discovery Service :ref:`SecretConfigDump <envoy_api_msg_admin.v2alpha.SecretsConfigDump>`.
 * api: added ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` option to omit the node identifier from the subsequent discovery requests on the same stream.
 * buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
+* config: added support for :ref:`delta xDS <arch_overview_dynamic_config_delta>` (including ADS) delivery
 * config: enforcing that terminal filters (e.g. HttpConnectionManager for L4, router for L7) be the last in their respective filter chains.
 * config: added access log :ref:`extension filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`.
 * config: added support for :option:`--reject-unknown-dynamic-fields`, providing independent control
@@ -58,11 +59,14 @@ Version history
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
 * router: added new :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy. Retries can now be configured to trigger by arbitrary response header matching.
+* router: added :ref:`respect_expected_rq_timeout <envoy_api_field_config.filter.http.router.v2.Router.respect_expected_rq_timeout>` that instructs ingress Envoy to respect :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress Envoy, when deriving timeout for upstream cluster.
+* router: added new :ref:`retriable request headers <envoy_api_field_route.RetryPolicy.retriable_request_headers>` to retry policies. Retries can now be configured to only trigger on request header match.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
 * router check tool: add support for outputting missing tests in the detailed coverage report.
+* runtime: allow for the ability to parse boolean values.
 * runtime: allow for the ability to parse integers as double values and vice-versa.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
 * server: added :ref:`per-handler listener stats <config_listener_stats_per_handler>` and
@@ -81,6 +85,15 @@ Version history
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
 * zookeeper: parse responses and emit latency stats.
+
+1.11.2 (October 8, 2019)
+========================
+* http: fixed CVE-2019-15226 by adding a cached byte size in HeaderMap.
+* http: added :ref:`max headers count <envoy_api_field_core.HttpProtocolOptions.max_headers_count>` for http connections. The default limit is 100.
+* upstream: runtime feature `envoy.reloadable_features.max_response_headers_count` overrides the default limit for upstream :ref:`max headers count <envoy_api_field_Cluster.common_http_protocol_options>`
+* http: added :ref:`common_http_protocol_options <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+  Runtime feature `envoy.reloadable_features.max_request_headers_count` overrides the default limit for downstream :ref:`max headers count <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+* regex: backported safe regex matcher fix for CVE-2019-15225.
 
 1.11.1 (August 13, 2019)
 ========================
@@ -163,9 +176,7 @@ Version history
 * router: added a route name field to each http route in route.Route list
 * router: added several new variables for exposing information about the downstream TLS connection via :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`.
-* router: per try timeouts will no longer start before the downstream request has been received
-  in full by the router. This ensures that the per try timeout does not account for slow
-  downstreams and that will not start before the global timeout.
+* router: per try timeouts will no longer start before the downstream request has been received in full by the router.This ensures that the per try timeout does not account for slow downstreams and that will not start before the global timeout.
 * router: added :ref:`RouteAction's auto_host_rewrite_header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>` to allow upstream host header substitution with some other header's value
 * router: added support for UPSTREAM_REMOTE_ADDRESS :ref:`header formatter
   <config_http_conn_man_headers_custom_request_headers>`.

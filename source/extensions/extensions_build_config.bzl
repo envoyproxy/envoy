@@ -31,9 +31,7 @@ EXTENSIONS = {
     # HTTP filters
     #
 
-    # NOTE: The adaptive concurrency filter does not have a proper filter
-    #       implemented right now. We are just referencing the filter lib here.
-    "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
+    "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
