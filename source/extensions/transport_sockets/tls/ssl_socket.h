@@ -104,7 +104,6 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
-  bool implementsSecureTransport() const override { return true; }
 
   SSL* rawSslForTest() const { return ssl_; }
 
