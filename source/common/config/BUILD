@@ -92,7 +92,7 @@ envoy_cc_library(
         ":subscription_state_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -104,7 +104,7 @@ envoy_cc_library(
         ":subscription_state_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -358,7 +358,7 @@ envoy_cc_library(
     name = "update_ack_lib",
     hdrs = ["update_ack.h"],
     deps = [
-        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
