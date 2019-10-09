@@ -401,7 +401,6 @@ envoy_cc_test(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
         "//source/common/upstream:static_cluster_lib",

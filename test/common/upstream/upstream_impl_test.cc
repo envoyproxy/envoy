@@ -11,7 +11,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
-#include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/static_cluster.h"
@@ -1626,38 +1625,6 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
   cluster.initialize([] {});
 
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-}
-
-TEST(ClusterDefinitionTest, BadClusterConfig) {
-  const std::string json = R"EOF(
-  {
-    "name": "cluster_1",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "fake_type" : "expected_failure",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
-}
-
-TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
-  const std::string json = R"EOF(
-  {
-    "name": "cluster_1",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}],
-    "dns_lookup_family" : "foo"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
 }
 
 TEST_F(StaticClusterImplTest, SourceAddressPriority) {
