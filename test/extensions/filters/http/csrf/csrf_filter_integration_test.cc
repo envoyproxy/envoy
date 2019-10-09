@@ -84,7 +84,7 @@ TEST_P(CsrfFilterIntegrationTest, TestCsrfSuccess) {
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("200"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "200");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
@@ -98,7 +98,7 @@ TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("200"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "200");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
@@ -112,7 +112,7 @@ TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("200"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "200");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
@@ -126,7 +126,7 @@ TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
   }};
   const auto& response = sendRequest(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "403");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesPost) {
@@ -140,7 +140,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesPost) {
   }};
   const auto& response = sendRequest(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "403");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
@@ -154,7 +154,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
   }};
   const auto& response = sendRequest(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "403");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesPatch) {
@@ -168,7 +168,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesPatch) {
   }};
   const auto& response = sendRequest(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "403");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
@@ -180,7 +180,7 @@ TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
                                      {"host", "test-origin"}};
   const auto& response = sendRequestAndWaitForResponse(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("200"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "200");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestMissingOrigin) {
@@ -189,7 +189,7 @@ TEST_P(CsrfFilterIntegrationTest, TestMissingOrigin) {
       {{":method", "DELETE"}, {":path", "/"}, {":scheme", "http"}, {"host", "test-origin"}}};
   const auto& response = sendRequest(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "403");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestShadowOnlyMode) {
@@ -203,7 +203,7 @@ TEST_P(CsrfFilterIntegrationTest, TestShadowOnlyMode) {
   }};
   const auto& response = sendRequestAndWaitForResponse(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("200"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "200");
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestFilterAndShadowEnabled) {
@@ -217,7 +217,7 @@ TEST_P(CsrfFilterIntegrationTest, TestFilterAndShadowEnabled) {
   }};
   const auto& response = sendRequest(headers);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response->headers().Status()->value().getStringView(), absl::string_view("403"));
+  EXPECT_EQ(response->headers().Status()->value().getStringView(), "403");
 }
 } // namespace
 } // namespace Envoy
