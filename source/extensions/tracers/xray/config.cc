@@ -22,10 +22,11 @@ XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2::XRayCon
                                          Server::Instance& server) {
   std::string sampling_rules_json;
   try {
-    sampling_rules_json = server.api().fileSystem().fileReadToEnd(proto_config.json_file());
+    sampling_rules_json =
+        server.api().fileSystem().fileReadToEnd(proto_config.sampling_rule_manifest().filename());
   } catch (EnvoyException& e) {
     ENVOY_LOG(error, "Could not read custom sampling rule json file: {}, because of {}.",
-              proto_config.json_file(), e.what());
+              proto_config.sampling_rule_manifest().filename(), e.what());
   }
 
   XRayConfiguration xconfig(proto_config.daemon_endpoint(), proto_config.segment_name(),

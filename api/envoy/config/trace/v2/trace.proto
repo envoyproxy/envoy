@@ -6,6 +6,7 @@ option java_outer_classname = "TraceProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.trace.v2";
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 
 import "google/protobuf/any.proto";
@@ -209,7 +210,7 @@ message XRayConfig {
   string segment_name = 2;
 
   // The location of custom sampling rule json file.
-  string json_file = 3;
+  api.v2.core.DataSource sampling_rule_manifest = 3;
 }
 
 // Configuration structure.
