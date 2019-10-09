@@ -61,7 +61,8 @@ public:
 /**
  * Implementation of Upstream::HostDescription.
  */
-class HostDescriptionImpl : virtual public HostDescription {
+class HostDescriptionImpl : virtual public HostDescription,
+                            protected Logger::Loggable<Logger::Id::upstream> {
 public:
   HostDescriptionImpl(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
@@ -76,7 +77,8 @@ public:
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
         locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
-        priority_(priority), socket_factory_(resolveTransportSocketFactory(metadata)) {
+        priority_(priority), socket_factory_(resolveTransportSocketFactory(
+                                 dest_address ? dest_address->asString() : "empty", metadata)) {
     if (health_check_config.port_value() != 0 &&
         dest_address->type() != Network::Address::Type::Ip) {
       // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
@@ -91,9 +93,12 @@ public:
   }
 
   Network::TransportSocketFactory&
-  resolveTransportSocketFactory(const envoy::api::v2::core::Metadata& metadata) {
+  resolveTransportSocketFactory(const std::string& addr,
+                                const envoy::api::v2::core::Metadata& metadata) {
     auto match = cluster_->transportSocketMatcher().resolve(metadata);
     match.stats_.total_match_count_.inc();
+    ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
+              match.name_, addr);
     return match.factory_;
   }
 
@@ -176,8 +181,7 @@ protected:
  */
 class HostImpl : public HostDescriptionImpl,
                  public Host,
-                 public std::enable_shared_from_this<HostImpl>,
-                 protected Logger::Loggable<Logger::Id::upstream> {
+                 public std::enable_shared_from_this<HostImpl> {
 public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address,

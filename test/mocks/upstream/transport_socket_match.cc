@@ -17,7 +17,7 @@ MockTransportSocketMatcher::MockTransportSocketMatcher(Network::TransportSocketF
     : socket_factory_(std::move(factory)),
       stats_({ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_store_, "test"))}) {
   ON_CALL(*this, resolve(_))
-      .WillByDefault(Return(TransportSocketMatcher::MatchData(*socket_factory_, stats_)));
+      .WillByDefault(Return(TransportSocketMatcher::MatchData(*socket_factory_, stats_, "test")));
 }
 
 MockTransportSocketMatcher::~MockTransportSocketMatcher() = default;

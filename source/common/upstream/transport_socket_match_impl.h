@@ -31,10 +31,10 @@ class TransportSocketMatcherImpl : public Logger::Loggable<Logger::Id::upstream>
                                    public TransportSocketMatcher {
 public:
   struct FactoryMatch {
-    FactoryMatch(std::string match_name, Network::TransportSocketFactoryPtr socket_factory,
+    FactoryMatch(const std::string& match_name, Network::TransportSocketFactoryPtr socket_factory,
                  TransportSocketMatchStats match_stats)
-        : name(std::move(match_name)), factory(std::move(socket_factory)), stats(match_stats) {}
-    std::string name;
+        : name(match_name), factory(std::move(socket_factory)), stats(match_stats) {}
+    const std::string name;
     Network::TransportSocketFactoryPtr factory;
     Config::Metadata::LabelSet label_set;
     mutable TransportSocketMatchStats stats;

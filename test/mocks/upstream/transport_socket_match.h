@@ -16,6 +16,8 @@ using testing::NiceMock;
 
 using testing::NiceMock;
 
+using testing::NiceMock;
+
 class MockTransportSocketMatcher : public TransportSocketMatcher {
 public:
   MockTransportSocketMatcher();

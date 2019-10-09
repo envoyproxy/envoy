@@ -39,10 +39,10 @@ TransportSocketMatcherImpl::resolve(const envoy::api::v2::core::Metadata& metada
     if (Config::Metadata::metadataLabelMatch(
             match.label_set, metadata,
             Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, false)) {
-      return MatchData(*match.factory, match.stats);
+      return MatchData(*match.factory, match.stats, match.name);
     }
   }
-  return MatchData(*default_match_.factory, default_match_.stats);
+  return MatchData(*default_match_.factory, default_match_.stats, default_match_.name);
 }
 
 } // namespace Upstream
