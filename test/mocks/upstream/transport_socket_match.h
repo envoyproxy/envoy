@@ -10,7 +10,6 @@
 
 namespace Envoy {
 namespace Upstream {
-namespace Outlier {
 
 using testing::NiceMock;
 
@@ -32,6 +31,5 @@ private:
   TransportSocketMatchStats stats_;
 };
 
-} // namespace Outlier
 } // namespace Upstream
 } // namespace Envoy

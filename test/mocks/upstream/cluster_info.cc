@@ -36,7 +36,7 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
 MockClusterInfo::MockClusterInfo()
     : stats_(ClusterInfoImpl::generateStats(stats_store_)),
-      transport_socket_matcher_(new NiceMock<Upstream::Outlier::MockTransportSocketMatcher>()),
+      transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),

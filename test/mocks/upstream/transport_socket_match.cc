@@ -8,7 +8,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
-namespace Outlier {
 
 MockTransportSocketMatcher::MockTransportSocketMatcher()
     : MockTransportSocketMatcher(std::make_unique<Network::RawBufferSocketFactory>()) {}
@@ -21,6 +20,5 @@ MockTransportSocketMatcher::MockTransportSocketMatcher(Network::TransportSocketF
 }
 
 MockTransportSocketMatcher::~MockTransportSocketMatcher() = default;
-} // namespace Outlier
 } // namespace Upstream
 } // namespace Envoy

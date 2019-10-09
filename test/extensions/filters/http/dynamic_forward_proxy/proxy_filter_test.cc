@@ -24,7 +24,7 @@ class ProxyFilterTest : public testing::Test,
                         public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
   ProxyFilterTest() {
-    transport_socket_match_ = new NiceMock<Upstream::Outlier::MockTransportSocketMatcher>(
+    transport_socket_match_ = new NiceMock<Upstream::MockTransportSocketMatcher>(
         Network::TransportSocketFactoryPtr(transport_socket_factory_));
     cm_.thread_local_cluster_.cluster_.info_->transport_socket_matcher_.reset(
         transport_socket_match_);
@@ -56,7 +56,7 @@ public:
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   Network::MockTransportSocketFactory* transport_socket_factory_{
       new Network::MockTransportSocketFactory()};
-  NiceMock<Upstream::Outlier::MockTransportSocketMatcher>* transport_socket_match_;
+  NiceMock<Upstream::MockTransportSocketMatcher>* transport_socket_match_;
   Upstream::MockClusterManager cm_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
