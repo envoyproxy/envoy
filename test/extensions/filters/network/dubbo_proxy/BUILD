@@ -30,7 +30,7 @@ envoy_cc_mock(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -92,7 +92,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
         "//test/mocks/server:server_mocks",
         "//test/test_common:registry_lib",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -114,7 +114,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
     ],
 )
 

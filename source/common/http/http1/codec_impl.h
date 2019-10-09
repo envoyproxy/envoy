@@ -191,7 +191,7 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
-                 uint32_t max_request_headers_kb);
+                 uint32_t max_headers_kb, const uint32_t max_headers_count);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -300,7 +300,8 @@ private:
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
-  const uint32_t max_request_headers_kb_;
+  const uint32_t max_headers_kb_;
+  const uint32_t max_headers_count_;
 
   bool strict_header_validation_;
 };
@@ -312,7 +313,7 @@ class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, Http1Settings settings,
-                       uint32_t max_request_headers_kb);
+                       uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
 
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
@@ -363,7 +364,7 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       ConnectionCallbacks& callbacks);
+                       ConnectionCallbacks& callbacks, const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;

@@ -31,7 +31,7 @@ envoy_cc_test_library(
     srcs = ["buffer_fuzz.cc"],
     hdrs = ["buffer_fuzz.h"],
     deps = [
-        ":buffer_fuzz_proto_cc",
+        ":buffer_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:stack_array",
         "//source/common/memory:stats_lib",

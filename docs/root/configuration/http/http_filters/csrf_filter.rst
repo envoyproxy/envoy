@@ -27,7 +27,9 @@ a request originated from the same host.
 When the filter is evaluating a request, it ensures both pieces of information are present
 and compares their values. If the source origin is missing or the origins do not match
 the request is rejected. The exception to this being if the source origin has been
-added to the policy as valid.
+added to the policy as valid. Because CSRF attacks specifically target state-changing
+requests, the filter only acts on HTTP requests that have a state-changing method
+(POST, PUT, etc.).
 
   .. note::
     Due to differing functionality between browsers this filter will determine

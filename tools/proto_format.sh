@@ -15,7 +15,7 @@ rm -rf bazel-bin/external/envoy_api
 # the precise set of protos we want to format, but as a starting place it seems
 # reasonable. In the future, we should change the logic here.
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
-  tools/protoxform/protoxform.bzl%proto_xform_aspect --output_groups=proto --action_env=CPROFILE_ENABLED=1 \
+  tools/protoxform/protoxform.bzl%protoxform_aspect --output_groups=proto --action_env=CPROFILE_ENABLED=1 \
   --spawn_strategy=standalone --host_force_python=PY3
 
 # Find all source protos.
