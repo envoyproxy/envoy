@@ -22,7 +22,7 @@ filter_chains:
     transport_protocol: "quic"
   filters: []
   transport_socket:
-    name: quic
+    name: envoy.transport_sockets.quic
     config:
       common_tls_context:
         tls_certificates:
