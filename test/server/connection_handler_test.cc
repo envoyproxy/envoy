@@ -10,6 +10,7 @@
 
 #include "server/connection_handler_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -140,23 +141,18 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
             listener_callbacks = &cb;
             return listener;
           }));
-  EXPECT_CALL(*connection_balancer, registerHandler(_));
+
+  Network::BalancedConnectionHandler* current_handler;
+  EXPECT_CALL(*connection_balancer, registerHandler(_)).WillOnce(SaveArgAddress(&current_handler));
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
-  EXPECT_CALL(*connection_balancer, balanceConnection(_, _))
-      .WillOnce(Invoke([](Network::ConnectionSocketPtr&& socket,
-                          Network::BalancedConnectionHandler& current_handler) {
-        // The fact that we are posting the socket to ourselves is not how a real balancer would
-        // work, but it's sufficient for this test.
-        current_handler.incNumConnections();
-        current_handler.post(std::move(socket));
-        return Network::ConnectionBalancer::BalanceConnectionResult::Rebalanced;
-      }));
+  // Fake a balancer posting a connection to us.
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
+  current_handler->incNumConnections();
+  current_handler->post(Network::ConnectionSocketPtr{connection});
 
   EXPECT_CALL(*connection_balancer, unregisterHandler(_));
 

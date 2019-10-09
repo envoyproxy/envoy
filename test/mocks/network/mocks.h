@@ -473,9 +473,8 @@ public:
 
   MOCK_METHOD1(registerHandler, void(BalancedConnectionHandler& handler));
   MOCK_METHOD1(unregisterHandler, void(BalancedConnectionHandler& handler));
-  MOCK_METHOD2(balanceConnection,
-               BalanceConnectionResult(Network::ConnectionSocketPtr&& socket,
-                                       BalancedConnectionHandler& current_handler));
+  MOCK_METHOD1(pickTargetHandler,
+               BalancedConnectionHandler&(BalancedConnectionHandler& current_handler));
 };
 
 } // namespace Network

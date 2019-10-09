@@ -253,8 +253,9 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
     // Hands off connections redirected by iptables to the listener associated with the
     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
     // prevent further redirection as well as 'rebalanced' as true since the connection has
-    // already been balanced if applicable. Note also that we must account for the number of
-    // connections properly across both listeners.
+    // already been balanced if applicable inside onAcceptWorker() when the connection was
+    // initially accepted. Note also that we must account for the number of connections properly
+    // across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
     tcp_listener->incNumConnections();
@@ -277,9 +278,13 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocke
 void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections,
     bool rebalanced) {
-  if (!rebalanced && Network::ConnectionBalancer::BalanceConnectionResult::Rebalanced ==
-                         config_.connectionBalancer().balanceConnection(std::move(socket), *this)) {
-    return;
+  if (!rebalanced) {
+    Network::BalancedConnectionHandler& target_handler =
+        config_.connectionBalancer().pickTargetHandler(*this);
+    if (&target_handler != this) {
+      target_handler.post(std::move(socket));
+      return;
+    }
   }
 
   auto active_socket = std::make_unique<ActiveTcpSocket>(*this, std::move(socket),

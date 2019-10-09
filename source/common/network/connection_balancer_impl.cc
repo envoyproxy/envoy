@@ -16,9 +16,8 @@ void ExactConnectionBalancerImpl::unregisterHandler(BalancedConnectionHandler& h
   handlers_.erase(std::find(handlers_.begin(), handlers_.end(), &handler));
 }
 
-ConnectionBalancer::BalanceConnectionResult
-ExactConnectionBalancerImpl::balanceConnection(ConnectionSocketPtr&& socket,
-                                               BalancedConnectionHandler& current_handler) {
+BalancedConnectionHandler&
+ExactConnectionBalancerImpl::pickTargetHandler(BalancedConnectionHandler&) {
   BalancedConnectionHandler* min_connection_handler = nullptr;
   {
     absl::MutexLock lock(&lock_);
@@ -32,11 +31,7 @@ ExactConnectionBalancerImpl::balanceConnection(ConnectionSocketPtr&& socket,
     min_connection_handler->incNumConnections();
   }
 
-  if (min_connection_handler != &current_handler) {
-    min_connection_handler->post(std::move(socket));
-    return ConnectionBalancer::BalanceConnectionResult::Rebalanced;
-  }
-  return ConnectionBalancer::BalanceConnectionResult::Continue;
+  return *min_connection_handler;
 }
 
 } // namespace Network
