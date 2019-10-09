@@ -53,7 +53,7 @@ public:
                  bool validate_clusters_default)
       : ConfigImpl(config, factory_context, validate_clusters_default), config_(config) {}
 
-  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, const Envoy::StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override {
     absl::optional<std::string> corpus_path =
         TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
@@ -70,7 +70,11 @@ public:
         corpus_file << corpus;
       }
     }
-    return ConfigImpl::route(headers, random_value);
+    return ConfigImpl::route(headers, stream_info, random_value);
+  }
+
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const {
+    return route(headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), random_value);
   }
 
   const envoy::api::v2::RouteConfiguration config_;
@@ -1757,7 +1761,7 @@ virtual_hosts:
     }
   }
 
-  ConfigImpl& config() {
+  TestConfigImpl& config() {
     if (config_ == nullptr) {
       config_ = std::make_unique<TestConfigImpl>(route_config_, factory_context_, true);
     }
@@ -4250,8 +4254,9 @@ virtual_hosts:
 
 TEST(NullConfigImplTest, All) {
   NullConfigImpl config;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
-  EXPECT_EQ(nullptr, config.route(headers, 0));
+  EXPECT_EQ(nullptr, config.route(headers, stream_info, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ("", config.name());
 }
@@ -4471,7 +4476,7 @@ virtual_hosts:
   )EOF";
 
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-  std::unique_ptr<ConfigImpl> config_ptr;
+  std::unique_ptr<TestConfigImpl> config_ptr;
 
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromV2Yaml(yaml),
                                                 factory_context_, true);
