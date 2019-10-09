@@ -18,11 +18,19 @@ message TcpProtocolOptions {
 }
 
 message HttpProtocolOptions {
-  // The idle timeout for upstream connection pool connections. The idle timeout is defined as the
+  // The idle timeout for connections. The idle timeout is defined as the
   // period in which there are no active requests. If not set, there is no idle timeout. When the
-  // idle timeout is reached the connection will be closed. Note that request based timeouts mean
-  // that HTTP/2 PINGs will not keep the connection alive.
+  // idle timeout is reached the connection will be closed. If the connection is an HTTP/2
+  // downstream connection a drain sequence will occur prior to closing the connection, see
+  // :ref:`drain_timeout
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.drain_timeout>`.
+  // Note that request based timeouts mean that HTTP/2 PINGs will not keep the connection alive.
   google.protobuf.Duration idle_timeout = 1;
+
+  // The maximum number of headers. If unconfigured, the default
+  // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
+  // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
+  google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
 }
 
 message Http1ProtocolOptions {

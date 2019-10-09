@@ -1398,6 +1398,15 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
+  // Prior to logging, refresh the byte size of the HeaderMaps.
+  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
+  // HeaderMap holds an accurate internal byte size count.
+  if (upstream_headers_ != nullptr) {
+    upstream_headers_->refreshByteSize();
+  }
+  if (upstream_trailers_ != nullptr) {
+    upstream_trailers_->refreshByteSize();
+  }
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);

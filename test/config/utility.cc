@@ -511,7 +511,7 @@ void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeou
   addConfigModifier(
       [timeout](
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-        hcm.mutable_idle_timeout()->MergeFrom(
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->MergeFrom(
             ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
       });
 }
