@@ -344,8 +344,10 @@ using RebalancedSocketSharedPtr = std::shared_ptr<RebalancedSocket>;
 } // namespace
 
 void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
-  // It is not possible to capture a unique_ptr so we must bundle the socket inside a shared_ptr
-  // that can be captured.
+  // It is not possible to capture a unique_ptr because the post() API copies the lambda, so we must
+  // bundle the socket inside a shared_ptr that can be captured.
+  // TODO(mattklein123): It may be possible to change the post() API such that the lambda is only
+  // moved, but this is non-trivial and needs investigation.
   RebalancedSocketSharedPtr socket_to_rebalance = std::make_shared<RebalancedSocket>();
   socket_to_rebalance->socket = std::move(socket);
 
