@@ -219,7 +219,7 @@ public:
    */
   virtual bool isThreadSafe() const PURE;
 
-  virtual timeval getSchedulerPrepareTime() const PURE;
+  virtual MonotonicTime approximateMonotonicTime() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

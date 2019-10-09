@@ -51,14 +51,35 @@ void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullpt
 
 void LibeventScheduler::initializeStats(DispatcherStats* stats) {
   stats_ = stats;
+
   // These are thread safe.
-  evwatch_prepare_new(libevent_.get(), &onPrepare, this);
+  if (!callback_) {
+    // Register prepare watcher unless already registered in registerOnPrepareCallback().
+    evwatch_prepare_new(libevent_.get(), &onPrepare, this);
+  }
   evwatch_check_new(libevent_.get(), &onCheck, this);
+}
+
+void LibeventScheduler::registerOnPrepareCallback(OnPrepareCallback callback) {
+  callback_ = std::move(callback);
+
+  if (!stats_) {
+    // Register prepare watcher unless already registered in initializeStats().
+    evwatch_prepare_new(libevent_.get(), &onPrepare, this);
+  }
 }
 
 void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info, void* arg) {
   // `self` is `this`, passed in from evwatch_prepare_new.
   auto self = static_cast<LibeventScheduler*>(arg);
+
+  if (self->callback_) {
+    self->callback_();
+  }
+
+  if (!self->stats_) {
+    return;
+  }
 
   // Record poll timeout and prepare time for this iteration of the event loop. The timeout is the
   // expected polling duration, whereas the actual polling duration will be the difference measured

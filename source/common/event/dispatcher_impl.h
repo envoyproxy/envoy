@@ -74,7 +74,8 @@ public:
     current_object_ = object;
     return return_object;
   }
-  timeval getSchedulerPrepareTime() const override { return base_scheduler_.getPrepareTime(); }
+  void updateApproximateMonotonicTime();
+  MonotonicTime approximateMonotonicTime() override;
 
   // FatalErrorInterface
   void onFatalError() const override {
@@ -114,6 +115,9 @@ private:
   std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
+  Thread::MutexBasicLockable time_lock_;
+  MonotonicTime approximate_monotonic_time_ {}
+  ABSL_GUARDED_BY(time_lock_);
 };
 
 } // namespace Event

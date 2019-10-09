@@ -236,6 +236,32 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
   EXPECT_FALSE(dispatcher_->isThreadSafe());
 }
 
+TEST_F(DispatcherImplTest, ApproximateMonotonicTime) {
+  MonotonicTime time1 = dispatcher_->timeSource().monotonicTime();
+  MonotonicTime time2 = dispatcher_->timeSource().monotonicTime();
+  EXPECT_NE(time1, time2);
+
+  time1 = dispatcher_->approximateMonotonicTime();
+  time2 = dispatcher_->approximateMonotonicTime();
+  EXPECT_EQ(time1, time2);
+
+  dispatcher_->post([this]() {
+    {
+      Thread::LockGuard lock(mu_);
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  MonotonicTime time3 = dispatcher_->approximateMonotonicTime();
+  EXPECT_NE(time1, time3);
+}
+
 class NotStartedDispatcherImplTest : public testing::Test {
 protected:
   NotStartedDispatcherImplTest()
