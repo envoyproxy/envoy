@@ -45,7 +45,7 @@ can be specified independently for each xDS API, pointing at an upstream
 cluster corresponding to a management server. This will initiate an
 independent bidirectional gRPC stream for each xDS resource type,
 potentially to distinct management servers. API delivery is eventually
-consistent. See <Aggregated Discovery Service>`
+consistent. See :ref:`Aggregated Discovery Service <xds_protocol_ads>`
 below for situations in which explicit control of sequencing is required.
 
 Type URLs
@@ -188,7 +188,7 @@ resources. :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names
 any superfluous resources. When a requested resource is missing in a RDS
 or EDS update, Envoy will retain the last known value for this resource
 except in the case where the `Cluster` or `Listener` is being
-warmed. See <Resource Warming> section below on
+warmed. See :ref:`Resource Warming <xds_protocol_resource_warming>` section below on
 the expectations during warming. The management server may be able to
 infer all the required EDS/RDS resources from the :ref:`node <envoy_api_msg_Core.Node>`
 identification in the :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`, in which case this hint may
