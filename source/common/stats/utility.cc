@@ -34,5 +34,31 @@ absl::optional<StatName> Utility::findTag(const Metric& metric, StatName find_ta
   return value;
 }
 
+std::string Utility::suffixedStatsName(absl::string_view name, Histogram::Unit unit) {
+  std::string suffixed_name = std::string(name);
+
+  if (unit != Histogram::Unit::Unspecified) {
+    absl::StrAppend(&suffixed_name, "_", Utility::unitSymbol(unit));
+  }
+
+  return suffixed_name;
+}
+
+absl::string_view Utility::unitSymbol(Histogram::Unit unit) {
+  switch (unit) {
+  case Histogram::Unit::Unspecified:
+    return "";
+  case Histogram::Unit::Bytes:
+    return "b";
+  case Histogram::Unit::Microseconds:
+    return "us";
+  case Histogram::Unit::Milliseconds:
+    return "ms";
+  }
+
+  ASSERT(0);
+  return "unknown";
+}
+
 } // namespace Stats
 } // namespace Envoy

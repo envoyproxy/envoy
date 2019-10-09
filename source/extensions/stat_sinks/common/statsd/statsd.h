@@ -13,6 +13,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
 #include "common/network/io_socket_handle_impl.h"
+#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -89,10 +90,7 @@ public:
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
     // For statsd histograms are all timers, append the ASCII SI symbol to disambiguate.
-    std::string si_name = histogram.unitSymbol().length() > 0
-                              ? fmt::format("{}_{}", histogram.name(), histogram.unitSymbol())
-                              : histogram.name();
-
+    std::string si_name = Stats::Utility::suffixedStatsName(histogram.name(), histogram.unit());
     tls_->getTyped<TlsSink>().onTimespanComplete(si_name, std::chrono::milliseconds(value));
   }
 

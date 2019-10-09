@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
 #include "common/stats/symbol_table_impl.h"
@@ -34,6 +35,27 @@ public:
    * @return The value of the tag, if found.
    */
   static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
+
+  /**
+   * Returns the stat name suffixed with the unit symbol (unless Unspecified) separated by an
+   * underscore, e.g. ("duration", Milliseconds) -> "duration_ms" but ("items", Unspecified) ->
+   * "items".
+   *
+   * @param name The stat name to suffix.
+   * @param unit The unit of measurement for the stat name specified.
+   * @return The suffixed stat name if the unit is specified, the stat name otherwise.
+   */
+  static std::string suffixedStatsName(absl::string_view name, Histogram::Unit unit);
+
+  /**
+   * Returns the ASCII SI symbol for the unit with the metric prefix if applicable,
+   * e.g. base unit for time is a second whose symbol is "s", but in case of a non-base unit
+   * like millisecond, the metric prefix is used and so "ms" is returned.
+   *
+   * @param unit The unit of measurement.
+   * @return The ASCII SI symbol for the unit.
+   */
+  static absl::string_view unitSymbol(Histogram::Unit unit);
 };
 
 } // namespace Stats

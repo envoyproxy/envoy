@@ -96,24 +96,6 @@ public:
   virtual Unit unit() const PURE;
 
   /**
-   * @return the unit symbol.
-   */
-  virtual std::string unitSymbol() const {
-    switch (unit()) {
-    case Unit::Unspecified:
-      return "";
-    case Unit::Bytes:
-      return "b";
-    case Unit::Microseconds:
-      return "us";
-    case Unit::Milliseconds:
-      return "ms";
-    }
-
-    return "";
-  }
-
-  /**
    * Records an unsigned value in the unit specified during the construction.
    */
   virtual void recordValue(uint64_t value) PURE;

@@ -208,9 +208,6 @@ public:
   MOCK_CONST_METHOD0(unit, Histogram::Unit());
   MOCK_METHOD1(recordValue, void(uint64_t value));
 
-  // Histogram
-  std::string unitSymbol() const override { return Histogram::unitSymbol(); }
-
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
@@ -237,9 +234,6 @@ public:
   MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
-
-  // Histogram
-  std::string unitSymbol() const override { return Histogram::unitSymbol(); }
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }

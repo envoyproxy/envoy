@@ -25,13 +25,13 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  using Allocator = std::function<RefcountPtr<Base>(StatName name)>;
-  using AllocatorImportMode = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
-  using AllocatorUnit = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
+  using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
+  using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
+  using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
 
-  IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
-  IsolatedStatsCache(AllocatorImportMode alloc) : alloc_import_(alloc) {}
-  IsolatedStatsCache(AllocatorUnit alloc) : alloc_unit_(alloc) {}
+  IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
+  IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
+  IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
 
   Base& get(StatName name) {
     auto stat = stats_.find(name);
@@ -39,7 +39,7 @@ public:
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = alloc_(name);
+    RefcountPtr<Base> new_stat = counter_alloc_(name);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -50,7 +50,7 @@ public:
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = alloc_import_(name, import_mode);
+    RefcountPtr<Base> new_stat = gauge_alloc_(name, import_mode);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -61,7 +61,7 @@ public:
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = alloc_unit_(name, unit);
+    RefcountPtr<Base> new_stat = histogram_alloc_(name, unit);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -88,9 +88,9 @@ private:
   }
 
   StatNameHashMap<RefcountPtr<Base>> stats_;
-  Allocator alloc_;
-  AllocatorImportMode alloc_import_;
-  AllocatorUnit alloc_unit_;
+  CounterAllocator counter_alloc_;
+  GaugeAllocator gauge_alloc_;
+  HistogramAllocator histogram_alloc_;
 };
 
 class IsolatedStoreImpl : public StoreImpl {
