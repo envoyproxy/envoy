@@ -101,6 +101,9 @@ public:
    */
   virtual const std::string& hostname() const PURE;
 
+  /**
+   * @return the transport socket factory responsible for this host.
+   */
   virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**

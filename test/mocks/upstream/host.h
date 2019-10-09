@@ -107,7 +107,7 @@ public:
   Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
-  testing::NiceMock<Network::MockTransportSocketFactory> socket_factory_;
+  Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   mutable Stats::TestSymbolTable symbol_table_;
@@ -188,6 +188,7 @@ public:
   MOCK_CONST_METHOD0(warmed, bool());
 
   testing::NiceMock<MockClusterInfo> cluster_;
+  Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   mutable Stats::TestSymbolTable symbol_table_;

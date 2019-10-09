@@ -14,6 +14,8 @@ namespace Outlier { // TODO: remove this?
 
 using testing::NiceMock;
 
+using testing::NiceMock;
+
 class MockTransportSocketMatcher : public TransportSocketMatcher {
 public:
   MockTransportSocketMatcher();

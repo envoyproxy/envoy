@@ -1,11 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -398,7 +397,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "transport_socket_match_lib",
+    name = "transport_socket_matcher_lib",
     srcs = ["transport_socket_match_impl.cc"],
     deps = [
         ":upstream_includes",

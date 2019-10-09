@@ -253,7 +253,6 @@ HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            const Network::Address::InstanceConstSharedPtr& address,
-                           //  const envoy::api::v2::core::Metadata& metadata,
                            Network::TransportSocketFactory& socket_factory,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            Network::TransportSocketOptionsSharedPtr transport_socket_options) {
@@ -604,7 +603,6 @@ ClusterInfoImpl::ClusterInfoImpl(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      // transport_socket_factory_(std::move(socket_factory)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
@@ -778,10 +776,9 @@ ClusterImplBase::ClusterImplBase(
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
-      cluster, factory_context.clusterManager().bindConfig(),
-      runtime, /*std::move(socket_factory),*/
-      std::move(socket_matcher), std::move(stats_scope), added_via_api,
-      factory_context.messageValidationVisitor(), factory_context);
+      cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_matcher),
+      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor(),
+      factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

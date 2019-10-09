@@ -1,13 +1,12 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -379,24 +378,14 @@ envoy_cc_test(
     name = "transport_socket_matcher_test",
     srcs = ["transport_socket_matcher_test.cc"],
     deps = [
-        ":utility_lib",
         "//include/envoy/api:api_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/network:transport_socket_options_lib",
-        "//source/common/network:utility_lib",
         "//source/common/upstream:transport_socket_matcher_lib",
-        "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],

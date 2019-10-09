@@ -37,7 +37,7 @@ public:
     std::string name;
     Network::TransportSocketFactoryPtr factory;
     Config::Metadata::LabelSet label_set;
-    mutable TransportSocketMatchStats stats; // TODO: why?
+    mutable TransportSocketMatchStats stats;
   };
 
   TransportSocketMatcherImpl(

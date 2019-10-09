@@ -1,30 +1,19 @@
-#include <chrono>
-#include <cstdint>
-#include <list>
+
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/http/codec.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
 #include "common/network/transport_socket_options_impl.h"
-#include "common/network/utility.h"
 #include "common/upstream/transport_socket_match_impl.h"
 
 #include "server/transport_socket_config_impl.h"
 
-#include "test/common/upstream/utility.h"
-#include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 

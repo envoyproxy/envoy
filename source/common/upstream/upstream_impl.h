@@ -97,7 +97,6 @@ public:
     return match.factory_;
   }
 
-  // Upstream::HostDescription
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return socket_factory_;
   }
@@ -528,7 +527,6 @@ class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::I
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  /*Network::TransportSocketFactoryPtr&& socket_factory,*/
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
                   bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::TransportSocketFactoryContext&);
