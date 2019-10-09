@@ -28,6 +28,6 @@ envoy_cc_library(
         "//include/envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/extensions/retry/priority:well_known_names",
-        "@envoy_api//envoy/config/retry/previous_priorities:previous_priorities_cc",
+        "@envoy_api//envoy/config/retry/previous_priorities:pkg_cc_proto",
     ],
 )

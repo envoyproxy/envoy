@@ -44,6 +44,7 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
+    "./source/common/config/version_converter.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc", "./test/common/grpc/codec_test.cc")
 

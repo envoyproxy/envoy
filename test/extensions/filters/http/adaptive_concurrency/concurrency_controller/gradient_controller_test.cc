@@ -47,12 +47,12 @@ public:
   }
 
 protected:
-  GradientControllerConfigSharedPtr makeConfig(const std::string& yaml_config) {
+  GradientControllerConfig makeConfig(const std::string& yaml_config) {
     envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
         TestUtility::parseYaml<
             envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
             yaml_config);
-    return std::make_shared<GradientControllerConfig>(proto);
+    return proto;
   }
 
   // Helper function that will attempt to pull forwarding decisions.
@@ -68,7 +68,7 @@ protected:
                               const std::string& yaml_config,
                               std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
     const auto config = makeConfig(yaml_config);
-    for (uint32_t i = 0; i <= config->minRTTAggregateRequestCount(); ++i) {
+    for (uint32_t i = 0; i <= config.minRTTAggregateRequestCount(); ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(latency);
     }
@@ -470,8 +470,8 @@ min_rtt_calc_params:
 
   // Verify the configuration affects the timers that are kicked off.
   NiceMock<Event::MockDispatcher> fake_dispatcher;
-  auto sample_timer = new NiceMock<Event::MockTimer>;
-  auto rtt_timer = new NiceMock<Event::MockTimer>;
+  auto sample_timer = new Event::MockTimer();
+  auto rtt_timer = new Event::MockTimer();
 
   // Expect the sample timer to trigger start immediately upon controller creation.
   EXPECT_CALL(fake_dispatcher, createTimer_(_))
@@ -488,6 +488,8 @@ min_rtt_calc_params:
   // random value > 10% of the interval.
   EXPECT_CALL(random_, random()).WillOnce(Return(15000));
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(105000), _));
+  // Verify the sample timer is reset after the minRTT calculation occurs.
+  EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
   for (int i = 0; i < 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
@@ -511,8 +513,8 @@ min_rtt_calc_params:
 
   // Verify the configuration affects the timers that are kicked off.
   NiceMock<Event::MockDispatcher> fake_dispatcher;
-  auto sample_timer = new NiceMock<Event::MockTimer>;
-  auto rtt_timer = new NiceMock<Event::MockTimer>;
+  auto sample_timer = new Event::MockTimer;
+  auto rtt_timer = new Event::MockTimer;
 
   // Expect the sample timer to trigger start immediately upon controller creation.
   EXPECT_CALL(fake_dispatcher, createTimer_(_))
@@ -525,6 +527,8 @@ min_rtt_calc_params:
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));
+  // Verify the sample timer is reset after the minRTT calculation occurs.
+  EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
   for (int i = 0; i < 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
