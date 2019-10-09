@@ -160,12 +160,10 @@ struct TransportSocketMatchStats {
 class TransportSocketMatcher {
 public:
   struct MatchData {
-    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
-              const std::string& name)
-        : factory_(factory), stats_(stats), name_(name) {}
+    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats)
+        : factory_(factory), stats_(stats) {}
     Network::TransportSocketFactory& factory_;
     TransportSocketMatchStats& stats_;
-    const std::string& name_;
   };
   virtual ~TransportSocketMatcher() = default;
 
