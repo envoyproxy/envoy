@@ -65,13 +65,10 @@ public:
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
-        scope_(scope), runtime_(runtime), http_context_(http_context), pool_(scope.symbolTable()),
+        scope_(scope), runtime_(runtime), http_context_(http_context),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
-        stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
-        ext_authz_denied_(pool_.add("ext_authz.denied")),
-        ext_authz_error_(pool_.add("ext_authz.error")),
-        ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
+        stats_(generateStats(stats_prefix, scope)) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -92,10 +89,6 @@ public:
   Stats::Scope& scope() { return scope_; }
 
   Http::Context& httpContext() { return http_context_; }
-
-  void incCounter(Stats::Scope& scope, Stats::StatName name) {
-    scope.counterFromStatName(name).inc();
-  }
 
   const std::vector<std::string>& metadataContextNamespaces() {
     return metadata_context_namespaces_;
@@ -125,19 +118,12 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
 
-  Stats::StatNamePool pool_;
-
   const std::vector<std::string> metadata_context_namespaces_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
 
 public:
-  const Stats::StatName ext_authz_ok_;
-  const Stats::StatName ext_authz_denied_;
-  const Stats::StatName ext_authz_error_;
-  const Stats::StatName ext_authz_failure_mode_allowed_;
-
   ExtAuthzFilterStats& stats() { return stats_; }
 };
 

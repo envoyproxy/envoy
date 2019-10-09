@@ -191,7 +191,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+	EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
 // Verifies that the filter responds with a configurable HTTP status when an network error occurs.
@@ -227,7 +227,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+	EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ("ext_authz_error", filter_callbacks_.details_);
 }
 
@@ -258,7 +258,7 @@ TEST_F(HttpFilterTest, ErrorOpen) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
 // Test when failure_mode_allow is set and the response from the authorization service is an
@@ -289,11 +289,8 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counter("ext_authz.failure_mode_allowed")
-                    .value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
 }
 
 // Check a bad configuration results in validation exception.
@@ -584,7 +581,7 @@ TEST_F(HttpFilterTest, ClearCache) {
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Verifies that the filter clears the route cache when an authorization response:
@@ -622,7 +619,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Verifies that the filter clears the route cache when an authorization response:
@@ -660,7 +657,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Verifies that the filter DOES NOT clear the route cache when an authorization response:
@@ -696,7 +693,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Verifies that the filter DOES NOT clear the route cache when clear_route_cache is set to false.
@@ -731,7 +728,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Verifies that the filter DOES NOT clear the route cache when authorization response is NOT OK.
@@ -764,7 +761,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ("ext_authz_denied", filter_callbacks_.details_);
 }
 
