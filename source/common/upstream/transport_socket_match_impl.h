@@ -1,14 +1,6 @@
 #pragma once
 
-#include <array>
-#include <atomic>
-#include <chrono>
-#include <cstdint>
-#include <functional>
-#include <list>
-#include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
