@@ -155,7 +155,7 @@ struct TransportSocketMatchStats {
 };
 
 /**
- * Libary to determine what transport socket configuration to use for a given host.
+ * Library to determine what transport socket configuration to use for a given host.
  */
 class TransportSocketMatcher {
 public:
