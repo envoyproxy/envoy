@@ -1,7 +1,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/http/context_impl.h"
@@ -211,7 +210,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr);
 
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
@@ -255,16 +254,20 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
 
+  Http::HeaderMapPtr upstream_headers{
+      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
   Http::HeaderMapPtr rl_headers{
       new Http::TestHeaderMapImpl{{"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "500"}}};
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
-                               Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*rl_headers)});
 
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
+                               Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*rl_headers)}, 
+                               Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*upstream_headers)});
   Http::TestHeaderMapImpl expected_headers(*rl_headers);
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(true, (expected_headers == response_headers));
 
+  EXPECT_EQ("true", request_headers_.get_("x-rls-rate-limited"));  
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
@@ -281,7 +284,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr);
           })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -310,7 +313,7 @@ TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr);
           })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -346,7 +349,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
             filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -376,7 +379,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr);
 
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError))
@@ -414,7 +417,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h));
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h), nullptr);
 
   EXPECT_EQ(1U,
             filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
@@ -453,9 +456,14 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
+  
+  Http::HeaderMapPtr upstream_headers{
+      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
 
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h));
+  Http::HeaderMapPtr uh{new Http::TestHeaderMapImpl(*upstream_headers)};
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h), std::move(uh));
+  EXPECT_EQ(false, request_headers_.has("x-rls-rate-limited"));
 
   EXPECT_EQ(1U,
             filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
@@ -482,7 +490,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
       .WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl()};
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h));
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h), nullptr);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -627,7 +635,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr);
           })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -671,7 +679,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr);
           })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -712,7 +720,7 @@ TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr);
           })));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -763,3 +771,4 @@ TEST_F(HttpRateLimitFilterTest, DefaultConfigValueTest) {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
