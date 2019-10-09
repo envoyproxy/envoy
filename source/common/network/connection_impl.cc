@@ -102,7 +102,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG(debug, "closing data_to_write={} type={}", *this, data_to_write, enumToInt(type));
-  const bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
+  const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
       !transport_socket_->canFlushClose()) {
     if (data_to_write > 0) {
@@ -589,7 +589,7 @@ void ConnectionImpl::onWriteReady() {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
       ASSERT(delayed_close_timer_ != nullptr);
-      delayed_close_timer_->enableTimer(delayedCloseTimeout());
+      delayed_close_timer_->enableTimer(delayed_close_timeout_);
     } else {
       ASSERT(bothSidesHalfClosed() || delayed_close_state_ == DelayedCloseState::CloseAfterFlush);
       closeSocket(ConnectionEvent::LocalClose);
@@ -597,7 +597,7 @@ void ConnectionImpl::onWriteReady() {
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
     if (delayed_close_timer_ != nullptr) {
-      delayed_close_timer_->enableTimer(delayedCloseTimeout());
+      delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
       for (BytesSentCb& cb : bytes_sent_callbacks_) {
@@ -654,11 +654,11 @@ void ConnectionImpl::onDelayedCloseTimeout() {
 }
 
 void ConnectionImpl::initializeDelayedCloseTimer() {
-  const auto timeout = delayedCloseTimeout().count();
+  const auto timeout = delayed_close_timeout_.count();
   ASSERT(delayed_close_timer_ == nullptr && timeout > 0);
   delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
   ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this, timeout);
-  delayed_close_timer_->enableTimer(delayedCloseTimeout());
+  delayed_close_timer_->enableTimer(delayed_close_timeout_);
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
