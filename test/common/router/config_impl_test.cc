@@ -53,7 +53,9 @@ public:
                  bool validate_clusters_default)
       : ConfigImpl(config, factory_context, validate_clusters_default), config_(config) {}
 
-  RouteConstSharedPtr route(const Http::HeaderMap& headers, const Envoy::StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override {
+  RouteConstSharedPtr route(const Http::HeaderMap& headers,
+                            const Envoy::StreamInfo::StreamInfo& stream_info,
+                            uint64_t random_value) const override {
     absl::optional<std::string> corpus_path =
         TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
