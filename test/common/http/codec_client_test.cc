@@ -75,7 +75,7 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
-TEST_F(CodecClientTest, NotCallDetectEearlyCloseWhenReadDiabledUsingHttp3) {
+TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
   auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
 
   EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
