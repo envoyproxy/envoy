@@ -117,7 +117,7 @@ public:
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStats stats_;
-  NiceMock<Upstream::Outlier::MockTransportSocketMatcher> transport_socket_matcher_;
+  Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;

@@ -10,11 +10,14 @@
 
 namespace Envoy {
 namespace Upstream {
-namespace Outlier {
+namespace Outlier { // TODO: remove this?
+
+using testing::NiceMock;
 
 class MockTransportSocketMatcher : public TransportSocketMatcher {
 public:
   MockTransportSocketMatcher();
+  MockTransportSocketMatcher(Network::TransportSocketFactoryPtr default_factory);
   ~MockTransportSocketMatcher() override;
   MOCK_CONST_METHOD1(resolve,
                      TransportSocketMatcher::MatchData(const envoy::api::v2::core::Metadata&));

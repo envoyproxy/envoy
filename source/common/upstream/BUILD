@@ -373,7 +373,7 @@ envoy_cc_library(
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",
-        ":transport_socket_matcher_lib",
+        ":transport_socket_match_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
@@ -398,8 +398,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "transport_socket_matcher_lib",
-    srcs = ["transport_socket_matcher.cc"],
+    name = "transport_socket_match_lib",
+    srcs = ["transport_socket_match_impl.cc"],
     deps = [
         ":upstream_includes",
         "//source/common/common:utility_lib",
@@ -434,7 +434,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_includes",
     hdrs = [
-        "transport_socket_matcher.h",
+        "transport_socket_match_impl.h",
         "upstream_impl.h",
     ],
     external_deps = ["abseil_synchronization"],

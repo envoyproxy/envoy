@@ -34,6 +34,7 @@ envoy_cc_mock(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//test/mocks/network:transport_socket_mocks",
     ],
 )
 
@@ -63,6 +64,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         ":load_balancer_context_mock",
+        ":transport_socket_match_mocks",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/upstream:cluster_factory_interface",
         "//include/envoy/upstream:cluster_manager_interface",

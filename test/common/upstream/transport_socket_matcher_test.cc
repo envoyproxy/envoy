@@ -16,7 +16,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
-#include "common/upstream/transport_socket_matcher.h"
+#include "common/upstream/transport_socket_match_impl.h"
 
 #include "server/transport_socket_config_impl.h"
 

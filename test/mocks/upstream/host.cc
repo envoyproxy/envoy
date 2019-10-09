@@ -1,6 +1,5 @@
 #include "test/mocks/upstream/host.h"
 
-#include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
 using testing::_;
@@ -39,6 +38,7 @@ MockHostDescription::MockHostDescription()
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, healthChecker()).WillByDefault(ReturnRef(health_checker_));
+  ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
 }
 
 MockHostDescription::~MockHostDescription() = default;

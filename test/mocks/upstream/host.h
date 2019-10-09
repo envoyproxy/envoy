@@ -10,6 +10,7 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 
+#include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 
@@ -106,6 +107,7 @@ public:
   Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
+  testing::NiceMock<Network::MockTransportSocketFactory> socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   mutable Stats::TestSymbolTable symbol_table_;

@@ -11,14 +11,16 @@ namespace Upstream {
 namespace Outlier {
 
 MockTransportSocketMatcher::MockTransportSocketMatcher()
-    : socket_factory_(new Network::RawBufferSocketFactory),
+    : MockTransportSocketMatcher(std::make_unique<Network::RawBufferSocketFactory>()) {}
+
+MockTransportSocketMatcher::MockTransportSocketMatcher(Network::TransportSocketFactoryPtr factory)
+    : socket_factory_(std::move(factory)),
       stats_({ALL_TRANSPORT_SOCKET_MATCH_STATS(POOL_COUNTER_PREFIX(stats_store_, "test"))}) {
   ON_CALL(*this, resolve(_))
       .WillByDefault(Return(TransportSocketMatcher::MatchData(*socket_factory_, stats_)));
 }
 
 MockTransportSocketMatcher::~MockTransportSocketMatcher() = default;
-
 } // namespace Outlier
 } // namespace Upstream
 } // namespace Envoy
