@@ -36,7 +36,7 @@ public:
       drain_request_timer_ = dispatcher.createTimer([this]() { callbacks_->onWriteable(); });
     }
 
-    // TODO(htuch): Make this configurable or some static.
+    // TODO(htuch): Make this configurable.
     static constexpr uint32_t RetryInitialDelayMs = 500;
     static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
     backoff_strategy_ =
