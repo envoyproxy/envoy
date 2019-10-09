@@ -81,6 +81,7 @@ public:
   }
 
   // Stats::Histogram
+  bool active() const override { return true; }
   Unit unit() const override { return unit_; };
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
@@ -100,19 +101,19 @@ private:
  */
 class NullHistogramImpl : public HistogramImplHelper {
 public:
-  NullHistogramImpl(SymbolTable& symbol_table, Unit unit)
-      : HistogramImplHelper(symbol_table), symbol_table_(symbol_table), unit_(unit) {}
+  NullHistogramImpl(SymbolTable& symbol_table)
+      : HistogramImplHelper(symbol_table), symbol_table_(symbol_table) {}
   ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
-  Unit unit() const override { return unit_; };
+  bool active() const override { return false; }
+  Unit unit() const override { return Unit::Unspecified; };
   void recordValue(uint64_t) override {}
 
 private:
   SymbolTable& symbol_table_;
-  Unit unit_;
 };
 
 } // namespace Stats

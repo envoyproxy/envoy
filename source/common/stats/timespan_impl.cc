@@ -5,7 +5,11 @@ namespace Stats {
 
 HistogramCompletableTimespanImpl::HistogramCompletableTimespanImpl(Histogram& histogram,
                                                                    TimeSource& time_source)
-    : HistogramCompletableTimespan(histogram, time_source) {
+    : time_source_(time_source), histogram_(histogram), start_(time_source.monotonicTime()) {
+  if (!histogram.active()) {
+    return;
+  }
+
   switch (histogram.unit()) {
   case Histogram::Unit::Unspecified:
   case Histogram::Unit::Bytes:
@@ -18,6 +22,10 @@ HistogramCompletableTimespanImpl::HistogramCompletableTimespanImpl(Histogram& hi
   ASSERT(0);
 }
 
+uint64_t HistogramCompletableTimespanImpl::elapsedMs() {
+  return HistogramCompletableTimespanImpl::elapsed<std::chrono::milliseconds>().count();
+}
+
 void HistogramCompletableTimespanImpl::complete() { histogram_.recordValue(tickCount()); }
 
 uint64_t HistogramCompletableTimespanImpl::tickCount() {
@@ -27,9 +35,9 @@ uint64_t HistogramCompletableTimespanImpl::tickCount() {
     // Unreachable, asserted to measure time on construction.
     return 0;
   case Histogram::Unit::Microseconds:
-    return HistogramCompletableTimespan::getRawDuration<std::chrono::microseconds>().count();
+    return HistogramCompletableTimespanImpl::elapsed<std::chrono::microseconds>().count();
   case Histogram::Unit::Milliseconds:
-    return HistogramCompletableTimespan::getRawDuration<std::chrono::milliseconds>().count();
+    return HistogramCompletableTimespanImpl::elapsed<std::chrono::milliseconds>().count();
   }
 
   return 0;

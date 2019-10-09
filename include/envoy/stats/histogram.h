@@ -91,6 +91,15 @@ public:
   ~Histogram() override = default;
 
   /**
+   * Indicates whether the histogram is recording.
+   *
+   * @return true if the histogram is recording values (or can be recording values, but has not been
+   * used yet), false if the histogram has been rejected by the stat matching and is essentially a
+   * NOP histogram (aka NullHistogram).
+   */
+  virtual bool active() const PURE;
+
+  /**
    * @return the unit of measurement for values recorded by the histogram.
    */
   virtual Unit unit() const PURE;

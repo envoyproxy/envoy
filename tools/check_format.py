@@ -521,10 +521,11 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
   if re.search("^[ ]+HISTOGRAM\(.*_(b|kb|mb|ns|us|ms|s)", line):
-    reportError("Don't suffix histogram names with the unit symbol, "
-                "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
-                "other sinks add the suffix automatically on flush. In the former case your suffix will cause confusion "
-                "as the Metric UI may already be displaying one, in the latter it will cause duplication.")
+    reportError(
+        "Don't suffix histogram names with the unit symbol, "
+        "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
+        "other sinks add the suffix automatically on flush. In the former case your suffix will cause confusion "
+        "as the Metric UI may already be displaying one, in the latter it will cause duplication.")
 
   if not whitelistedForStdRegex(file_path) and "std::regex" in line:
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")

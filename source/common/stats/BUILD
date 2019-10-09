@@ -241,6 +241,8 @@ envoy_cc_library(
     srcs = ["timespan_impl.cc"],
     hdrs = ["timespan_impl.h"],
     deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:timespan_interface",
     ],
 )

@@ -23,7 +23,7 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
 
   // TODO(jmarantz): use stat-names here.
   scope_->histogram(prefix_ + "downstream_cx_length", Stats::Histogram::Unit::Milliseconds)
-      .recordValue(span.getRawDuration<std::chrono::milliseconds>().count());
+      .recordValue(span.elapsedMs());
 }
 
 void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,

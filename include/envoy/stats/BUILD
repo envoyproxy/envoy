@@ -58,10 +58,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "timespan_interface",
     hdrs = ["timespan.h"],
-    deps = [
-        ":stats_interface",
-        "//include/envoy/common:time_interface",
-    ],
 )
 
 envoy_cc_library(
