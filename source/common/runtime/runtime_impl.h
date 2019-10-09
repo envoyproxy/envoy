@@ -93,14 +93,11 @@ public:
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
   double getDouble(const std::string& key, double default_value) const override;
+  bool getBoolean(absl::string_view key, bool value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
   static Entry createEntry(const ProtobufWkt::Value& value);
-
-  // Returns true and sets 'value' to the key if found.
-  // Returns false if the key is not a boolean value.
-  bool getBoolean(absl::string_view key, bool& value) const;
 
 private:
   static void resolveEntryType(Entry& entry) {

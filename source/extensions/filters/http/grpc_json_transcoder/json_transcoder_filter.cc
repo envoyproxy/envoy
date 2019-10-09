@@ -52,6 +52,11 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
+
+const Http::LowerCaseString& trailerHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
+}
+
 // Transcoder:
 // https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/master/src/include/grpc_transcoding/transcoder.h
 // implementation based on JsonRequestTranslator & ResponseToJsonTranslator
@@ -459,12 +464,17 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   response_in_.finish();
 
+  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+      Grpc::Common::getGrpcStatus(trailers);
+  if (grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers)) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
   Buffer::OwnedImpl data;
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (data.length()) {
     encoder_callbacks_->addEncodedData(data, true);
-    has_body_ = true;
   }
 
   if (method_->server_streaming()) {
@@ -476,25 +486,16 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   // so there is no need to copy headers from one to the other.
   bool is_trailers_only_response = response_headers_ == &trailers;
 
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-      Grpc::Common::getGrpcStatus(trailers);
-  bool status_converted_to_json = grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers);
-
   if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
-    if (!status_converted_to_json && !is_trailers_only_response) {
+    if (!is_trailers_only_response) {
       response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
     }
   }
 
-  if (status_converted_to_json && is_trailers_only_response) {
-    // Drop the gRPC status headers, we already have them in the JSON body.
-    response_headers_->removeGrpcStatus();
-    response_headers_->removeGrpcMessage();
-    response_headers_->remove(Http::Headers::get().GrpcStatusDetailsBin);
-  } else if (!status_converted_to_json && !is_trailers_only_response) {
+  if (!is_trailers_only_response) {
     // Copy the grpc-message header if it exists.
     const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
     if (grpc_message_header) {
@@ -504,8 +505,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   // remove Trailer headers if the client connection was http/1
   if (encoder_callbacks_->streamInfo().protocol() != Http::Protocol::Http2) {
-    static const Http::LowerCaseString trailer_key = Http::LowerCaseString("trailer");
-    response_headers_->remove(trailer_key);
+    response_headers_->remove(trailerHeader());
   }
 
   response_headers_->insertContentLength().value(
@@ -594,8 +594,26 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
     return false;
   }
 
+  response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status));
+
+  bool is_trailers_only_response = response_headers_ == &trailers;
+  if (is_trailers_only_response) {
+    // Drop the gRPC status headers, we already have them in the JSON body.
+    response_headers_->removeGrpcStatus();
+    response_headers_->removeGrpcMessage();
+    response_headers_->remove(Http::Headers::get().GrpcStatusDetailsBin);
+  }
+
+  // remove Trailer headers if the client connection was http/1
+  if (encoder_callbacks_->streamInfo().protocol() != Http::Protocol::Http2) {
+    response_headers_->remove(trailerHeader());
+  }
+
   response_headers_->insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
+
+  response_headers_->insertContentLength().value(json_status.length());
+
   Buffer::OwnedImpl status_data(json_status);
   encoder_callbacks_->addEncodedData(status_data, false);
   return true;

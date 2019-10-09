@@ -90,7 +90,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
-        "@envoy_api//envoy/type:http_status_cc",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -220,7 +220,7 @@ envoy_cc_library(
     deps = [
         ":utility_lib",
         "//include/envoy/http:hash_policy_interface",
-        "@envoy_api//envoy/api/v2/route:route_cc",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -319,8 +319,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:http_uri_cc",
-        "@envoy_api//envoy/api/v2/core:protocol_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -337,8 +336,8 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/route:route_cc",
-        "@envoy_api//envoy/type:range_cc",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 

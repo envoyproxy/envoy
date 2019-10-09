@@ -3795,6 +3795,36 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
                  .setTransportSocketOptions(transport_socket_options));
 }
 
+TEST_P(SslSocketTest, OverrideApplicationProtocols) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CommonTlsContext* server_ctx =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context();
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  TestUtilOptionsV2 test_options(listener, client, true, GetParam());
+
+  // Client connects without ALPN to a server with "test" ALPN, no ALPN is negotiated.
+  server_ctx->add_alpn_protocols("test");
+  testUtilV2(test_options);
+  server_ctx->clear_alpn_protocols();
+
+  // Override client side ALPN, "test" ALPN is used.
+  server_ctx->add_alpn_protocols("test");
+  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+      new Network::TransportSocketOptionsImpl("", {}, {"foo", "test", "bar"}));
+
+  testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
+      transport_socket_options));
+  server_ctx->clear_alpn_protocols();
+}
+
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
 // NotReadySslSocket object to handle downstream connection.
 TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {

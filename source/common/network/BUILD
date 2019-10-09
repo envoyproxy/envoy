@@ -32,6 +32,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "application_protocol_lib",
+    srcs = ["application_protocol.cc"],
+    hdrs = ["application_protocol.h"],
+    deps = [
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
@@ -42,7 +52,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:address_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -182,7 +192,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -198,7 +208,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -244,7 +254,7 @@ envoy_cc_library(
         ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
-        "@envoy_api//envoy/api/v2/core:address_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -262,8 +272,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:address_cc",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

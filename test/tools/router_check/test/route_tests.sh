@@ -3,10 +3,10 @@
 set -e
 
 # Router_check_tool binary path
-PATH_BIN="${TEST_RUNDIR}"/test/tools/router_check/router_check_tool
+PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
 
 # Config json path
-PATH_CONFIG="${TEST_RUNDIR}"/test/tools/router_check/test/config
+PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config
 
 TESTS=("ContentType" "ClusterHeader" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "TestRoutes" "Weighted")
 
