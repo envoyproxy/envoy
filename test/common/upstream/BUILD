@@ -381,7 +381,7 @@ envoy_cc_test(
         "//include/envoy/api:api_interface",
         "//source/common/config:metadata_lib",
         "//source/common/network:transport_socket_options_lib",
-        "//source/common/upstream:transport_socket_matcher_lib",
+        "//source/common/upstream:transport_socket_match_lib",
         "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
