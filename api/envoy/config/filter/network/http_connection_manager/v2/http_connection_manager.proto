@@ -23,8 +23,8 @@ import "validate/validate.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#next-free-field:35]
 // [#comment:next free field: 36]
+// [#next-free-field:36]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
