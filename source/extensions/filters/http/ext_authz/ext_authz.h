@@ -184,7 +184,7 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
-      : config_(config), client_(std::move(client)) {}
+      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -222,6 +222,8 @@ private:
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  // The stats for the filter.
+  ExtAuthzFilterStats stats_;
 
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};

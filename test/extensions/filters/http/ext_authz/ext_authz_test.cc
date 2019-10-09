@@ -55,8 +55,8 @@ public:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(
-        new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
+    config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_,
+                                   "ext_authz_prefix"));
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -881,9 +881,7 @@ TEST_F(HttpFilterTestParam, DisabledOnRoute) {
   envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(addr_));
-  ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(addr_));
+  prepareCheck();
 
   ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
@@ -1232,6 +1230,34 @@ TEST_F(HttpFilterTestParam, ResetDuringCall) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(*client_, cancel());
   filter_->onDestroy();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/pull/8436.
+// Test that ext_authz filter is not in noop mode when cluster is not specified per route
+// (this could be the case when route is configured with redirect or direct response action).
+TEST_F(HttpFilterTestParam, CustomTest) {
+
+  ON_CALL(filter_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
+
+  // Place something in the context extensions on the route.
+  envoy::config::filter::http::ext_authz::v2::ExtAuthzPerRoute settingsroute;
+  (*settingsroute.mutable_check_settings()->mutable_context_extensions())["key_route"] =
+      "value_route";
+  // Initialize the route's per filter config.
+  FilterConfigPerRoute auth_per_route(settingsroute);
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  prepareCheck();
+
+  // Save the check request from the check call.
+  envoy::service::auth::v2::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(WithArgs<1>(Invoke([&](const envoy::service::auth::v2::CheckRequest& check_param)
+                                       -> void { check_request = check_param; })));
+
+  // Engage the filter so that check is called.
+  filter_->decodeHeaders(request_headers_, false);
 }
 
 } // namespace
