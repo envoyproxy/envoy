@@ -19,10 +19,9 @@ namespace ResponseCodecUnitTest {
 
 class MockResponseInitialParserFactory : public ResponseInitialParserFactory {
 public:
-  MOCK_METHOD1(create, ResponseParserSharedPtr(const ResponseParserResolver&));
+  MOCK_CONST_METHOD2(create, ResponseParserSharedPtr(ExpectedResponsesSharedPtr,
+                                                     const ResponseParserResolver&));
 };
-
-using MockResponseInitialParserFactorySharedPtr = std::shared_ptr<MockResponseInitialParserFactory>;
 
 class MockParser : public ResponseParser {
 public:
@@ -47,8 +46,7 @@ using MockResponseCallbackSharedPtr = std::shared_ptr<MockResponseCallback>;
 
 class ResponseCodecUnitTest : public testing::Test, public BufferBasedTest {
 protected:
-  MockResponseInitialParserFactorySharedPtr factory_{
-      std::make_shared<MockResponseInitialParserFactory>()};
+  MockResponseInitialParserFactory factory_{};
   MockResponseParserResolver parser_resolver_{};
   MockResponseCallbackSharedPtr callback_{std::make_shared<MockResponseCallback>()};
 };
@@ -65,7 +63,7 @@ TEST_F(ResponseCodecUnitTest, shouldDoNothingIfParserReturnsWaiting) {
   MockParserSharedPtr parser = std::make_shared<MockParser>();
   EXPECT_CALL(*parser, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
 
-  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(parser));
+  EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
 
   EXPECT_CALL(*callback_, onMessage(_)).Times(0);
@@ -91,7 +89,7 @@ TEST_F(ResponseCodecUnitTest, shouldUseNewParserAsResponse) {
   EXPECT_CALL(*parser2, parse(_)).WillOnce(Return(ResponseParseResponse::nextParser(parser3)));
   EXPECT_CALL(*parser3, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
 
-  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(parser1));
+  EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser1));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
 
   EXPECT_CALL(*callback_, onMessage(_)).Times(0);
@@ -121,7 +119,7 @@ TEST_F(ResponseCodecUnitTest, shouldPassParsedMessageToCallback) {
   };
   EXPECT_CALL(*all_consuming_parser, parse(_)).WillOnce(Invoke(consume_and_return));
 
-  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(all_consuming_parser));
+  EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(all_consuming_parser));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
 
   EXPECT_CALL(*callback_, onMessage(parsed_message));
@@ -151,7 +149,7 @@ TEST_F(ResponseCodecUnitTest, shouldPassParsedMessageToCallbackAndInitializeNext
   MockParserSharedPtr parser2 = std::make_shared<MockParser>();
   EXPECT_CALL(*parser2, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
 
-  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(parser1)).WillOnce(Return(parser2));
+  EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser1)).WillOnce(Return(parser2));
 
   EXPECT_CALL(*callback_, onMessage(parsed_message));
   EXPECT_CALL(*callback_, onFailedParse(_)).Times(0);
@@ -179,7 +177,7 @@ TEST_F(ResponseCodecUnitTest, shouldPassParseFailureDataToCallback) {
   };
   EXPECT_CALL(*parser, parse(_)).WillOnce(Invoke(consume_and_return));
 
-  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(parser));
+  EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
 
   EXPECT_CALL(*callback_, onMessage(_)).Times(0);

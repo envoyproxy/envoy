@@ -1,7 +1,5 @@
 #pragma once
 
-#include <queue>
-
 #include "extensions/filters/network/kafka/codec.h"
 #include "extensions/filters/network/kafka/kafka_response_parser.h"
 
@@ -14,37 +12,25 @@ using ResponseCallback = MessageCallback<AbstractResponseSharedPtr, ResponseMeta
 
 using ResponseCallbackSharedPtr = std::shared_ptr<ResponseCallback>;
 
-// Helper container for data stored in ResponseInitialParserFactory.
-using ExpectedResponseSpec = std::pair<int16_t, int16_t>;
-
 /**
- * Provides initial parser for responses.
- * Response information needs to be registered with this factory beforehand, as payloads do not
- * carry message type information.
+ * Provides initial parser for responses (class extracted to allow injecting test factories).
  */
 class ResponseInitialParserFactory {
 public:
   virtual ~ResponseInitialParserFactory() = default;
 
   /**
-   * Creates parser with given context.
+   * Creates default instance that returns ResponseHeaderParser instances.
    */
-  virtual ResponseParserSharedPtr create(const ResponseParserResolver& parser_resolver);
+  static const ResponseInitialParserFactory& getDefaultInstance();
 
   /**
-   * Registers next expected message.
-   * @param api_key response's api key.
-   * @param api_version response's api version.
+   * Creates first parser in a chain with given dependencies (that will be used by parser further
+   * along the parse process).
    */
-  void expectResponse(const int16_t api_key, const int16_t api_version);
-
-private:
-  ExpectedResponseSpec getNextResponseSpec();
-
-  std::queue<ExpectedResponseSpec> expected_responses_;
+  virtual ResponseParserSharedPtr create(ExpectedResponsesSharedPtr expected_responses,
+                                         const ResponseParserResolver& parser_resolver) const PURE;
 };
-
-using ResponseInitialParserFactorySharedPtr = std::shared_ptr<ResponseInitialParserFactory>;
 
 /**
  * Decoder that decodes Kafka responses.
@@ -66,7 +52,7 @@ public:
    * @param callbacks callbacks to be invoked (in order).
    */
   ResponseDecoder(const std::vector<ResponseCallbackSharedPtr> callbacks)
-      : ResponseDecoder{std::make_shared<ResponseInitialParserFactory>(),
+      : ResponseDecoder{ResponseInitialParserFactory::getDefaultInstance(),
                         ResponseParserResolver::getDefaultInstance(), callbacks} {};
 
   /**
@@ -76,9 +62,10 @@ public:
    * @param parserResolver supported parser resolver.
    * @param callbacks callbacks to be invoked (in order).
    */
-  ResponseDecoder(const ResponseInitialParserFactorySharedPtr factory,
+  ResponseDecoder(const ResponseInitialParserFactory& factory,
                   const ResponseParserResolver& response_parser_resolver,
                   const std::vector<ResponseCallbackSharedPtr> callbacks)
+
       : AbstractMessageDecoder{callbacks}, factory_{factory}, response_parser_resolver_{
                                                                   response_parser_resolver} {};
 
@@ -95,8 +82,12 @@ protected:
   ResponseParserSharedPtr createStartParser() override;
 
 private:
-  ResponseInitialParserFactorySharedPtr factory_;
+  const ResponseInitialParserFactory& factory_;
   const ResponseParserResolver& response_parser_resolver_;
+
+  // Store containing expected response metadata (api key & version).
+  // Response data is stored in order, as per Kafka protocol.
+  const ExpectedResponsesSharedPtr expected_responses_ = std::make_shared<ExpectedResponses>();
 };
 
 using ResponseDecoderSharedPtr = std::shared_ptr<ResponseDecoder>;
