@@ -253,7 +253,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
   single_mget.type(Common::Redis::RespType::Array);
   single_mget.asArray().swap(values);
 
-  for (uint64_t i = 1; i < incoming_request->asArray().size(); i++) {
+  for (unsigned int i = 1; i < incoming_request->asArray().size(); i++) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
@@ -382,8 +382,8 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
   single_mset.type(Common::Redis::RespType::Array);
   single_mset.asArray().swap(values);
 
-  uint64_t fragment_index = 0;
-  for (uint64_t i = 1; i < incoming_request->asArray().size(); i += 2) {
+  unsigned fragment_index = 0;
+  for (unsigned i = 1; i < incoming_request->asArray().size(); i += 2) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
@@ -478,7 +478,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
   single_fragment.type(Common::Redis::RespType::Array);
   single_fragment.asArray().swap(values);
 
-  for (uint64_t i = 1; i < incoming_request->asArray().size(); i++) {
+  for (unsigned i = 1; i < incoming_request->asArray().size(); i++) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 

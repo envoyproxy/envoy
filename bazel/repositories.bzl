@@ -241,6 +241,8 @@ def _com_github_eile_tclap():
     _repository_impl(
         name = "com_github_eile_tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:tclap-win64-ull-sizet.patch"],
     )
     native.bind(
         name = "tclap",

@@ -1,3 +1,11 @@
+// grpcpp/grpcpp.h includes <windows.h>, so undef some interfering symbols
+#ifdef WIN32
+#undef TRUE
+#undef DELETE
+#undef ERROR
+#undef GetMessage
+#endif
+
 #pragma once
 
 #include <string>

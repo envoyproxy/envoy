@@ -16,7 +16,11 @@ public:
     memset(&fake_time, 0, sizeof(fake_time));
     fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on macOS
     fake_time.tm_mday = 1;
-    start_time_ = std::chrono::system_clock::from_time_t(timegm(&fake_time));
+#if !defined(WIN32)
+    start_time_ = std::chrono::system_clock::from_time_t(::timegm(&fake_time));
+#else
+    start_time_ = std::chrono::system_clock::from_time_t(::_mkgmtime(&fake_time));
+#endif
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;

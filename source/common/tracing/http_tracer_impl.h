@@ -11,6 +11,13 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
+#ifdef WIN32
+// <windows.h> defines macros for ERROR and TRUE, so we need to undef them in
+// case it's been included above
+#undef ERROR
+#undef TRUE
+#endif
+
 namespace Envoy {
 namespace Tracing {
 

@@ -5,9 +5,9 @@
 
 #include "gtest/gtest.h"
 
-#define EXPECT_NEXT_BYTES(istream, bs...)                                                          \
+#define EXPECT_NEXT_BYTES(istream, ...)                                                            \
   do {                                                                                             \
-    std::vector<uint8_t> expected_bytes{bs};                                                       \
+    std::vector<uint8_t> expected_bytes{__VA_ARGS__};                                              \
     std::vector<uint8_t> actual_bytes(expected_bytes.size());                                      \
     istream->read(reinterpret_cast<char*>(actual_bytes.data()), expected_bytes.size());            \
     EXPECT_EQ(actual_bytes, expected_bytes);                                                       \

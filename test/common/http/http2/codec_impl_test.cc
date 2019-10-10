@@ -396,7 +396,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   // maximum frame size is 16K. We will add 3,000 headers that will take us above this size and
   // not easily compress with HPACK. (I confirmed this generates 26,468 bytes of header data
   // which should contain a continuation.)
-  for (uint i = 1; i < 3000; i++) {
+  for (unsigned i = 1; i < 3000; i++) {
     response_headers.addCopy(std::to_string(i), std::to_string(i));
   }
 
@@ -426,7 +426,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   // maximum frame size is 16K. We will add 3,000 headers that will take us above this size and
   // not easily compress with HPACK. (I confirmed this generates 26,468 bytes of header data
   // which should contain a continuation.)
-  for (uint i = 1; i < 3000; i++) {
+  for (int i = 1; i < 3000; i++) {
     response_headers.addCopy(std::to_string(i), std::to_string(i));
   }
 

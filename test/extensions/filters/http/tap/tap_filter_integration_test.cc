@@ -108,7 +108,7 @@ public:
     EXPECT_NE(pb_file_name, files.end());
 
     std::vector<envoy::data::tap::v2alpha::TraceWrapper> traces;
-    std::ifstream pb_file(*pb_file_name);
+    std::ifstream pb_file(*pb_file_name, std::ios_base::binary);
     Protobuf::io::IstreamInputStream stream(&pb_file);
     Protobuf::io::CodedInputStream coded_stream(&stream);
     while (true) {
