@@ -471,6 +471,13 @@ StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
 }
 
 StatName StatNameSet::getDynamic(absl::string_view token) {
+  // We duplicate most of the getBuiltin implementation so that we can detect
+  // the difference between "not found" and "found empty stat name".
+  const auto iter = builtin_stat_names_.find(token);
+  if (iter != builtin_stat_names_.end()) {
+    return iter->second;
+  }
+
   Stats::StatName stat_name = getBuiltin(token, StatName());
   if (stat_name.empty()) {
     // Other tokens require holding a lock for our local cache.
