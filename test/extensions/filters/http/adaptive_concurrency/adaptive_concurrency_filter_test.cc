@@ -110,7 +110,7 @@ enabled:
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   filter_->encodeComplete();
 }
 
@@ -153,7 +153,7 @@ enabled:
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   filter_->encodeComplete();
 }
 
@@ -226,7 +226,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
   time_system_.sleep(advance_time);
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
 
@@ -248,7 +248,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   time_system_.setMonotonicTime(mt + advance_time);
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
 }
@@ -265,7 +265,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, DisregardHealthChecks) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 
   // We do not expect a call to recordLatencySample() as well.
 
