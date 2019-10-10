@@ -66,7 +66,7 @@ This example show how to configure secrets in the static_resource:
           cluster_name: local_service_tls
           ...
           transport_socket:
-            name: tls
+            name: envoy.transport_sockets.tls
             typed_config:
               "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
               common_tls_context:
@@ -76,7 +76,7 @@ This example show how to configure secrets in the static_resource:
       ....
       filter_chains:
         transport_socket:
-          name: tls
+          name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
             common_tls_context:
@@ -108,7 +108,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
                     address: 127.0.0.1
                     port_value: 8234
         transport_socket:
-          name: tls
+          name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
             common_tls_context:
@@ -133,7 +133,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
           cluster_name: local_service_tls
           ...
           transport_socket:
-          name: tls
+          name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
               common_tls_context:
@@ -149,7 +149,7 @@ This example shows how to configure secrets fetched from remote SDS servers:
       ....
       filter_chains:
       - transport_socket:
-          name: tls
+          name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
             common_tls_context:

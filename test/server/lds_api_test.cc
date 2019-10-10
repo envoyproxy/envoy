@@ -350,7 +350,7 @@ resources:
       port_value: 61001
   filter_chains:
   - transport_socket:
-      name: tls
+      name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
         common_tls_context:

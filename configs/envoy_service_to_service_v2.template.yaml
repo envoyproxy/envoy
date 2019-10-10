@@ -339,7 +339,7 @@ static_resources:
   - name: egress_{{ host['name'] }}
     {% if host.get('ssl', False) %}
     transport_socket:
-      name: tls
+      name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
         common_tls_context:
@@ -405,7 +405,7 @@ static_resources:
                 port_value: 443
                 protocol: TCP
     transport_socket:
-      name: tls
+      name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
         sni: www.main_website.com
@@ -493,7 +493,7 @@ static_resources:
     http2_protocol_options:
       max_concurrent_streams: 100
     transport_socket:
-      name: tls
+      name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
         common_tls_context:

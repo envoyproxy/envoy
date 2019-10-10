@@ -81,7 +81,7 @@ Example configuration
         - name: envoy.http_connection_manager
           # ...
         transport_socket:
-          name: tls
+          name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
             common_tls_context:
@@ -103,7 +103,7 @@ Example configuration
                   address: 127.0.0.2
                   port_value: 1234
       transport_socket:
-        name: tls
+        name: envoy.transport_sockets.tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
           common_tls_context:

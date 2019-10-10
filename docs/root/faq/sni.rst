@@ -24,7 +24,7 @@ The following is a YAML example of the above requirement.
   - filter_chain_match:
       server_names: ["example.com", "www.example.com"]
     transport_socket:
-      name: tls
+      name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
         common_tls_context:
@@ -46,7 +46,7 @@ The following is a YAML example of the above requirement.
   - filter_chain_match:
       server_names: "api.example.com"
     transport_socket:
-      name: tls
+      name: envoy.transport_sockets.tls
       typed_config:
         "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
         common_tls_context:

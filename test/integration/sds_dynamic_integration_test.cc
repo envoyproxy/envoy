@@ -155,7 +155,7 @@ public:
       auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
       setUpSdsConfig(secret_config, "server_cert");
 
-      transport_socket->set_name("tls");
+      transport_socket->set_name("envoy.transport_sockets.tls");
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       // Add a static sds cluster
@@ -272,7 +272,7 @@ public:
         auto* secret_config = common_tls_context->mutable_validation_context_sds_secret_config();
         setUpSdsConfig(secret_config, validation_secret_);
       }
-      transport_socket->set_name("tls");
+      transport_socket->set_name("envoy.transport_sockets.tls");
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       // Add a static sds cluster
@@ -346,7 +346,7 @@ public:
           tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
       setUpSdsConfig(secret_config, "client_cert");
 
-      transport_socket->set_name("tls");
+      transport_socket->set_name("envoy.transport_sockets.tls");
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
     });
 

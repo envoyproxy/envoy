@@ -105,7 +105,7 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
                     address: www.google.com
                     port_value: 443
         transport_socket:
-          name: tls
+          name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
             sni: www.google.com

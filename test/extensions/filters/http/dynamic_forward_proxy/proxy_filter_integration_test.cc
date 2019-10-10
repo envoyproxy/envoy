@@ -52,7 +52,7 @@ config:
                 tls_context.mutable_common_tls_context()->mutable_validation_context();
             validation_context->mutable_trusted_ca()->set_filename(
                 TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-            cluster_0->mutable_transport_socket()->set_name("tls");
+            cluster_0->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
             cluster_0->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
           }
 

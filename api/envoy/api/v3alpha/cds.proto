@@ -464,7 +464,7 @@ message Cluster {
   //    match:
   //      acceptMTLS: true
   //    transport_socket:
-  //      name: tls
+  //      name: envoy.transport_sockets.tls
   //      config: { ... } # tls socket configuration
   //  - name: "defaultToPlaintext"
   //    match: {}

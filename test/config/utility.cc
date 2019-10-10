@@ -583,7 +583,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   initializeTls(options, *tls_context.mutable_common_tls_context());
-  filter_chain->mutable_transport_socket()->set_name("tls");
+  filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 

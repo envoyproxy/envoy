@@ -166,7 +166,7 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
       ssl_creds->mutable_root_certs()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     }
-    ads_cluster->mutable_transport_socket()->set_name("tls");
+    ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
     ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);

@@ -130,7 +130,7 @@ void XfccIntegrationTest::initialize() {
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     validation_context->add_verify_subject_alt_name("foo.lyft.com");
-    transport_socket->set_name("tls");
+    transport_socket->set_name("envoy.transport_sockets.tls");
     transport_socket->mutable_typed_config()->PackFrom(context);
   });
 
