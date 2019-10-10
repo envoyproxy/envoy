@@ -558,6 +558,7 @@ public:
   }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -583,6 +584,8 @@ public:
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
+  Http::Protocol
+  upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
 private:
   struct ResourceManagers {
@@ -601,6 +604,7 @@ private:
   const std::string name_;
   const envoy::api::v2::Cluster::DiscoveryType type_;
   const uint64_t max_requests_per_connection_;
+  const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;

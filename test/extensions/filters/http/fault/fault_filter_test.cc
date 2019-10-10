@@ -3,11 +3,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/http/fault/v2/fault.pb.h"
+#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
-#include "common/config/filter_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
@@ -39,93 +40,87 @@ namespace {
 
 class FaultFilterTest : public testing::Test {
 public:
-  const std::string fixed_delay_and_abort_nodes_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 503
-      },
-      "downstream_nodes": ["canary"]
-    }
-    )EOF";
+  const std::string fixed_delay_and_abort_nodes_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 503
+  downstream_nodes:
+  - canary
+  )EOF";
 
-  const std::string fixed_delay_only_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      }
-    }
-    )EOF";
+  const std::string fixed_delay_only_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  )EOF";
 
-  const std::string abort_only_json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 429
-      }
-    }
-    )EOF";
+  const std::string abort_only_yaml = R"EOF(
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 429
+  )EOF";
 
-  const std::string fixed_delay_and_abort_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 503
-      }
-    }
-    )EOF";
+  const std::string fixed_delay_and_abort_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 503
+  )EOF";
 
-  const std::string fixed_delay_and_abort_match_headers_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 503
-      },
-      "headers" : [
-        {"name" : "X-Foo1", "value" : "Bar"},
-        {"name" : "X-Foo2"}
-      ]
-    }
-    )EOF";
+  const std::string fixed_delay_and_abort_match_headers_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 503
+  headers:
+  - name: X-Foo1
+    exact_match: Bar
+  - name: X-Foo2
+  )EOF";
 
-  const std::string delay_with_upstream_cluster_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "upstream_cluster" : "www1"
-    }
-    )EOF";
+  const std::string delay_with_upstream_cluster_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  upstream_cluster: www1
+  )EOF";
 
-  const std::string v2_empty_fault_config_json = R"EOF(
-    {
-    }
-    )EOF";
+  const std::string v2_empty_fault_config_yaml = "{}";
 
   envoy::config::filter::http::fault::v2::HTTPFault
-  convertJsonStrToProtoConfig(const std::string json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
+  convertYamlStrToProtoConfig(const std::string& yaml) {
     envoy::config::filter::http::fault::v2::HTTPFault fault;
-    Config::FilterJson::translateFaultFilter(*config, fault);
+    TestUtility::loadFromYaml(yaml, fault);
     return fault;
   }
 
@@ -137,7 +132,7 @@ public:
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
   }
 
-  void SetUpTest(const std::string json) { SetUpTest(convertJsonStrToProtoConfig(json)); }
+  void SetUpTest(const std::string& yaml) { SetUpTest(convertYamlStrToProtoConfig(yaml)); }
 
   void expectDelayTimer(uint64_t duration_ms) {
     timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
@@ -161,104 +156,72 @@ public:
   Event::SimulatedTimeSystem time_system_;
 };
 
-void faultFilterBadConfigHelper(const std::string& json) {
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
+void faultFilterBadConfigHelper(const std::string& yaml) {
   envoy::config::filter::http::fault::v2::HTTPFault fault;
-  EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
-}
-
-TEST(FaultFilterBadConfigTest, BadAbortPercent) {
-  const std::string json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 200,
-        "http_status" : 429
-      }
-    }
-  )EOF";
-
-  faultFilterBadConfigHelper(json);
+  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, fault), EnvoyException);
 }
 
 TEST(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
-  const std::string json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 80,
-        "http_status" : 503
-      },
-      "downstream_nodes": []
-    }
+  const std::string yaml = R"EOF(
+  abort:
+    abort_percent:
+      numerator: 80
+      denominator: HUNDRED
+    http_status: 503
+  downstream_nodes: []
+
   )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
-  const std::string json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 100
-      }
-    }
+  const std::string yaml = R"EOF(
+  abort:
+    abort_percent:
+      numerator: 100
+      denominator: HUNDRED
   )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, BadDelayType) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "foo",
-        "fixed_delay_percent" : 50,
-        "fixed_duration_ms" : 5000
-      }
-    }
+  const std::string yaml = R"EOF(
+  delay:
+    type: foo
+    percentage:
+      numerator: 50
+      denominator: HUNDRED
+    fixed_delay: 5s
   )EOF";
 
-  faultFilterBadConfigHelper(json);
-}
-
-TEST(FaultFilterBadConfigTest, BadDelayPercent) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 500,
-        "fixed_duration_ms" : 5000
-      }
-    }
-  )EOF";
-
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, BadDelayDuration) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 50,
-        "fixed_duration_ms" : 0
-      }
-    }
+  const std::string yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 50
+      denominator: HUNDRED
+    fixed_delay: 0s
    )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 50
-      }
-    }
+  const std::string yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 50
+      denominator: HUNDRED
    )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST_F(FaultFilterTest, AbortWithHttpStatus) {
@@ -312,7 +275,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
-  SetUpTest(fixed_delay_only_json);
+  SetUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -415,7 +378,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
 }
 
 TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
-  SetUpTest(fixed_delay_only_json);
+  SetUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -476,7 +439,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
-  SetUpTest(fixed_delay_and_abort_json);
+  SetUpTest(fixed_delay_and_abort_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -548,7 +511,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbort) {
-  SetUpTest(fixed_delay_and_abort_json);
+  SetUpTest(fixed_delay_and_abort_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -602,7 +565,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
-  SetUpTest(fixed_delay_and_abort_nodes_json);
+  SetUpTest(fixed_delay_and_abort_nodes_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -654,7 +617,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 }
 
 TEST_F(FaultFilterTest, NoDownstreamMatch) {
-  SetUpTest(fixed_delay_and_abort_nodes_json);
+  SetUpTest(fixed_delay_and_abort_nodes_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -664,7 +627,7 @@ TEST_F(FaultFilterTest, NoDownstreamMatch) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
-  SetUpTest(fixed_delay_and_abort_match_headers_json);
+  SetUpTest(fixed_delay_and_abort_match_headers_yaml);
   request_headers_.addCopy("x-foo1", "Bar");
   request_headers_.addCopy("x-foo2", "RandomValue");
 
@@ -719,7 +682,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
-  SetUpTest(fixed_delay_and_abort_match_headers_json);
+  SetUpTest(fixed_delay_and_abort_match_headers_yaml);
   request_headers_.addCopy("x-foo1", "Bar");
   request_headers_.addCopy("x-foo3", "Baz");
 
@@ -749,7 +712,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
 }
 
 TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
-  SetUpTest(fixed_delay_only_json);
+  SetUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -798,7 +761,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
-  SetUpTest(delay_with_upstream_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(decoder_filter_callbacks_.route_->route_entry_, clusterName())
@@ -848,7 +811,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
-  SetUpTest(delay_with_upstream_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("mismatch");
 
   EXPECT_CALL(decoder_filter_callbacks_.route_->route_entry_, clusterName())
@@ -877,7 +840,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
-  SetUpTest(delay_with_upstream_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(*decoder_filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
@@ -959,12 +922,12 @@ void FaultFilterTest::TestPerFilterConfigFault(
 
 TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
 
-  Fault::FaultSettings abort_fault(convertJsonStrToProtoConfig(abort_only_json));
-  Fault::FaultSettings delay_fault(convertJsonStrToProtoConfig(delay_with_upstream_cluster_json));
+  Fault::FaultSettings abort_fault(convertYamlStrToProtoConfig(abort_only_yaml));
+  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
 
   // route-level fault overrides listener-level fault
   {
-    SetUpTest(v2_empty_fault_config_json); // This is a valid listener level fault
+    SetUpTest(v2_empty_fault_config_yaml); // This is a valid listener level fault
     TestPerFilterConfigFault(&delay_fault, nullptr);
   }
 
@@ -972,7 +935,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   {
     config_->stats().aborts_injected_.reset();
     config_->stats().delays_injected_.reset();
-    SetUpTest(v2_empty_fault_config_json);
+    SetUpTest(v2_empty_fault_config_yaml);
     TestPerFilterConfigFault(nullptr, &delay_fault);
   }
 
@@ -980,7 +943,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   {
     config_->stats().aborts_injected_.reset();
     config_->stats().delays_injected_.reset();
-    SetUpTest(v2_empty_fault_config_json);
+    SetUpTest(v2_empty_fault_config_yaml);
     TestPerFilterConfigFault(&delay_fault, &abort_fault);
   }
 }

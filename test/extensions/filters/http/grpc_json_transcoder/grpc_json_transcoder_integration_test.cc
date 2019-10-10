@@ -42,7 +42,7 @@ public:
               services : "bookstore.Bookstore"
             )EOF";
     config_helper_.addFilter(
-        fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   }
 
   /**
@@ -340,7 +340,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
               ignore_unknown_query_parameters : true
             )EOF";
   config_helper_.addFilter(
-      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "GET"},
@@ -363,7 +363,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
               convert_grpc_status: true
             )EOF";
   config_helper_.addFilter(
-      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{
@@ -387,7 +387,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
               convert_grpc_status: true
             )EOF";
   config_helper_.addFilter(
-      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{
@@ -411,7 +411,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
               convert_grpc_status: true
             )EOF";
   config_helper_.addFilter(
-      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::ListBooksRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{

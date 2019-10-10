@@ -173,10 +173,7 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/type/matcher:metadata_cc",
-        "@envoy_api//envoy/type/matcher:number_cc",
-        "@envoy_api//envoy/type/matcher:string_cc",
-        "@envoy_api//envoy/type/matcher:value_cc",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )
 
@@ -189,7 +186,7 @@ envoy_cc_library(
         "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "@com_googlesource_code_re2//:re2",
-        "@envoy_api//envoy/type/matcher:regex_cc",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )
 

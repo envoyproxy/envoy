@@ -43,6 +43,11 @@ Version 1.12.0 (pending)
   and :ref:`Cluster <envoy_api_field_Cluster.tls_context>` message have been deprecated in favor of
   `transport_socket` with name `tls`. The latter takes priority if specified.
 
+1.11.2 (October 8, 2019)
+========================
+* Use of :ref:`idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>` is deprecated. Use :ref:`idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>` instead.
+
+
 Version 1.11.0 (July 11, 2019)
 ==============================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.

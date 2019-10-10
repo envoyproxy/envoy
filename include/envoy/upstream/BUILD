@@ -29,8 +29,8 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 
@@ -39,7 +39,7 @@ envoy_cc_library(
     hdrs = ["health_checker.h"],
     deps = [
         ":upstream_interface",
-        "@envoy_api//envoy/data/core/v2alpha:health_check_event_cc",
+        "@envoy_api//envoy/data/core/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -57,7 +57,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:primitive_stats_macros",
         "//include/envoy/stats:stats_macros",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -76,7 +76,7 @@ envoy_cc_library(
     hdrs = ["load_balancer_type.h"],
     deps = [
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -85,7 +85,7 @@ envoy_cc_library(
     hdrs = ["locality.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -95,7 +95,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
-        "@envoy_api//envoy/data/cluster/v2alpha:outlier_detection_event_cc",
+        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -169,6 +169,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
-        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
