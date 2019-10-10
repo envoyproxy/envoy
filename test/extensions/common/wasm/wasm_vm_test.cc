@@ -39,7 +39,16 @@ std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   return result;
 }
 
-TEST(WasmVmTest, BadVmType) { EXPECT_THROW(createWasmVm("bad.vm"), WasmVmException); }
+TEST(WasmVmTest, NoRuntime) {
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm(""), WasmVmException,
+                            "Failed to create WASM VM with unspecified runtime.");
+}
+
+TEST(WasmVmTest, BadRuntime) {
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm("envoy.wasm.runtime.invalid"), WasmVmException,
+                            "Failed to create WASM VM using envoy.wasm.runtime.invalid runtime. "
+                            "Envoy was compiled without support for it.");
+}
 
 TEST(WasmVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
