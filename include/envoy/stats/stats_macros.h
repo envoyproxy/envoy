@@ -5,8 +5,6 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/assert.h"
-
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
