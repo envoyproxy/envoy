@@ -728,6 +728,13 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
+TEST_P(AdminInstanceTest, StatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK, getCallback("/stats?filter=*.test", header_map, data)));
+  EXPECT_EQ("Invalid regex: \"regex_error\": *.test\n", data.toString());
+}
+
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
