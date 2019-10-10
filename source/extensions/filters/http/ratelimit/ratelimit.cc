@@ -161,9 +161,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::Head
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "",
-                               [this](Http::HeaderMap& headers) { addHeaders(headers); },
-                               config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
+    callbacks_->sendLocalReply(
+        Http::Code::TooManyRequests, "", [this](Http::HeaderMap& headers) { addHeaders(headers); },
+        config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {

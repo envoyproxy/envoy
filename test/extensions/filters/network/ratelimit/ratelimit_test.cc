@@ -140,7 +140,8 @@ TEST_F(RateLimitFilterTest, OverLimit) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -168,7 +169,8 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
   EXPECT_CALL(*client_, cancel()).Times(0);
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 

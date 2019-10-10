@@ -125,7 +125,8 @@ public:
   }
 
   void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
-                             const Http::HeaderMapImpl& headers, const Http::HeaderMapImpl& upstream_headers) {
+                             const Http::HeaderMapImpl& headers,
+                             const Http::HeaderMapImpl& upstream_headers) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v2::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
@@ -140,16 +141,16 @@ public:
           return Http::HeaderMap::Iterate::Continue;
         },
         &response_msg);
-    upstream_headers.iterate( 
-      [](const Http::HeaderEntry& h, void* context)->Http::HeaderMap::Iterate {
-        auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
+    upstream_headers.iterate(
+        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
+          auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
                             ->mutable_upstream_headers()
                             ->Add();
-        header->set_key(std::string(h.key().getStringView()));
-        header->set_value(std::string(h.value().getStringView()));
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &response_msg);
+          header->set_key(std::string(h.key().getStringView()));
+          header->set_value(std::string(h.value().getStringView()));
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &response_msg);
     ratelimit_request_->sendGrpcMessage(response_msg);
     ratelimit_request_->finishGrpcStream(Grpc::Status::Ok);
   }
@@ -214,8 +215,8 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
                                             {"x-ratelimit-remaining", "500"}};
   Http::TestHeaderMapImpl upstream_headers{{"x-ratelimit-done", "true"}};
 
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
-                        ratelimit_headers, upstream_headers);
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK, ratelimit_headers,
+                        upstream_headers);
   waitForSuccessfulUpstreamResponse();
 
   ratelimit_headers.iterate(

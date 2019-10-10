@@ -207,8 +207,9 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                            {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -236,8 +237,9 @@ TEST_F(ThriftRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                            {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -258,8 +260,9 @@ TEST_F(ThriftRateLimitFilterTest, ImmediateErrorResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                            {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {

@@ -129,8 +129,8 @@ public:
   ThriftProxy::FilterStatus setEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
   // RateLimit::RequestCallbacks
-  void complete(Filters::Common::RateLimit::LimitStatus status,
-                Http::HeaderMapPtr&& headers, Http::HeaderMapPtr&& upstream_headers) override;
+  void complete(Filters::Common::RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers,
+                Http::HeaderMapPtr&& upstream_headers) override;
 
 private:
   void initiateCall(const ThriftProxy::MessageMetadata& metadata);
