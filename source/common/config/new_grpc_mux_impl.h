@@ -51,7 +51,7 @@ protected:
   virtual bool grpcStreamAvailable() const PURE;
   virtual bool rateLimitAllowsDrain() PURE;
 
-  SubscriptionState* subscriptionStateFor(const std::string& type_url);
+  SubscriptionState& subscriptionStateFor(const std::string& type_url);
   WatchMap& watchMapFor(const std::string& type_url);
   void handleEstablishedStream();
   void handleStreamEstablishmentFailure();
@@ -75,8 +75,6 @@ private:
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
                    const std::set<std::string>& resources);
-
-  void addSubscription(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout);
 
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a DeltaDiscoveryRequest).

@@ -101,8 +101,10 @@ Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std:
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, init_fetch_timeout);
-    return addWatch(type_url, resources, callbacks, init_fetch_timeout);
+    watch_map = watch_maps_.emplace(type_url, std::make_unique<WatchMap>()).first;
+    subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
+                                         type_url, *watch_maps_[type_url], init_fetch_timeout));
+    subscription_ordering_.emplace_back(type_url);
   }
 
   Watch* watch = watch_map->second->addWatch(callbacks);
@@ -117,32 +119,24 @@ Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std:
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                                  const std::set<std::string>& resources) {
   ASSERT(watch != nullptr);
-  SubscriptionState* sub = subscriptionStateFor(type_url);
+  SubscriptionState& sub = subscriptionStateFor(type_url);
   WatchMap& watch_map = watchMapFor(type_url);
 
   auto added_removed = watch_map.updateWatchInterest(watch, resources);
-  sub->updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
+  sub.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
 
   // Tell the server about our change in interest, if any.
-  if (sub->subscriptionUpdatePending()) {
+  if (sub.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
-                                     std::chrono::milliseconds init_fetch_timeout) {
-  watch_maps_.emplace(type_url, std::make_unique<WatchMap>());
-  subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
-                                       type_url, *watch_maps_[type_url], init_fetch_timeout));
-  subscription_ordering_.emplace_back(type_url);
-}
-
-SubscriptionState* NewGrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
+SubscriptionState& NewGrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Tried to look up SubscriptionState for non-existent subscription {}.",
                              type_url));
-  return sub->second.get();
+  return *sub->second;
 }
 
 WatchMap& NewGrpcMuxImpl::watchMapFor(const std::string& type_url) {
@@ -163,7 +157,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     // If so, which one (by type_url)?
     std::string next_request_type_url = maybe_request_type.value();
     // If we don't have a subscription object for this request's type_url, drop the request.
-    SubscriptionState* sub = subscriptionStateFor(next_request_type_url);
+    SubscriptionState& sub = subscriptionStateFor(next_request_type_url);
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
@@ -172,13 +166,13 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
       // safe to assume it's of the type_url that we're wanting to send.
-      UpdateAck ack = pausable_ack_queue_.front();
-      pausable_ack_queue_.pop();
+      //
       // getNextRequestWithAck() returns a raw unowned pointer, which sendGrpcMessage deletes.
-      sendGrpcMessage(sub->getNextRequestWithAck(ack));
+      sendGrpcMessage(sub.getNextRequestWithAck(pausable_ack_queue_.front()));
+      pausable_ack_queue_.pop();
     } else {
       // getNextRequestAckless() returns a raw unowned pointer, which sendGrpcMessage deletes.
-      sendGrpcMessage(sub->getNextRequestAckless());
+      sendGrpcMessage(sub.getNextRequestAckless());
     }
   }
   maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
@@ -218,8 +212,8 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   // If we're looking to send multiple non-ACK requests, send them in the order that their
   // subscriptions were initiated.
   for (const auto& sub_type : subscription_ordering_) {
-    SubscriptionState* sub = subscriptionStateFor(sub_type);
-    if (sub->subscriptionUpdatePending() && !pausable_ack_queue_.paused(sub_type)) {
+    SubscriptionState& sub = subscriptionStateFor(sub_type);
+    if (sub.subscriptionUpdatePending() && !pausable_ack_queue_.paused(sub_type)) {
       return sub_type;
     }
   }

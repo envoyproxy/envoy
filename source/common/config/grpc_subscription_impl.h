@@ -58,8 +58,8 @@ private:
   const std::string type_url_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
-  // NOTE: if another subscription of the same type_url has already been started, this value will be
-  // ignored in favor of the other subscription's.
+  // NOTE: if another subscription of the same type_url has already been started, the value of
+  // init_fetch_timeout_ will be ignored in favor of the other subscription's.
   const std::chrono::milliseconds init_fetch_timeout_;
   Watch* watch_{};
   const bool is_aggregated_;
