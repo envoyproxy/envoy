@@ -572,8 +572,8 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
   switch (codec_settings_.header_key_format_) {
   case Http1Settings::HeaderKeyFormat::Default:
     break;
-  case Http1Settings::HeaderKeyFormat::TrainCase:
-    header_key_formatter_ = std::make_unique<TrainCaseHeaderKeyFormatter>();
+  case Http1Settings::HeaderKeyFormat::ProperCase:
+    header_key_formatter_ = std::make_unique<ProperCaseHeaderKeyFormatter>();
     break;
   }
 }

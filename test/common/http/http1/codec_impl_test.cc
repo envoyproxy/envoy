@@ -504,8 +504,8 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
-TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainCaseHeaders) {
-  codec_settings_.header_key_format_ = Http1Settings::HeaderKeyFormat::TrainCase;
+TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainProperHeaders) {
+  codec_settings_.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
   initialize();
 
   NiceMock<Http::MockStreamDecoder> decoder;

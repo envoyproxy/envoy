@@ -10,6 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "header_formatter_lib",
+    srcs = ["header_formatter.cc"],
     hdrs = ["header_formatter.h"],
 )
 

@@ -225,7 +225,7 @@ struct Http1Settings {
 
   enum class HeaderKeyFormat {
     Default,
-    TrainCase,
+    ProperCase,
   };
 
   HeaderKeyFormat header_key_format_;

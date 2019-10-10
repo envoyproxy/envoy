@@ -44,20 +44,21 @@ message Http1ProtocolOptions {
   string default_host_for_http_10 = 3;
 
   message HeaderKeyFormat {
-    message TrainCase {
+    message ProperCaseWords {
     }
 
     oneof header_format {
-      // Formats the header using Train-Case: the first character and any character following a
-      // special character will be capitalized if it's an alpha character. For example,
+      // Formats the header by proper casing words: the first character and any character following
+      // a special character will be capitalized if it's an alpha character. For example,
       // "content-type" becomes "Content-Type", and "foo$b#$ar" becomes "Foo$B#$Ar".
-      TrainCase train_case = 1;
+      ProperCaseWords proper_case_words = 1;
     }
   }
 
   // Describes how the keys for response headers should be formatted. By default, all header keys
   // are lower cased.
-  HeaderKeyFormat response_header_key_format = 4;
+  // [#not-implemented-hide:] Hiding until both request and response formating has been implemented.
+  HeaderKeyFormat header_key_format = 4;
 }
 
 // [#comment:next free field: 13]
