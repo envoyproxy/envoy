@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3alpha;
+
+option java_outer_classname = "StringProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
+
+import "envoy/type/matcher/v3alpha/regex.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: StringMatcher]
+
+// Specifies the way to match a string.
+message StringMatcher {
+  reserved 4;
+
+  reserved "regex";
+
+  oneof match_pattern {
+    option (validate.required) = true;
+
+    // The input string must match exactly the string specified here.
+    //
+    // Examples:
+    //
+    // * *abc* only matches the value *abc*.
+    string exact = 1;
+
+    // The input string must have the prefix specified here.
+    // Note: empty prefix is not allowed, please use regex instead.
+    //
+    // Examples:
+    //
+    // * *abc* matches the value *abc.xyz*
+    string prefix = 2 [(validate.rules).string = {min_bytes: 1}];
+
+    // The input string must have the suffix specified here.
+    // Note: empty prefix is not allowed, please use regex instead.
+    //
+    // Examples:
+    //
+    // * *abc* matches the value *xyz.abc*
+    string suffix = 3 [(validate.rules).string = {min_bytes: 1}];
+
+    // The input string must match the regular expression specified here.
+    RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
+  }
+}
+
+// Specifies a list of ways to match a string.
+message ListStringMatcher {
+  repeated StringMatcher patterns = 1 [(validate.rules).repeated = {min_items: 1}];
+}

@@ -12,7 +12,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/discovery.proto";
 import "envoy/api/v3alpha/listener/listener.proto";
 import "envoy/api/v3alpha/listener/udp_listener_config.proto";
-import "envoy/config/listener/v3alpha/api_listener.proto";
+import "envoy/config/listener/v2/api_listener.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -85,9 +85,9 @@ message Listener {
   core.Address address = 2 [(validate.rules).message = {required: true}];
 
   // A list of filter chains to consider for this listener. The
-  // :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` with the most specific
-  // :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>` criteria is used on a
-  // connection.
+  // :ref:`FilterChain <envoy_api_msg_api.v3alpha.listener.FilterChain>` with the most specific
+  // :ref:`FilterChainMatch <envoy_api_msg_api.v3alpha.listener.FilterChainMatch>` criteria is used
+  // on a connection.
   //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
@@ -108,12 +108,12 @@ message Listener {
 
   // Listener filters have the opportunity to manipulate and augment the connection metadata that
   // is used in connection filter chain matching, for example. These filters are run before any in
-  // :ref:`filter_chains <envoy_api_field_Listener.filter_chains>`. Order matters as the
+  // :ref:`filter_chains <envoy_api_field_api.v3alpha.Listener.filter_chains>`. Order matters as the
   // filters are processed sequentially right after a socket has been accepted by the listener, and
   // before a connection is created.
   // UDP Listener filters can be specified when the protocol in the listener socket address in
-  // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
-  // <envoy_api_field_core.Protocol.UDP>`.
+  // :ref:`protocol <envoy_api_field_api.v3alpha.core.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_api.v3alpha.core.SocketAddress.Protocol.UDP>`.
   // UDP listeners currently support a single filter.
   repeated listener.ListenerFilter listener_filters = 9;
 
@@ -137,15 +137,14 @@ message Listener {
   // *iptables* *TPROXY* target, in which case the original source and destination addresses and
   // ports are preserved on accepted connections. This flag should be used in combination with
   // :ref:`an original_dst <config_listener_filters_original_dst>` :ref:`listener filter
-  // <envoy_api_field_Listener.listener_filters>` to mark the connections' local addresses as
-  // "restored." This can be used to hand off each redirected connection to another listener
-  // associated with the connection's destination address. Direct connections to the socket without
-  // using *TPROXY* cannot be distinguished from connections redirected using *TPROXY* and are
-  // therefore treated as if they were redirected.
-  // When this flag is set to false, the listener's socket is explicitly reset as non-transparent.
-  // Setting this flag requires Envoy to run with the *CAP_NET_ADMIN* capability.
-  // When this flag is not set (default), the socket is not modified, i.e. the transparent option
-  // is neither set nor reset.
+  // <envoy_api_field_api.v3alpha.Listener.listener_filters>` to mark the connections' local
+  // addresses as "restored." This can be used to hand off each redirected connection to another
+  // listener associated with the connection's destination address. Direct connections to the socket
+  // without using *TPROXY* cannot be distinguished from connections redirected using *TPROXY* and
+  // are therefore treated as if they were redirected. When this flag is set to false, the
+  // listener's socket is explicitly reset as non-transparent. Setting this flag requires Envoy to
+  // run with the *CAP_NET_ADMIN* capability. When this flag is not set (default), the socket is not
+  // modified, i.e. the transparent option is neither set nor reset.
   google.protobuf.BoolValue transparent = 10;
 
   // Whether the listener should set the *IP_FREEBIND* socket option. When this
@@ -180,23 +179,24 @@ message Listener {
   core.TrafficDirection traffic_direction = 16;
 
   // If the protocol in the listener socket address in :ref:`protocol
-  // <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
-  // <envoy_api_field_core.Protocol.UDP>`, this field specifies the actual udp listener to create,
-  // i.e. :ref:`udp_listener_name
-  // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
-  // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
+  // <envoy_api_field_api.v3alpha.core.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_api.v3alpha.core.SocketAddress.Protocol.UDP>`, this field specifies the
+  // actual udp listener to create, i.e. :ref:`udp_listener_name
+  // <envoy_api_field_api.v3alpha.listener.UdpListenerConfig.udp_listener_name>` =
+  // "raw_udp_listener" for creating a packet-oriented UDP listener. If not present, treat it as
+  // "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;
 
   // [#not-implemented-hide:]
   // Used to represent an API listener, which is used in non-proxy clients. The type of API
   // exposed to the non-proxy application depends on the type of API listener.
-  // When this field is set, no other field except for :ref:`name<envoy_api_field_Listener.name>`
-  // should be set.
+  // When this field is set, no other field except for
+  // :ref:`name<envoy_api_field_api.v3alpha.Listener.name>` should be set.
   // [#next-major-version: In the v3 API, instead of this messy approach where the socket
   // listener fields are directly in the top-level Listener message and the API listener types
   // are in the ApiListener message, the socket listener messages should be in their own message,
   // and the top-level Listener should essentially be a oneof that selects between the
   // socket listener and the various types of API listener. That way, a given Listener message
   // can structurally only contain the fields of the relevant type.]
-  config.listener.v3alpha.ApiListener api_listener = 19;
+  config.listener.v2.ApiListener api_listener = 19;
 }

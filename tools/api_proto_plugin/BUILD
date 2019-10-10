@@ -15,3 +15,10 @@ py_library(
         "@com_google_protobuf//:protobuf_python",
     ],
 )
+
+py_library(
+    name = "utils",
+    srcs = ["utils.py"],
+    srcs_version = "PY3",
+    visibility = ["//visibility:public"],
+)

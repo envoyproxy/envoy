@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 
 import "envoy/api/v3alpha/core/http_uri.proto";
-import "envoy/type/percent.proto";
+import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -57,14 +57,15 @@ enum TrafficDirection {
 
 // Identifies location of where either Envoy runs or where upstream hosts run.
 message Locality {
-  // Region this :ref:`zone <envoy_api_field_core.Locality.zone>` belongs to.
+  // Region this :ref:`zone <envoy_api_field_api.v3alpha.core.Locality.zone>` belongs to.
   string region = 1;
 
   // Defines the local service zone where Envoy is running. Though optional, it
   // should be set if discovery service routing is used and the discovery
-  // service exposes :ref:`zone data <envoy_api_field_endpoint.LocalityLbEndpoints.locality>`,
-  // either in this message or via :option:`--service-zone`. The meaning of zone
-  // is context dependent, e.g. `Availability Zone (AZ)
+  // service exposes :ref:`zone data
+  // <envoy_api_field_api.v3alpha.endpoint.LocalityLbEndpoints.locality>`, either in this message or
+  // via :option:`--service-zone`. The meaning of zone is context dependent, e.g. `Availability Zone
+  // (AZ)
   // <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
   // on AWS, `Zone <https://cloud.google.com/compute/docs/regions-zones/>`_ on
   // GCP, etc.
@@ -91,7 +92,7 @@ message Node {
   // Defines the local service cluster name where Envoy is running. Though
   // optional, it should be set if any of the following features are used:
   // :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
-  // verification <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>`,
+  // verification <envoy_api_field_api.v3alpha.core.HealthCheck.HttpHealthCheck.service_name>`,
   // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v3alpha.Runtime>`,
   // :ref:`user agent addition
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.add_user_agent>`,
@@ -228,7 +229,7 @@ message AsyncDataSource {
 }
 
 // Configuration for transport socket in :ref:`listeners <config_listeners>` and
-// :ref:`clusters <envoy_api_msg_Cluster>`. If the configuration is
+// :ref:`clusters <envoy_api_msg_api.v3alpha.Cluster>`. If the configuration is
 // empty, a default transport socket implementation and configuration will be
 // chosen based on the platform and existence of tls_context.
 message TransportSocket {
@@ -288,7 +289,7 @@ message SocketOption {
 // specified via a runtime key.
 message RuntimeFractionalPercent {
   // Default value if the runtime value's for the numerator/denominator keys are not available.
-  type.FractionalPercent default_value = 1 [(validate.rules).message = {required: true}];
+  type.v3alpha.FractionalPercent default_value = 1 [(validate.rules).message = {required: true}];
 
   // Runtime key for a YAML representation of a FractionalPercent.
   string runtime_key = 2;
