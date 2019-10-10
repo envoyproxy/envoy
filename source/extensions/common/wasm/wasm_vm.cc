@@ -15,7 +15,7 @@ thread_local uint32_t effective_context_id_ = 0;
 
 WasmVmPtr createWasmVm(absl::string_view runtime) {
   if (runtime.empty()) {
-    throw WasmException("Failed to create WASM VM with unspecified runtime.");
+    throw WasmVmException("Failed to create WASM VM with unspecified runtime.");
   } else if (runtime == WasmRuntimeNames::get().Null) {
     return Null::createVm();
   } else {
