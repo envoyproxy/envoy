@@ -478,17 +478,15 @@ StatName StatNameSet::getDynamic(absl::string_view token) {
     return iter->second;
   }
 
-  Stats::StatName stat_name = getBuiltin(token, StatName());
-  if (stat_name.empty()) {
+  {
     // Other tokens require holding a lock for our local cache.
     absl::MutexLock lock(&mutex_);
     Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
     if (stat_name_ref.empty()) { // Note that builtin_stat_names_ already has one for "".
       stat_name_ref = pool_.add(token);
     }
-    stat_name = stat_name_ref;
+    return stat_name_ref;
   }
-  return stat_name;
 }
 
 } // namespace Stats
