@@ -47,14 +47,14 @@ TEST_F(GrpcStreamTest, EstablishStream) {
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
   // Successful establishment
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
   // Idempotent
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _)).Times(0);
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).Times(0);
     EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
@@ -63,7 +63,7 @@ TEST_F(GrpcStreamTest, EstablishStream) {
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
   // Successful re-establishment
   {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
@@ -73,7 +73,7 @@ TEST_F(GrpcStreamTest, EstablishStream) {
 // A failure in the underlying gRPC machinery should result in grpcStreamAvailable() false. Calling
 // sendMessage would segfault.
 TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, onEstablishmentFailure());
   grpc_stream_.establishNewStream();
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
@@ -82,7 +82,7 @@ TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
 // Checks that sendMessage correctly passes a DiscoveryRequest down to the underlying gRPC
 // machinery.
 TEST_F(GrpcStreamTest, SendMessage) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_stream_.establishNewStream();
   envoy::api::v2::DiscoveryRequest request;
   request.set_response_nonce("grpc_stream_test_noncense");
