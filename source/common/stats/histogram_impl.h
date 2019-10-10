@@ -101,7 +101,7 @@ private:
  */
 class NullHistogramImpl : public HistogramImplHelper {
 public:
-  NullHistogramImpl(SymbolTable& symbol_table)
+  explicit NullHistogramImpl(SymbolTable& symbol_table)
       : HistogramImplHelper(symbol_table), symbol_table_(symbol_table) {}
   ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
