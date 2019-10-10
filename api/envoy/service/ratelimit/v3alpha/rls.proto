@@ -103,4 +103,7 @@ message RateLimitResponse {
 
   // A list of headers to add to the response
   repeated api.v3alpha.core.HeaderValue headers = 3;
+
+  // A list of headers to add to the upstream server
+  repeated api.v2.core.HeaderValue upstream_headers = 4;
 }
