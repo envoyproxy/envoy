@@ -70,19 +70,21 @@ public:
   }
 
   double maxGradient() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_);
+    return std::max(1.0, runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_));
   }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double sampleAggregatePercentile() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().SampleAggregatePercentileKey,
-                                         sample_aggregate_percentile_) /
-           100.0;
+    const double val =
+      runtime_.snapshot().getDouble(RuntimeKeys::get().SampleAggregatePercentileKey,
+                                         sample_aggregate_percentile_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
-  // The percentage is normalized to the range [0.0, 1.0].
+  // The percentage is normalized and clamped to the range [0.0, 1.0].
   double jitterPercent() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_) / 100.0;
+    const double val = runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
 private:
