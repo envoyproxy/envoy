@@ -1,6 +1,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/http/context_impl.h"
@@ -28,6 +29,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::SetArgReferee;
 using testing::WithArgs;
+using testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -184,9 +186,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
               getApplicableRateLimit(0))
       .Times(1);
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -229,9 +230,8 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
               getApplicableRateLimit(0))
       .Times(1);
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -254,20 +254,19 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
 
-  Http::HeaderMapPtr upstream_headers{
-      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
+  Http::HeaderMapPtr upstream_headers{new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
   Http::HeaderMapPtr rl_headers{
       new Http::TestHeaderMapImpl{{"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "500"}}};
 
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
-                               Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*rl_headers)}, 
+                               Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*rl_headers)},
                                Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*upstream_headers)});
   Http::TestHeaderMapImpl expected_headers(*rl_headers);
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(true, (expected_headers == response_headers));
 
-  EXPECT_EQ("true", request_headers_.get_("x-rls-rate-limited"));  
+  EXPECT_THAT(*upstream_headers, IsSubsetOfHeaders(request_headers_));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
@@ -278,9 +277,8 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -307,9 +305,8 @@ TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -417,7 +414,8 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h), nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
+                               nullptr);
 
   EXPECT_EQ(1U,
             filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
@@ -456,15 +454,15 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
-  
-  Http::HeaderMapPtr upstream_headers{
-      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
+
+  Http::HeaderMapPtr upstream_headers{new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
 
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
   Http::HeaderMapPtr uh{new Http::TestHeaderMapImpl(*upstream_headers)};
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h), std::move(uh));
-  EXPECT_EQ(false, request_headers_.has("x-rls-rate-limited"));
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
+                               std::move(uh));
 
+  EXPECT_THAT(*upstream_headers, Not(IsSubsetOfHeaders(request_headers_)));
   EXPECT_EQ(1U,
             filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
@@ -490,7 +488,8 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
       .WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl()};
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h), nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
+                               nullptr);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -629,9 +628,8 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
               getApplicableRateLimit(0))
       .Times(1);
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -673,9 +671,8 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
               getApplicableRateLimit(0))
       .Times(1);
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -714,9 +711,8 @@ TEST_F(HttpRateLimitFilterTest, ExcludeVirtualHost) {
               getApplicableRateLimit(0))
       .Times(0);
 
-  EXPECT_CALL(*client_, limit(_, "foo",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"descriptor_key", "descriptor_value"}}}}),
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                            {{{"descriptor_key", "descriptor_value"}}}}),
                               _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
@@ -771,4 +767,3 @@ TEST_F(HttpRateLimitFilterTest, DefaultConfigValueTest) {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

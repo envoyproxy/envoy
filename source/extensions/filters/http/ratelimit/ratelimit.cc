@@ -126,11 +126,10 @@ void Filter::onDestroy() {
   }
 }
 
-void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& headers, Http::HeaderMapPtr&& upstream_headers) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers,
+                      Http::HeaderMapPtr&& upstream_headers) {
   state_ = State::Complete;
   headers_to_add_ = std::move(headers);
-  upstream_headers_to_add_ = std::move(upstream_headers);
   Stats::StatName empty_stat_name;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
@@ -162,9 +161,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    callbacks_->sendLocalReply(
-        Http::Code::TooManyRequests, "", [this](Http::HeaderMap& headers) { addHeaders(headers); },
-        config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
+    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "",
+                               [this](Http::HeaderMap& headers) { addHeaders(headers); },
+                               config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
@@ -179,7 +178,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
-    addUpstreamHeaders();
+    Http::HeaderMapPtr upstream_headers_to_add = std::move(upstream_headers);
+    if (upstream_headers_to_add) {
+      Http::HeaderUtility::addHeaders(*request_headers_, *upstream_headers_to_add);
+    }
     callbacks_->continueDecoding();
   }
 }
@@ -205,13 +207,6 @@ void Filter::addHeaders(Http::HeaderMap& headers) {
   if (headers_to_add_) {
     Http::HeaderUtility::addHeaders(headers, *headers_to_add_);
     headers_to_add_ = nullptr;
-  }
-}
-
-void Filter::addUpstreamHeaders() {
-  if (upstream_headers_to_add_) {
-    Http::HeaderUtility::addHeaders(*request_headers_, *upstream_headers_to_add_);
-    upstream_headers_to_add_ = nullptr;
   }
 }
 
