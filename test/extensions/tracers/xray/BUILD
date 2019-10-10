@@ -22,3 +22,15 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/xray:xray_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.tracers.xray",
+    deps = [
+        "//source/extensions/tracers/xray:config",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
