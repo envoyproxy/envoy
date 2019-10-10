@@ -174,6 +174,6 @@ if __name__ == '__main__':
   for proto_path in sorted(next_proto_path):
     type_db.next_version_proto_paths[proto_path] = UpgradedPath(proto_path)
 
-  # Write out proto binary blob.
-  with open(out_path, 'wb') as f:
-    f.write(type_db.SerializeToString())
+  # Write out proto text.
+  with open(out_path, 'w') as f:
+    f.write(str(type_db))

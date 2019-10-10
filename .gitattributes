@@ -1,2 +1,3 @@
 /docs/root/intro/version_history.rst merge=union
-*.pb binary
+*.generated.pb_text linguist-generated=true
+*.generated.pb_text -diff -merge

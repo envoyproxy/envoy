@@ -21,7 +21,7 @@ declare -r PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, @envoy_api//do
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/type_whisperer/type_whisperer.bzl%type_whisperer_aspect --output_groups=types_pb_text \
   --spawn_strategy=standalone --host_force_python=PY3
-declare -x -r TYPE_DB_PATH="${PWD}"/source/common/config/api_type_db.pb
+declare -x -r TYPE_DB_PATH="${PWD}"/source/common/config/api_type_db.generated.pb_text
 bazel run ${BAZEL_BUILD_OPTIONS} //tools/type_whisperer:typedb_gen --spawn_strategy=standalone -- \
   ${PWD} ${TYPE_DB_PATH} ${PROTO_TARGETS}
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
