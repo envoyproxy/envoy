@@ -39,7 +39,6 @@ jobs:
       # (on Fuzzit) is not crashing envoy. This will help find bugs BEFORE merging and not after.
       fuzzit:
         CI_TARGET: 'bazel.fuzzit_regression'
-  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
