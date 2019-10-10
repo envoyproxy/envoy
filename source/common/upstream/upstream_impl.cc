@@ -217,6 +217,41 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 
 } // namespace
 
+HostDescriptionImpl::HostDescriptionImpl(
+    ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+    Network::Address::InstanceConstSharedPtr dest_address,
+    const envoy::api::v2::core::Metadata& metadata, const envoy::api::v2::core::Locality& locality,
+    const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+    uint32_t priority)
+    : cluster_(cluster), hostname_(hostname), address_(dest_address),
+      canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                              Config::MetadataEnvoyLbKeys::get().CANARY)
+                  .bool_value()),
+      metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
+      locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
+      priority_(priority), socket_factory_(resolveTransportSocketFactory(dest_address, metadata)) {
+  if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
+    // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
+    // for a pipe address is a misconfiguration. Throw an exception.
+    throw EnvoyException(
+        fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+  }
+  health_check_address_ =
+      health_check_config.port_value() == 0
+          ? dest_address
+          : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+}
+
+Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
+    Network::Address::InstanceConstSharedPtr& dest_address,
+    const envoy::api::v2::core::Metadata& metadata) {
+  auto match = cluster_->transportSocketMatcher().resolve(metadata);
+  match.stats_.total_match_count_.inc();
+  ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
+            match.name_, dest_address ? dest_address->asString() : "empty");
+  return match.factory_;
+}
+
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
