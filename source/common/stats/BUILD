@@ -251,7 +251,5 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = [
-        ":symbol_table_lib",
-    ],
+    deps = [":symbol_table_lib"],
 )
