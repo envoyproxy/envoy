@@ -1,6 +1,9 @@
 #include "extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
+
+#include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -35,7 +38,7 @@ INSTANTIATE_TEST_SUITE_P(IpList, RouteIpListConfigTest,
                                                 ],)EOF"));
 
 TEST_P(RouteIpListConfigTest, TcpProxy) {
-  std::string json_string = R"EOF(
+  const std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
     "route_config": {
@@ -53,15 +56,15 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   }
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
+  TestUtility::loadFromJson(json_string, proto_config);
+
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
-
-  factory.createFilterFactory(*json_config, context);
 }
 
 TEST(ConfigTest, ValidateFail) {
