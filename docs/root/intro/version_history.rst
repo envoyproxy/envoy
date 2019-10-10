@@ -23,6 +23,7 @@ Version history
 * config: async data access for local and remote data source.
 * config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
 * config: added stat :ref:`init_fetch_timeout <config_cluster_manager_cds>`.
+* csrf: add PATCH to supported methods.
 * dns: added support for configuring :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>` to set the DNS refresh rate during failures.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
 * ext_authz: added tracing to the HTTP client.
@@ -84,6 +85,15 @@ Version history
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
 * zookeeper: parse responses and emit latency stats.
+
+1.11.2 (October 8, 2019)
+========================
+* http: fixed CVE-2019-15226 by adding a cached byte size in HeaderMap.
+* http: added :ref:`max headers count <envoy_api_field_core.HttpProtocolOptions.max_headers_count>` for http connections. The default limit is 100.
+* upstream: runtime feature `envoy.reloadable_features.max_response_headers_count` overrides the default limit for upstream :ref:`max headers count <envoy_api_field_Cluster.common_http_protocol_options>`
+* http: added :ref:`common_http_protocol_options <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+  Runtime feature `envoy.reloadable_features.max_request_headers_count` overrides the default limit for downstream :ref:`max headers count <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+* regex: backported safe regex matcher fix for CVE-2019-15225.
 
 1.11.1 (August 13, 2019)
 ========================
@@ -166,9 +176,7 @@ Version history
 * router: added a route name field to each http route in route.Route list
 * router: added several new variables for exposing information about the downstream TLS connection via :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`.
-* router: per try timeouts will no longer start before the downstream request has been received
-  in full by the router. This ensures that the per try timeout does not account for slow
-  downstreams and that will not start before the global timeout.
+* router: per try timeouts will no longer start before the downstream request has been received in full by the router.This ensures that the per try timeout does not account for slow downstreams and that will not start before the global timeout.
 * router: added :ref:`RouteAction's auto_host_rewrite_header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>` to allow upstream host header substitution with some other header's value
 * router: added support for UPSTREAM_REMOTE_ADDRESS :ref:`header formatter
   <config_http_conn_man_headers_custom_request_headers>`.

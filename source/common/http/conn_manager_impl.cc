@@ -506,6 +506,18 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
+  // Refresh byte sizes of the HeaderMaps before logging.
+  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
+  // HeaderMap holds an accurate internal byte size count.
+  if (request_headers_ != nullptr) {
+    request_headers_->refreshByteSize();
+  }
+  if (response_headers_ != nullptr) {
+    response_headers_->refreshByteSize();
+  }
+  if (response_trailers_ != nullptr) {
+    response_trailers_->refreshByteSize();
+  }
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                     stream_info_);
@@ -717,14 +729,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                      StreamInfo::ResponseCodeDetails::get().MissingHost);
       return;
     }
-  }
-
-  ASSERT(connection_manager_.config_.maxRequestHeadersKb() > 0);
-  if (request_headers_->byteSize() > (connection_manager_.config_.maxRequestHeadersKb() * 1024)) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
-    return;
   }
 
   // Currently we only support relative paths at the application layer. We expect the codec to have

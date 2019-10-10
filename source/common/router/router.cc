@@ -563,24 +563,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
-  auto features = cluster_->features();
+  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
 
-  Http::Protocol protocol;
-  if (features & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
-    protocol = callbacks_->streamInfo().protocol().value();
-  } else {
-    protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
-                                                                   : Http::Protocol::Http11;
-  }
-
-  if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
-          Network::ApplicationProtocols::key())) {
-    const auto& alpn =
-        callbacks_->streamInfo().filterState().getDataReadOnly<Network::ApplicationProtocols>(
-            Network::ApplicationProtocols::key());
-    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
-        "", std::vector<std::string>{}, std::vector<std::string>{alpn.value()});
-  }
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      callbacks_->streamInfo().filterState());
 
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
@@ -1398,6 +1384,15 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
+  // Prior to logging, refresh the byte size of the HeaderMaps.
+  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
+  // HeaderMap holds an accurate internal byte size count.
+  if (upstream_headers_ != nullptr) {
+    upstream_headers_->refreshByteSize();
+  }
+  if (upstream_trailers_ != nullptr) {
+    upstream_trailers_->refreshByteSize();
+  }
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);

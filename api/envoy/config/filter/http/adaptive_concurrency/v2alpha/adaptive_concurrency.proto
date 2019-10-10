@@ -6,6 +6,7 @@ option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.http.adaptive_concurrency.v2alpha";
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
@@ -70,4 +71,8 @@ message AdaptiveConcurrency {
     GradientControllerConfig gradient_controller_config = 1
         [(validate.rules).message = {required: true}];
   }
+
+  // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the
+  // message is unspecified, the filter will be enabled.
+  api.v2.core.RuntimeFeatureFlag enabled = 2;
 }

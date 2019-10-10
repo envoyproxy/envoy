@@ -333,7 +333,8 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
 }
 
 TEST_F(RouterTest, Http1Upstream) {
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocol(_))
+      .WillOnce(Return(Http::Protocol::Http11));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -356,7 +357,8 @@ TEST_F(RouterTest, Http1Upstream) {
 // x-envoy-original-path in the basic upstream test when Envoy header
 // suppression is configured.
 TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocol(_))
+      .WillOnce(Return(Http::Protocol::Http11));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -375,8 +377,8 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
 }
 
 TEST_F(RouterTest, Http2Upstream) {
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillOnce(Return(Upstream::ClusterInfo::Features::HTTP2));
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocol(_))
+      .WillOnce(Return(Http::Protocol::Http2));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -385,46 +387,6 @@ TEST_F(RouterTest, Http2Upstream) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(span_, injectContext(_));
-  router_.decodeHeaders(headers, true);
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
-  router_.onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-}
-
-TEST_F(RouterTest, UseDownstreamProtocol1) {
-  absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http11};
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
-  EXPECT_CALL(callbacks_.stream_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
-
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
-  router_.onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-}
-
-TEST_F(RouterTest, UseDownstreamProtocol2) {
-  absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http2};
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
-  EXPECT_CALL(callbacks_.stream_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
-
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
