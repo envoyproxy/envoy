@@ -565,14 +565,8 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
 
-  if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
-          Network::ApplicationProtocols::key())) {
-    const auto& alpn =
-        callbacks_->streamInfo().filterState().getDataReadOnly<Network::ApplicationProtocols>(
-            Network::ApplicationProtocols::key());
-    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
-        "", std::vector<std::string>{}, std::vector<std::string>{alpn.value()});
-  }
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      callbacks_->streamInfo().filterState());
 
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
