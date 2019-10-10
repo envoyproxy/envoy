@@ -38,7 +38,7 @@ Android requirements
 iOS requirements
 ----------------
 
-- Xcode 11.0.0
+- Xcode 11.1.0
 - Swift 5.0
 - Note: Requirements are listed in the :repo:`.bazelrc file <.bazelrc>`
 
