@@ -22,6 +22,8 @@ jobs:
 
 - job: bazel
   dependsOn: ["format"]
+  # For master builds, continue even if format fails
+  condition: or(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
   strategy:
     maxParallel: 3
     matrix:
