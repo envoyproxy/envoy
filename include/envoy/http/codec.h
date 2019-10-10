@@ -15,6 +15,13 @@ namespace Http {
 
 // Legacy default value of 60K is safely under both codec default limits.
 static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
+// Default maximum number of headers.
+static const uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
+
+const char MaxRequestHeadersCountOverrideKey[] =
+    "envoy.reloadable_features.max_request_headers_count";
+const char MaxResponseHeadersCountOverrideKey[] =
+    "envoy.reloadable_features.max_response_headers_count";
 
 class Stream;
 

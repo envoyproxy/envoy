@@ -126,7 +126,14 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build', '_venv', 'Thumbs.db', '.DS_Store']
+exclude_patterns = [
+    '_build',
+    '_venv',
+    'Thumbs.db',
+    '.DS_Store',
+    'api-v2/api/v2/endpoint/load_report.proto.rst',
+    'api-v2/service/discovery/v2/hds.proto.rst',
+]
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.

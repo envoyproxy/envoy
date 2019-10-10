@@ -10,9 +10,9 @@ option java_generic_services = true;
 import "envoy/api/v3alpha/discovery.proto";
 
 // [#not-implemented-hide:] Discovery services for endpoints, clusters, routes,
-// and listeners are retained in the package `envoy.api.v3alpha` for backwards
+// and listeners are retained in the package `envoy.api.v2` for backwards
 // compatibility with existing management servers. New development in discovery
-// services should proceed in the package `envoy.service.discovery.v3alpha`.
+// services should proceed in the package `envoy.service.discovery.v2`.
 
 // See https://github.com/lyft/envoy-api#apis for a description of the role of
 // ADS and how it is intended to be used by a management server. ADS requests

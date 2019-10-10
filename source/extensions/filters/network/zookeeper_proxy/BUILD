@@ -45,6 +45,6 @@ envoy_cc_library(
         ":proxy_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/zookeeper_proxy/v1alpha1:zookeeper_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg_cc_proto",
     ],
 )

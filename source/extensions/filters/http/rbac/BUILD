@@ -31,6 +31,6 @@ envoy_cc_library(
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/config/filter/http/rbac/v2:rbac_cc",
+        "@envoy_api//envoy/config/filter/http/rbac/v2:pkg_cc_proto",
     ],
 )

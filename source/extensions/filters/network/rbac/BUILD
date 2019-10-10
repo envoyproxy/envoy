@@ -18,7 +18,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/rbac/v2:rbac_cc",
+        "@envoy_api//envoy/config/filter/network/rbac/v2:pkg_cc_proto",
     ],
 )
 
