@@ -53,6 +53,9 @@ function cp_binary_for_image_build() {
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_"$1"
   mkdir -p "${ENVOY_SRCDIR}"/build_"$1"_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
+
+  # Copy for azp which doesn't preserve permissions, creating a tar archive
+  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
 }
 
 function bazel_binary_build() {
