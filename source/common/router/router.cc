@@ -563,15 +563,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
-  auto features = cluster_->features();
-
-  Http::Protocol protocol;
-  if (features & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
-    protocol = callbacks_->streamInfo().protocol().value();
-  } else {
-    protocol = (features & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
-                                                                   : Http::Protocol::Http11;
-  }
+  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
 
   if (callbacks_->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
           Network::ApplicationProtocols::key())) {
