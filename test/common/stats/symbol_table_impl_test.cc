@@ -557,6 +557,13 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_EQ("dynamic", table_->toString(dynamic));
   EXPECT_EQ(dynamic.data(), set->getDynamic("dynamic").data());
 
+  // Make sure blanks are always the same.
+  const Stats::StatName blank = set->getDynamic("");
+  EXPECT_EQ("", table_->toString(blank));
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic(absl::string_view()).data());
+
   // There's another corner case for the same "dynamic" name from a
   // different set. Here we will get a different StatName object
   // out of the second set, though it will share the same underlying

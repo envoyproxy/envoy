@@ -18,7 +18,7 @@ import "envoy/api/v3alpha/core/health_check.proto";
 import "envoy/api/v3alpha/core/protocol.proto";
 import "envoy/api/v3alpha/discovery.proto";
 import "envoy/api/v3alpha/eds.proto";
-import "envoy/type/percent.proto";
+import "envoy/type/v3alpha/percent.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/any.proto";
@@ -113,7 +113,8 @@ message Cluster {
     CLUSTER_PROVIDED = 6;
 
     // [#not-implemented-hide:] Use the new :ref:`load_balancing_policy
-    // <envoy_api_field_Cluster.load_balancing_policy>` field to determine the LB policy.
+    // <envoy_api_field_api.v3alpha.Cluster.load_balancing_policy>` field to determine the LB
+    // policy.
     // [#next-major-version: In the v3 API, we should consider deprecating the lb_policy field
     // and instead using the new load_balancing_policy field as the one and only mechanism for
     // configuring this.]
@@ -126,8 +127,8 @@ message Cluster {
   // specified, the DNS resolver will first perform a lookup for addresses in
   // the IPv6 family and fallback to a lookup for addresses in the IPv4 family.
   // For cluster types other than
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>` and
-  // :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>` and
+  // :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this setting is
   // ignored.
   enum DnsLookupFamily {
@@ -138,8 +139,8 @@ message Cluster {
 
   enum ClusterProtocolSelection {
     // Cluster can only operate on one of the possible upstream protocols (HTTP1.1, HTTP2).
-    // If :ref:`http2_protocol_options <envoy_api_field_Cluster.http2_protocol_options>` are
-    // present, HTTP2 will be used, otherwise HTTP1.1 will be used.
+    // If :ref:`http2_protocol_options <envoy_api_field_api.v3alpha.Cluster.http2_protocol_options>`
+    // are present, HTTP2 will be used, otherwise HTTP1.1 will be used.
     USE_CONFIGURED_PROTOCOL = 0;
 
     // Use HTTP1.1 or HTTP2, depending on which one is used on the downstream connection.
@@ -228,17 +229,17 @@ message Cluster {
 
     // The behavior used when no endpoint subset matches the selected route's
     // metadata. The value defaults to
-    // :ref:`NO_FALLBACK<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
+    // :ref:`NO_FALLBACK<envoy_api_enum_value_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
     LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Specifies the default subset of endpoints used during fallback if
     // fallback_policy is
-    // :ref:`DEFAULT_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.DEFAULT_SUBSET>`.
+    // :ref:`DEFAULT_SUBSET<envoy_api_enum_value_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.DEFAULT_SUBSET>`.
     // Each field in default_subset is
     // compared to the matching LbEndpoint.Metadata under the *envoy.lb*
     // namespace. It is valid for no hosts to match, in which case the behavior
     // is the same as a fallback_policy of
-    // :ref:`NO_FALLBACK<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
+    // :ref:`NO_FALLBACK<envoy_api_enum_value_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
     google.protobuf.Struct default_subset = 2;
 
     // For each entry, LbEndpoint.Metadata's
@@ -315,16 +316,16 @@ message Cluster {
     // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
     // provided host) the better the request distribution will reflect the desired weights. Defaults
     // to 1024 entries, and limited to 8M entries. See also
-    // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
+    // :ref:`maximum_ring_size<envoy_api_field_api.v3alpha.Cluster.RingHashLbConfig.maximum_ring_size>`.
     google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64 = {lte: 8388608}];
 
     // The hash function used to hash hosts onto the ketama ring. The value defaults to
-    // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
+    // :ref:`XX_HASH<envoy_api_enum_value_api.v3alpha.Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
     HashFunction hash_function = 3 [(validate.rules).enum = {defined_only: true}];
 
     // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
     // to further constrain resource use. See also
-    // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
+    // :ref:`minimum_ring_size<envoy_api_field_api.v3alpha.Cluster.RingHashLbConfig.minimum_ring_size>`.
     google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64 = {lte: 8388608}];
   }
 
@@ -353,7 +354,7 @@ message Cluster {
       // if zone aware routing is configured. If not specified, the default is 100%.
       // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
       // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
-      type.Percent routing_enabled = 1;
+      type.v3alpha.Percent routing_enabled = 1;
 
       // Configures minimum upstream cluster size required for zone aware routing
       // If upstream cluster size is less than specified, zone aware routing is not performed
@@ -380,7 +381,7 @@ message Cluster {
     //
     // .. note::
     //   The specified percent will be truncated to the nearest 1%.
-    type.Percent healthy_panic_threshold = 1;
+    type.v3alpha.Percent healthy_panic_threshold = 1;
 
     oneof locality_config_specifier {
       ZoneAwareLbConfig zone_aware_lb_config = 2;
@@ -433,7 +434,7 @@ message Cluster {
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
-    // :ref:`max_interval <envoy_api_field_Cluster.RefreshRate.max_interval>`.
+    // :ref:`max_interval <envoy_api_field_api.v3alpha.Cluster.RefreshRate.max_interval>`.
     google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
       required: true
       gt {nanos: 1000000}
@@ -441,8 +442,9 @@ message Cluster {
 
     // Specifies the maximum interval between refreshes. This parameter is optional, but must be
     // greater than or equal to the
-    // :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`  if set. The default
-    // is 10 times the :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`.
+    // :ref:`base_interval <envoy_api_field_api.v3alpha.Cluster.RefreshRate.base_interval>`  if set.
+    // The default is 10 times the :ref:`base_interval
+    // <envoy_api_field_api.v3alpha.Cluster.RefreshRate.base_interval>`.
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
@@ -450,9 +452,9 @@ message Cluster {
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket* in the
-  // :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>`
+  // :ref:`LbEndpoint.Metadata <envoy_api_field_api.v3alpha.endpoint.LbEndpoint.metadata>`
   // is used to match against the transport sockets as they appear in the list. The first
-  // :ref:`match <envoy_api_msg_Cluster.TransportSocketMatch>` is used.
+  // :ref:`match <envoy_api_msg_api.v3alpha.Cluster.TransportSocketMatch>` is used.
   // For example, with the following match
   //
   // .. code-block:: yaml
@@ -472,9 +474,9 @@ message Cluster {
   // Connections to the endpoints whose metadata value under *envoy.transport_socket*
   // having "acceptMTLS"/"true" key/value pair use the "enableMTLS" socket configuration.
   //
-  // If a :ref:`socket match <envoy_api_msg_Cluster.TransportSocketMatch>` with empty match
-  // criteria is provided, that always match any endpoint. For example, the "defaultToPlaintext"
-  // socket match in case above.
+  // If a :ref:`socket match <envoy_api_msg_api.v3alpha.Cluster.TransportSocketMatch>` with empty
+  // match criteria is provided, that always match any endpoint. For example, the
+  // "defaultToPlaintext" socket match in case above.
   //
   // If an endpoint metadata's value under *envoy.transport_socket* does not match any
   // *TransportSocketMatch*, socket configuration fallbacks to use the *tls_context* or
@@ -499,7 +501,7 @@ message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
   // :ref:`statistics <config_cluster_manager_cluster_stats>` if :ref:`alt_stat_name
-  // <envoy_api_field_Cluster.alt_stat_name>` is not provided.
+  // <envoy_api_field_api.v3alpha.Cluster.alt_stat_name>` is not provided.
   // Any ``:`` in the cluster name will be converted to ``_`` when emitting statistics.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -533,31 +535,31 @@ message Cluster {
   LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
 
   // If the service discovery type is
-  // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // :ref:`STATIC<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STATIC>`,
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // then hosts is required.
   //
   // .. attention::
   //
   //   **This field is deprecated**. Set the
-  //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field instead.
+  //   :ref:`load_assignment<envoy_api_field_api.v3alpha.Cluster.load_assignment>` field instead.
   //
   repeated core.Address hosts = 7;
 
   // Setting this is required for specifying members of
-  // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` clusters.
-  // This field supersedes :ref:`hosts<envoy_api_field_Cluster.hosts>` field.
+  // :ref:`STATIC<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STATIC>`,
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`
+  // clusters. This field supersedes :ref:`hosts<envoy_api_field_api.v3alpha.Cluster.hosts>` field.
   // [#comment:TODO(dio): Deprecate the hosts field and add it to :ref:`deprecated log<deprecated>`
   // once load_assignment is implemented.]
   //
   // .. attention::
   //
   //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
-  //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
-  //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
+  //   :ref:`endpoint assignments<envoy_api_msg_api.v3alpha.ClusterLoadAssignment>`.
+  //   Setting this overrides :ref:`hosts<envoy_api_field_api.v3alpha.Cluster.hosts>` values.
   //
   ClusterLoadAssignment load_assignment = 33;
 
@@ -582,8 +584,8 @@ message Cluster {
   // .. attention::
   //
   //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
-  //   verification.
+  //   :ref:`trusted_ca<envoy_api_field_api.v3alpha.auth.CertificateValidationContext.trusted_ca>`
+  //   to enable verification.
   auth.UpstreamTlsContext tls_context = 11;
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
@@ -614,24 +616,24 @@ message Cluster {
   map<string, google.protobuf.Any> typed_extension_protocol_options = 36;
 
   // If the DNS refresh rate is specified and the cluster type is either
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
   // rate. If this setting is not specified, the value defaults to 5000ms. For
   // cluster types other than
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`
+  // and :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
   google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration = {gt {}}];
 
   // If the DNS failure refresh rate is specified and the cluster type is either
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this is used as the cluster’s DNS refresh rate when requests are failing. If this setting is
   // not specified, the failure refresh rate defaults to the DNS refresh rate. For cluster types
-  // other than :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>` and
-  // :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` this setting is
-  // ignored.
+  // other than :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`
+  // and :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>` this
+  // setting is ignored.
   //
   // Note: Currently, DNS failures and empty DNS responses are not treated differently and this
   // configuration is applied in both situations.
@@ -644,18 +646,18 @@ message Cluster {
 
   // The DNS IP address resolution policy. If this setting is not specified, the
   // value defaults to
-  // :ref:`AUTO<envoy_api_enum_value_Cluster.DnsLookupFamily.AUTO>`.
+  // :ref:`AUTO<envoy_api_enum_value_api.v3alpha.Cluster.DnsLookupFamily.AUTO>`.
   DnsLookupFamily dns_lookup_family = 17 [(validate.rules).enum = {defined_only: true}];
 
   // If DNS resolvers are specified and the cluster type is either
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used to specify the cluster’s dns resolvers.
   // If this setting is not specified, the value defaults to the default
   // resolver, which uses /etc/resolv.conf for configuration. For cluster types
   // other than
-  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
+  // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`
+  // and :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
   repeated core.Address dns_resolvers = 18;
 
@@ -665,7 +667,7 @@ message Cluster {
   cluster.OutlierDetection outlier_detection = 19;
 
   // The interval for removing stale hosts from a cluster type
-  // :ref:`ORIGINAL_DST<envoy_api_enum_value_Cluster.DiscoveryType.ORIGINAL_DST>`.
+  // :ref:`ORIGINAL_DST<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.ORIGINAL_DST>`.
   // Hosts are considered stale if they have not been used
   // as upstream destinations during this interval. New hosts are added
   // to original destination clusters on demand as new connections are
@@ -675,7 +677,7 @@ message Cluster {
   // them remain open, saving the latency that would otherwise be spent
   // on opening new connections. If this setting is not specified, the
   // value defaults to 5000ms. For cluster types other than
-  // :ref:`ORIGINAL_DST<envoy_api_enum_value_Cluster.DiscoveryType.ORIGINAL_DST>`
+  // :ref:`ORIGINAL_DST<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.ORIGINAL_DST>`
   // this setting is ignored.
   google.protobuf.Duration cleanup_interval = 20 [(validate.rules).duration = {gt {}}];
 
@@ -689,8 +691,8 @@ message Cluster {
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
-  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>` and
-  // :ref:`LEAST_REQUEST<envoy_api_enum_value_Cluster.LbPolicy.LEAST_REQUEST>`
+  // :ref:`RING_HASH<envoy_api_enum_value_api.v3alpha.Cluster.LbPolicy.RING_HASH>` and
+  // :ref:`LEAST_REQUEST<envoy_api_enum_value_api.v3alpha.Cluster.LbPolicy.LEAST_REQUEST>`
   // has additional configuration options.
   // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
   // LbPolicy will generate an error at runtime.
@@ -753,8 +755,8 @@ message Cluster {
   repeated cluster.Filter filters = 40;
 
   // [#not-implemented-hide:] New mechanism for LB policy configuration. Used only if the
-  // :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>` field has the value
-  // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_api_enum_value_Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
+  // :ref:`lb_policy<envoy_api_field_api.v3alpha.Cluster.lb_policy>` field has the value
+  // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_api_enum_value_api.v3alpha.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
   LoadBalancingPolicy load_balancing_policy = 41;
 
   // [#not-implemented-hide:]

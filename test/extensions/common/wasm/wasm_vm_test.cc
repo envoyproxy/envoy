@@ -39,10 +39,19 @@ std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   return result;
 }
 
-TEST(WasmVmTest, BadVmType) { EXPECT_THROW(createWasmVm("bad.vm"), WasmException); }
+TEST(WasmVmTest, NoRuntime) {
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm(""), WasmVmException,
+                            "Failed to create WASM VM with unspecified runtime.");
+}
+
+TEST(WasmVmTest, BadRuntime) {
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm("envoy.wasm.runtime.invalid"), WasmVmException,
+                            "Failed to create WASM VM using envoy.wasm.runtime.invalid runtime. "
+                            "Envoy was compiled without support for it.");
+}
 
 TEST(WasmVmTest, NullVmStartup) {
-  auto wasm_vm = createWasmVm("envoy.wasm.vm.null");
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->cloneable());
   auto wasm_vm_clone = wasm_vm->clone();
@@ -51,7 +60,7 @@ TEST(WasmVmTest, NullVmStartup) {
 }
 
 TEST(WasmVmTest, NullVmMemory) {
-  auto wasm_vm = createWasmVm("envoy.wasm.vm.null");
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_EQ(wasm_vm->getMemorySize(), std::numeric_limits<uint64_t>::max());
   std::string d = "data";
   auto m = wasm_vm->getMemory(reinterpret_cast<uint64_t>(d.data()), d.size()).value();
@@ -78,7 +87,7 @@ TEST(WasmVmTest, NullVmMemory) {
 }
 
 TEST(WasmVmTest, NullVmStart) {
-  auto wasm_vm = createWasmVm("envoy.wasm.vm.null");
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm->load("test_null_vm_plugin", true));
   wasm_vm->link("test", false);
   // Test that context argument to start is pushed and that the effective_context_id_ is reset.

@@ -763,6 +763,16 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
   }
 }
 
+Http::Protocol
+ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
+  if (features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+    return downstream_protocol.value();
+  } else {
+    return (features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                                : Http::Protocol::Http11;
+  }
+}
+
 ClusterImplBase::ClusterImplBase(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,

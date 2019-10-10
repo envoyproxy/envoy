@@ -127,8 +127,8 @@ message Listener {
   // filters are processed sequentially right after a socket has been accepted by the listener, and
   // before a connection is created.
   // UDP Listener filters can be specified when the protocol in the listener socket address in
-  // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
-  // <envoy_api_field_core.Protocol.UDP>`.
+  // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_core.SocketAddress.Protocol.UDP>`.
   // UDP listeners currently support a single filter.
   repeated listener.ListenerFilter listener_filters = 9;
 
@@ -195,9 +195,9 @@ message Listener {
   core.TrafficDirection traffic_direction = 16;
 
   // If the protocol in the listener socket address in :ref:`protocol
-  // <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
-  // <envoy_api_field_core.Protocol.UDP>`, this field specifies the actual udp listener to create,
-  // i.e. :ref:`udp_listener_name
+  // <envoy_api_field_core.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_core.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
+  // listener to create, i.e. :ref:`udp_listener_name
   // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
   // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;

@@ -857,6 +857,12 @@ public:
    */
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
 
+  /**
+   * Calculate upstream protocol based on features.
+   */
+  virtual Http::Protocol
+  upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

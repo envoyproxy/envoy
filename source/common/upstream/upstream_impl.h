@@ -584,6 +584,8 @@ public:
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
+  Http::Protocol
+  upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
 private:
   struct ResourceManagers {

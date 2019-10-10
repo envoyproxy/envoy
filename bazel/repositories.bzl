@@ -179,7 +179,11 @@ def envoy_dependencies(skip_targets = []):
     )
 
 def _boringssl():
-    _repository_impl("boringssl")
+    _repository_impl(
+        name = "boringssl",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:boringssl_static.patch"],
+    )
 
 def _boringssl_fips():
     location = REPOSITORY_LOCATIONS["boringssl_fips"]
@@ -301,6 +305,8 @@ def _com_github_libevent_libevent():
     http_archive(
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:libevent_msvc.patch"],
         **location
     )
     native.bind(

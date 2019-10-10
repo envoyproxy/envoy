@@ -23,7 +23,7 @@ void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v2::StreamMetricsMes
   if (stream_ == nullptr) {
     stream_ = client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                                  "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
-                             *this);
+                             *this, Http::AsyncClient::StreamOptions());
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }

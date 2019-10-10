@@ -40,9 +40,10 @@ public:
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _))
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
         .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
-                                                     Grpc::RawAsyncStreamCallbacks& callbacks) {
+                                                     Grpc::RawAsyncStreamCallbacks& callbacks,
+                                                     const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<AccessLogCallbacks*>(&callbacks);
           return &stream;
         }));
@@ -134,9 +135,10 @@ TEST_F(GrpcAccessLoggerImplTest, StreamFailure) {
   InSequence s;
   initLogger(FlushInterval, 0);
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _))
-      .WillOnce(Invoke(
-          [](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+      .WillOnce(
+          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));

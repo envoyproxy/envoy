@@ -100,6 +100,7 @@ public:
  */
 template <class RouteMatcherImpl>
 class RouteMatcherFactoryBase : public NamedRouteMatcherConfigFactory {
+public:
   RouteMatcherPtr createRouteMatcher(const RouteConfigurations& route_configs,
                                      Server::Configuration::FactoryContext& context) override {
     return std::make_unique<RouteMatcherImpl>(route_configs, context);

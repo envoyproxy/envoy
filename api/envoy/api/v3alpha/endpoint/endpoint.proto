@@ -35,7 +35,7 @@ message Endpoint {
   //
   //   The form of host address depends on the given cluster type. For STATIC or EDS,
   //   it is expected to be a direct IP address (or something resolvable by the
-  //   specified :ref:`resolver <envoy_api_field_core.SocketAddress.resolver_name>`
+  //   specified :ref:`resolver <envoy_api_field_api.v3alpha.core.SocketAddress.resolver_name>`
   //   in the Address). For LOGICAL or STRICT DNS, it is expected to be hostname,
   //   and will be resolved via DNS.
   core.Address address = 1;
@@ -67,7 +67,7 @@ message LbEndpoint {
   // name should be specified as *envoy.lb*. An example boolean key-value pair
   // is *canary*, providing the optional canary status of the upstream host.
   // This may be matched against in a route's
-  // :ref:`RouteAction <envoy_api_msg_route.RouteAction>` metadata_match field
+  // :ref:`RouteAction <envoy_api_msg_api.v3alpha.route.RouteAction>` metadata_match field
   // to subset the endpoints considered in cluster load balancing.
   core.Metadata metadata = 3;
 
