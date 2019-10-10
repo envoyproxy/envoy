@@ -161,8 +161,8 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   return shard->master();
 }
 
-namespace {
-bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request) {
+bool RedisLoadBalancerContextImpl::isReadRequest(
+    const NetworkFilters::Common::Redis::RespValue& request) {
   if (request.type() != NetworkFilters::Common::Redis::RespType::Array) {
     return false;
   }
@@ -171,9 +171,15 @@ bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request) {
       first.type() != NetworkFilters::Common::Redis::RespType::BulkString) {
     return false;
   }
-  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(first.asString());
+  std::string to_lower_string(first.asString());
+  toLowerTable().toLowerCase(to_lower_string);
+  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(to_lower_string);
 }
-} // namespace
+
+const ToLowerTable& RedisLoadBalancerContextImpl::toLowerTable() {
+  static auto* table = new ToLowerTable();
+  return *table;
+}
 
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
     const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
