@@ -7,7 +7,7 @@
 namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {
 public:
-  RouteCoverage(const Envoy::Router::RouteEntry* route) : route_(*route){};
+  RouteCoverage(const Envoy::Router::Route* route) : route_(*route){};
 
   double report();
   void setClusterCovered() { cluster_covered_ = true; }
@@ -16,11 +16,11 @@ public:
   void setPathRewriteCovered() { path_rewrite_covered_ = true; }
   void setHostRewriteCovered() { host_rewrite_covered_ = true; }
   void setRedirectPathCovered() { redirect_path_covered_ = true; }
-  bool covers(const Envoy::Router::RouteEntry* route) { return &route_ == route; }
-  const Envoy::Router::RouteEntry& route() { return route_; }
+  bool covers(const Envoy::Router::Route* route);
+  const std::string routeName();
 
 private:
-  const Envoy::Router::RouteEntry& route_;
+  const Envoy::Router::Route& route_;
   bool cluster_covered_{false};
   bool virtual_cluster_covered_{false};
   bool virtual_host_covered_{false};
@@ -38,19 +38,19 @@ private:
 class Coverage : Logger::Loggable<Logger::Id::testing> {
 public:
   Coverage(envoy::api::v2::RouteConfiguration config) : route_config_(config){};
-  void markClusterCovered(const Envoy::Router::RouteEntry& route);
-  void markVirtualClusterCovered(const Envoy::Router::RouteEntry& route);
-  void markVirtualHostCovered(const Envoy::Router::RouteEntry& route);
-  void markPathRewriteCovered(const Envoy::Router::RouteEntry& route);
-  void markHostRewriteCovered(const Envoy::Router::RouteEntry& route);
-  void markRedirectPathCovered(const Envoy::Router::RouteEntry& route);
+  void markClusterCovered(const Envoy::Router::Route& route);
+  void markVirtualClusterCovered(const Envoy::Router::Route& route);
+  void markVirtualHostCovered(const Envoy::Router::Route& route);
+  void markPathRewriteCovered(const Envoy::Router::Route& route);
+  void markHostRewriteCovered(const Envoy::Router::Route& route);
+  void markRedirectPathCovered(const Envoy::Router::Route& route);
   double report();
   double detailedReport();
   void printMissingTests(const std::set<std::string>& all_route_names,
                          const std::set<std::string>& covered_route_names);
 
 private:
-  RouteCoverage& coveredRoute(const Envoy::Router::RouteEntry& route);
+  RouteCoverage& coveredRoute(const Envoy::Router::Route& route);
 
   std::vector<std::unique_ptr<RouteCoverage>> covered_routes_;
   const envoy::api::v2::RouteConfiguration route_config_;

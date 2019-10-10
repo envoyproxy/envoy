@@ -15,31 +15,53 @@ double RouteCoverage::report() {
   return static_cast<double>(route_weight) / coverageFields().size();
 }
 
-void Coverage::markClusterCovered(const Envoy::Router::RouteEntry& route) {
+bool RouteCoverage::covers(const Envoy::Router::Route* route) {
+  if (route->routeEntry() != nullptr) {
+    return route_.routeEntry() == route->routeEntry();
+  } else if (route->directResponseEntry() != nullptr) {
+    return route_.directResponseEntry() == route->directResponseEntry();
+  } else {
+    return false;
+  }
+}
+
+const std::string RouteCoverage::routeName() {
+  if (route_.routeEntry() != nullptr) {
+    return route_.routeEntry()->routeName();
+  } else if (route_.directResponseEntry() != nullptr) {
+    return route_.directResponseEntry()->routeName();
+  } else {
+    return "";
+  }
+}
+
+void Coverage::markClusterCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setClusterCovered();
 }
 
-void Coverage::markVirtualClusterCovered(const Envoy::Router::RouteEntry& route) {
+void Coverage::markVirtualClusterCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setVirtualClusterCovered();
 }
 
-void Coverage::markVirtualHostCovered(const Envoy::Router::RouteEntry& route) {
+void Coverage::markVirtualHostCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setVirtualHostCovered();
 }
 
-void Coverage::markPathRewriteCovered(const Envoy::Router::RouteEntry& route) {
+void Coverage::markPathRewriteCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setPathRewriteCovered();
 }
 
-void Coverage::markHostRewriteCovered(const Envoy::Router::RouteEntry& route) {
+void Coverage::markHostRewriteCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setHostRewriteCovered();
 }
 
-void Coverage::markRedirectPathCovered(const Envoy::Router::RouteEntry& route) {
+void Coverage::markRedirectPathCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setRedirectPathCovered();
 }
 
 double Coverage::report() {
+  std::set<std::string> all_route_names;
+  std::set<std::string> covered_route_names;
   uint64_t num_routes = 0;
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
@@ -48,9 +70,17 @@ double Coverage::report() {
       } else {
         num_routes += 1;
       }
+      all_route_names.emplace(route.name());
     }
   }
-  return 100 * static_cast<double>(covered_routes_.size()) / num_routes;
+  for (auto& covered_route : covered_routes_) {
+    covered_route_names.emplace(covered_route->routeName());
+  }
+  std::set<std::string> missing_route_names;
+  std::set_difference(all_route_names.begin(), all_route_names.end(), covered_route_names.begin(),
+                      covered_route_names.end(),
+                      std::inserter(missing_route_names, missing_route_names.end()));
+  return 100 * static_cast<double>(num_routes - missing_route_names.size()) / num_routes;
 }
 
 void Coverage::printMissingTests(const std::set<std::string>& all_route_names,
@@ -86,13 +116,13 @@ double Coverage::detailedReport() {
   double cumulative_coverage = 0;
   for (auto& covered_route : covered_routes_) {
     cumulative_coverage += covered_route->report();
-    covered_route_names.emplace(covered_route->route().routeName());
+    covered_route_names.emplace(covered_route->routeName());
   }
   printMissingTests(all_route_names, covered_route_names);
   return 100 * cumulative_coverage / num_routes;
 }
 
-RouteCoverage& Coverage::coveredRoute(const Envoy::Router::RouteEntry& route) {
+RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
   for (auto& route_coverage : covered_routes_) {
     if (route_coverage->covers(&route)) {
       return *route_coverage;
