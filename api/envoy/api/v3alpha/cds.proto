@@ -464,7 +464,7 @@ message Cluster {
   //    match:
   //      acceptMTLS: true
   //    transport_socket:
-  //      name: envoy.transport_sockets.tls
+  //      name: tls
   //      config: { ... } # tls socket configuration
   //  - name: "defaultToPlaintext"
   //    match: {}
@@ -578,8 +578,8 @@ message Cluster {
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   cluster.CircuitBreakers circuit_breakers = 10;
 
-  // Additional options when handling HTTP requests upstream. These options will be applicable to
-  // both HTTP1 and HTTP2 requests.
+  // Additional options when handling HTTP requests. These options will be applicable to both
+  // HTTP1 and HTTP2 requests.
   core.HttpProtocolOptions common_http_protocol_options = 29;
 
   // Additional options when handling HTTP1 requests.
