@@ -378,7 +378,8 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
     const auto peerExpirationTime =
         stream_info.downstreamSslConnection()->expirationPeerCertificate();
     // Treats no presented credentials as not expired
-    const bool peerExpired = peerExpirationTime.has_value() ? now > peerExpirationTime.value() : false;
+    const bool peerExpired =
+        peerExpirationTime.has_value() ? now > peerExpirationTime.value() : false;
     matches &= criteria.expired().value() == peerExpired;
   }
 
