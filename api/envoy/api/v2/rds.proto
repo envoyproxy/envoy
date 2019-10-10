@@ -56,7 +56,7 @@ service VirtualHostDiscoveryService {
   }
 }
 
-// [#comment:next free field: 10]
+// [#comment:next free field: 11]
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
@@ -107,6 +107,18 @@ message RouteConfiguration {
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
   repeated string request_headers_to_remove = 8;
+
+  // By default, headers that should be added/removed are evaluated from most to least specific:
+  //
+  // * route level
+  // * virtual host level
+  // * connection manager level
+  //
+  // To allow setting overrides at the route or virtual host level, this order can be reversed
+  // by setting this option to true. Defaults to false.
+  //
+  // [#next-major-version: In the v3 API, this will default to true.]
+  bool most_specific_header_mutations_wins = 10;
 
   // An optional boolean that specifies whether the clusters that the route
   // table refers to will be validated by the cluster manager. If set to true
