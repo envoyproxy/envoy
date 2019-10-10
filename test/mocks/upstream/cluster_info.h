@@ -90,6 +90,7 @@ public:
   MOCK_CONST_METHOD0(lbOriginalDstConfig,
                      const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
+  MOCK_CONST_METHOD0(maxResponseHeadersCount, uint32_t());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
@@ -106,12 +107,14 @@ public:
   MOCK_CONST_METHOD0(warmHosts, bool());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
+  MOCK_CONST_METHOD1(upstreamHttpProtocol, Http::Protocol(absl::optional<Http::Protocol>));
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;
   Http::Http2Settings http2_settings_{};
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};
+  uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStats stats_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;

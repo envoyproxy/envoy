@@ -8,8 +8,6 @@
 
 #include "common/protobuf/utility.h"
 
-#include "external/envoy_api/envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

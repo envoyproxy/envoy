@@ -35,8 +35,12 @@ public:
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
       drain_request_timer_ = dispatcher.createTimer([this]() { callbacks_->onWriteable(); });
     }
-    backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
-                                                                  RETRY_MAX_DELAY_MS, random_);
+
+    // TODO(htuch): Make this configurable.
+    static constexpr uint32_t RetryInitialDelayMs = 500;
+    static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
+    backoff_strategy_ =
+        std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
   void establishNewStream() {
@@ -127,10 +131,6 @@ private:
   }
 
   GrpcStreamCallbacks<ResponseProto>* const callbacks_;
-
-  // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
-  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
   Grpc::AsyncClient<RequestProto, ResponseProto> async_client_;
   Grpc::AsyncStream<RequestProto> stream_{};
