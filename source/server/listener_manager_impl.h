@@ -139,6 +139,7 @@ public:
   void stopListeners() override;
   void stopWorkers() override;
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
+  void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
@@ -205,6 +206,7 @@ private:
   const bool enable_dispatcher_stats_{};
   using UpdateFailureState = envoy::admin::v2alpha::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
+  FailureStates overall_error_state_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by

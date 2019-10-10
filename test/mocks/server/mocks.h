@@ -277,6 +277,7 @@ public:
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(stopWorkers, void());
   MOCK_METHOD0(beginListenerUpdate, void());
+  MOCK_METHOD1(endListenerUpdate, void(ListenerManager::FailureStates&&));
 };
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {

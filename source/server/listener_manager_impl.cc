@@ -547,6 +547,11 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
     dynamic_listener->mutable_error_state()->CopyFrom(state);
   }
 
+  // Dump errors not associated with named listeners.
+  for (const auto& error : overall_error_state_) {
+    config_dump->add_dynamic_listeners()->mutable_error_state()->CopyFrom(*error);
+  }
+
   return config_dump;
 }
 
@@ -890,6 +895,10 @@ void ListenerManagerImpl::stopWorkers() {
   for (const auto& worker : workers_) {
     worker->stop();
   }
+}
+
+void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
+  overall_error_state_ = std::move(failure_states);
 }
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(

@@ -46,8 +46,9 @@ void LdsApiImpl::onConfigUpdate(
     }
   }
 
-  std::vector<std::string> exception_msgs;
+  ListenerManager::FailureStates failure_state;
   std::unordered_set<std::string> listener_names;
+  std::string message;
   for (const auto& resource : added_resources) {
     envoy::api::v2::Listener listener;
     try {
@@ -64,17 +65,21 @@ void LdsApiImpl::onConfigUpdate(
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", listener.name(), e.what()));
+      failure_state.push_back(std::make_unique<envoy::admin::v2alpha::UpdateFailureState>());
+      auto& state = failure_state.back();
+      state->set_details(e.what());
+      state->mutable_failed_configuration()->PackFrom(resource);
+      message = absl::StrCat(message, fmt::format("{}: {}", listener.name(), e.what()), "\n");
     }
   }
+  listener_manager_.endListenerUpdate(std::move(failure_state));
 
   if (any_applied) {
     system_version_info_ = system_version_info;
   }
   init_target_.ready();
-  if (!exception_msgs.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+  if (!message.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}", message));
   }
 }
 
