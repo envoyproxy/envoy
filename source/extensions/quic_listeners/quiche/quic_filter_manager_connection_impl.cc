@@ -5,10 +5,10 @@
 namespace Envoy {
 namespace Quic {
 
-QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(std::unique_ptr<EnvoyQuicConnection> connection,
+QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection* connection,
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
-    : quic_connection_(std::move(connection)), dispatcher_(dispatcher), filter_manager_(*this),
+    : quic_connection_(connection), dispatcher_(dispatcher), filter_manager_(*this),
       // QUIC connection id can be 18 bytes. It's easier to use hash value instead
       // of trying to map it into a 64-bit space.
       stream_info_(dispatcher.timeSource()), id_(quic_connection_->connection_id().Hash()),
