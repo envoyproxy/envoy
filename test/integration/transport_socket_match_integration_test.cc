@@ -27,7 +27,8 @@ public:
       auto* cluster = static_resources->mutable_clusters(0);
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
       if (enable_transport_socket_match_) {
-        std::vector<std::string> yamls{R"EOF(
+        const std::string match_yaml = absl::StrFormat(
+            R"EOF(
 name: "tls_socket"
 match:
   mtlsReady: "true"
@@ -36,13 +37,13 @@ transport_socket:
   config:
     common_tls_context:
       tls_certificates:
-      - certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
-        private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
- )EOF"};
-        for (const auto& yaml : yamls) {
-          auto* transport_socket_match = cluster->add_transport_socket_matches();
-          TestUtility::loadFromYaml(yaml, *transport_socket_match);
-        }
+      - certificate_chain: { filename: "%s" }
+        private_key: { filename: "%s" }
+ )EOF",
+            TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
+            TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+        auto* transport_socket_match = cluster->add_transport_socket_matches();
+        TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
       }
       // Setup the client Envoy TLS config.
       cluster->clear_hosts();
@@ -113,15 +114,19 @@ transport_socket:
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
     envoy::api::v2::auth::DownstreamTlsContext tls_context;
-    const std::string yaml = R"EOF(
+    const std::string yaml = absl::StrFormat(
+        R"EOF(
 common_tls_context:
   tls_certificates:
-  - certificate_chain: { filename: "test/config/integration/certs/upstreamcert.pem" }
-    private_key: { filename: "test/config/integration/certs/upstreamkey.pem" }
+  - certificate_chain: { filename: "%s" }
+    private_key: { filename: "%s" }
   validation_context:
-    trusted_ca: { filename: "test/config/integration/certs/cacert.pem" }
+    trusted_ca: { filename: "%s" }
 require_client_certificate: true
-)EOF";
+)EOF",
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     TestUtility::loadFromYaml(yaml, tls_context);
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
