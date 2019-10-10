@@ -72,10 +72,6 @@ public:
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority);
 
-  Network::TransportSocketFactory&
-  resolveTransportSocketFactory(Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::api::v2::core::Metadata& metadata);
-
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return socket_factory_;
   }
@@ -132,6 +128,11 @@ public:
   }
   uint32_t priority() const override { return priority_; }
   void priority(uint32_t priority) override { priority_ = priority; }
+
+private:
+  Network::TransportSocketFactory&
+  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
+                                const envoy::api::v2::core::Metadata& metadata);
 
 protected:
   ClusterInfoConstSharedPtr cluster_;

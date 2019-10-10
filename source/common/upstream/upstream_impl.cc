@@ -243,7 +243,7 @@ HostDescriptionImpl::HostDescriptionImpl(
 }
 
 Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
-    Network::Address::InstanceConstSharedPtr& dest_address,
+    const Network::Address::InstanceConstSharedPtr& dest_address,
     const envoy::api::v2::core::Metadata& metadata) {
   auto match = cluster_->transportSocketMatcher().resolve(metadata);
   match.stats_.total_match_count_.inc();
