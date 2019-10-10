@@ -3,6 +3,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
+#include <string>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
