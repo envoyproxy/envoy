@@ -118,21 +118,21 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
   information.name_ = "information";
   information.unit_ = Stats::Histogram::Unit::Bytes;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.information_b:2|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.information:2|ms\n"), _));
   sink_->onHistogramComplete(information, 2);
 
   NiceMock<Stats::MockHistogram> duration_micro;
   duration_micro.name_ = "duration";
   duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration_us:3|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:3|ms\n"), _));
   sink_->onHistogramComplete(duration_micro, 3);
 
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";
   duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration_ms:4|ms\n"), _));
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:4|ms\n"), _));
   sink_->onHistogramComplete(duration_milli, 4);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));

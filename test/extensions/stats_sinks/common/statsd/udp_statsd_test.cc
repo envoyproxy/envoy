@@ -200,7 +200,7 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   information.unit_ = Stats::Histogram::Unit::Bytes;
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.information_b:2|ms"));
+              write("envoy.information:2|ms"));
   sink.onHistogramComplete(information, 2);
 
   NiceMock<Stats::MockHistogram> duration_micro;
@@ -208,7 +208,7 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.duration_us:3|ms"));
+              write("envoy.duration:3|ms"));
   sink.onHistogramComplete(duration_micro, 3);
 
   NiceMock<Stats::MockHistogram> duration_milli;
@@ -216,7 +216,7 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.duration_ms:4|ms"));
+              write("envoy.duration:4|ms"));
   sink.onHistogramComplete(duration_milli, 4);
 
   tls_.shutdownThread();
@@ -286,7 +286,7 @@ TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
   information.setTags(tags);
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.information_b:2|ms|#key1:value1,key2:value2"));
+              write("envoy.information:2|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(information, 2);
 
   NiceMock<Stats::MockHistogram> duration_micro;
@@ -295,7 +295,7 @@ TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
   duration_micro.setTags(tags);
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.duration_us:3|ms|#key1:value1,key2:value2"));
+              write("envoy.duration:3|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(duration_micro, 3);
 
   NiceMock<Stats::MockHistogram> duration_milli;
@@ -304,7 +304,7 @@ TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
   duration_milli.setTags(tags);
 
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.duration_ms:4|ms|#key1:value1,key2:value2"));
+              write("envoy.duration:4|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(duration_milli, 4);
 
   tls_.shutdownThread();

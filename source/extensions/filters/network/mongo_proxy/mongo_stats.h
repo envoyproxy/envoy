@@ -47,8 +47,8 @@ public:
   const Stats::StatName multi_get_;
   const Stats::StatName reply_num_docs_;
   const Stats::StatName reply_size_;
-  const Stats::StatName reply_time_;
-  const Stats::StatName time_;
+  const Stats::StatName reply_time_ms_;
+  const Stats::StatName time_ms_;
   const Stats::StatName query_;
   const Stats::StatName scatter_get_;
   const Stats::StatName total_;

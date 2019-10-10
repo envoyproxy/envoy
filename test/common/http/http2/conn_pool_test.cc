@@ -387,7 +387,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   EXPECT_CALL(cluster_->stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   expectClientConnect(0, r1);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
   r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
@@ -396,7 +396,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(cluster_->stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 

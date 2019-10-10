@@ -185,7 +185,7 @@ void ActiveMessageEncoderFilter::continueEncoding() {
 // class ActiveMessage
 ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-                           parent_.stats().request_time_, parent.time_system())),
+                           parent_.stats().request_time_ms_, parent.time_system())),
       request_id_(-1), stream_id_(parent.random_generator().random()),
       stream_info_(parent.time_system()), pending_stream_decoded_(false),
       local_response_sent_(false) {

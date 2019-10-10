@@ -307,7 +307,7 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
   EXPECT_TRUE(
-      stats_store_.histogram("server.initialization_time", Stats::Histogram::Unit::Milliseconds)
+      stats_store_.histogram("server.initialization_time_ms", Stats::Histogram::Unit::Milliseconds)
           .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }

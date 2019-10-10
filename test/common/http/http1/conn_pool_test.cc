@@ -239,9 +239,9 @@ TEST_F(Http1ConnPoolImplTest, DrainConnections) {
  */
 TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
   EXPECT_CALL(cluster_->stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   EXPECT_CALL(cluster_->stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();

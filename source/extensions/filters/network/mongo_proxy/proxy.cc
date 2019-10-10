@@ -306,7 +306,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec
                                 message.documents().size());
   names[orig_size] = mongo_stats_->reply_size_;
   mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Bytes, reply_documents_byte_size);
-  names[orig_size] = mongo_stats_->reply_time_;
+  names[orig_size] = mongo_stats_->reply_time_ms_;
   mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Milliseconds,
                                 std::chrono::duration_cast<std::chrono::milliseconds>(
                                     time_source_.monotonicTime() - active_query.start_time_)

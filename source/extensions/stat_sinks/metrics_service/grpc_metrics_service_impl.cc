@@ -65,8 +65,6 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_hist
   // information. We should make this configurable if it turns out that sending both affects
   // performance.
 
-  // TODO(troshko): update the metric service API include the histogram unit.
-
   // Add summary information for histograms.
   io::prometheus::client::MetricFamily* summary_metrics_family = message_.add_envoy_metrics();
   summary_metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);

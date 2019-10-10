@@ -22,7 +22,7 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
   }
 
   // TODO(jmarantz): use stat-names here.
-  scope_->histogram(prefix_ + "downstream_cx_length", Stats::Histogram::Unit::Milliseconds)
+  scope_->histogram(prefix_ + "downstream_cx_length_ms", Stats::Histogram::Unit::Milliseconds)
       .recordValue(span.elapsedMs());
 }
 

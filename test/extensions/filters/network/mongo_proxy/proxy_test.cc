@@ -303,7 +303,7 @@ TEST_F(MongoProxyFilterTest, Stats) {
                   Property(&Stats::Metric::name, "test.collection.test.query.reply_size"), 22));
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_time"), _));
+                  Property(&Stats::Metric::name, "test.collection.test.query.reply_time_ms"), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
@@ -397,7 +397,7 @@ TEST_F(MongoProxyFilterTest, CommandStats) {
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "test.cmd.insert.reply_size"), 22));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.insert.reply_time"), _));
+                          Property(&Stats::Metric::name, "test.cmd.insert.reply_time_ms"), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
@@ -445,7 +445,7 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
                   Property(&Stats::Metric::name, "test.collection.test.query.reply_size"), 22));
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_time"), _));
+                  Property(&Stats::Metric::name, "test.collection.test.query.reply_time_ms"), _));
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name,
@@ -455,10 +455,11 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
                           Property(&Stats::Metric::name,
                                    "test.collection.test.callsite.getByMongoId.query.reply_size"),
                           22));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name,
-                                   "test.collection.test.callsite.getByMongoId.query.reply_time"),
-                          _));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "test.collection.test.callsite.getByMongoId.query.reply_time_ms"),
+                  _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));

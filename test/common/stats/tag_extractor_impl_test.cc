@@ -344,8 +344,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   worker_id.name_ = tag_names.WORKER_ID;
   worker_id.value_ = "worker_123";
 
-  regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration",
-                         "listener_manager.dispatcher.loop_duration", {worker_id});
+  regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
+                         "listener_manager.dispatcher.loop_duration_us", {worker_id});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {

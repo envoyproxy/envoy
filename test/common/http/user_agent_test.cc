@@ -28,11 +28,12 @@ TEST(UserAgentTest, All) {
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_total"));
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_rq_total"));
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_destroy_remote_active_rq"));
-  EXPECT_CALL(stat_store, histogram("test.user_agent.ios.downstream_cx_length",
+  EXPECT_CALL(stat_store, histogram("test.user_agent.ios.downstream_cx_length_ms",
                                     Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(stat_store,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.user_agent.ios.downstream_cx_length"), _));
+  EXPECT_CALL(
+      stat_store,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "test.user_agent.ios.downstream_cx_length_ms"), _));
 
   {
     UserAgent ua;
@@ -46,12 +47,12 @@ TEST(UserAgentTest, All) {
   EXPECT_CALL(stat_store, counter("test.user_agent.android.downstream_rq_total"));
   EXPECT_CALL(stat_store,
               counter("test.user_agent.android.downstream_cx_destroy_remote_active_rq"));
-  EXPECT_CALL(stat_store, histogram("test.user_agent.android.downstream_cx_length",
+  EXPECT_CALL(stat_store, histogram("test.user_agent.android.downstream_cx_length_ms",
                                     Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(
       stat_store,
       deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "test.user_agent.android.downstream_cx_length"), _));
+          Property(&Stats::Metric::name, "test.user_agent.android.downstream_cx_length_ms"), _));
 
   {
     UserAgent ua;

@@ -67,12 +67,8 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
-  // For statsd histograms are all timers, append the ASCII SI symbol to disambiguate.
-  std::string si_name = Stats::Utility::suffixedStatsName(getName(histogram), histogram.unit());
-
-  // The "ms" here is the stat type, not to be confused with the unit symbol.
-  // statsd treats all histograms as timers so "ms" simply means a histogram.
-  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, si_name,
+  // For statsd histograms are all timers.
+  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, getName(histogram),
                                         std::chrono::milliseconds(value).count(),
                                         buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
@@ -210,9 +206,6 @@ void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
                                                 std::chrono::milliseconds ms) {
   // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
   // also currently not possible that this interleaves with any counter/gauge flushing.
-  //
-  // See UdpStatsdSink::onHistogramComplete comment for the explanation of the "ms" type and non-ms
-  // histograms.
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
       fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));

@@ -103,8 +103,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Server::OverloadManager* overload_manager,
                                              TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
-      conn_length_(new Stats::HistogramCompletableTimespanImpl(stats_.named_.downstream_cx_length_,
-                                                               time_source)),
+      conn_length_(new Stats::HistogramCompletableTimespanImpl(
+          stats_.named_.downstream_cx_length_ms_, time_source)),
       drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),

@@ -72,7 +72,7 @@ void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info,
   if (self->check_time_.tv_sec != 0) {
     timeval delta;
     evutil_timersub(&self->prepare_time_, &self->check_time_, &delta);
-    recordTimeval(self->stats_->loop_duration_, delta);
+    recordTimeval(self->stats_->loop_duration_us_, delta);
   }
 }
 
@@ -94,7 +94,7 @@ void LibeventScheduler::onCheck(evwatch*, const evwatch_check_cb_info*, void* ar
     // feeling saucy. Disregard negative delays in stats, since they don't indicate anything
     // particularly useful.
     if (delay.tv_sec >= 0) {
-      recordTimeval(self->stats_->poll_delay_, delay);
+      recordTimeval(self->stats_->poll_delay_us_, delay);
     }
   }
 }
