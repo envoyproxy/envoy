@@ -69,7 +69,7 @@ void LdsApiImpl::onConfigUpdate(
       auto& state = failure_state.back();
       state->set_details(e.what());
       state->mutable_failed_configuration()->PackFrom(resource);
-      message = absl::StrCat(message, fmt::format("{}: {}", listener.name(), e.what()), "\n");
+      absl::StrAppend(&message, listener.name(), ": ", e.what(), "\n");
     }
   }
   listener_manager_.endListenerUpdate(std::move(failure_state));

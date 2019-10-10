@@ -994,8 +994,9 @@ dynamic_listeners:
 )EOF");
 
   // And clear again.
+  ListenerManager::FailureStates empty_failure_state2;
   manager_->beginListenerUpdate();
-  manager_->endListenerUpdate(std::move(empty_failure_state));
+  manager_->endListenerUpdate(std::move(empty_failure_state2));
   checkConfigDump(R"EOF(
 dynamic_listeners:
 )EOF");
