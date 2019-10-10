@@ -89,17 +89,17 @@ private:
   class RuntimeKeyValues {
   public:
     const std::string MinRTTCalcIntervalKey =
-        "http.adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms";
+        "adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms";
     const std::string SampleRTTCalcIntervalKey =
-        "http.adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms";
+        "adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms";
     const std::string MaxConcurrencyLimitKey =
-        "http.adaptive_concurrency.gradient_controller.max_concurrency_limit";
+        "adaptive_concurrency.gradient_controller.max_concurrency_limit";
     const std::string MinRTTAggregateRequestCountKey =
-        "http.adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
-    const std::string MaxGradientKey = "http.adaptive_concurrency.gradient_controller.max_gradient";
+        "adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
+    const std::string MaxGradientKey = "adaptive_concurrency.gradient_controller.max_gradient";
     const std::string SampleAggregatePercentileKey =
-        "http.adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
-    const std::string JitterPercentKey = "http.adaptive_concurrency.gradient_controller.jitter";
+        "adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
+    const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
