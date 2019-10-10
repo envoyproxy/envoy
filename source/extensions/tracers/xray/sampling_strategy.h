@@ -43,7 +43,7 @@ public:
    * sampleRequest determines if the given request should be traced or not.
    */
   virtual bool sampleRequest(const SamplingRequest& sampling_request) {
-    (void)sampling_request; // unused for now
+    UNREFERENCED_PARAMETER(sampling_request); // unused for now
     return rng_() % 100 == 42;
   }
 

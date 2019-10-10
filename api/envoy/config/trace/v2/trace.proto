@@ -200,6 +200,7 @@ message OpenCensusConfig {
   repeated TraceContext outgoing_trace_context = 9;
 }
 
+// [#not-implemented-hide:]
 // Configuration for AWS X-Ray tracer.
 message XRayConfig {
   // The endpoint of the X-Ray Daemon where the spans will be sent. Since by default daemon

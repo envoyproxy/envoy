@@ -19,7 +19,7 @@ bool wildcardMatch(absl::string_view pattern, absl::string_view input) {
     return true;
   }
 
-  size_t i = 0, p = 0, iStar = input.size(), pStar = 0;
+  size_t i = 0, p = 0, i_star = input.size(), p_star = 0;
   while (i < input.size()) {
     if (p < pattern.size() && absl::ascii_tolower(input[i]) == absl::ascii_tolower(pattern[p])) {
       ++i;
@@ -28,11 +28,11 @@ bool wildcardMatch(absl::string_view pattern, absl::string_view input) {
       ++i;
       ++p;
     } else if (p < pattern.size() && pattern[p] == glob) {
-      iStar = i;
-      pStar = p++;
-    } else if (iStar != input.size()) {
-      i = ++iStar;
-      p = pStar + 1;
+      i_star = i;
+      p_star = p++;
+    } else if (i_star != input.size()) {
+      i = ++i_star;
+      p = p_star + 1;
     } else {
       return false;
     }
