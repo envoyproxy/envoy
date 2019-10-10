@@ -271,7 +271,8 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
-      socket_factory.createTransportSocket(transport_socket_options), connection_options);
+      socket_factory.createTransportSocket(std::move(transport_socket_options)),
+      connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;

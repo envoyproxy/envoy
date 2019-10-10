@@ -161,8 +161,8 @@ class TransportSocketMatcher {
 public:
   struct MatchData {
     MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
-              const std::string& name)
-        : factory_(factory), stats_(stats), name_(name) {}
+              std::string name)
+        : factory_(factory), stats_(stats), name_(std::move(name)) {}
     Network::TransportSocketFactory& factory_;
     TransportSocketMatchStats& stats_;
     std::string name_;

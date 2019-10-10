@@ -3,7 +3,6 @@
 #include "common/network/raw_buffer_socket.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
