@@ -426,10 +426,10 @@ void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std:
     RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
   } else if (tls_config.has_value()) {
-    inner_transport_socket.set_name("tls");
+    inner_transport_socket.set_name("envoy.transport_sockets.tls");
     inner_transport_socket.mutable_config()->MergeFrom(tls_config.value());
   } else {
-    inner_transport_socket.set_name("raw_buffer");
+    inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
   // Configure outer tap transport socket.
   transport_socket.set_name("envoy.transport_sockets.tap");

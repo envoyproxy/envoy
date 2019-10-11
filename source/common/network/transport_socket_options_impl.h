@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/transport_socket.h"
+#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace Network {
@@ -32,6 +33,18 @@ private:
   const absl::optional<std::string> override_server_name_;
   const std::vector<std::string> override_verify_san_list_;
   const std::vector<std::string> override_alpn_list_;
+};
+
+class TransportSocketOptionsUtility {
+public:
+  /**
+   * Construct TransportSocketOptions from StreamInfo::FilterState, using UpstreamServerName
+   * and ApplicationProtocols key in the filter state.
+   * @returns TransportSocketOptionsSharedPtr a shared pointer to the transport socket options,
+   * nullptr if nothing is in the filter state.
+   */
+  static TransportSocketOptionsSharedPtr
+  fromFilterState(const StreamInfo::FilterState& stream_info);
 };
 
 } // namespace Network

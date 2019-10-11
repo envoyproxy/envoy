@@ -6,7 +6,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
@@ -372,6 +371,23 @@ envoy_cc_test(
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "transport_socket_matcher_test",
+    srcs = ["transport_socket_matcher_test.cc"],
+    deps = [
+        "//include/envoy/api:api_interface",
+        "//source/common/config:metadata_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/upstream:transport_socket_match_lib",
+        "//source/server:transport_socket_config_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

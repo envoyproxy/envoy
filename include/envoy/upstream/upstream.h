@@ -785,10 +785,10 @@ public:
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
-   * @return Network::TransportSocketFactory& the factory of transport socket to use when
-   *         communicating with the cluster.
+   * @return TransportSocketMatcher& the transport socket matcher associated
+   * factory.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.
@@ -856,6 +856,12 @@ public:
    * Create network filters on a new upstream connection.
    */
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
+
+  /**
+   * Calculate upstream protocol based on features.
+   */
+  virtual Http::Protocol
+  upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
 protected:
   /**

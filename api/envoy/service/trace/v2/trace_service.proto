@@ -8,9 +8,10 @@ option java_package = "io.envoyproxy.envoy.service.trace.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "opencensus/proto/trace/v1/trace.proto";
 
 import "google/api/annotations.proto";
+
+import "opencensus/proto/trace/v1/trace.proto";
 
 import "validate/validate.proto";
 
@@ -30,7 +31,7 @@ message StreamTracesResponse {
 message StreamTracesMessage {
   message Identifier {
     // The node sending the access log messages over the stream.
-    envoy.api.v2.core.Node node = 1 [(validate.rules).message.required = true];
+    api.v2.core.Node node = 1 [(validate.rules).message = {required: true}];
   }
 
   // Identifier data effectively is a structured metadata.

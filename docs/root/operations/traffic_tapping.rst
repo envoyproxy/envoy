@@ -45,7 +45,7 @@ or cluster. For a plain text socket this might look like:
                 file_per_tap:
                   path_prefix: /some/tap/path
       transport_socket:
-        name: raw_buffer
+        name: envoy.transport_sockets.raw_buffer
 
 For a TLS socket, this will be:
 
@@ -64,7 +64,7 @@ For a TLS socket, this will be:
                 file_per_tap:
                   path_prefix: /some/tap/path
       transport_socket:
-        name: ssl
+        name: envoy.transport_sockets.tls
         config: <TLS context>
 
 where the TLS context configuration replaces any existing :ref:`downstream
