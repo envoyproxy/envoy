@@ -82,8 +82,6 @@ double Coverage::report(bool detailed) {
                       std::inserter(missing_route_names, missing_route_names.end()));
   if (detailed) {
     printMissingTests(missing_route_names);
-
-    // Calculate cumulative coverage.
     double cumulative_coverage = getCumulativeCoverage(all_route_names, missing_route_names);
     return 100 * cumulative_coverage / num_routes;
   } else {
