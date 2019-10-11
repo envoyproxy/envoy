@@ -26,9 +26,9 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
                                        absl::string_view method_name, Buffer::InstancePtr&& request,
                                        RawAsyncRequestCallbacks& callbacks,
                                        Tracing::Span& parent_span,
-                                       const absl::optional<std::chrono::milliseconds>& timeout) {
+                                       const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new AsyncRequestImpl(
-      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, timeout);
+      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
   std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
 
   grpc_stream->initialize(true);
@@ -42,10 +42,10 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
 
 RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
                                           absl::string_view method_name,
-                                          RawAsyncStreamCallbacks& callbacks) {
-  const absl::optional<std::chrono::milliseconds> no_timeout;
-  auto grpc_stream = std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name,
-                                                       callbacks, no_timeout);
+                                          RawAsyncStreamCallbacks& callbacks,
+                                          const Http::AsyncClient::StreamOptions& options) {
+  auto grpc_stream =
+      std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name, callbacks, options);
 
   grpc_stream->initialize(false);
   if (grpc_stream->hasResetStream()) {
@@ -58,9 +58,9 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-                                 const absl::optional<std::chrono::milliseconds>& timeout)
+                                 const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
-      callbacks_(callbacks), timeout_(timeout) {}
+      callbacks_(callbacks), options_(options) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
@@ -71,9 +71,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 
   auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
   dispatcher_ = &http_async_client.dispatcher();
-  stream_ = http_async_client.start(
-      *this, Http::AsyncClient::StreamOptions().setTimeout(timeout_).setBufferBodyForRetry(
-                 buffer_body_for_retry));
+  stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
 
   if (stream_ == nullptr) {
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, EMPTY_STRING);
@@ -85,7 +83,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
   headers_message_ =
       Common::prepareHeaders(parent_.remote_cluster_name_, service_full_name_, method_name_,
-                             absl::optional<std::chrono::milliseconds>(timeout_));
+                             absl::optional<std::chrono::milliseconds>(options_.timeout));
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
     headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
@@ -212,8 +210,8 @@ void AsyncStreamImpl::cleanup() {
 AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                    absl::string_view method_name, Buffer::InstancePtr&& request,
                                    RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                   const absl::optional<std::chrono::milliseconds>& timeout)
-    : AsyncStreamImpl(parent, service_full_name, method_name, *this, timeout),
+                                   const Http::AsyncClient::RequestOptions& options)
+    : AsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
 
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),

@@ -355,9 +355,8 @@ public:
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
-    request->grpc_request_ =
-        grpc_client_->send(*method_descriptor_, request_msg, *request, active_span,
-                           absl::optional<std::chrono::milliseconds>());
+    request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
+                                                active_span, Http::AsyncClient::RequestOptions());
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
@@ -391,7 +390,8 @@ public:
           }
         }));
 
-    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream);
+    stream->grpc_stream_ =
+        grpc_client_->start(*method_descriptor_, *stream, Http::AsyncClient::StreamOptions());
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {

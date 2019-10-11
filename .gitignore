@@ -4,6 +4,7 @@ BROWSE
 /build_*
 *.bzlc
 .cache
+.clangd
 .classpath
 .clwb/
 /ci/bazel-*

@@ -8,7 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/api/v3alpha/core:pkg",
         "//envoy/api/v3alpha/route:pkg",
-        "//envoy/type/matcher:pkg",
+        "//envoy/type/matcher/v3alpha:pkg",
         "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
     ],
 )
