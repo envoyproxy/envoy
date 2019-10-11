@@ -206,6 +206,17 @@ message Listener {
   // "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;
 
+  // [#not-implemented-hide:]
+  // Used to represent an API listener, which is used in non-proxy clients. The type of API
+  // exposed to the non-proxy application depends on the type of API listener.
+  // When this field is set, no other field except for
+  // :ref:`name<envoy_api_field_api.v3alpha.Listener.name>` should be set.
+  // [#next-major-version: In the v3 API, instead of this messy approach where the socket
+  // listener fields are directly in the top-level Listener message and the API listener types
+  // are in the ApiListener message, the socket listener messages should be in their own message,
+  // and the top-level Listener should essentially be a oneof that selects between the
+  // socket listener and the various types of API listener. That way, a given Listener message
+  // can structurally only contain the fields of the relevant type.]
   config.listener.v2.ApiListener api_listener = 19;
 
   // The listener's connection balancer configuration, currently only applicable to TCP listeners.

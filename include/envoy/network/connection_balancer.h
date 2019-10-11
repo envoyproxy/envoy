@@ -53,7 +53,7 @@ public:
   virtual void unregisterHandler(BalancedConnectionHandler& handler) PURE;
 
   /**
-   * Picket a target handler to send a connection to.
+   * Pick a target handler to send a connection to.
    * @param current_handler supplies the currently executing connection handler.
    * @return current_handler if the connection should stay bound to the current handler, or a
    *         different handler if the connection should be rebalanced.
