@@ -3,6 +3,7 @@
 #include <memory>
 #include <random>
 
+#include "envoy/common/macros.h"
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
