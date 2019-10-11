@@ -191,7 +191,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-	EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
 // Verifies that the filter responds with a configurable HTTP status when an network error occurs.
@@ -203,7 +203,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
     envoy_grpc:
       cluster_name: "ext_authz_server"
   failure_mode_allow: false
-  status_on_error: 
+  status_on_error:
     code: 503
   )EOF");
 
@@ -227,7 +227,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-	EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ("ext_authz_error", filter_callbacks_.details_);
 }
 
@@ -914,14 +914,6 @@ TEST_F(HttpFilterTestParam, NoRoute) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
-// Test that the request continues when the authorization service cluster is not present.
-TEST_F(HttpFilterTestParam, NoCluster) {
-  EXPECT_CALL(filter_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-}
-
 // Test that the request is stopped till there is an OK response back after which it continues on.
 TEST_F(HttpFilterTestParam, OkResponse) {
   InSequence s;
@@ -936,6 +928,7 @@ TEST_F(HttpFilterTestParam, OkResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
+
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
       .Times(0);
@@ -943,8 +936,7 @@ TEST_F(HttpFilterTestParam, OkResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
-
+  EXPECT_EQ(1U, config_->stats().ok_.value());
   // decodeData() and decodeTrailers() are called after continueDecoding().
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -969,7 +961,7 @@ TEST_F(HttpFilterTestParam, ImmediateOkResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
 // Test that an synchronous denied response from the authorization service passing additional HTTP
@@ -995,11 +987,11 @@ TEST_F(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
   // When request is denied, no call to continueDecoding(). As a result, decodeData() and
   // decodeTrailer() will not be called.
 }
-
+//
 // Test that an synchronous ok response from the authorization service passing additional HTTP
 // attributes to the upstream.
 TEST_F(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
@@ -1057,7 +1049,7 @@ TEST_F(HttpFilterTestParam, ImmediateDeniedResponse) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
   // When request is denied, no call to continueDecoding(). As a result, decodeData() and
   // decodeTrailer() will not be called.
 }
@@ -1085,7 +1077,7 @@ TEST_F(HttpFilterTestParam, DeniedResponseWith401) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
 }
 
@@ -1112,7 +1104,7 @@ TEST_F(HttpFilterTestParam, DeniedResponseWith403) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
@@ -1157,7 +1149,7 @@ TEST_F(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
@@ -1207,7 +1199,7 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
@@ -1232,7 +1224,7 @@ TEST_F(HttpFilterTestParam, ResetDuringCall) {
 // Regression test for https://github.com/envoyproxy/envoy/pull/8436.
 // Test that ext_authz filter is not in noop mode when cluster is not specified per route
 // (this could be the case when route is configured with redirect or direct response action).
-TEST_F(HttpFilterTestParam, CustomTest) {
+TEST_F(HttpFilterTestParam, NoCluster) {
 
   ON_CALL(filter_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
 
@@ -1249,9 +1241,13 @@ TEST_F(HttpFilterTestParam, CustomTest) {
 
   // Save the check request from the check call.
   envoy::service::auth::v2::CheckRequest check_request;
+
   EXPECT_CALL(*client_, check(_, _, _))
       .WillOnce(WithArgs<1>(Invoke([&](const envoy::service::auth::v2::CheckRequest& check_param)
                                        -> void { check_request = check_param; })));
+  // Make sure that filter chain is not continued and the call has been invoked.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Engage the filter so that check is called.
   filter_->decodeHeaders(request_headers_, false);
