@@ -734,6 +734,5 @@ void ClientConnectionImpl::connect() {
     socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
   }
 }
-
 } // namespace Network
 } // namespace Envoy

@@ -526,6 +526,7 @@ public:
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
                bool enable_half_close = false);
+
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system, bool enable_half_close = false);

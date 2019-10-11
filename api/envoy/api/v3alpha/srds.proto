@@ -21,7 +21,7 @@ import "validate/validate.proto";
 // resources. Each ScopedRouteConfiguration resource represents a "routing
 // scope" containing a mapping that allows the HTTP connection manager to
 // dynamically assign a routing table (specified via a
-// :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` message) to each
+// :ref:`RouteConfiguration<envoy_api_msg_api.v3alpha.RouteConfiguration>` message) to each
 // HTTP request.
 service ScopedRoutesDiscoveryService {
   rpc StreamScopedRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
@@ -39,7 +39,7 @@ service ScopedRoutesDiscoveryService {
 }
 
 // Specifies a routing scope, which associates a
-// :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>` to a
+// :ref:`Key<envoy_api_msg_api.v3alpha.ScopedRouteConfiguration.Key>` to a
 // :ref:`envoy_api_msg_RouteConfiguration` (identified by its resource name).
 //
 // The HTTP connection manager builds up a table consisting of these Key to

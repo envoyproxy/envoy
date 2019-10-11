@@ -11,6 +11,6 @@ api_proto_package(
         "//envoy/api/v3alpha/core:pkg",
         "//envoy/config/bootstrap/v3alpha:pkg",
         "//envoy/service/tap/v3alpha:pkg",
-        "//envoy/type:pkg",
+        "//envoy/type/v3alpha:pkg",
     ],
 )

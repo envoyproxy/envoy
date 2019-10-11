@@ -217,10 +217,46 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 
 } // namespace
 
+HostDescriptionImpl::HostDescriptionImpl(
+    ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+    Network::Address::InstanceConstSharedPtr dest_address,
+    const envoy::api::v2::core::Metadata& metadata, const envoy::api::v2::core::Locality& locality,
+    const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+    uint32_t priority)
+    : cluster_(cluster), hostname_(hostname), address_(dest_address),
+      canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                              Config::MetadataEnvoyLbKeys::get().CANARY)
+                  .bool_value()),
+      metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
+      locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
+      priority_(priority), socket_factory_(resolveTransportSocketFactory(dest_address, metadata)) {
+  if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
+    // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
+    // for a pipe address is a misconfiguration. Throw an exception.
+    throw EnvoyException(
+        fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+  }
+  health_check_address_ =
+      health_check_config.port_value() == 0
+          ? dest_address
+          : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+}
+
+Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
+    const Network::Address::InstanceConstSharedPtr& dest_address,
+    const envoy::api::v2::core::Metadata& metadata) {
+  auto match = cluster_->transportSocketMatcher().resolve(metadata);
+  match.stats_.total_match_count_.inc();
+  ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
+            match.name_, dest_address ? dest_address->asString() : "empty");
+  return match.factory_;
+}
+
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options, transport_socket_options),
+  return {createConnection(dispatcher, *cluster_, address_, socket_factory_, options,
+                           transport_socket_options),
           shared_from_this()};
 }
 
@@ -244,13 +280,15 @@ void HostImpl::setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), socket_factory_, nullptr,
+                           nullptr),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           Network::Address::InstanceConstSharedPtr address,
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           Network::TransportSocketFactory& socket_factory,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
@@ -266,10 +304,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
-      cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
+      socket_factory.createTransportSocket(std::move(transport_socket_options)),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
@@ -587,7 +624,7 @@ private:
 
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
-    Runtime::Loader& runtime, Network::TransportSocketFactoryPtr&& socket_factory,
+    Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -602,7 +639,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      transport_socket_factory_(std::move(socket_factory)), stats_scope_(std::move(stats_scope)),
+      socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
@@ -782,8 +819,10 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
+  auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
+      cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
-      cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
+      cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_matcher),
       std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor(),
       factory_context);
   // Create the default (empty) priority set before registering callbacks to
