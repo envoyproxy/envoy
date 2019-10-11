@@ -37,7 +37,7 @@ message DiscoveryRequest {
   repeated string resource_names = 3;
 
   // Type of the resource that is being requested, e.g.
-  // "type.googleapis.com/envoy.api.v3alpha.ClusterLoadAssignment". This is implicit
+  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
   // in requests made via singleton xDS APIs such as CDS, LDS, etc. but is
   // required for ADS.
   string type_url = 4;
@@ -49,10 +49,11 @@ message DiscoveryRequest {
   // delta, where it is populated only for new explicit ACKs).
   string response_nonce = 5;
 
-  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
-  // failed to update configuration. The *message* field in *error_details* provides the Envoy
-  // internal exception related to the failure. It is only intended for consumption during manual
-  // debugging, the string provided is not guaranteed to be stable across Envoy versions.
+  // This is populated when the previous :ref:`DiscoveryResponse
+  // <envoy_api_msg_api.v3alpha.DiscoveryResponse>` failed to update configuration. The *message*
+  // field in *error_details* provides the Envoy internal exception related to the failure. It is
+  // only intended for consumption during manual debugging, the string provided is not guaranteed to
+  // be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
 }
 
@@ -135,7 +136,7 @@ message DeltaDiscoveryRequest {
   core.Node node = 1;
 
   // Type of the resource that is being requested, e.g.
-  // "type.googleapis.com/envoy.api.v3alpha.ClusterLoadAssignment".
+  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment".
   string type_url = 2;
 
   // DeltaDiscoveryRequests allow the client to add or remove individual
@@ -180,9 +181,9 @@ message DeltaDiscoveryRequest {
   // Otherwise (unlike in DiscoveryRequest) response_nonce must be omitted.
   string response_nonce = 6;
 
-  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
-  // failed to update configuration. The *message* field in *error_details*
-  // provides the Envoy internal exception related to the failure.
+  // This is populated when the previous :ref:`DiscoveryResponse
+  // <envoy_api_msg_api.v3alpha.DiscoveryResponse>` failed to update configuration. The *message*
+  // field in *error_details* provides the Envoy internal exception related to the failure.
   google.rpc.Status error_detail = 7;
 }
 

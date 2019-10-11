@@ -42,6 +42,7 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
+#include "common/upstream/transport_socket_match_impl.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -60,7 +61,8 @@ public:
 /**
  * Implementation of Upstream::HostDescription.
  */
-class HostDescriptionImpl : virtual public HostDescription {
+class HostDescriptionImpl : virtual public HostDescription,
+                            protected Logger::Loggable<Logger::Id::upstream> {
 public:
   HostDescriptionImpl(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
@@ -68,28 +70,12 @@ public:
       const envoy::api::v2::core::Metadata& metadata,
       const envoy::api::v2::core::Locality& locality,
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority)
-      : cluster_(cluster), hostname_(hostname), address_(dest_address),
-        canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
-                                                Config::MetadataEnvoyLbKeys::get().CANARY)
-                    .bool_value()),
-        metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
-        locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
-        priority_(priority) {
-    if (health_check_config.port_value() != 0 &&
-        dest_address->type() != Network::Address::Type::Ip) {
-      // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
-      // for a pipe address is a misconfiguration. Throw an exception.
-      throw EnvoyException(
-          fmt::format("Invalid host configuration: non-zero port for non-IP address"));
-    }
-    health_check_address_ =
-        health_check_config.port_value() == 0
-            ? dest_address
-            : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+      uint32_t priority);
+
+  Network::TransportSocketFactory& transportSocketFactory() const override {
+    return socket_factory_;
   }
 
-  // Upstream::HostDescription
   bool canary() const override { return canary_; }
   void canary(bool is_canary) override { canary_ = is_canary; }
 
@@ -143,6 +129,11 @@ public:
   uint32_t priority() const override { return priority_; }
   void priority(uint32_t priority) override { priority_ = priority; }
 
+private:
+  Network::TransportSocketFactory&
+  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
+                                const envoy::api::v2::core::Metadata& metadata);
+
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
@@ -157,6 +148,7 @@ protected:
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
+  Network::TransportSocketFactory& socket_factory_;
 };
 
 /**
@@ -188,6 +180,7 @@ public:
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
+
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
     return stats_.gauges();
@@ -236,7 +229,8 @@ public:
 protected:
   static Network::ClientConnectionPtr
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                   Network::Address::InstanceConstSharedPtr address,
+                   const Network::Address::InstanceConstSharedPtr& address,
+                   Network::TransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
@@ -512,9 +506,8 @@ class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::I
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Network::TransportSocketFactoryPtr&& socket_factory,
-                  Stats::ScopePtr&& stats_scope, bool added_via_api,
-                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
+                  bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
@@ -561,9 +554,7 @@ public:
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
-  Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
-  }
+  TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -608,7 +599,7 @@ private:
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
+  TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;

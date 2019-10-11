@@ -44,13 +44,14 @@ service RouteDiscoveryService {
 // Virtual Host Discovery Service (VHDS) is used to dynamically update the list of virtual hosts for
 // a given RouteConfiguration. If VHDS is configured a virtual host list update will be triggered
 // during the processing of an HTTP request if a route for the request cannot be resolved. The
-// :ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>`
-// field contains a list of virtual host names or aliases to track. The contents of an alias would
-// be the contents of a *host* or *authority* header used to make an http request. An xDS server
-// will match an alias to a virtual host based on the content of :ref:`domains'
-// <envoy_api_msg_route.VirtualHost.domains>` field. The *resource_names_unsubscribe* field contains
-// a list of virtual host names that have been :ref:`unsubscribed <xds_protocol_unsubscribe>`
-// from the routing table associated with the RouteConfiguration.
+// :ref:`resource_names_subscribe
+// <envoy_api_field_api.v3alpha.DeltaDiscoveryRequest.resource_names_subscribe>` field contains a
+// list of virtual host names or aliases to track. The contents of an alias would be the contents of
+// a *host* or *authority* header used to make an http request. An xDS server will match an alias to
+// a virtual host based on the content of :ref:`domains'
+// <envoy_api_field_api.v3alpha.route.VirtualHost.domains>` field. The *resource_names_unsubscribe*
+// field contains a list of virtual host names that have been :ref:`unsubscribed
+// <xds_protocol_unsubscribe>` from the routing table associated with the RouteConfiguration.
 service VirtualHostDiscoveryService {
   rpc DeltaVirtualHosts(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
@@ -61,7 +62,7 @@ message RouteConfiguration {
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.Rds.route_config_name>`
-  // in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v3alpha.Rds`.
+  // in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.Rds`.
   string name = 1;
 
   // An array of virtual hosts that make up the route table.

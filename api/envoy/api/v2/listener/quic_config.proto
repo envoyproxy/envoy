@@ -11,6 +11,8 @@ option ruby_package = "Envoy.Api.V2.ListenerNS";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+// [#protodoc-title: QUIC listener Config]
+
 // Configuration specific to the QUIC protocol.
 // Next id: 4
 message QuicProtocolOptions {

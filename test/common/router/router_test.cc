@@ -4036,22 +4036,13 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
 
 TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
-    Upstream::MockClusterInfo cluster;
     Http::TestHeaderMapImpl headers;
-    Network::MockTransportSocketFactory transport_socket_factory;
-    EXPECT_CALL(cluster, transportSocketFactory()).WillOnce(ReturnRef(transport_socket_factory));
-    EXPECT_CALL(transport_socket_factory, implementsSecureTransport()).WillOnce(Return(false));
-    FilterUtility::setUpstreamScheme(headers, cluster);
+    FilterUtility::setUpstreamScheme(headers, false);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
   {
-    Upstream::MockClusterInfo cluster;
-    Ssl::MockClientContext context;
     Http::TestHeaderMapImpl headers;
-    Network::MockTransportSocketFactory transport_socket_factory;
-    EXPECT_CALL(cluster, transportSocketFactory()).WillOnce(ReturnRef(transport_socket_factory));
-    EXPECT_CALL(transport_socket_factory, implementsSecureTransport()).WillOnce(Return(true));
-    FilterUtility::setUpstreamScheme(headers, cluster);
+    FilterUtility::setUpstreamScheme(headers, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
 }

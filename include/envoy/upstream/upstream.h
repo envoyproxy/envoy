@@ -785,10 +785,10 @@ public:
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
-   * @return Network::TransportSocketFactory& the factory of transport socket to use when
-   *         communicating with the cluster.
+   * @return TransportSocketMatcher& the transport socket matcher associated
+   * factory.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.
