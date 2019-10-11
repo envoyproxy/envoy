@@ -27,7 +27,7 @@ namespace ConcurrencyController {
  */
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                              \
   COUNTER(rq_blocked)                                                                              \
-  GAUGE(min_rtt_calculation_active)                                                                \
+  GAUGE(min_rtt_calculation_active, Accumulate)                                                    \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(burst_queue_size, NeverImport)                                                             \
