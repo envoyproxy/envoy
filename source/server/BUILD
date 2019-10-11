@@ -258,8 +258,26 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "listener_manager_lib",
-    srcs = ["listener_manager_impl.cc"],
-    hdrs = ["listener_manager_impl.h"],
+    srcs = [
+        "listener_impl.cc",
+    ],
+    hdrs = [
+        "listener_impl.h",
+    ],
+    deps = [
+        ":listener_manager_impl",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_manager_impl",
+    srcs = [
+        "listener_manager_impl.cc",
+    ],
+    hdrs = [
+        "listener_impl.h",
+        "listener_manager_impl.h",
+    ],
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",
