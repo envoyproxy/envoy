@@ -3,8 +3,9 @@
 #include <memory>
 #include <random>
 
-#include "envoy/common/macros.h"
 #include "envoy/common/pure.h"
+
+#include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
 

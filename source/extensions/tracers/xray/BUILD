@@ -27,6 +27,7 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/common:macros",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/tracing:http_tracer_lib",
