@@ -53,10 +53,10 @@ service LoadReportingService {
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsRequest {
   // Node identifier for Envoy instance.
-  envoy.api.v3alpha.core.Node node = 1;
+  api.v3alpha.core.Node node = 1;
 
   // A list of load stats to report.
-  repeated envoy.api.v3alpha.endpoint.ClusterStats cluster_stats = 2;
+  repeated api.v3alpha.endpoint.ClusterStats cluster_stats = 2;
 }
 
 // The management server sends envoy a LoadStatsResponse with all clusters it
@@ -64,7 +64,7 @@ message LoadStatsRequest {
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsResponse {
   // Clusters to report stats for.
-  repeated string clusters = 1 [(validate.rules).repeated .min_items = 1];
+  repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 
   // The minimum interval of time to collect stats over. This is only a minimum for two reasons:
   // 1. There may be some delay from when the timer fires until stats sampling occurs.
