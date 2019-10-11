@@ -156,8 +156,8 @@ public:
   }
 
   const SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) const {
-    return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_SR_monitor_
-                                                            : local_origin_SR_monitor_;
+    return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_sr_monitor_
+                                                            : local_origin_sr_monitor_;
   }
 
   SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) {
@@ -197,8 +197,8 @@ private:
   //   and for external origin failures when external/local events are split
   // - local origin: for local events when external/local events are split and
   //   not used when external/local events are not split.
-  SuccessRateMonitor external_origin_SR_monitor_;
-  SuccessRateMonitor local_origin_SR_monitor_;
+  SuccessRateMonitor external_origin_sr_monitor_;
+  SuccessRateMonitor local_origin_sr_monitor_;
 
   void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
@@ -396,17 +396,17 @@ private:
   EventLoggerSharedPtr event_logger_;
 
   // EjectionPair for external and local origin events.
-  // When external/local origin events are not split, external_origin_SR_num_ are used for
-  // both types of events: external and local. local_origin_SR_num_ is not used.
-  // When external/local origin events are split, external_origin_SR_num_ are used only
-  // for external events and local_origin_SR_num_ is used for local origin events.
-  EjectionPair external_origin_SR_num_;
-  EjectionPair local_origin_SR_num_;
+  // When external/local origin events are not split, external_origin_sr_num_ are used for
+  // both types of events: external and local. local_origin_sr_num_ is not used.
+  // When external/local origin events are split, external_origin_sr_num_ are used only
+  // for external events and local_origin_sr_num_ is used for local origin events.
+  EjectionPair external_origin_sr_num_;
+  EjectionPair local_origin_sr_num_;
 
   const EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) const {
     return (DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin == monitor_type)
-               ? external_origin_SR_num_
-               : local_origin_SR_num_;
+               ? external_origin_sr_num_
+               : local_origin_sr_num_;
   }
   EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
     return const_cast<EjectionPair&>(

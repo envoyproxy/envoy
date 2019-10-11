@@ -529,6 +529,7 @@ public:
  * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+public:
   ProtocolPtr createProtocol() override { return std::move(std::make_unique<ProtocolImpl>()); }
 
   std::string name() override { return name_; }

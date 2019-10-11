@@ -253,6 +253,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "transport_socket_match_integration_test",
+    srcs = [
+        "transport_socket_match_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/common/upstream:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "http_timeout_integration_test",
     srcs = [
         "http_timeout_integration_test.cc",

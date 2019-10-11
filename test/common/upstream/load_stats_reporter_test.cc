@@ -83,16 +83,16 @@ public:
 
 // Validate that stream creation results in a timer based retry.
 TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   createLoadStatsReporter();
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }
 
 TEST_F(LoadStatsReporterTest, TestPubSub) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createLoadStatsReporter();
   deliverLoadStatsResponse({"foo"});
@@ -110,7 +110,7 @@ TEST_F(LoadStatsReporterTest, TestPubSub) {
 
 // Validate treatment of existing clusters across updates.
 TEST_F(LoadStatsReporterTest, ExistingClusters) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
@@ -218,13 +218,13 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
 
 // Validate that the client can recover from a remote stream closure via retry.
 TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
   EXPECT_CALL(*response_timer_, disableTimer());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   load_stats_reporter_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }

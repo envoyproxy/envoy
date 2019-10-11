@@ -1228,7 +1228,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
-      maxRequestHeadersKb());
+      maxRequestHeadersKb(), maxRequestHeadersCount());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

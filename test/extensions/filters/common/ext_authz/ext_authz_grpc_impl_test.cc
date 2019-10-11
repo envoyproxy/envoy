@@ -44,14 +44,13 @@ public:
   void expectCallSend(envoy::service::auth::v2::CheckRequest& request) {
     EXPECT_CALL(*async_client_,
                 sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-        .WillOnce(Invoke(
-            [this](
-                absl::string_view service_full_name, absl::string_view method_name,
-                Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                const absl::optional<std::chrono::milliseconds>& timeout) -> Grpc::AsyncRequest* {
+        .WillOnce(
+            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
+                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(use_alpha_ ? V2Alpha : V2, service_full_name);
               EXPECT_EQ("Check", method_name);
-              EXPECT_EQ(timeout_->count(), timeout->count());
+              EXPECT_EQ(timeout_->count(), options.timeout->count());
               return &async_request_;
             }));
   }

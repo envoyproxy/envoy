@@ -157,7 +157,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
       .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
         EXPECT_EQ(*listen_socket_->localAddress(), *socket.localAddress());
-        EXPECT_EQ(Extensions::TransportSockets::TransportSocketNames::get().Quic,
+        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                   socket.detectedTransportProtocol());
         EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(socket.remoteAddress()));
         return &filter_chain;

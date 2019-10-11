@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -16,15 +17,21 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&,
-    Runtime::Loader&, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
-    : stats_prefix_(std::move(stats_prefix)), time_source_(time_source) {}
+    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
+        proto_config,
+    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
+    : stats_prefix_(std::move(stats_prefix)), time_source_(time_source),
+      adaptive_concurrency_feature_(proto_config.enabled(), runtime) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
     : config_(std::move(config)), controller_(std::move(controller)) {}
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
+  if (!config_->filterEnabled()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (controller_->forwardingDecision() == ConcurrencyController::RequestForwardingAction::Block) {
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "reached concurrency limit");
