@@ -156,7 +156,6 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     }
     // If so, which one (by type_url)?
     std::string next_request_type_url = maybe_request_type.value();
-    // If we don't have a subscription object for this request's type_url, drop the request.
     SubscriptionState& sub = subscriptionStateFor(next_request_type_url);
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
