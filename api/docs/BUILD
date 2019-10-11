@@ -29,6 +29,7 @@ proto_library(
         "//envoy/config/filter/accesslog/v2:pkg",
         "//envoy/config/filter/dubbo/router/v2alpha1:pkg",
         "//envoy/config/filter/fault/v2:pkg",
+        "//envoy/config/filter/http/adaptive_concurrency/v2alpha:pkg",
         "//envoy/config/filter/http/buffer/v2:pkg",
         "//envoy/config/filter/http/csrf/v2:pkg",
         "//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:pkg",

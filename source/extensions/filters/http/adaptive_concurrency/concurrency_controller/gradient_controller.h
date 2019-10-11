@@ -27,6 +27,7 @@ namespace ConcurrencyController {
  */
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                              \
   COUNTER(rq_blocked)                                                                              \
+  GAUGE(min_rtt_calculation_active)                                                                \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(burst_queue_size, NeverImport)                                                             \
@@ -70,20 +71,21 @@ public:
   }
 
   double maxGradient() const {
-    return std::max(1.0, runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_));
+    return std::max(
+        1.0, runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_));
   }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double sampleAggregatePercentile() const {
-    const double val =
-      runtime_.snapshot().getDouble(RuntimeKeys::get().SampleAggregatePercentileKey,
-                                         sample_aggregate_percentile_);
+    const double val = runtime_.snapshot().getDouble(
+        RuntimeKeys::get().SampleAggregatePercentileKey, sample_aggregate_percentile_);
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
   // The percentage is normalized and clamped to the range [0.0, 1.0].
   double jitterPercent() const {
-    const double val = runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
+    const double val =
+        runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
