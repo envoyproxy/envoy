@@ -98,7 +98,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           scoped_rds.scoped_rds_config_source(),
           Grpc::Common::typeUrl(
               envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
-          *scope_, *this, true);
+          *scope_, *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -115,7 +115,7 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
       route_provider_(static_cast<RdsRouteConfigProviderImpl*>(
           parent_.route_config_provider_manager_
               .createRdsRouteConfigProvider(rds, parent_.factory_context_, parent_.stat_prefix_,
-                                            init_manager, true)
+                                            init_manager)
               .release())),
       rds_update_callback_handle_(route_provider_->subscription().addUpdateCallback([this]() {
         // Subscribe to RDS update.
