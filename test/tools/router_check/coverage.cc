@@ -84,18 +84,7 @@ double Coverage::report(bool detailed) {
     printMissingTests(missing_route_names);
 
     // Calculate cumulative coverage.
-    std::set<std::string> defined_covered_route_names;
-    std::set_difference(
-        all_route_names.begin(), all_route_names.end(), missing_route_names.begin(),
-        missing_route_names.end(),
-        std::inserter(defined_covered_route_names, defined_covered_route_names.end()));
-    double cumulative_coverage = 0;
-    for (auto& covered_route : covered_routes_) {
-      if (defined_covered_route_names.find(covered_route->routeName()) !=
-          defined_covered_route_names.end()) {
-        cumulative_coverage += covered_route->report();
-      }
-    }
+    double cumulative_coverage = getCumulativeCoverage(all_route_names, missing_route_names);
     return 100 * cumulative_coverage / num_routes;
   } else {
     return 100 * static_cast<double>(num_routes - missing_route_names.size()) / num_routes;
@@ -111,6 +100,22 @@ void Coverage::printMissingTests(const std::set<std::string>& missing_route_name
       }
     }
   }
+}
+
+double Coverage::getCumulativeCoverage(const std::set<std::string>& all_route_names, const std::set<std::string>& missing_route_names) {
+  std::set<std::string> defined_covered_route_names;
+  std::set_difference(
+      all_route_names.begin(), all_route_names.end(), missing_route_names.begin(),
+      missing_route_names.end(),
+      std::inserter(defined_covered_route_names, defined_covered_route_names.end()));
+  double cumulative_coverage = 0;
+  for (auto& covered_route : covered_routes_) {
+    if (defined_covered_route_names.find(covered_route->routeName()) !=
+        defined_covered_route_names.end()) {
+      cumulative_coverage += covered_route->report();
+    }
+  }
+  return cumulative_coverage;
 }
 
 RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
