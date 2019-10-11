@@ -90,7 +90,7 @@ http_filters:
 
     EXPECT_CALL(factory_context_.init_manager_, add(_));
     rds_ =
-        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
                                         factory_context_, "foo.", *route_config_provider_manager_);
     rds_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
