@@ -735,7 +735,7 @@ TEST_P(AdminInstanceTest, StatsInvalidRegex) {
   Buffer::OwnedImpl data;
   EXPECT_LOG_CONTAINS(
       "error", "Invalid regex: ",
-      EXPECT_EQ(Http::Code::OK, getCallback("/stats?filter=*.test", header_map, data)));
+      EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test", header_map, data)));
 
   // Note: depending on the library, the detailed error message might be one of:
   //   "One of *?+{ was not preceded by a valid regular expression."

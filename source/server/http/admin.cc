@@ -748,7 +748,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
   if (!filterParam(params, response, regex)) {
-    return Http::Code::OK;
+    return Http::Code::BadRequest;
   }
 
   std::map<std::string, uint64_t> all_stats;
@@ -803,11 +803,12 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, H
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
-  if (filterParam(params, response, regex)) {
-    PrometheusStatsFormatter::statsAsPrometheus(
-        server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
-        response, used_only, regex);
+  if (!filterParam(params, response, regex)) {
+    return Http::Code::BadRequest;
   }
+  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
+                                              server_.stats().histograms(), response, used_only,
+                                              regex);
   return Http::Code::OK;
 }
 
