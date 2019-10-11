@@ -182,7 +182,7 @@ message FilterChain {
   // [#not-implemented-hide:] filter chain metadata.
   core.Metadata metadata = 5;
 
-  // See :ref:`base.TransportSocket<envoy_api_msg_core.TransportSocket>` description.
+  // See :ref:`base.TransportSocket<envoy_api_msg_api.v3alpha.core.TransportSocket>` description.
   core.TransportSocket transport_socket = 6;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no

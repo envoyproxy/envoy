@@ -29,6 +29,35 @@ private:
 using PortRangeList = std::list<PortRange>;
 
 /**
+ * A callback interface used by readFromSocket() to pass packets read from
+ * socket.
+ */
+class UdpPacketProcessor {
+public:
+  virtual ~UdpPacketProcessor() = default;
+
+  /**
+   * Consume the packet read out of the socket with the information from UDP
+   * header.
+   * @param local_address is the destination address in the UDP header.
+   * @param peer_address is the source address in the UDP header.
+   * @param buffer contains the packet read.
+   * @param receive_time is the time when the packet is read.
+   */
+  virtual void processPacket(Address::InstanceConstSharedPtr local_address,
+                             Address::InstanceConstSharedPtr peer_address,
+                             Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
+
+  /**
+   * The expected max size of the packet to be read. If it's smaller than
+   * actually packets received, the payload will be truncated.
+   */
+  virtual uint64_t maxPacketSize() const PURE;
+};
+
+static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
+
+/**
  * Common network utility routines.
  */
 class Utility {
@@ -257,6 +286,33 @@ public:
    */
   static Address::SocketType
   protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address);
+
+  /**
+   * Send a packet via given UDP socket with specific source address.
+   * @param socket is the UDP socket used to send.
+   * @param slices points to the buffers containing the packet.
+   * @param num_slices is the number of buffers.
+   * @param local_ip is the source address to be used to send.
+   * @param peer_address is the destination address to send to.
+   */
+  static Api::IoCallUint64Result writeToSocket(Network::Socket& socket, Buffer::RawSlice* slices,
+                                               uint64_t num_slices, const Address::Ip* local_ip,
+                                               const Address::Instance& peer_address);
+
+  /**
+   * Read a packet from given UDP socket and pass the packet to given
+   * UdpPacketProcessor.
+   * @param socket is the UDP socket to read from.
+   * @param udp_packet_processor is the callback to receive the packet.
+   * @param receive_time is the timestamp passed to udp_packet_processor for the
+   * receive time of the packet.
+   * @param packets_dropped is the output parameter for number of packets dropped in kernel. If the
+   * caller is not interested in it, nullptr can be passed in.
+   */
+  static Api::IoCallUint64Result readFromSocket(Network::Socket& socket,
+                                                UdpPacketProcessor& udp_packet_processor,
+                                                MonotonicTime receive_time,
+                                                uint32_t* packets_dropped);
 
 private:
   static void throwWithMalformedIp(const std::string& ip_address);

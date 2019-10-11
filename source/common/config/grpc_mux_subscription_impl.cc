@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux,
+GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
                                                  SubscriptionCallbacks& callbacks,
                                                  SubscriptionStats stats,
                                                  absl::string_view type_url,
@@ -28,19 +28,20 @@ void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ = grpc_mux_.subscribe(type_url_, resources, *this);
+  watch_ = grpc_mux_->subscribe(type_url_, resources, *this);
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
   // "attempt" for a given xDS API combined by ADS is not really that meaningful.
   stats_.update_attempt_.inc();
 }
 
-void GrpcMuxSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {
+void GrpcMuxSubscriptionImpl::updateResourceInterest(
+    const std::set<std::string>& update_to_these_names) {
   // First destroy the watch, so that this subscribe doesn't send a request for both the
   // previously watched resources and the new ones (we may have lost interest in some of the
   // previously watched ones).
   watch_.reset();
-  watch_ = grpc_mux_.subscribe(type_url_, update_to_these_names, *this);
+  watch_ = grpc_mux_->subscribe(type_url_, update_to_these_names, *this);
   stats_.update_attempt_.inc();
 }
 

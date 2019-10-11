@@ -87,7 +87,7 @@ public:
       current_upstream_log->CopyFrom(upstream_log.value());
     }
 
-    config_.reset(new FilterConfig("prefix", context_, ShadowWriterPtr(new MockShadowWriter()),
+    config_.reset(new FilterConfig("prefix.", context_, ShadowWriterPtr(new MockShadowWriter()),
                                    router_proto));
     router_.reset(new TestFilter(*config_));
     router_->setDecoderFilterCallbacks(callbacks_);

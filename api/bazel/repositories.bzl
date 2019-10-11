@@ -41,10 +41,10 @@ def api_dependencies():
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
-api_proto_library(
+api_cc_py_proto_library(
     name = "client_model",
     srcs = [
         "metrics.proto",
@@ -61,10 +61,10 @@ go_proto_library(
 """
 
 OPENCENSUSTRACE_BUILD_CONTENT = """
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
-api_proto_library(
+api_cc_py_proto_library(
     name = "trace_model",
     srcs = [
         "trace.proto",
@@ -102,10 +102,10 @@ filegroup(
 
 ZIPKINAPI_BUILD_CONTENT = """
 
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
-api_proto_library(
+api_cc_py_proto_library(
     name = "zipkin",
     srcs = [
         "zipkin-jsonv2.proto",

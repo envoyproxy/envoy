@@ -28,7 +28,7 @@ bool isModifyMethod(const Http::HeaderMap& headers) {
   const absl::string_view method_type = method->value().getStringView();
   const auto& method_values = Http::Headers::get().MethodValues;
   return (method_type == method_values.Post || method_type == method_values.Put ||
-          method_type == method_values.Delete);
+          method_type == method_values.Delete || method_type == method_values.Patch);
 }
 
 absl::string_view hostAndPort(const Http::HeaderEntry* header) {
@@ -126,7 +126,7 @@ bool CsrfFilter::isValid(const absl::string_view source_origin, Http::HeaderMap&
     return true;
   }
 
-  for (const auto& additional_origin : policy_->additional_origins()) {
+  for (const auto& additional_origin : policy_->additionalOrigins()) {
     if (additional_origin->match(source_origin)) {
       return true;
     }

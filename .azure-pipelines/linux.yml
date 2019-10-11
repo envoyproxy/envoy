@@ -21,7 +21,11 @@ jobs:
     displayName: "Run check format scripts"
 
 - job: bazel
+  dependsOn: ["format"]
+  # For master builds, continue even if format fails
+  condition: or(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
   strategy:
+    maxParallel: 3
     matrix:
       release:
         CI_TARGET: 'bazel.release'
@@ -37,7 +41,6 @@ jobs:
       # (on Fuzzit) is not crashing envoy. This will help find bugs BEFORE merging and not after.
       fuzzit:
         CI_TARGET: 'bazel.fuzzit_regression'
-  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
@@ -61,7 +64,7 @@ jobs:
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_RBE: "true"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=100 --curses=no"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=$(RbeJobs) --curses=no"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -116,7 +119,7 @@ jobs:
         FUZZIT_API_KEY: $(FuzzitApiKey)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=100 --curses=no"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=$(RbeJobs) --curses=no"
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
