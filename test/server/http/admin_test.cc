@@ -36,6 +36,7 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::EndsWith;
 using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -46,6 +47,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -731,8 +733,16 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
 TEST_P(AdminInstanceTest, StatsInvalidRegex) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl data;
-  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK, getCallback("/stats?filter=*.test", header_map, data)));
-  EXPECT_EQ("Invalid regex: \"regex_error\": *.test\n", data.toString());
+  EXPECT_LOG_CONTAINS(
+      "error", "Invalid regex: ",
+      EXPECT_EQ(Http::Code::OK, getCallback("/stats?filter=*.test", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {

@@ -165,7 +165,9 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
     try {
       regex = std::regex(pattern);
     } catch (std::regex_error& error) {
-      response.add(fmt::format("Invalid regex: \"{}\": {}\n", error.what(), pattern));
+      // Include the offending pattern in the log, but not the error message.
+      response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
+      ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
       return false;
     }
   }
