@@ -45,8 +45,8 @@ limit of 1) at the same time. The jitter helps negate the effect of the minRTT c
 downstream success rate if retries are enabled.
 
 It is possible that there is a noticeable increase in request 503s during the minRTT measurement
-window because of the potentially significant drop in the concurrency limit. This is expected and
-    it is recommended to enable retries for resets/503s.
+window because of the potentially significant drop in the concurrency limit. This is expected and it
+is recommended to enable retries for resets/503s.
 
 .. note::
 
