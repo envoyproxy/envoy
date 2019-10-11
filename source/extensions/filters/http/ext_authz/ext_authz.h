@@ -45,7 +45,7 @@ enum class FilterRequestType { Internal, External, Both };
   COUNTER(failure_mode_allowed)
 
 /**
- * Wrapper struct for jwt_authn filter stats. @see stats_macros.h
+ * Wrapper struct for ext_authz filter stats. @see stats_macros.h
  */
 struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
