@@ -263,6 +263,12 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "curl-7.65.3",
         urls = ["https://github.com/curl/curl/releases/download/curl-7_65_3/curl-7.65.3.tar.gz"],
     ),
+    com_googlesource_chromium_v8 = dict(
+        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
+        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
+        sha256 = "57758d2bbd7abfe3f18185bd7898e6d0c79e036122559ebaff2b5f02ebb89255",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-7.8.279.17.tar.gz"],
+    ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz
         sha256 = "c60bca3cf7f58b91394a89da96080657ff0fbe4d5675be9b21e90da8f68bc06f",

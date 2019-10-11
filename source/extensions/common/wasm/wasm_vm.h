@@ -23,6 +23,8 @@ struct Word {
   uint64_t u64_;
 };
 
+inline std::ostream& operator<<(std::ostream& os, const Word& w) { return os << w.u64_; }
+
 // Convert Word type for use by 32-bit VMs.
 template <typename T> struct ConvertWordTypeToUint32 {
   using type = T; // NOLINT(readability-identifier-naming)

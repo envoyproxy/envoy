@@ -3,10 +3,13 @@
 #include "extensions/common/wasm/null/null_vm_plugin.h"
 #include "extensions/common/wasm/wasm_vm.h"
 
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -39,18 +42,18 @@ std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   return result;
 }
 
-TEST(WasmVmTest, NoRuntime) {
+TEST(BadVmTest, NoRuntime) {
   EXPECT_THROW_WITH_MESSAGE(createWasmVm(""), WasmVmException,
                             "Failed to create WASM VM with unspecified runtime.");
 }
 
-TEST(WasmVmTest, BadRuntime) {
+TEST(BadVmTest, BadRuntime) {
   EXPECT_THROW_WITH_MESSAGE(createWasmVm("envoy.wasm.runtime.invalid"), WasmVmException,
                             "Failed to create WASM VM using envoy.wasm.runtime.invalid runtime. "
                             "Envoy was compiled without support for it.");
 }
 
-TEST(WasmVmTest, NullVmStartup) {
+TEST(NullVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->cloneable());
@@ -59,7 +62,7 @@ TEST(WasmVmTest, NullVmStartup) {
   EXPECT_TRUE(wasm_vm->getUserSection("user").empty());
 }
 
-TEST(WasmVmTest, NullVmMemory) {
+TEST(NullVmTest, NullVmMemory) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_EQ(wasm_vm->getMemorySize(), std::numeric_limits<uint64_t>::max());
   std::string d = "data";
@@ -86,7 +89,7 @@ TEST(WasmVmTest, NullVmMemory) {
   EXPECT_EQ(w2.u64_, 7);
 }
 
-TEST(WasmVmTest, NullVmStart) {
+TEST(NullVmTest, NullVmStart) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm->load("test_null_vm_plugin", true));
   wasm_vm->link("test", false);
@@ -103,6 +106,99 @@ TEST(WasmVmTest, NullVmStart) {
   wasm_vm->start(context2);
   EXPECT_EQ(current_context_, context1);
   EXPECT_EQ(effective_context_id_, 1);
+}
+
+class MockHostFunctions {
+public:
+  MOCK_CONST_METHOD0(ping, void());
+};
+
+MockHostFunctions* g_host_functions;
+
+void ping(void*) { g_host_functions->ping(); }
+
+class WasmVmTest : public testing::Test {
+public:
+  virtual void SetUp() { g_host_functions = new MockHostFunctions(); }
+  virtual void TearDown() { delete g_host_functions; }
+};
+
+TEST_F(WasmVmTest, V8BadCode) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+  ASSERT_TRUE(wasm_vm != nullptr);
+
+  EXPECT_FALSE(wasm_vm->load("bad code", false));
+}
+
+TEST_F(WasmVmTest, V8Code) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+  ASSERT_TRUE(wasm_vm != nullptr);
+  EXPECT_FALSE(wasm_vm->cloneable());
+
+  auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
+  EXPECT_TRUE(wasm_vm->load(code, false));
+  EXPECT_THAT(wasm_vm->getUserSection("producers"), HasSubstr("rustc"));
+  EXPECT_TRUE(wasm_vm->getUserSection("emscripten_metadata").empty());
+}
+
+TEST_F(WasmVmTest, V8MissingHostFunction) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+  ASSERT_TRUE(wasm_vm != nullptr);
+
+  auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
+  EXPECT_TRUE(wasm_vm->load(code, false));
+
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test", false), WasmVmException,
+                            "Failed to load WASM module due to a missing import: env.ping");
+}
+
+TEST_F(WasmVmTest, V8FunctionCalls) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+  ASSERT_TRUE(wasm_vm != nullptr);
+
+  auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
+  EXPECT_TRUE(wasm_vm->load(code, false));
+
+  wasm_vm->registerCallback("env", "ping", ping, &ping);
+  wasm_vm->link("test", false);
+
+  EXPECT_CALL(*g_host_functions, ping());
+  wasm_vm->start(nullptr /* no context */);
+
+  WasmCallWord<3> sum;
+  wasm_vm->getFunction("sum", &sum);
+  Word word = sum(nullptr /* no context */, 13, 14, 15);
+  EXPECT_EQ(42, word.u64_);
+}
+
+TEST_F(WasmVmTest, V8Memory) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+  ASSERT_TRUE(wasm_vm != nullptr);
+
+  auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
+  EXPECT_TRUE(wasm_vm->load(code, false));
+
+  wasm_vm->registerCallback("env", "ping", ping, &ping);
+  wasm_vm->link("test", false);
+
+  EXPECT_EQ(wasm_vm->getMemorySize(), 65536 /* stack size requested at the build-time */);
+
+  const uint64_t test_addr = 128;
+
+  std::string set = "test";
+  EXPECT_TRUE(wasm_vm->setMemory(test_addr, set.size(), set.data()));
+  auto got = wasm_vm->getMemory(test_addr, set.size()).value();
+  EXPECT_EQ(sizeof("test") - 1, got.size());
+  EXPECT_STREQ("test", got.data());
+
+  Word word(0);
+  EXPECT_TRUE(wasm_vm->setWord(test_addr, std::numeric_limits<uint32_t>::max()));
+  EXPECT_TRUE(wasm_vm->getWord(test_addr, &word));
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(), word.u64_);
 }
 
 } // namespace

@@ -35,6 +35,7 @@ build:sanitizer --build_tag_filters=-no_san
 build:sanitizer --test_tag_filters=-no_san
 
 # Basic ASAN/UBSAN that works for gcc
+build:asan --action_env=ENVOY_ASAN=1
 build:asan --config=sanitizer
 # ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
 build:asan --define signal_trace=disabled
@@ -64,6 +65,7 @@ build:macos-asan --copt -DGRPC_BAZEL_BUILD
 build:macos-asan --dynamic_mode=off
 
 # Clang TSAN
+build:clang-tsan --action_env=ENVOY_TSAN=1
 build:clang-tsan --config=sanitizer
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
@@ -74,6 +76,7 @@ build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
+build:clang-msan --action_env=ENVOY_MSAN=1
 build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
@@ -84,6 +87,7 @@ build:clang-msan --copt -fsanitize-memory-track-origins=2
 # TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
 # and update stats_integration_test with appropriate m_per_cluster value
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
 build:libc++ --host_linkopt=-fuse-ld=lld
@@ -109,6 +113,8 @@ build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
 build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
