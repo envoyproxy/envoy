@@ -11,8 +11,8 @@ import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
-import "envoy/type/percent.proto";
 import "envoy/type/format.proto";
+import "envoy/type/percent.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -478,23 +478,20 @@ message LocalReplyConfig {
   // It is allowed to use :ref:`command operators <config_access_log_command_operators>`
   // which will be resolved to actual data.
   type.StringOrJson format = 2;
-};
+}
 
 message ResponseMapper {
   // Filter is used to determine if the response should be changed.
-  envoy.config.filter.accesslog.v2.AccessLogFilter filter = 1
-      [(validate.rules).message.required = true];
+  accesslog.v2.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
 
   // Rewriter defines which values in local reply should be changed.
-  ResponseRewriter rewriter = 2 [(validate.rules).message.required = true];
+  ResponseRewriter rewriter = 2 [(validate.rules).message = {required: true}];
 }
 
 // Configuration of new value for matched local response.
 message ResponseRewriter {
   // Status code for matched response.
   google.protobuf.UInt32Value status_code = 1;
-
-  // TODO: add support for GRPC rewrite.
 }
 
 message Rds {

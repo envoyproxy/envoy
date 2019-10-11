@@ -12,7 +12,6 @@ import "google/protobuf/struct.proto";
 
 // Allows to define one of format: flat plain text or structured json.
 message StringOrJson {
-
   oneof format {
     // Allows to specify flat plain text format.
     //
