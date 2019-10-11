@@ -369,7 +369,7 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
 
   if (criteria.presented().has_value()) {
     const bool peerPresented = stream_info.downstreamSslConnection() &&
-                               stream_info.downstreamSslConnection()->expirationPeerCertificate();
+                               stream_info.downstreamSslConnection()->peerCertificatePresented();
     matches &= criteria.presented().value() == peerPresented;
   }
 
