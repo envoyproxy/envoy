@@ -189,7 +189,9 @@ min_rtt_calc_params:
 
   // The controller should be measuring minRTT upon creation, so the concurrency window is 1.
   EXPECT_EQ(
-      1, stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate).value());
+      1,
+      stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
+          .value());
   EXPECT_EQ(controller->concurrencyLimit(), 1);
   tryForward(controller, true);
   tryForward(controller, false);
@@ -206,7 +208,9 @@ min_rtt_calc_params:
 
   // Verify the minRTT value measured is accurate.
   EXPECT_EQ(
-      0, stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate).value());
+      0,
+      stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
+          .value());
   EXPECT_EQ(
       13, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
 }
