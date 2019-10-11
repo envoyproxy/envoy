@@ -104,18 +104,18 @@ protected:
     // To build the map from RDS route_config_name to the RDS subscription, we need to get the
     // route_config_name by mocking start() on the Config::Subscription.
     EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
-                subscriptionFromConfigSource(_, _, _, _, _))
+                subscriptionFromConfigSource(_, _, _, _))
         .Times(AnyNumber());
     EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
                 subscriptionFromConfigSource(
                     _,
                     Eq(Grpc::Common::typeUrl(
                         envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name())),
-                    _, _, _))
+                    _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](const envoy::api::v2::core::ConfigSource&, absl::string_view,
                                       Stats::Scope&,
-                                      Envoy::Config::SubscriptionCallbacks& callbacks, bool) {
+                                      Envoy::Config::SubscriptionCallbacks& callbacks) {
           auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
           rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
           EXPECT_CALL(*ret, start(_))

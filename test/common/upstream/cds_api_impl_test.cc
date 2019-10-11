@@ -180,7 +180,7 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
 TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
   {
     InSequence s;
-    setup(true);
+    setup();
   }
   EXPECT_CALL(initialized_, ready());
 
