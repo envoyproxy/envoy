@@ -171,7 +171,7 @@ TEST_F(SotwSubscriptionStateTest, CheckUpdatePending) {
 
 TEST_F(SotwSubscriptionStateTest, handleEstablishmentFailure) {
   // Although establishment failure is not supposed to cause an onConfigUpdateFailed() on the
-  // ultimate actual subscription callbacks, SotwSubscriptionState's callbacks are actually
+  // ultimate actual subscription callbacks, the callbacks reference held is actually to
   // the WatchMap, which then calls GrpcSubscriptionImpl(s). It is the GrpcSubscriptionImpl
   // that will decline to pass on an onConfigUpdateFailed(ConnectionFailure).
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));

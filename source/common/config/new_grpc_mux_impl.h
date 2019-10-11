@@ -94,7 +94,7 @@ private:
   PausableAckQueue pausable_ack_queue_;
 
   // Makes SubscriptionStates, to be held in the subscriptions_ map. Whether this GrpcMux is doing
-  // delta or SotW xDS is determined by whether this is a {Delta,Sotw}SubscriptionStateFactory.
+  // delta or state of the world xDS is determined by which concrete subclass this variable gets.
   std::unique_ptr<SubscriptionStateFactory> subscription_state_factory_;
 
   // Map key is type_url.
