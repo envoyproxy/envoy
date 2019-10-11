@@ -233,6 +233,31 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
   filter_->onDestroy();
 }
 
+TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTestWithBody) {
+  auto mt = time_system_.monotonicTime();
+  time_system_.setMonotonicTime(mt + std::chrono::nanoseconds(123));
+
+  // Get the filter to record the request start time via decode.
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .WillOnce(Return(RequestForwardingAction::Forward));
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers));
+
+  const auto advance_time = std::chrono::nanoseconds(42);
+  mt = time_system_.monotonicTime();
+  time_system_.setMonotonicTime(mt + advance_time);
+
+  Http::TestHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers));
+  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
+  filter_->encodeComplete();
+}
+
 TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   auto mt = time_system_.monotonicTime();
   time_system_.setMonotonicTime(mt + std::chrono::nanoseconds(123));
