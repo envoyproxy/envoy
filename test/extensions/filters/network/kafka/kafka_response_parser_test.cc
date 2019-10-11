@@ -47,7 +47,7 @@ TEST_F(KafkaResponseParserTest, ResponseHeaderParserShouldExtractHeaderAndResolv
   const int16_t api_version = 123;
 
   ExpectedResponsesSharedPtr expected_responses = std::make_shared<ExpectedResponses>();
-  expected_responses->push({api_key, api_version});
+  (*expected_responses)[correlation_id] = {api_key, api_version};
 
   const MockResponseParserResolver parser_resolver;
   const ResponseParserSharedPtr parser{new MockParser{}};

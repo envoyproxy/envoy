@@ -34,12 +34,16 @@ public:
   static int16_t requestApiVersions(const int16_t api_key);
 
   /**
-   * Make example requests with given api_key. One message per api version in given api key.
+   * Make example requests with given api_key.
+   * One message per api version in given api key.
+   * The message correlation id-s start at value provided.
    */
-  static std::vector<AbstractRequestSharedPtr> makeRequests(const int16_t api_key);
+  static std::vector<AbstractRequestSharedPtr> makeRequests(const int16_t api_key,
+                                                            int32_t& correlation_id);
 
   /**
    * Make example requests, one message per given api key + api version pair.
+   * The message correlation id-s start at 0.
    */
   static std::vector<AbstractRequestSharedPtr> makeAllRequests();
 
@@ -54,12 +58,16 @@ public:
   static int16_t responseApiVersions(const int16_t api_key);
 
   /**
-   * Make example requests with given api_key. One message per api version in given api key.
+   * Make example requests with given api_key.
+   * One message per api version in given api key.
+   * The message correlation id-s start at value provided.
    */
-  static std::vector<AbstractResponseSharedPtr> makeResponses(const int16_t api_key);
+  static std::vector<AbstractResponseSharedPtr> makeResponses(const int16_t api_key,
+                                                              int32_t& correlation_id);
 
   /**
    * Make example responses, one message per given api key + api version pair.
+   * The message correlation id-s start at 0.
    */
   static std::vector<AbstractResponseSharedPtr> makeAllResponses();
 

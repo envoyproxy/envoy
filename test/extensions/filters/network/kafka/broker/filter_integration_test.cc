@@ -87,14 +87,15 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenRequestPayload) {
 TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenResponsePayload) {
   // given
 
+  const int32_t correlation_id = 42;
   // Encode broken response into buffer.
   // Produce response v0 is a nullable array of TopicProduceResponses.
   // Encoding invalid length (< -1) of this nullable array is going to break the parser.
   ResponseB::putIntoBuffer(BROKEN_MESSAGE_SIZE);
-  ResponseB::putIntoBuffer(static_cast<int32_t>(0)); // Correlation-id.
+  ResponseB::putIntoBuffer(correlation_id); // Correlation-id.
   ResponseB::putIntoBuffer(static_cast<int32_t>(std::numeric_limits<int32_t>::min())); // Array.
 
-  testee_.getResponseDecoderForTest()->expectResponse(0, 0);
+  testee_.getResponseDecoderForTest()->expectResponse(correlation_id, 0, 0);
 
   // when
   const Network::FilterStatus result = consumeResponseFromBuffer();

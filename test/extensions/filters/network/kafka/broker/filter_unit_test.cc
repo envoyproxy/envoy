@@ -35,7 +35,7 @@ class MockResponseDecoder : public ResponseDecoder {
 public:
   MockResponseDecoder() : ResponseDecoder{{}} {};
   MOCK_METHOD1(onData, void(Buffer::Instance&));
-  MOCK_METHOD2(expectResponse, void(const int16_t, const int16_t));
+  MOCK_METHOD3(expectResponse, void(const int32_t, const int16_t, const int16_t));
   MOCK_METHOD0(reset, void());
 };
 
@@ -171,10 +171,12 @@ protected:
 TEST_F(ForwarderUnitTest, shouldUpdateResponseDecoderState) {
   // given
   const int16_t api_key = 42;
-  const int32_t api_version = 13;
-  AbstractRequestSharedPtr request = std::make_shared<MockRequest>(api_key, api_version, 0);
+  const int16_t api_version = 13;
+  const int32_t correlation_id = 1234;
+  AbstractRequestSharedPtr request =
+      std::make_shared<MockRequest>(api_key, api_version, correlation_id);
 
-  EXPECT_CALL(*response_decoder_, expectResponse(api_key, api_version));
+  EXPECT_CALL(*response_decoder_, expectResponse(correlation_id, api_key, api_version));
 
   // when
   testee_.onMessage(request);
@@ -185,11 +187,12 @@ TEST_F(ForwarderUnitTest, shouldUpdateResponseDecoderState) {
 TEST_F(ForwarderUnitTest, shouldUpdateResponseDecoderStateOnFailedParse) {
   // given
   const int16_t api_key = 42;
-  const int32_t api_version = 13;
-  RequestHeader header = {api_key, api_version, 0, ""};
+  const int16_t api_version = 13;
+  const int32_t correlation_id = 1234;
+  RequestHeader header = {api_key, api_version, correlation_id, ""};
   RequestParseFailureSharedPtr parse_failure = std::make_shared<RequestParseFailure>(header);
 
-  EXPECT_CALL(*response_decoder_, expectResponse(api_key, api_version));
+  EXPECT_CALL(*response_decoder_, expectResponse(correlation_id, api_key, api_version));
 
   // when
   testee_.onFailedParse(parse_failure);

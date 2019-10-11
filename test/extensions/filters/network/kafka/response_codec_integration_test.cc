@@ -27,17 +27,21 @@ TEST_F(ResponseCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
   // As real api keys have values below 100, the messages generated in this loop should not be
   // recognized by the codec.
   const int16_t base_api_key = 100;
+  const int32_t base_correlation_id = 0;
   std::vector<ResponseMetadata> sent;
+
   for (int16_t i = 0; i < 1000; ++i) {
     const int16_t api_key = static_cast<int16_t>(base_api_key + i);
     const int16_t api_version = 0;
-    const ResponseMetadata metadata = {api_key, api_version, 0};
+    const int32_t correlation_id = base_correlation_id + i;
+
+    const ResponseMetadata metadata = {api_key, api_version, correlation_id};
     const std::vector<unsigned char> data = std::vector<unsigned char>(1024);
     const auto message = Response<std::vector<unsigned char>>{metadata, data};
     putMessageIntoBuffer(message);
     sent.push_back(metadata);
     // We need to register the response, so the parser knows what to expect.
-    testee.expectResponse(api_key, api_version);
+    testee.expectResponse(correlation_id, api_key, api_version);
   }
 
   // when

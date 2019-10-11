@@ -24,7 +24,7 @@ ResponseParseResponse ResponseHeaderParser::parse(absl::string_view& data) {
   context_->remaining_response_size_ -= sizeof(context_->correlation_id_);
   context_->correlation_id_ = correlation_id_deserializer_.get();
 
-  const ExpectedResponseSpec spec = getNextResponseSpec();
+  const ExpectedResponseSpec spec = getResponseSpec(context_->correlation_id_);
   context_->api_key_ = spec.first;
   context_->api_version_ = spec.second;
   // At this stage, we have setup the context - we know the response's api key & version, so we can
@@ -34,14 +34,16 @@ ResponseParseResponse ResponseHeaderParser::parse(absl::string_view& data) {
   return ResponseParseResponse::nextParser(next_parser);
 }
 
-ExpectedResponseSpec ResponseHeaderParser::getNextResponseSpec() {
-  if (!expected_responses_->empty()) {
-    const ExpectedResponseSpec spec = expected_responses_->front();
-    expected_responses_->pop();
+ExpectedResponseSpec ResponseHeaderParser::getResponseSpec(const int32_t correlation_id) {
+  const auto it = expected_responses_->find(correlation_id);
+  if (it != expected_responses_->end()) {
+    const auto spec = it->second;
+    expected_responses_->erase(it);
     return spec;
   } else {
     // Response data should always be present in expected responses before response is to be parsed.
-    throw EnvoyException("attempted to create a response parser while no responses are expected");
+    throw EnvoyException(
+        fmt::format("no response metadata registered for correlation_id {}", correlation_id));
   }
 };
 

@@ -41,16 +41,17 @@ TEST_F(ResponseCodecResponseTest, shouldHandle{{ message_type.name }}Messages) {
   using ResponseUnderTest = Response<{{ message_type.name }}>;
 
   std::vector<ResponseUnderTest> sent;
-  int32_t correlation = 0;
+  int32_t correlation_id = 0;
 
   {% for field_list in message_type.compute_field_lists() %}
   for (int i = 0; i < 100; ++i ) {
     const ResponseMetadata metadata =
-      { {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, correlation++ };
+      { {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, ++correlation_id };
     const {{ message_type.name }} data = { {{ field_list.example_value() }} };
     const ResponseUnderTest response = {metadata, data};
     putMessageIntoBuffer(response);
-    testee.expectResponse({{ message_type.get_extra('api_key') }}, {{ field_list.version }});
+    testee.expectResponse(
+      correlation_id, {{ message_type.get_extra('api_key') }}, {{ field_list.version }});
     sent.push_back(response);
   }
   {% endfor %}

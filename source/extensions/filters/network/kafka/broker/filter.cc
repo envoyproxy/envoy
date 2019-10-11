@@ -8,12 +8,12 @@ namespace Broker {
 
 void Forwarder::onMessage(AbstractRequestSharedPtr request) {
   const RequestHeader& header = request->request_header_;
-  response_decoder_.expectResponse(header.api_key_, header.api_version_);
+  response_decoder_.expectResponse(header.correlation_id_, header.api_key_, header.api_version_);
 }
 
 void Forwarder::onFailedParse(RequestParseFailureSharedPtr parse_failure) {
   const RequestHeader& header = parse_failure->request_header_;
-  response_decoder_.expectResponse(header.api_key_, header.api_version_);
+  response_decoder_.expectResponse(header.correlation_id_, header.api_key_, header.api_version_);
 }
 
 // Nothing fancy here, proper metrics registration is left to Rich...MetricsImpl constructors.

@@ -19,8 +19,9 @@ const ResponseInitialParserFactory& ResponseInitialParserFactory::getDefaultInst
   CONSTRUCT_ON_FIRST_USE(ResponseInitialParserFactoryImpl);
 }
 
-void ResponseDecoder::expectResponse(const int16_t api_key, const int16_t api_version) {
-  expected_responses_->push({api_key, api_version});
+void ResponseDecoder::expectResponse(const int32_t correlation_id, const int16_t api_key,
+                                     const int16_t api_version) {
+  (*expected_responses_)[correlation_id] = {api_key, api_version};
 };
 
 ResponseParserSharedPtr ResponseDecoder::createStartParser() {

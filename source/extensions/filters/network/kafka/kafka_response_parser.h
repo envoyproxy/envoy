@@ -1,7 +1,7 @@
 #pragma once
 
+#include <map>
 #include <memory>
-#include <queue>
 
 #include "extensions/filters/network/kafka/kafka_response.h"
 #include "extensions/filters/network/kafka/parser.h"
@@ -55,7 +55,8 @@ using ResponseContextSharedPtr = std::shared_ptr<ResponseContext>;
 
 // Helper container for response api key & version.
 using ExpectedResponseSpec = std::pair<int16_t, int16_t>;
-using ExpectedResponses = std::queue<ExpectedResponseSpec>;
+// Response metadata store (maps from correlation id to api key & version).
+using ExpectedResponses = std::map<int32_t, ExpectedResponseSpec>;
 using ExpectedResponsesSharedPtr = std::shared_ptr<ExpectedResponses>;
 
 /**
@@ -110,7 +111,7 @@ public:
   const ResponseContextSharedPtr contextForTest() const { return context_; }
 
 private:
-  ExpectedResponseSpec getNextResponseSpec();
+  ExpectedResponseSpec getResponseSpec(int32_t correlation_id);
 
   const ExpectedResponsesSharedPtr expected_responses_;
   const ResponseParserResolver& parser_resolver_;

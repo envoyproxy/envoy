@@ -71,12 +71,14 @@ public:
 
   /**
    * Registers an expected message.
-   * After all the previous expected responses have been parsed, the coded will use this data to
-   * create a parser for next message.
-   * @param api_key api key of the next response to be parsed.
-   * @param api_version api version of the next response to be parsed.
+   * The response's api key & version will be used to create corresponding payload parser when
+   * message with the same correlation id is received.
+   * @param correlation_id id of the response.
+   * @param api_key expected api key of response with given correlation id.
+   * @param api_version expected api version of response with given correlation id.
    */
-  virtual void expectResponse(const int16_t api_key, const int16_t api_version);
+  virtual void expectResponse(const int32_t correlation_id, const int16_t api_key,
+                              const int16_t api_version);
 
 protected:
   ResponseParserSharedPtr createStartParser() override;
