@@ -310,6 +310,7 @@ WS
 Welford's
 Werror
 XDS
+ar
 decRefCount
 getaddrinfo
 sendto

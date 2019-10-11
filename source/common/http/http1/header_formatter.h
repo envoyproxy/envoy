@@ -22,7 +22,7 @@ using HeaderKeyFormatterPtr = std::unique_ptr<HeaderKeyFormatter>;
 
 /**
  * A HeaderKeyFormatter that uppercases the first character in each word: The
- * first characeter as well as any alpha characeter following a special
+ * first character as well as any alpha character following a special
  * character is uppercased.
  */
 class ProperCaseHeaderKeyFormatter : public HeaderKeyFormatter {
