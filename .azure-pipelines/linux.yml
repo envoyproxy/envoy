@@ -108,8 +108,7 @@ jobs:
       ci/docker_tag.sh
     workingDirectory: $(Build.SourcesDirectory)
     env:
-      DOCKER_IMAGE_PREFIX: lizan/envoy-azp
-      AZP_BRANCH: refs/heads/master
+      AZP_BRANCH: $(Build.SourceBranch)
       CIRCLE_SHA1: $(Build.SourceVersion)
       DOCKERHUB_USERNAME: $(DockerUsername)
       DOCKERHUB_PASSWORD: $(DockerPassword)

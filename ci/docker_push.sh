@@ -13,7 +13,7 @@ fi
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 # push the envoy image on tags or merge to master
-if [ -n "$CIRCLE_TAG" ] || [ "$CIRCLE_BRANCH" = 'master' ] || [ "$AZP_BRANCH" = 'refs/heads/master' ]
+if [ -n "$CIRCLE_TAG" ] || [ "$AZP_BRANCH" = 'refs/heads/master' ]
 then
     docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
