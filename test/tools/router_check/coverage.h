@@ -7,7 +7,7 @@
 namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {
 public:
-  RouteCoverage(const Envoy::Router::Route* route) : route_(*route){};
+  RouteCoverage(const Envoy::Router::ResponseEntry* route, const std::string route_name) : route_(*route), route_name_(route_name){};
 
   double report();
   void setClusterCovered() { cluster_covered_ = true; }
@@ -16,11 +16,12 @@ public:
   void setPathRewriteCovered() { path_rewrite_covered_ = true; }
   void setHostRewriteCovered() { host_rewrite_covered_ = true; }
   void setRedirectPathCovered() { redirect_path_covered_ = true; }
-  bool covers(const Envoy::Router::Route* route);
-  const std::string routeName();
+  bool covers(const Envoy::Router::ResponseEntry* route) { return &route_ == route; };
+  const std::string routeName() { return route_name_; };
 
 private:
-  const Envoy::Router::Route& route_;
+  const Envoy::Router::ResponseEntry& route_;
+  const std::string route_name_;
   bool cluster_covered_{false};
   bool virtual_cluster_covered_{false};
   bool virtual_host_covered_{false};
