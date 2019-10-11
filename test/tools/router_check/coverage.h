@@ -44,10 +44,8 @@ public:
   void markPathRewriteCovered(const Envoy::Router::Route& route);
   void markHostRewriteCovered(const Envoy::Router::Route& route);
   void markRedirectPathCovered(const Envoy::Router::Route& route);
-  double report();
-  double detailedReport();
-  void printMissingTests(const std::set<std::string>& all_route_names,
-                         const std::set<std::string>& covered_route_names);
+  double report(bool detailed);
+  void printMissingTests(const std::set<std::string>& missing_route_names);
 
 private:
   RouteCoverage& coveredRoute(const Envoy::Router::Route& route);
