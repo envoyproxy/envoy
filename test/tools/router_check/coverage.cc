@@ -85,12 +85,14 @@ double Coverage::report(bool detailed) {
 
     // Calculate cumulative coverage.
     std::set<std::string> defined_covered_route_names;
-    std::set_difference(all_route_names.begin(), all_route_names.end(), missing_route_names.begin(),
-                        missing_route_names.end(),
-                        std::inserter(defined_covered_route_names, defined_covered_route_names.end()));
+    std::set_difference(
+        all_route_names.begin(), all_route_names.end(), missing_route_names.begin(),
+        missing_route_names.end(),
+        std::inserter(defined_covered_route_names, defined_covered_route_names.end()));
     double cumulative_coverage = 0;
     for (auto& covered_route : covered_routes_) {
-      if (defined_covered_route_names.find(covered_route->routeName()) != defined_covered_route_names.end()) {
+      if (defined_covered_route_names.find(covered_route->routeName()) !=
+          defined_covered_route_names.end()) {
         cumulative_coverage += covered_route->report();
       }
     }

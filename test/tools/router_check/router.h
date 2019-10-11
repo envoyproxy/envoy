@@ -96,9 +96,7 @@ public:
    */
   void setOnlyShowFailures() { only_show_failures_ = true; }
 
-  float coverage(bool detailed) {
-    return coverage_.report(detailed);
-  }
+  float coverage(bool detailed) { return coverage_.report(detailed); }
 
 private:
   RouterCheckTool(
