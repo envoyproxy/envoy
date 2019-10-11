@@ -50,7 +50,7 @@ private:
   RouteCoverage& coveredRoute(const Envoy::Router::Route& route);
   void printMissingTests(const std::set<std::string>& missing_route_names);
   double getCumulativeCoverage(const std::set<std::string>& all_route_names,
-                                const std::set<std::string>& missing_route_names);
+                               const std::set<std::string>& missing_route_names);
   std::vector<std::unique_ptr<RouteCoverage>> covered_routes_;
   const envoy::api::v2::RouteConfiguration route_config_;
 };

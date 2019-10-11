@@ -102,7 +102,8 @@ void Coverage::printMissingTests(const std::set<std::string>& missing_route_name
   }
 }
 
-double Coverage::getCumulativeCoverage(const std::set<std::string>& all_route_names, const std::set<std::string>& missing_route_names) {
+double Coverage::getCumulativeCoverage(const std::set<std::string>& all_route_names,
+                                       const std::set<std::string>& missing_route_names) {
   std::set<std::string> defined_covered_route_names;
   std::set_difference(
       all_route_names.begin(), all_route_names.end(), missing_route_names.begin(),
