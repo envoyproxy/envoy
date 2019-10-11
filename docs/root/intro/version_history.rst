@@ -41,6 +41,8 @@ Version history
 * http: absolute URL support is now on by default. The prior behavior can be reinstated by setting :ref:`allow_absolute_url <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` to false.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
+* listeners: added :ref:`connection balancer <envoy_api_field_Listener.connection_balance_config>`
+  configuration for TCP listeners.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
 * lua: extended `dynamicMetadata:set()` to allow setting complex values
 * metrics_service: added support for flushing histogram buckets.
@@ -60,6 +62,8 @@ Version history
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
 * router: added new :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy. Retries can now be configured to trigger by arbitrary response header matching.
+* router: added ability for most specific header mutations to take precedence, see :ref:`route configuration's most specific
+  header mutations wins flag <envoy_api_field_RouteConfiguration.most_specific_header_mutations_wins>`
 * router: added :ref:`respect_expected_rq_timeout <envoy_api_field_config.filter.http.router.v2.Router.respect_expected_rq_timeout>` that instructs ingress Envoy to respect :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress Envoy, when deriving timeout for upstream cluster.
 * router: added new :ref:`retriable request headers <envoy_api_field_route.RetryPolicy.retriable_request_headers>` to retry policies. Retries can now be configured to only trigger on request header match.
 * router check tool: add coverage reporting & enforcement.
@@ -80,6 +84,7 @@ Version history
 * tracing: added tags for gRPC response status and meesage.
 * tracing: added :ref:`max_path_tag_length <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support customizing the length of the request path included in the extracted `http.url <https://github.com/opentracing/specification/blob/master/semantic_conventions.md#standard-span-tags-and-log-fields>` tag.
 * upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows draining HTTP, TCP connection pools on cluster membership change.
+* upstream: added :ref:`transport_socket_matches <envoy_api_field_Cluster.transport_socket_matches>`, support using different transport socket config when connecting to different upstream endpoints within a cluster.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
 * upstream: added new :ref:`failure-percentage based outlier detection<arch_overview_outlier_detection_failure_percentage>` mode.
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.

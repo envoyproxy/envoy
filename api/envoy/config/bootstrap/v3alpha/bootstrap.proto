@@ -12,8 +12,9 @@ import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/api/v3alpha/lds.proto";
+import "envoy/config/bootstrap/v2/bootstrap.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
-import "envoy/config/overload/v3alpha/overload.proto";
+import "envoy/config/overload/v2alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
 
 import "google/protobuf/duration.proto";
@@ -30,7 +31,7 @@ import "validate/validate.proto";
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
 message Bootstrap {
   message StaticResources {
-    // Static :ref:`Listeners <envoy_api_msg_Listener>`. These listeners are
+    // Static :ref:`Listeners <envoy_api_msg_api.v3alpha.Listener>`. These listeners are
     // available regardless of LDS configuration.
     repeated api.v3alpha.Listener listeners = 1;
 
@@ -42,28 +43,28 @@ message Bootstrap {
     repeated api.v3alpha.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
-    // <envoy_api_msg_auth.SdsSecretConfig>`
+    // <envoy_api_msg_api.v3alpha.auth.SdsSecretConfig>`
     repeated api.v3alpha.auth.Secret secrets = 3;
   }
 
   message DynamicResources {
     reserved 4;
 
-    // All :ref:`Listeners <envoy_api_msg_Listener>` are provided by a single
+    // All :ref:`Listeners <envoy_api_msg_api.v3alpha.Listener>` are provided by a single
     // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     api.v3alpha.core.ConfigSource lds_config = 1;
 
-    // All post-bootstrap :ref:`Cluster <envoy_api_msg_Cluster>` definitions are
+    // All post-bootstrap :ref:`Cluster <envoy_api_msg_api.v3alpha.Cluster>` definitions are
     // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
     // configuration source.
     api.v3alpha.core.ConfigSource cds_config = 2;
 
     // A single :ref:`ADS <config_overview_v2_ads>` source may be optionally
     // specified. This must have :ref:`api_type
-    // <envoy_api_field_core.ApiConfigSource.api_type>` :ref:`GRPC
-    // <envoy_api_enum_value_core.ApiConfigSource.ApiType.GRPC>`. Only
-    // :ref:`ConfigSources <envoy_api_msg_core.ConfigSource>` that have
-    // the :ref:`ads <envoy_api_field_core.ConfigSource.ads>` field set will be
+    // <envoy_api_field_api.v3alpha.core.ApiConfigSource.api_type>` :ref:`GRPC
+    // <envoy_api_enum_value_api.v3alpha.core.ApiConfigSource.ApiType.GRPC>`. Only
+    // :ref:`ConfigSources <envoy_api_msg_api.v3alpha.core.ConfigSource>` that have
+    // the :ref:`ads <envoy_api_field_api.v3alpha.core.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
     api.v3alpha.core.ApiConfigSource ads_config = 3;
   }
@@ -87,7 +88,7 @@ message Bootstrap {
   ClusterManager cluster_manager = 4;
 
   // Health discovery service config option.
-  // (:ref:`core.ApiConfigSource <envoy_api_msg_core.ApiConfigSource>`)
+  // (:ref:`core.ApiConfigSource <envoy_api_msg_api.v3alpha.core.ApiConfigSource>`)
   api.v3alpha.core.ApiConfigSource hds_config = 14;
 
   // Optional file system path to search for startup flag files.
@@ -125,7 +126,7 @@ message Bootstrap {
   Admin admin = 12;
 
   // Optional overload manager configuration.
-  overload.v3alpha.OverloadManager overload_manager = 15;
+  overload.v2alpha.OverloadManager overload_manager = 15;
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
@@ -184,7 +185,7 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <envoy_api_msg_Cluster>` must be defined in the :ref:`Bootstrap
+  // <envoy_api_msg_api.v3alpha.Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.StaticResources.clusters>`. This is
   // unrelated to the :option:`--service-cluster` option which does not `affect zone aware routing
@@ -200,8 +201,8 @@ message ClusterManager {
 
   // A management server endpoint to stream load stats to via
   // *StreamLoadStats*. This must have :ref:`api_type
-  // <envoy_api_field_core.ApiConfigSource.api_type>` :ref:`GRPC
-  // <envoy_api_enum_value_core.ApiConfigSource.ApiType.GRPC>`.
+  // <envoy_api_field_api.v3alpha.core.ApiConfigSource.api_type>` :ref:`GRPC
+  // <envoy_api_enum_value_api.v3alpha.core.ApiConfigSource.ApiType.GRPC>`.
   api.v3alpha.core.ApiConfigSource load_stats_config = 4;
 }
 

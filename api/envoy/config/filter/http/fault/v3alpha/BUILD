@@ -8,6 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/api/v3alpha/route:pkg",
         "//envoy/config/filter/fault/v3alpha:pkg",
-        "//envoy/type:pkg",
+        "//envoy/type/v3alpha:pkg",
     ],
 )

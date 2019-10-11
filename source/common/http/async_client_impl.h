@@ -169,6 +169,7 @@ private:
 
     const std::string& name() const override { return EMPTY_STRING; }
     bool usesVhds() const override { return false; }
+    bool mostSpecificHeaderMutationsWins() const override { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };

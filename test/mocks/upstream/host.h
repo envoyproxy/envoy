@@ -10,6 +10,7 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 
+#include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 
@@ -90,6 +91,7 @@ public:
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
   MOCK_CONST_METHOD0(priority, uint32_t());
@@ -105,6 +107,7 @@ public:
   Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
+  Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   mutable Stats::TestSymbolTable symbol_table_;
@@ -170,6 +173,7 @@ public:
   MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
   MOCK_CONST_METHOD0(health, Host::Health());
   MOCK_CONST_METHOD0(hostname, const std::string&());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));
   MOCK_METHOD1(setOutlierDetector_, void(Outlier::DetectorHostMonitorPtr& outlier_detector));
@@ -184,6 +188,7 @@ public:
   MOCK_CONST_METHOD0(warmed, bool());
 
   testing::NiceMock<MockClusterInfo> cluster_;
+  Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   mutable Stats::TestSymbolTable symbol_table_;
