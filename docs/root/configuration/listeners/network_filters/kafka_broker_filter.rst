@@ -4,9 +4,12 @@ Kafka Broker filter
 ===================
 
 The Apache Kafka broker filter decodes the client protocol for
-`Apache Kafka <https://kafka.apache.org/>`_. It decodes the requests and responses in the payload.
+`Apache Kafka <https://kafka.apache.org/>`_, both the requests and responses in the payload.
 The message versions in `Kafka 2.0 <http://kafka.apache.org/20/protocol.html#protocol_api_keys>`_
 are supported.
+The filter attempts not to influence the communication between client and brokers, so the messages
+that could not be decoded (due to Kafka client or broker running a newer version than supported by
+this filter) are forwarded as-is.
 
 .. attention::
 
@@ -23,16 +26,41 @@ in the configuration snippet below:
 
 .. code-block:: yaml
 
-  filter_chains:
-  - filters:
-    - name: envoy.filters.network.kafka_broker
-      config:
-        stat_prefix: exampleprefix
-    - name: envoy.tcp_proxy
-      config:
-        stat_prefix: tcp
-        cluster: ...
+  listeners:
+  - address:
+      socket_address:
+        address: 127.0.0.1 # Host that Kafka clients should connect to.
+        port_value: 19092  # Port that Kafka clients should connect to.
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.kafka_broker
+        config:
+          stat_prefix: exampleprefix
+      - name: envoy.tcp_proxy
+        config:
+          stat_prefix: tcp
+          cluster: localkafka
+  clusters:
+  - name: localkafka
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    hosts:
+    - socket_address:
+        address: 127.0.0.1 # Kafka broker's host.
+        port_value: 9092   # Kafka broker's port.
 
+The Kafka broker needs to advertise Envoy listener port instead of its own.
+
+.. code-block:: text
+
+  # Listener value needs to be equal to cluster value in Envoy config
+  # (will receive payloads from Envoy).
+  listeners=PLAINTEXT://127.0.0.1:9092
+
+  # Advertised listener value needs to be equal to Envoy's listener
+  # (will make clients discovering this broker talk to it through Envoy).
+  advertised.listeners=PLAINTEXT://127.0.0.1:19092
 
 .. _config_network_filters_kafka_broker_stats:
 
