@@ -813,7 +813,7 @@ if __name__ == "__main__":
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
-  build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths
+  build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + ["./tools/clang_tools"]
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)

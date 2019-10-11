@@ -101,7 +101,29 @@ def _go_deps(skip_targets):
         _repository_impl("io_bazel_rules_go")
         _repository_impl("bazel_gazelle")
 
-def envoy_dependencies(skip_targets = []):
+CLANG_TOOLS_INCLUDE_ENV = "CLANG_TOOLS_INCLUDE"
+CLANG_TOOLS_LIB_ENV = "CLANG_TOOLS_LIB"
+
+def _clang_tools_impl(ctxt):
+    if CLANG_TOOLS_INCLUDE_ENV in ctxt.os.environ and CLANG_TOOLS_LIB_ENV in ctxt.os.environ:
+        clang_tools_include_path = ctxt.os.environ["CLANG_TOOLS_INCLUDE"]
+        clang_tools_lib_path = ctxt.os.environ["CLANG_TOOLS_LIB"]
+        for include_dir in ["clang", "clang-c", "llvm", "llvm-c"]:
+            ctxt.symlink(clang_tools_include_path + "/" + include_dir, include_dir)
+        ctxt.symlink(clang_tools_lib_path, "lib")
+        ctxt.symlink(Label("//tools/clang_tools/support:BUILD.prebuilt"), "BUILD")
+
+_clang_tools = repository_rule(
+    implementation = _clang_tools_impl,
+    environ = [
+        "CLANG_TOOLS_INCLUDE",
+        "CLANG_TOOLS_LIB",
+    ],
+)
+
+# Set developer_tools to True to enable build of Envoy developer facing tools
+# (not needed by any importing projects).
+def envoy_dependencies(skip_targets = [], developer_tools = False):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -120,6 +142,9 @@ def envoy_dependencies(skip_targets = []):
         name = "ssl",
         actual = "@envoy//bazel:boringssl",
     )
+
+    if developer_tools:
+        _clang_tools(name = "clang_tools")
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate

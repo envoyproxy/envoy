@@ -10,7 +10,7 @@ envoy_api_dependencies()
 
 load("//bazel:repositories.bzl", "envoy_dependencies")
 
-envoy_dependencies()
+envoy_dependencies(developer_tools = True)
 
 load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
