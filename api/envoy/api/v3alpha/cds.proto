@@ -156,7 +156,7 @@ message Cluster {
     // Optional endpoint metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
     // will use the transport socket configuration specified here.
-    // The endpoint's metadata entry in *envoy.transport_socket* is used to match
+    // The endpoint's metadata entry in *envoy.transport_socket_match* is used to match
     // against the values specified in this field.
     google.protobuf.Struct match = 2;
 
@@ -495,7 +495,6 @@ message Cluster {
   // *transport_socket_match* set, and still send plain text traffic to the same cluster.
   //
   // TODO(incfly): add a detailed architecture doc on intended usage.
-  // [#not-implemented-hide:]
   repeated TransportSocketMatch transport_socket_matches = 43;
 
   // Supplies the name of the cluster which must be unique across all clusters.

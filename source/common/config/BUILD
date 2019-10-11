@@ -271,6 +271,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

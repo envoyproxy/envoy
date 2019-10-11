@@ -3,6 +3,7 @@
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/transport_socket_match.h"
 
 using testing::AtLeast;
 using testing::Eq;
@@ -23,8 +24,10 @@ class ProxyFilterTest : public testing::Test,
                         public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
   ProxyFilterTest() {
-    cm_.thread_local_cluster_.cluster_.info_->transport_socket_factory_.reset(
-        transport_socket_factory_);
+    transport_socket_match_ = new NiceMock<Upstream::MockTransportSocketMatcher>(
+        Network::TransportSocketFactoryPtr(transport_socket_factory_));
+    cm_.thread_local_cluster_.cluster_.info_->transport_socket_matcher_.reset(
+        transport_socket_match_);
 
     envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig proto_config;
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
@@ -52,7 +55,8 @@ public:
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   Network::MockTransportSocketFactory* transport_socket_factory_{
-      new Network::MockTransportSocketFactory};
+      new Network::MockTransportSocketFactory()};
+  NiceMock<Upstream::MockTransportSocketMatcher>* transport_socket_match_;
   Upstream::MockClusterManager cm_;
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;

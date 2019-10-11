@@ -156,15 +156,6 @@ MockIp::~MockIp() = default;
 
 MockResolvedAddress::~MockResolvedAddress() = default;
 
-MockTransportSocket::MockTransportSocket() {
-  ON_CALL(*this, setTransportSocketCallbacks(_))
-      .WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }));
-}
-MockTransportSocket::~MockTransportSocket() = default;
-
-MockTransportSocketFactory::MockTransportSocketFactory() = default;
-MockTransportSocketFactory::~MockTransportSocketFactory() = default;
-
 MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
   ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
 }
