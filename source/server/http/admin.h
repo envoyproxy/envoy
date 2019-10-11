@@ -27,6 +27,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -327,11 +328,13 @@ private:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
+    Network::NopConnectionBalancerImpl connection_balancer_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
