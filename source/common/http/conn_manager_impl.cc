@@ -349,8 +349,8 @@ void ConnectionManagerImpl::resetAllStreams(
     auto& stream = *streams_.front();
     stream.response_encoder_->getStream().removeCallbacks(stream);
     stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
-    if (response_flag) {
-      stream.stream_info_.setResponseFlag(*response_flag);
+    if (response_flag.has_value()) {
+      stream.stream_info_.setResponseFlag(response_flag.value());
     }
   }
 }
