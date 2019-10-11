@@ -275,6 +275,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
+        "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
