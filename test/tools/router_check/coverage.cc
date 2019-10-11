@@ -112,7 +112,8 @@ RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
       return *route_coverage;
     }
   }
-  std::unique_ptr<RouteCoverage> new_coverage = std::make_unique<RouteCoverage>(response_entry, route_name);
+  std::unique_ptr<RouteCoverage> new_coverage =
+      std::make_unique<RouteCoverage>(response_entry, route_name);
   covered_routes_.push_back(std::move(new_coverage));
   return coveredRoute(route);
 };

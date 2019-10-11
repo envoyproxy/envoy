@@ -7,7 +7,8 @@
 namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {
 public:
-  RouteCoverage(const Envoy::Router::ResponseEntry* route, const std::string route_name) : route_(*route), route_name_(route_name){};
+  RouteCoverage(const Envoy::Router::ResponseEntry* route, const std::string route_name)
+      : route_(*route), route_name_(route_name){};
 
   double report();
   void setClusterCovered() { cluster_covered_ = true; }
