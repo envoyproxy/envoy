@@ -41,6 +41,8 @@ Version history
 * http: absolute URL support is now on by default. The prior behavior can be reinstated by setting :ref:`allow_absolute_url <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` to false.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
+* listeners: added :ref:`connection balancer <envoy_api_field_Listener.connection_balance_config>`
+  configuration for TCP listeners.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
 * lua: extended `dynamicMetadata:set()` to allow setting complex values
 * metrics_service: added support for flushing histogram buckets.

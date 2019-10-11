@@ -810,6 +810,22 @@ types {
   }
 }
 types {
+  key: "envoy.api.v2.Listener.ConnectionBalanceConfig"
+  value {
+    qualified_package: "envoy.api.v2"
+    proto_path: "envoy/api/v2/lds.proto"
+    next_version_type_name: "envoy.api.v3alpha.Listener.ConnectionBalanceConfig"
+  }
+}
+types {
+  key: "envoy.api.v2.Listener.ConnectionBalanceConfig.ExactBalance"
+  value {
+    qualified_package: "envoy.api.v2"
+    proto_path: "envoy/api/v2/lds.proto"
+    next_version_type_name: "envoy.api.v3alpha.Listener.ConnectionBalanceConfig.ExactBalance"
+  }
+}
+types {
   key: "envoy.api.v2.Listener.DeprecatedV1"
   value {
     qualified_package: "envoy.api.v2"
@@ -2204,6 +2220,20 @@ types {
 }
 types {
   key: "envoy.api.v3alpha.Listener"
+  value {
+    qualified_package: "envoy.api.v3alpha"
+    proto_path: "envoy/api/v3alpha/lds.proto"
+  }
+}
+types {
+  key: "envoy.api.v3alpha.Listener.ConnectionBalanceConfig"
+  value {
+    qualified_package: "envoy.api.v3alpha"
+    proto_path: "envoy/api/v3alpha/lds.proto"
+  }
+}
+types {
+  key: "envoy.api.v3alpha.Listener.ConnectionBalanceConfig.ExactBalance"
   value {
     qualified_package: "envoy.api.v3alpha"
     proto_path: "envoy/api/v3alpha/lds.proto"

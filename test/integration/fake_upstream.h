@@ -24,6 +24,7 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -608,13 +609,12 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      return udp_listener_factory_.get();
-    }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
     FakeUpstream& parent_;
-    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
-    std::string name_;
+    const std::string name_;
+    Network::NopConnectionBalancerImpl connection_balancer_;
   };
 
   void threadRoutine();
