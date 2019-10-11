@@ -61,7 +61,6 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.unit_ = Stats::Histogram::Unit::Unspecified;
   sink.onHistogramComplete(timer, 5);
 
   EXPECT_EQ(fd, sink.getFdForTests());
@@ -110,7 +109,6 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.unit_ = Stats::Histogram::Unit::Unspecified;
   timer.setTags(tags);
   sink.onHistogramComplete(timer, 5);
 
@@ -153,7 +151,6 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.unit_ = Stats::Histogram::Unit::Unspecified;
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_timer:5|ms"));
   sink.onHistogramComplete(timer, 5);
@@ -254,7 +251,6 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.unit_ = Stats::Histogram::Unit::Unspecified;
   timer.setTags(tags);
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_timer:5|ms|#key1:value1,key2:value2"));

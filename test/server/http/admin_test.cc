@@ -1562,7 +1562,6 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
 
   auto histogram = makeHistogram();
   histogram->name_ = "histogram1";
-  histogram->unit_ = Stats::Histogram::Unit::Unspecified;
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
       .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
@@ -1616,7 +1615,6 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   auto histogram = makeHistogram();
   histogram->name_ = "histogram1";
-  histogram->unit_ = Stats::Histogram::Unit::Unspecified;
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
       .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));

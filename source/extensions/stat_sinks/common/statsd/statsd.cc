@@ -67,10 +67,10 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
-  // TODO: for statsd histograms are all timers in milliseconds, Envoy histograms are however not
-  // necessarily timers in milliseconds, for Envoy histograms suffixed with their corresponding SI
-  // unit symbol this is acceptable, but for histograms without a suffix, especially those which are
-  // timers but record in units other than milliseconds, it may make sense to scale the value to
+  // TODO(#8594): for statsd histograms are all timers in milliseconds, Envoy histograms are however
+  // not necessarily timers in milliseconds, for Envoy histograms suffixed with their corresponding
+  // SI unit symbol this is acceptable, but for histograms without a suffix, especially those which
+  // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
   const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, getName(histogram),
@@ -211,7 +211,7 @@ void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
                                                 std::chrono::milliseconds ms) {
   // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
   // also currently not possible that this interleaves with any counter/gauge flushing.
-  // TODO: see the comment at UdpStatsdSink::onHistogramComplete.
+  // TODO(#8594): see the comment at UdpStatsdSink::onHistogramComplete.
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
       fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));

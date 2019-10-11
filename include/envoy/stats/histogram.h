@@ -46,17 +46,16 @@ public:
   virtual const std::vector<double>& supportedBuckets() const PURE;
 
   /**
-   * Returns computed bucket values during the period. The vector contains an
-   * approximation of samples below each quantile bucket defined in
-   * supportedBuckets(). This vector is guaranteed to be the same length as
-   * supportedBuckets().
+   * Returns computed bucket values during the period. The vector contains an approximation
+   * of samples below each quantile bucket defined in supportedBuckets(). This vector is
+   * guaranteed to be the same length as supportedBuckets().
    */
   virtual const std::vector<uint64_t>& computedBuckets() const PURE;
 
   /**
-   * Returns number of values during the period. This number may be an
-   * approximation of the number of samples in the histogram, it is not
-   * guaranteed that this will be 100% the number of samples observed.
+   * Returns number of values during the period. This number may be an approximation
+   * of the number of samples in the histogram, it is not guaranteed that this will be
+   * 100% the number of samples observed.
    */
   virtual uint64_t sampleCount() const PURE;
 
@@ -113,16 +112,15 @@ public:
 using HistogramSharedPtr = RefcountPtr<Histogram>;
 
 /**
- * A histogram that is stored in main thread and provides summary view of the
- * histogram.
+ * A histogram that is stored in main thread and provides summary view of the histogram.
  */
 class ParentHistogram : public Histogram {
 public:
   ~ParentHistogram() override = default;
 
   /**
-   * This method is called during the main stats flush process for each of the
-   * histograms and used to merge the histogram values.
+   * This method is called during the main stats flush process for each of the histograms and used
+   * to merge the histogram values.
    */
   virtual void merge() PURE;
 

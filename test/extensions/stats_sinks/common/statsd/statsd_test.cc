@@ -95,7 +95,6 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
-  timer.unit_ = Stats::Histogram::Unit::Unspecified;
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n"), _));
   sink_->onHistogramComplete(timer, 5);
 
