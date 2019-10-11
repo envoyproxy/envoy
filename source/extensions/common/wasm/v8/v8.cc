@@ -24,14 +24,14 @@ wasm::Engine* engine() {
 }
 
 struct FuncData {
-  FuncData(std::string name) : name(name) {}
+  FuncData(std::string name) : name(std::move(name)) {}
 
   std::string name;
   wasm::own<wasm::Func> callback;
   void* raw_func;
 };
 
-typedef std::unique_ptr<FuncData> FuncDataPtr;
+using FuncDataPtr = std::unique_ptr<FuncData>;
 
 class V8 : public WasmVm {
 public:
@@ -62,25 +62,25 @@ public:
   bool getWord(uint64_t pointer, Word* word) override;
   bool setWord(uint64_t pointer, Word word) override;
 
-#define _REGISTER_HOST_GLOBAL(_T)                                                                  \
-  std::unique_ptr<Global<_T>> makeGlobal(absl::string_view module_name, absl::string_view name,    \
-                                         _T initial_value) override {                              \
+#define _REGISTER_HOST_GLOBAL(T)                                                                   \
+  std::unique_ptr<Global<T>> makeGlobal(absl::string_view module_name, absl::string_view name,     \
+                                        T initial_value) override {                                \
     return registerHostGlobalImpl(module_name, name, initial_value);                               \
   };
   _REGISTER_HOST_GLOBAL(Word);
   _REGISTER_HOST_GLOBAL(double);
 #undef _REGISTER_HOST_GLOBAL
 
-#define _REGISTER_HOST_FUNCTION(_T)                                                                \
-  void registerCallback(absl::string_view module_name, absl::string_view function_name, _T,        \
-                        typename ConvertFunctionTypeWordToUint32<_T>::type f) override {           \
+#define _REGISTER_HOST_FUNCTION(T)                                                                 \
+  void registerCallback(absl::string_view module_name, absl::string_view function_name, T,         \
+                        typename ConvertFunctionTypeWordToUint32<T>::type f) override {            \
     registerHostFunctionImpl(module_name, function_name, f);                                       \
   };
   FOR_ALL_WASM_VM_IMPORTS(_REGISTER_HOST_FUNCTION)
 #undef _REGISTER_HOST_FUNCTION
 
-#define _GET_MODULE_FUNCTION(_T)                                                                   \
-  void getFunction(absl::string_view function_name, _T* f) override {                              \
+#define _GET_MODULE_FUNCTION(T)                                                                    \
+  void getFunction(absl::string_view function_name, T* f) override {                               \
     getModuleFunctionImpl(function_name, f);                                                       \
   };
   FOR_ALL_WASM_VM_EXPORTS(_GET_MODULE_FUNCTION)
@@ -227,8 +227,12 @@ static uint32_t parseVarint(const byte_t*& pos, const byte_t* end) {
 
 // Template magic.
 
-template <typename T> struct ConvertWordType { using type = T; };
-template <> struct ConvertWordType<Word> { using type = uint32_t; };
+template <typename T> struct ConvertWordType {
+  using type = T; // NOLINT(readability-identifier-naming)
+};
+template <> struct ConvertWordType<Word> {
+  using type = uint32_t; // NOLINT(readability-identifier-naming)
+};
 
 template <typename T> wasm::Val makeVal(T t) { return wasm::Val::make(t); }
 template <> wasm::Val makeVal(Word t) { return wasm::Val::make(static_cast<uint32_t>(t.u64_)); }
@@ -313,7 +317,7 @@ absl::string_view V8::getUserSection(absl::string_view name) {
       rest -= (pos - start);
       if (len == name.size() && ::memcmp(pos - len, name.data(), len) == 0) {
         ENVOY_LOG(trace, "[wasm] getUserSection(\"{}\") found, size: {}", name, rest);
-        return absl::string_view(pos, rest);
+        return {pos, rest};
       }
     }
     pos += rest;
@@ -343,11 +347,11 @@ void V8::link(absl::string_view debug_name, bool needs_emscripten) {
       const wasm::Func* func = nullptr;
       auto it = host_functions_.find(absl::StrCat(module, ".", name));
       if (it != host_functions_.end()) {
-        func = it->second.get()->callback.get();
+        func = it->second->callback.get();
       } else {
         it = host_functions_.find(absl::StrCat("envoy", ".", name));
         if (it != host_functions_.end()) {
-          func = it->second.get()->callback.get();
+          func = it->second->callback.get();
         }
       }
       if (func) {
@@ -615,8 +619,8 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
         return nullptr;
       },
       data.get());
-  data.get()->callback = std::move(func);
-  data.get()->raw_func = reinterpret_cast<void*>(function);
+  data->callback = std::move(func);
+  data->raw_func = reinterpret_cast<void*>(function);
   host_functions_.emplace(absl::StrCat(module_name, ".", function_name), std::move(data));
 }
 
@@ -642,8 +646,8 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
         return nullptr;
       },
       data.get());
-  data.get()->callback = std::move(func);
-  data.get()->raw_func = reinterpret_cast<void*>(function);
+  data->callback = std::move(func);
+  data->raw_func = reinterpret_cast<void*>(function);
   host_functions_.emplace(absl::StrCat(module_name, ".", function_name), std::move(data));
 }
 

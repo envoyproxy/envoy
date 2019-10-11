@@ -119,8 +119,8 @@ void ping(void*) { g_host_functions->ping(); }
 
 class WasmVmTest : public testing::Test {
 public:
-  virtual void SetUp() { g_host_functions = new MockHostFunctions(); }
-  virtual void TearDown() { delete g_host_functions; }
+  void SetUp() override { g_host_functions = new MockHostFunctions(); }
+  void TearDown() override { delete g_host_functions; }
 };
 
 TEST_F(WasmVmTest, V8BadCode) {
