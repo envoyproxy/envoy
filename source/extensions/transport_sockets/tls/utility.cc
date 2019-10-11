@@ -123,14 +123,14 @@ SystemTime Utility::getValidFrom(const X509& cert) {
   int days, seconds;
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notBefore(&cert));
   ASSERT(rc == 1);
-  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
+  return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
 SystemTime Utility::getExpirationTime(const X509& cert) {
   int days, seconds;
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notAfter(&cert));
   ASSERT(rc == 1);
-  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
+  return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
 } // namespace Tls
