@@ -1,4 +1,4 @@
-static_resources {   listeners {     name: "          "     address {       pipe {         path: "\000"       }     }     transparent {     }   } } stats_sinks {   typed_config {
+static_resources {   listeners {     name: "          "     address {       pipe {         path: "aa\000"       }     }     transparent {     }   } } stats_sinks {   typed_config {
     type_url: "type.googleapis.com/envoy.api.v2.route.Route"
     value: "\022*J.:*stateq {($ *stateq {($  cluster{s"
   }
