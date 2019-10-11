@@ -43,7 +43,7 @@ public:
    * response headers are supplied.
    */
   virtual void complete(LimitStatus status, Http::HeaderMapPtr&& headers,
-                        Http::HeaderMapPtr&& upstream_headers) PURE;
+                        Http::HeaderMapPtr&& request_headers_to_add) PURE;
 };
 
 /**

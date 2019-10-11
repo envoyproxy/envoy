@@ -35,12 +35,12 @@ namespace {
 class MockRequestCallbacks : public RequestCallbacks {
 public:
   void complete(LimitStatus status, Http::HeaderMapPtr&& headers,
-                Http::HeaderMapPtr&& upstream_headers) override {
-    complete_(status, headers.get(), upstream_headers.get());
+                Http::HeaderMapPtr&& request_headers_to_add) override {
+    complete_(status, headers.get(), request_headers_to_add.get());
   }
 
   MOCK_METHOD3(complete_, void(LimitStatus status, const Http::HeaderMap* headers,
-                               const Http::HeaderMap* upstream_headers));
+                               const Http::HeaderMap* request_headers_to_add));
 };
 
 class RateLimitGrpcClientTest : public testing::Test {

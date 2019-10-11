@@ -126,7 +126,7 @@ public:
 
   void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
                              const Http::HeaderMapImpl& headers,
-                             const Http::HeaderMapImpl& upstream_headers) {
+                             const Http::HeaderMapImpl& request_headers_to_add) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v2::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
@@ -141,10 +141,10 @@ public:
           return Http::HeaderMap::Iterate::Continue;
         },
         &response_msg);
-    upstream_headers.iterate(
+    request_headers_to_add.iterate(
         [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
           auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
-                            ->mutable_upstream_headers()
+                            ->mutable_request_headers_to_add()
                             ->Add();
           header->set_key(std::string(h.key().getStringView()));
           header->set_value(std::string(h.value().getStringView()));
@@ -213,10 +213,10 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   waitForRatelimitRequest();
   Http::TestHeaderMapImpl ratelimit_headers{{"x-ratelimit-limit", "1000"},
                                             {"x-ratelimit-remaining", "500"}};
-  Http::TestHeaderMapImpl upstream_headers{{"x-ratelimit-done", "true"}};
+  Http::TestHeaderMapImpl request_headers_to_add{{"x-ratelimit-done", "true"}};
 
   sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK, ratelimit_headers,
-                        upstream_headers);
+                        request_headers_to_add);
   waitForSuccessfulUpstreamResponse();
 
   ratelimit_headers.iterate(
@@ -228,7 +228,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
       },
       response_.get());
 
-  upstream_headers.iterate(
+  request_headers_to_add.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
         FakeStream* upstream = static_cast<FakeStream*>(context);
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};

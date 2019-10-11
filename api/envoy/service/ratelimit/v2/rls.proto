@@ -101,9 +101,9 @@ message RateLimitResponse {
   // descriptors failed and/or what the currently configured limits are for all of them.
   repeated DescriptorStatus statuses = 2;
 
-  // A list of headers to add to the response
+  // [#next-major-version: rename to response_headers]
   repeated api.v2.core.HeaderValue headers = 3;
 
-  // A list of headers to add to the upstream server
-  repeated api.v2.core.HeaderValue upstream_headers = 4;
+  // A list of headers to add to the request when forwarded
+  repeated api.v2.core.HeaderValue request_headers_to_add = 4;
 }

@@ -256,19 +256,21 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited))
       .Times(0);
 
-  Http::HeaderMapPtr upstream_headers{new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
+  Http::HeaderMapPtr request_headers_to_add{
+      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
   Http::HeaderMapPtr rl_headers{
       new Http::TestHeaderMapImpl{{"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "500"}}};
 
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
-                               Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*rl_headers)},
-                               Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*upstream_headers)});
+  request_callbacks_->complete(
+      Filters::Common::RateLimit::LimitStatus::OK,
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*rl_headers)},
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl(*request_headers_to_add)});
   Http::TestHeaderMapImpl expected_headers(*rl_headers);
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(true, (expected_headers == response_headers));
 
-  EXPECT_THAT(*upstream_headers, IsSubsetOfHeaders(request_headers_));
+  EXPECT_THAT(*request_headers_to_add, IsSubsetOfHeaders(request_headers_));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.ok").value());
 }
 
@@ -459,14 +461,15 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
-  Http::HeaderMapPtr upstream_headers{new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
+  Http::HeaderMapPtr request_headers_to_add{
+      new Http::TestHeaderMapImpl{{"x-rls-rate-limited", "true"}}};
 
   Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
-  Http::HeaderMapPtr uh{new Http::TestHeaderMapImpl(*upstream_headers)};
+  Http::HeaderMapPtr uh{new Http::TestHeaderMapImpl(*request_headers_to_add)};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
                                std::move(uh));
 
-  EXPECT_THAT(*upstream_headers, Not(IsSubsetOfHeaders(request_headers_)));
+  EXPECT_THAT(*request_headers_to_add, Not(IsSubsetOfHeaders(request_headers_)));
   EXPECT_EQ(1U,
             filter_callbacks_.clusterInfo()->statsScope().counter("ratelimit.over_limit").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
