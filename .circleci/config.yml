@@ -31,7 +31,7 @@ jobs:
            destination: /
    docker:
      docker:
-       - image: docker
+       - image: google/cloud-sdk
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
