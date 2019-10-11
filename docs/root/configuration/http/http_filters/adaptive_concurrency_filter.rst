@@ -9,7 +9,7 @@ Adaptive Concurrency
 
 This filter should be configured with the name `envoy.filters.http.adaptive_concurrency`.
 
-:ref:`v2 API reference <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency>`
+See the :ref:`v2 API reference <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency>` for details on each configuration parameter.
 
 Overview
 --------
@@ -33,18 +33,30 @@ time (minRTT) for an upstream.
 Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The minRTT is periodically measured by only allowing a single
-outstanding request at a time and measuring the latency under these ideal conditions. The length of
-this minRTT calculation window is variable depending on the number of requests the filter is
-configured to aggregate to represent the expected latency of an upstream.
+The minRTT is periodically measured by only allowing a single outstanding request at a time to an
+upstream cluster and measuring the latency under these ideal conditions. The length of this minRTT
+calculation window is variable depending on the number of requests the filter is configured to
+aggregate to represent the expected latency of an upstream.
+
+A configurable *jitter* value is used to randomly delay the start of the minRTT calculation window
+by some amount of time. This is not necessary and can be disabled; however, it is recommended to
+prevent all hosts in a cluster from being in a minRTT calculation window (and having a concurrency
+limit of 1) at the same time. The jitter helps negate the effect of the minRTT calculation on the
+downstream success rate if retries are enabled.
+
+It is possible that there is a noticeable increase in request 503s during the minRTT measurement
+window because of the potentially significant drop in the concurrency limit. This is expected and
+    it is recommended to enable retries for resets/503s.
 
 .. note::
 
-    It is possible that there is a noticeable increase in request 503s during the minRTT
-    measurement window because of a significant drop in the concurrency limit. This is expected and
-    it is recommended to use :ref:`the previous_hosts retry predicate <arch_overview_http_retry_plugins>` to avoid unexpected synchonization of upstream hosts configured with the adaptive concurrency filter.
+    It is recommended to use :ref:`the previous_hosts retry predicate
+    <arch_overview_http_retry_plugins>`. Due to the minRTT recalculation jitter, it's unlikely that
+    all hosts in the cluster will be in a minRTT calculation window, so retrying on a different host
+    in the cluster will have a higher likelihood of success in this scenario.
 
-The calculated minRTT is then used in the calculation of a value referred to as the *gradient*.
+Once calculated, the minRTT is then used in the calculation of a value referred to as the
+*gradient*.
 
 The Gradient
 ^^^^^^^^^^^^
@@ -69,12 +81,13 @@ calculation, since it forces the concurrency limit to increase until there is a 
 minRTT latency. In the absence of a headroom value, the concurrency limit could potentially stagnate
 at an unnecessary small value if the sampleRTT and minRTT are close to each other.
 
-Because the headroom value is so necessary to the proper function fo the gradient controller, the
+Because the headroom value is so necessary to the proper function for the gradient controller, the
 headroom value is unconfigurable and pinned to the square-root of the concurrency limit.
 
 Example Configuration
 ---------------------
-An example filter configuration:
+An example filter configuration can be found below. Not all fields are required and many of the
+fields can be overridden via runtime settings.
 
 .. code-block:: yaml
 
@@ -82,17 +95,33 @@ An example filter configuration:
   config:
     gradient_controller_config:
       sample_aggregate_percentile:
-        value: 50
+        value: 90
       concurrency_limit_params:
         concurrency_update_interval: 0.1s
       min_rtt_calc_params:
         jitter:
-          value: 15
+          value: 10
         interval: 60s
         request_count: 50
     enabled:
       default_value: true
       runtime_key: "adaptive_concurrency.enabled"
+
+The above configuration can be understood as follows:
+
+* Gather latency samples for a time window of 100ms. When entering a new window, summarize the
+  requests (sampleRTT) and and update the concurrency limit using this sampleRTT.
+* When calculating the sampleRTT, use the p90 of all sampled latencies for that window.
+* Recalculate the minRTT every 60s and add a jitter (random delay) of 0s-6s to the start of the
+  minRTT recalculation. The delay is dictated by the jitter value.
+* Collect 50 request samples to calculate the minRTT and use the p90 to summarize them.
+* The filter is enabled by default.
+
+.. note::
+
+    It is recommended that the adaptive concurrency filter come after the healthcheck filter in the
+    filter chain to prevent latency sampling of health checks. If health check traffic is sampled,
+    it could potentially affect the accuracy of the minRTT measurements.
 
 Runtime
 -------
