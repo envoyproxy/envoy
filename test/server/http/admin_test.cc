@@ -745,6 +745,22 @@ TEST_P(AdminInstanceTest, StatsInvalidRegex) {
   EXPECT_THAT(data.toString(), EndsWith("\"\n"));
 }
 
+TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_LOG_CONTAINS(
+      "error", ": *.ptest",
+      EXPECT_EQ(Http::Code::BadRequest,
+                getCallback("/stats?format=prometheus&filter=*.ptest", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
+}
+
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
