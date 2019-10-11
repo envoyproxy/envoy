@@ -46,7 +46,8 @@ message Tracing {
     // - :ref:`DynamicOtConfig <envoy_api_msg_config.trace.v3alpha.DynamicOtConfig>`
     // - :ref:`DatadogConfig <envoy_api_msg_config.trace.v3alpha.DatadogConfig>`
     // - :ref:`OpenCensusConfig <envoy_api_msg_config.trace.v3alpha.OpenCensusConfig>`
-    // - :ref:`XRayConfig <envoy_api_msg_config.trace.v3alpha.XRayConfig>`
+    // [#comment: TODO(marco) when XRay is implemented, uncomment the following; - :ref:`XRayConfig
+    // <envoy_api_msg_config.trace.v3alpha.XRayConfig>`]
     oneof config_type {
       google.protobuf.Struct config = 2;
 
