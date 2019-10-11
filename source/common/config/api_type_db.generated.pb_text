@@ -3987,6 +3987,13 @@ types {
   }
 }
 types {
+  key: "envoy.config.filter.http.compressor.v2.Compressor"
+  value {
+    qualified_package: "envoy.config.filter.http.compressor.v2"
+    proto_path: "envoy/config/filter/http/compressor/v2/compressor.proto"
+  }
+}
+types {
   key: "envoy.config.filter.http.csrf.v2.CsrfPolicy"
   value {
     qualified_package: "envoy.config.filter.http.csrf.v2"
@@ -4178,6 +4185,7 @@ types {
   value {
     qualified_package: "envoy.config.filter.http.gzip.v2"
     proto_path: "envoy/config/filter/http/gzip/v2/gzip.proto"
+    next_version_type_name: "envoy.config.filter.http.gzip.v3alpha.Gzip"
   }
 }
 types {
@@ -4185,6 +4193,7 @@ types {
   value {
     qualified_package: "envoy.config.filter.http.gzip.v2"
     proto_path: "envoy/config/filter/http/gzip/v2/gzip.proto"
+    next_version_type_name: "envoy.config.filter.http.gzip.v3alpha.Gzip.CompressionLevel"
   }
 }
 types {
@@ -4192,6 +4201,7 @@ types {
   value {
     qualified_package: "envoy.config.filter.http.gzip.v2"
     proto_path: "envoy/config/filter/http/gzip/v2/gzip.proto"
+    next_version_type_name: "envoy.config.filter.http.gzip.v3alpha.Gzip.CompressionLevel.Enum"
   }
 }
 types {
@@ -4199,6 +4209,35 @@ types {
   value {
     qualified_package: "envoy.config.filter.http.gzip.v2"
     proto_path: "envoy/config/filter/http/gzip/v2/gzip.proto"
+    next_version_type_name: "envoy.config.filter.http.gzip.v3alpha.Gzip.CompressionStrategy"
+  }
+}
+types {
+  key: "envoy.config.filter.http.gzip.v3alpha.Gzip"
+  value {
+    qualified_package: "envoy.config.filter.http.gzip.v3alpha"
+    proto_path: "envoy/config/filter/http/gzip/v3alpha/gzip.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.http.gzip.v3alpha.Gzip.CompressionLevel"
+  value {
+    qualified_package: "envoy.config.filter.http.gzip.v3alpha"
+    proto_path: "envoy/config/filter/http/gzip/v3alpha/gzip.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.http.gzip.v3alpha.Gzip.CompressionLevel.Enum"
+  value {
+    qualified_package: "envoy.config.filter.http.gzip.v3alpha"
+    proto_path: "envoy/config/filter/http/gzip/v3alpha/gzip.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.http.gzip.v3alpha.Gzip.CompressionStrategy"
+  value {
+    qualified_package: "envoy.config.filter.http.gzip.v3alpha"
+    proto_path: "envoy/config/filter/http/gzip/v3alpha/gzip.proto"
   }
 }
 types {
@@ -7827,6 +7866,10 @@ next_version_packages {
   value: "envoy.config.filter.http.fault.v3alpha"
 }
 next_version_packages {
+  key: "envoy.config.filter.http.gzip.v2"
+  value: "envoy.config.filter.http.gzip.v3alpha"
+}
+next_version_packages {
   key: "envoy.config.filter.http.health_check.v2"
   value: "envoy.config.filter.http.health_check.v3alpha"
 }
@@ -8157,6 +8200,10 @@ next_version_proto_paths {
 next_version_proto_paths {
   key: "envoy/config/filter/http/fault/v2/fault.proto"
   value: "envoy/config/filter/http/fault/v3alpha/fault.proto"
+}
+next_version_proto_paths {
+  key: "envoy/config/filter/http/gzip/v2/gzip.proto"
+  value: "envoy/config/filter/http/gzip/v3alpha/gzip.proto"
 }
 next_version_proto_paths {
   key: "envoy/config/filter/http/health_check/v2/health_check.proto"
