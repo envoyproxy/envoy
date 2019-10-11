@@ -45,6 +45,8 @@ message AccessLog {
   }
 }
 
+// [#next-major-version: In the v3 API, we should consider renaming
+// it to more generic filter]
 message AccessLogFilter {
   oneof filter_specifier {
     option (validate.required) = true;

@@ -4914,11 +4914,35 @@ types {
   }
 }
 types {
+  key: "envoy.config.filter.network.http_connection_manager.v2.LocalReplyConfig"
+  value {
+    qualified_package: "envoy.config.filter.network.http_connection_manager.v2"
+    proto_path: "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto"
+    next_version_type_name: "envoy.config.filter.network.http_connection_manager.v3alpha.LocalReplyConfig"
+  }
+}
+types {
   key: "envoy.config.filter.network.http_connection_manager.v2.Rds"
   value {
     qualified_package: "envoy.config.filter.network.http_connection_manager.v2"
     proto_path: "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto"
     next_version_type_name: "envoy.config.filter.network.http_connection_manager.v3alpha.Rds"
+  }
+}
+types {
+  key: "envoy.config.filter.network.http_connection_manager.v2.ResponseMapper"
+  value {
+    qualified_package: "envoy.config.filter.network.http_connection_manager.v2"
+    proto_path: "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto"
+    next_version_type_name: "envoy.config.filter.network.http_connection_manager.v3alpha.ResponseMapper"
+  }
+}
+types {
+  key: "envoy.config.filter.network.http_connection_manager.v2.ResponseRewriter"
+  value {
+    qualified_package: "envoy.config.filter.network.http_connection_manager.v2"
+    proto_path: "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto"
+    next_version_type_name: "envoy.config.filter.network.http_connection_manager.v3alpha.ResponseRewriter"
   }
 }
 types {
@@ -5048,7 +5072,28 @@ types {
   }
 }
 types {
+  key: "envoy.config.filter.network.http_connection_manager.v3alpha.LocalReplyConfig"
+  value {
+    qualified_package: "envoy.config.filter.network.http_connection_manager.v3alpha"
+    proto_path: "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.proto"
+  }
+}
+types {
   key: "envoy.config.filter.network.http_connection_manager.v3alpha.Rds"
+  value {
+    qualified_package: "envoy.config.filter.network.http_connection_manager.v3alpha"
+    proto_path: "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.network.http_connection_manager.v3alpha.ResponseMapper"
+  value {
+    qualified_package: "envoy.config.filter.network.http_connection_manager.v3alpha"
+    proto_path: "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.network.http_connection_manager.v3alpha.ResponseRewriter"
   value {
     qualified_package: "envoy.config.filter.network.http_connection_manager.v3alpha"
     proto_path: "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.proto"
@@ -7574,6 +7619,14 @@ types {
   }
 }
 types {
+  key: "envoy.type.StringOrJson"
+  value {
+    qualified_package: "envoy.type"
+    proto_path: "envoy/type/format.proto"
+    next_version_type_name: "envoy.type.v3alpha.StringOrJson"
+  }
+}
+types {
   key: "envoy.type.matcher.DoubleMatcher"
   value {
     qualified_package: "envoy.type.matcher"
@@ -7770,6 +7823,13 @@ types {
   value {
     qualified_package: "envoy.type.v3alpha"
     proto_path: "envoy/type/v3alpha/http_status.proto"
+  }
+}
+types {
+  key: "envoy.type.v3alpha.StringOrJson"
+  value {
+    qualified_package: "envoy.type.v3alpha"
+    proto_path: "envoy/type/v3alpha/format.proto"
   }
 }
 next_version_packages {
@@ -8379,6 +8439,10 @@ next_version_proto_paths {
 next_version_proto_paths {
   key: "envoy/service/trace/v2/trace_service.proto"
   value: "envoy/service/trace/v3alpha/trace_service.proto"
+}
+next_version_proto_paths {
+  key: "envoy/type/format.proto"
+  value: "envoy/type/v3alpha/format.proto"
 }
 next_version_proto_paths {
   key: "envoy/type/http_status.proto"
