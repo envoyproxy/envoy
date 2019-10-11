@@ -66,6 +66,7 @@ Version history
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
 * router check tool: add support for outputting missing tests in the detailed coverage report.
+* router check tool: fix coverage calculation bug and support coverage reporting for direct response routes.
 * runtime: allow for the ability to parse boolean values.
 * runtime: allow for the ability to parse integers as double values and vice-versa.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
