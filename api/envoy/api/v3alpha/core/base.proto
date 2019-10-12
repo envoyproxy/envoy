@@ -136,6 +136,7 @@ message Node {
 // * ``{"envoy.lb": {"canary": <bool> }}`` This indicates the canary status of an
 //   endpoint and is also used during header processing
 //   (x-envoy-upstream-canary) and for stats purposes.
+// [#next-major-version: move to type/metadata/v2]
 message Metadata {
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.

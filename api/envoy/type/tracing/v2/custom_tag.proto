@@ -43,11 +43,19 @@ message CustomTag {
   }
 
   // Metadata type custom tag using
-  // :ref:`MetadataLocate <envoy_api_msg_type.metadata.v2.MetadataLocate>` to retrieve tag value
+  // :ref:`MetadataKey <envoy_api_msg_type.metadata.v2.MetadataKey>` to retrieve tag value
   // from :ref:`Metadata <envoy_api_msg_core.Metadata>`.
+  // The value will be format with following way by type:
+  //
+  // * `boolean`: populate with ``true`` or ``false`` string;
+  // * `number`: populate with number string;
+  // * `string`: populate with the string itself if not empty, otherwise considered as not found;
+  // * `list`/`struct`: populate with the corresponding JSON string
+  //   converted from the protobuf message;
+  // * otherwise means that no valid metadata is found.
   message Metadata {
-    // Metadata locate to define the path to retrieve the tag value.
-    metadata.v2.MetadataLocate metadata_locate = 1;
+    // Metadata key to define the path to retrieve the tag value.
+    metadata.v2.MetadataKey metadata_key = 1;
 
     // When no valid metadata is found,
     // the tag value would be populated with this default value if specified,

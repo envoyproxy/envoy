@@ -7724,14 +7724,14 @@ types {
   }
 }
 types {
-  key: "envoy.type.metadata.v2.MetadataLocate"
+  key: "envoy.type.metadata.v2.MetadataKey"
   value {
     qualified_package: "envoy.type.metadata.v2"
     proto_path: "envoy/type/metadata/v2/metadata.proto"
   }
 }
 types {
-  key: "envoy.type.metadata.v2.MetadataLocate.PathSegment"
+  key: "envoy.type.metadata.v2.MetadataKey.PathSegment"
   value {
     qualified_package: "envoy.type.metadata.v2"
     proto_path: "envoy/type/metadata/v2/metadata.proto"
