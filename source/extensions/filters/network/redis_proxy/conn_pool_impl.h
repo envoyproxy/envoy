@@ -23,11 +23,11 @@
 
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
+#include "extensions/common/redis/redirection_mgr.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
-#include "extensions/filters/network/redis_proxy/redirection_mgr.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,7 +54,7 @@ public:
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
       Api::Api& api, Stats::ScopePtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
-      RedisProxy::RedirectionManagerSharedPtr redirection_manager);
+      Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, const Common::Redis::RespValue& request,
@@ -138,7 +138,7 @@ private:
   Stats::ScopePtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   RedisClusterStats redis_cluster_stats_;
-  RedisProxy::RedirectionManagerSharedPtr redirection_manager_;
+  Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
 };
 
 } // namespace ConnPool

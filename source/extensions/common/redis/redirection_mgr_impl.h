@@ -11,12 +11,12 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 
-#include "extensions/filters/network/redis_proxy/redirection_mgr.h"
+#include "extensions/common/redis/redirection_mgr.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 class RedirectionManagerImpl : public RedirectionManager,
                                public Envoy::Singleton::Instance,
@@ -81,7 +81,11 @@ private:
   Thread::MutexBasicLockable map_mutex_;
 };
 
-} // namespace RedisProxy
-} // namespace NetworkFilters
+RedirectionManagerSharedPtr getRedirectionManager(Singleton::Manager& manager,
+                                                  Event::Dispatcher& main_thread_dispatcher,
+                                                  Upstream::ClusterManager& cm,
+                                                  TimeSource& time_source);
+} // namespace Redis
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

@@ -4,11 +4,11 @@
 #include <list>
 #include <string>
 
+#include "extensions/common/redis/redirection_mgr.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
-#include "extensions/filters/network/redis_proxy/redirection_mgr.h"
 #include "extensions/filters/network/redis_proxy/router.h"
 
 #include "test/test_common/printers.h"
@@ -36,18 +36,6 @@ public:
   MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
   ConnPool::InstanceSharedPtr conn_pool_;
   const MirrorPolicies policies_;
-};
-
-class MockRedirectionManager : public RedirectionManager {
-public:
-  MockRedirectionManager() = default;
-  ~MockRedirectionManager() override = default;
-
-  MOCK_METHOD1(onRedirection, bool(const std::string& cluster_name));
-  MOCK_METHOD4(registerCluster,
-               HandlePtr(const std::string& cluster_name,
-                         const std::chrono::milliseconds min_time_between_triggering,
-                         const uint32_t redirects_threshold, const RedirectCB cb));
 };
 
 namespace ConnPool {

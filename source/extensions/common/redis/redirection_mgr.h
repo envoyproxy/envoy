@@ -10,8 +10,8 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 using RedirectCB = std::function<void()>;
 
@@ -57,7 +57,7 @@ public:
 
 using RedirectionManagerSharedPtr = std::shared_ptr<RedirectionManager>;
 
-} // namespace RedisProxy
-} // namespace NetworkFilters
+} // namespace Redis
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

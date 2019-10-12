@@ -49,14 +49,9 @@ RedisCluster::RedisCluster(
     }
   }
 
-  redirection_manager_ =
-      factory_context.singletonManager().getTyped<NetworkFilters::RedisProxy::RedirectionManager>(
-          NetworkFilters::RedisProxy::global_redis_redirection_manager_singleton_name,
-          [&factory_context] {
-            return std::make_shared<NetworkFilters::RedisProxy::RedirectionManagerImpl>(
-                factory_context.dispatcher(), factory_context.clusterManager(),
-                factory_context.api().timeSource());
-          });
+  redirection_manager_ = Common::Redis::getRedirectionManager(
+      factory_context.singletonManager(), factory_context.dispatcher(),
+      factory_context.clusterManager(), factory_context.api().timeSource());
 
   registration_handle_ = redirection_manager_->registerCluster(
       cluster.name(), redirect_refresh_interval_, redirect_refresh_threshold_, [&]() {

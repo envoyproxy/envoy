@@ -1,9 +1,23 @@
-#include "extensions/filters/network/redis_proxy/redirection_mgr_impl.h"
+#include "extensions/common/redis/redirection_mgr_impl.h"
+
+#include "envoy/singleton/manager.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
+
+SINGLETON_MANAGER_REGISTRATION(redis_redirection_manager);
+
+RedirectionManagerSharedPtr getRedirectionManager(Singleton::Manager& manager,
+                                                  Event::Dispatcher& main_thread_dispatcher,
+                                                  Upstream::ClusterManager& cm,
+                                                  TimeSource& time_source) {
+  return manager.getTyped<RedirectionManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(redis_redirection_manager), [&] {
+        return std::make_shared<RedirectionManagerImpl>(main_thread_dispatcher, cm, time_source);
+      });
+}
 
 bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
   ClusterInfoSharedPtr info;
@@ -61,7 +75,7 @@ void RedirectionManagerImpl::unregisterCluster(ClusterInfoSharedPtr& cluster_inf
   info_map_.erase(cluster_info->cluster_name_);
 }
 
-} // namespace RedisProxy
-} // namespace NetworkFilters
+} // namespace Redis
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

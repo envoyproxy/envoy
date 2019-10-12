@@ -57,12 +57,12 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
+#include "extensions/common/redis/redirection_mgr_impl.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/config.h"
-#include "extensions/filters/network/redis_proxy/redirection_mgr_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -267,8 +267,8 @@ private:
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
 
-  NetworkFilters::RedisProxy::RedirectionManagerSharedPtr redirection_manager_;
-  NetworkFilters::RedisProxy::RedirectionManager::HandlePtr registration_handle_;
+  Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
+  Common::Redis::RedirectionManager::HandlePtr registration_handle_;
   const std::string auth_password_;
 };
 

@@ -6,7 +6,7 @@
 
 #include "exe/platform_impl.h"
 
-#include "extensions/filters/network/redis_proxy/redirection_mgr_impl.h"
+#include "extensions/common/redis/redirection_mgr_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
@@ -22,8 +22,8 @@ using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 class RedirectionMgrTest : public testing::Test {
 public:
@@ -198,7 +198,7 @@ TEST_F(RedirectionMgrTest, HighVolume) {
   EXPECT_EQ(callback_count_, 30);
 }
 
-} // namespace RedisProxy
-} // namespace NetworkFilters
+} // namespace Redis
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy
