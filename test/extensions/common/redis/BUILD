@@ -20,7 +20,9 @@ envoy_package()
 envoy_cc_library(
     name = "mocks_interface",
     hdrs = ["mocks.h"],
-    deps = [],
+    deps = [
+        "//source/extensions/common/redis:redirection_mgr_interface",
+    ],
 )
 
 envoy_extension_cc_test(
