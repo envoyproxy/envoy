@@ -314,7 +314,8 @@ public:
   }
 
   // Http::AsyncClient with tracing
-  Request* send(MessagePtr&& request, Callbacks& callbacks, const RequestOptions& args, Tracing::Span&) override {
+  Request* send(MessagePtr&& request, Callbacks& callbacks, const RequestOptions& args,
+                Tracing::Span&) override {
     return send_(request, callbacks, args);
   }
 

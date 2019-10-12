@@ -54,8 +54,7 @@ public:
 
   // Http::AsyncClient with tracing
   Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const AsyncClient::RequestOptions& options,
-                Tracing::Span& parent_span) override;
+                const AsyncClient::RequestOptions& options, Tracing::Span& parent_span) override;
 
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
 

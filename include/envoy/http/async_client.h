@@ -246,9 +246,8 @@ public:
    *         handle should just be used to cancel.
    */
 
-  virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
-                        const RequestOptions& options, Tracing::Span& parent_span) PURE;
-  
+  virtual Request* send(MessagePtr&& request, Callbacks& callbacks, const RequestOptions& options,
+                        Tracing::Span& parent_span) PURE;
 
   /**
    * Start an HTTP stream asynchronously.

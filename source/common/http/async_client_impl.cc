@@ -54,7 +54,8 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
 }
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
-                                            const AsyncClient::RequestOptions& options, Tracing::Span& parent_span) {
+                                            const AsyncClient::RequestOptions& options,
+                                            Tracing::Span& parent_span) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, options, parent_span);
   async_request->initialize();
@@ -241,9 +242,9 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
                                    const AsyncClient::RequestOptions& options,
                                    Tracing::Span& parent_span)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
-  child_span_ = parent_span.spawnChild(
-        Tracing::EgressConfig::get(), "async " + parent.cluster_->name() + " egress",
-        parent.dispatcher().timeSource().systemTime());
+  child_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
+                                       "async " + parent.cluster_->name() + " egress",
+                                       parent.dispatcher().timeSource().systemTime());
 }
 
 void AsyncRequestImpl::initialize() {
@@ -260,9 +261,9 @@ void AsyncRequestImpl::onComplete() {
   callbacks_.onSuccess(std::move(response_));
 
   if (child_span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
-                                                     this->response_->trailers(), this->streamInfo(),
-                                                     Tracing::EgressConfig::get());
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(
+        *child_span_, &this->response_->headers(), this->response_->trailers(), this->streamInfo(),
+        Tracing::EgressConfig::get());
   }
 }
 
@@ -294,9 +295,9 @@ void AsyncRequestImpl::onReset() {
   }
 
   if (child_span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
-                                                     this->response_->trailers(), this->streamInfo(),
-                                                     Tracing::EgressConfig::get());
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(
+        *child_span_, &this->response_->headers(), this->response_->trailers(), this->streamInfo(),
+        Tracing::EgressConfig::get());
   }
 }
 
