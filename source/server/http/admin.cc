@@ -156,11 +156,22 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
-// Helper method to get filter parameter
-absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
-  return (params.find("filter") != params.end())
-             ? absl::optional<std::regex>{std::regex(params.at("filter"))}
-             : absl::nullopt;
+// Helper method to get filter parameter, or report an error for an invalid regex.
+bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
+                 absl::optional<std::regex>& regex) {
+  auto p = params.find("filter");
+  if (p != params.end()) {
+    const std::string& pattern = p->second;
+    try {
+      regex = std::regex(pattern);
+    } catch (std::regex_error& error) {
+      // Include the offending pattern in the log, but not the error message.
+      response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
+      ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
+      return false;
+    }
+  }
+  return true;
 }
 
 // Helper method to get the format parameter
@@ -735,7 +746,10 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
   const bool used_only = params.find("usedonly") != params.end();
-  const absl::optional<std::regex> regex = filterParam(params);
+  absl::optional<std::regex> regex;
+  if (!filterParam(params, response, regex)) {
+    return Http::Code::BadRequest;
+  }
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -788,7 +802,10 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, H
                                              Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
-  const absl::optional<std::regex> regex = filterParam(params);
+  absl::optional<std::regex> regex;
+  if (!filterParam(params, response, regex)) {
+    return Http::Code::BadRequest;
+  }
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
                                               server_.stats().histograms(), response, used_only,
                                               regex);

@@ -26,8 +26,6 @@ message Pipe {
 message SocketAddress {
   enum Protocol {
     TCP = 0;
-
-    // [#not-implemented-hide:]
     UDP = 1;
   }
 

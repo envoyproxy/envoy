@@ -35,7 +35,7 @@ message TapConfig {
   // .. note::
   //
   //   This field defaults to 100/:ref:`HUNDRED
-  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  //   <envoy_api_enum_type.v3alpha.FractionalPercent.DenominatorType>`.
   api.v3alpha.core.RuntimeFractionalPercent tap_enabled = 3;
 }
 

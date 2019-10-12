@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.tcp_proxy.v3alp
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
+import "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";

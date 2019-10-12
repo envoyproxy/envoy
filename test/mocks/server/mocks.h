@@ -535,10 +535,10 @@ public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext() override;
 
-  const Network::ListenerConfig& listenerConfig() const override { return _listenerConfig_; }
+  const Network::ListenerConfig& listenerConfig() const override { return listener_config_; }
   MOCK_CONST_METHOD0(listenerConfig_, const Network::ListenerConfig&());
 
-  Network::MockListenerConfig _listenerConfig_;
+  Network::MockListenerConfig listener_config_;
 };
 
 class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {
