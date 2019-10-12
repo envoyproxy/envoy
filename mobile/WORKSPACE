@@ -126,9 +126,9 @@ maven_install(
 
 http_archive(
     name = "google_bazel_common",
-    strip_prefix = "bazel-common-f1115e0f777f08c3cdb115526c4e663005bec69b",
-    urls = ["https://github.com/google/bazel-common/archive/f1115e0f777f08c3cdb115526c4e663005bec69b.zip"],
-    sha256 = "1e05a4791cc3470d3ecf7edb556f796b1d340359f1c4d293f175d4d0946cf84c",
+    sha256 = "d8c9586b24ce4a5513d972668f94b62eb7d705b92405d4bc102131f294751f1d",
+    strip_prefix = "bazel-common-413b433b91f26dbe39cdbc20f742ad6555dd1e27",
+    urls = ["https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"],
 )
 
 http_archive(
@@ -145,9 +145,9 @@ http_archive(
 # https://github.com/grpc/grpc-java/commit/57e7bd394e92015d2891adc74af0eaf9cd347ea8#diff-515bc54a0cbb4b12fb4a7c465758b011L128-L131
 http_archive(
     name = "io_grpc_grpc_java",
-    urls = ["https://github.com/grpc/grpc-java/archive/v1.24.0.tar.gz"],
     sha256 = "8b495f58aaf75138b24775600a062bbdaa754d85f7ab2a47b2c9ecb432836dd1",
-    strip_prefix ="grpc-java-1.24.0",
+    strip_prefix = "grpc-java-1.24.0",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.24.0.tar.gz"],
 )
 
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
@@ -167,17 +167,19 @@ register_toolchains(":kotlin_toolchain")
 
 http_archive(
     name = "rules_proto_grpc",
-    urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/0.2.0.tar.gz"],
     sha256 = "1e08cd6c61f893417b14930ca342950f5f22f71f929a38a8c4bbfeae2a80d03e",
     strip_prefix = "rules_proto_grpc-0.2.0",
+    urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/0.2.0.tar.gz"],
 )
 
 load("@rules_proto_grpc//protobuf:repositories.bzl", "protobuf_repos")
+
 protobuf_repos()
 
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
+
 rules_proto_grpc_toolchains()
 
-load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos="java_repos")
+load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos = "java_repos")
 
 rules_proto_grpc_java_repos()
