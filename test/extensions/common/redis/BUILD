@@ -6,6 +6,7 @@ load(
     "envoy_cc_mock",
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
+    "envoy_cc_test_library",
     "envoy_cc_win32_library",
     "envoy_package",
 )
@@ -17,7 +18,7 @@ load(
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "mocks_interface",
     hdrs = ["mocks.h"],
     deps = [
