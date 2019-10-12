@@ -1,3 +1,5 @@
+#include <string>
+
 #include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
 #include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.validate.h"
 
@@ -67,9 +69,10 @@ TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
   cb(connection);
 }
 
-void handleInvalidConfiguration(const std::string& yaml_string) {
+void handleInvalidConfiguration(const std::string& yaml_string, const std::string& error_regex) {
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy config;
-  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml_string, config), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml_string, config), EnvoyException,
+                          error_regex);
 }
 
 TEST(MongoFilterConfigTest, InvalidExtraProperty) {
@@ -79,77 +82,62 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
   test: a
   )EOF";
 
-  handleInvalidConfiguration(yaml_string);
+  handleInvalidConfiguration(yaml_string, "test: Cannot find field");
 }
 
-TEST(MongoFilterConfigTest, EmptyConfig) { handleInvalidConfiguration("{}"); }
+TEST(MongoFilterConfigTest, EmptyConfig) {
+  handleInvalidConfiguration(
+      "{}", R"(StatPrefix: \["value length must be at least " '\\x01' " bytes"\])");
+}
 
 TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
   const std::string yaml_string = R"EOF(
   stat_prefix: my_stat_prefix
-  fault: {}
+  delay: {}
   )EOF";
 
-  handleInvalidConfiguration(yaml_string);
+  handleInvalidConfiguration(yaml_string,
+                             R"(caused by field: "fault_delay_secifier", reason: is required)");
 }
 
-TEST(MongoFilterConfigTest, InvalidFaultsMissingPercentage) {
+TEST(MongoFilterConfigTest, InvalidFaultsMissingFixedDelayTime) {
   const std::string yaml_string = R"EOF(
   stat_prefix: my_stat_prefix
-  fault:
-    fixed_delay:
-      duration_ms: 1
+  delay:
+    percentage:
+      numerator: 1
+      denominator: HUNDRED
   )EOF";
 
-  handleInvalidConfiguration(yaml_string);
-}
-
-TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: my_stat_prefix
-  fault:
-    fixed_delay:
-      delay_percent: 1
-  )EOF";
-
-  handleInvalidConfiguration(yaml_string);
+  handleInvalidConfiguration(yaml_string,
+                             R"(caused by field: "fault_delay_secifier", reason: is required)");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
   const std::string yaml_string = R"EOF(
   stat_prefix: my_stat_prefix
-  fault:
-    fixed_delay:
-      percent: 1
-      duration: -1s
+  delay:
+    percentage:
+      numerator: 1
+      denominator: HUNDRED
+    fixed_delay: -1s
   )EOF";
 
-  handleInvalidConfiguration(yaml_string);
+  handleInvalidConfiguration(yaml_string, R"(FixedDelay: \["value must be greater than " "0s"\])");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
   {
     const std::string yaml_string = R"EOF(
     stat_prefix: my_stat_prefix
-    fault:
-      fixed_delay:
-        percent: 101
-        duration: 1s
+    delay:
+      percentage:
+        numerator: -1
+        denominator: HUNDRED
+      fixed_delay: 1s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string);
-  }
-
-  {
-    const std::string yaml_string = R"EOF(
-    stat_prefix: my_stat_prefix
-    fault:
-      fixed_delay:
-        percent: -1
-        duration: 1s
-    )EOF";
-
-    handleInvalidConfiguration(yaml_string);
+    handleInvalidConfiguration(yaml_string, R"(invalid value -1 for type TYPE_UINT32)");
   }
 }
 
@@ -157,47 +145,52 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
   {
     const std::string yaml_string = R"EOF(
     stat_prefix: my_stat_prefix
-    fault:
-      fixed_delay:
-        percent: df
-        duration: 1
+    delay:
+      percentage:
+        numerator: df
+        denominator: HUNDRED
+      fixed_delay: 1s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string);
+    handleInvalidConfiguration(yaml_string, R"(invalid value "df" for type TYPE_UINT32)");
   }
 
   {
     const std::string yaml_string = R"EOF(
     stat_prefix: my_stat_prefix
-    fault:
-      fixed_delay:
-        percent: 3
-        duration: ab
+    delay:
+      percentage:
+        numerator: 1
+        denominator: HUNDRED
+      fixed_delay: ab
     )EOF";
 
-    handleInvalidConfiguration(yaml_string);
+    handleInvalidConfiguration(yaml_string, "Illegal duration format; duration must end with 's'");
   }
 
   {
     const std::string yaml_string = R"EOF(
     stat_prefix: my_stat_prefix
-    fault:
-      fixed_delay:
-        percent: 3
-        duration: 0s
+    delay:
+      percentage:
+        numerator: 3
+        denominator: HUNDRED
+      fixed_delay: 0s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string);
+    handleInvalidConfiguration(yaml_string,
+                               R"(FixedDelay: \["value must be greater than " "0s"\])");
   }
 }
 
 TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
   const std::string yaml_string = R"EOF(
   stat_prefix: my_stat_prefix
-  fault:
-    fixed_delay:
-      percent: 1
-      duration: 1s
+  delay:
+    percentage:
+      numerator: 1
+      denominator: HUNDRED
+    fixed_delay: 1s
   )EOF";
 
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy proto_config;
