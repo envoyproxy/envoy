@@ -25,6 +25,7 @@ namespace Http {
 #define DEFINE_INLINE_HEADER_FUNCS(name)                                                           \
 public:                                                                                            \
   const HeaderEntry* name() const override { return inline_headers_.name##_; }                     \
+  const HeaderEntry* const##name() const override { return name(); }                               \
   HeaderEntry* name() override {                                                                   \
     cached_byte_size_.reset();                                                                     \
     return inline_headers_.name##_;                                                                \

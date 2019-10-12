@@ -376,6 +376,27 @@ TEST(HeaderMapImplTest, InlineInsert) {
   EXPECT_EQ("hello", headers.get(Headers::get().Host)->value().getStringView());
 }
 
+TEST(HeaderMapImplTest, ConstGetter) {
+  HeaderMapImpl headers;
+  headers.insertHost().value(std::string("hello"));
+  EXPECT_GT(headers.refreshByteSize(), 0);
+  EXPECT_TRUE(headers.byteSize().has_value());
+
+  // const header map getter method  will not invalidate the byte cache
+  const auto& const_headers = headers;
+  const_headers.Host();
+  EXPECT_TRUE(const_headers.byteSize().has_value());
+
+  // Non const header map will default invalidate the size cache
+  headers.Host();
+  EXPECT_FALSE(headers.byteSize().has_value());
+
+  // const method will not invalidate the size cache
+  EXPECT_GT(headers.refreshByteSize(), 0);
+  headers.constHost();
+  EXPECT_TRUE(headers.byteSize().has_value());
+}
+
 // Utility function for testing byteSize() against a manual byte count.
 uint64_t countBytesForTest(const HeaderMapImpl& headers) {
   uint64_t byte_size = 0;

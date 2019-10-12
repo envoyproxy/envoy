@@ -36,7 +36,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  origin_ = headers.Origin();
+  origin_ = headers.constOrigin();
   if (origin_ == nullptr || origin_->value().empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -53,13 +53,13 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
 
   is_cors_request_ = true;
 
-  const auto method = headers.Method();
+  const auto method = headers.constMethod();
   if (method == nullptr ||
       method->value().getStringView() != Http::Headers::get().MethodValues.Options) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const auto requestMethod = headers.AccessControlRequestMethod();
+  const auto requestMethod = headers.constAccessControlRequestMethod();
   if (requestMethod == nullptr || requestMethod->value().empty()) {
     return Http::FilterHeadersStatus::Continue;
   }

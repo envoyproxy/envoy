@@ -350,6 +350,7 @@ private:
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
+  virtual const HeaderEntry* const##name() const PURE;                                             \
   virtual HeaderEntry* name() PURE;                                                                \
   virtual HeaderEntry& insert##name() PURE;                                                        \
   virtual void remove##name() PURE;
