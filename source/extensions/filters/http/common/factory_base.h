@@ -14,7 +14,6 @@ namespace Common {
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
 class FactoryBase : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,

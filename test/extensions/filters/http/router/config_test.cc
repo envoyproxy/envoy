@@ -1,3 +1,5 @@
+#include <string>
+
 #include "envoy/config/filter/http/router/v2/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
@@ -5,8 +7,6 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
-
-#include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -42,7 +42,8 @@ TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
   )EOF";
 
   envoy::config::filter::http::router::v2::Router proto_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException, "route: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
+                          "route: Cannot find field");
 }
 
 TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {

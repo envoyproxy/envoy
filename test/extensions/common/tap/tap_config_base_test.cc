@@ -1,8 +1,8 @@
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/common/tap/tap_config_base.h"
-
-#include <vector>
 
 #include "gtest/gtest.h"
 

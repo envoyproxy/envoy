@@ -1,11 +1,11 @@
+#include <string>
+
 #include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
 
 #include "extensions/filters/http/lua/config.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
-
-#include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
