@@ -193,6 +193,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "json_utility_lib",
+    hdrs = ["json_utility.h"],
+    deps = [
+        "//include/envoy/json:json_object_interface",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "metadata_lib",
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
@@ -281,16 +291,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "json_utility_lib",
-    hdrs = ["json_utility.h"],
-    deps = [
-        "//include/envoy/json:json_object_interface",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
     ],
 )
 
