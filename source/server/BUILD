@@ -257,7 +257,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "listener_manager_lib",
+    name = "listener_lib",
     srcs = [
         "listener_impl.cc",
     ],
@@ -266,6 +266,7 @@ envoy_cc_library(
     ],
     deps = [
         ":listener_manager_impl",
+        "//source/common/network:connection_balancer_lib",
     ],
 )
 
@@ -290,12 +291,9 @@ envoy_cc_library(
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
-        "//source/common/api:os_sys_calls_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
-        "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
-        "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -362,7 +360,7 @@ envoy_cc_library(
         ":connection_handler_lib",
         ":guarddog_lib",
         ":listener_hooks_lib",
-        ":listener_manager_lib",
+        ":listener_lib",
         ":ssl_context_manager_lib",
         ":worker_lib",
         "//include/envoy/event:dispatcher_interface",

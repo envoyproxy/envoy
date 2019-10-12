@@ -5,9 +5,7 @@
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
@@ -124,17 +122,12 @@ public:
   ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
   const envoy::api::v2::core::Metadata& listenerMetadata() const override;
-
   envoy::api::v2::core::TrafficDirection direction() const override;
-
   TimeSource& timeSource() override;
-
   const Network::ListenerConfig& listenerConfig() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-
   OptProcessContextRef processContext() override;
 
   void ensureSocketOptions() {

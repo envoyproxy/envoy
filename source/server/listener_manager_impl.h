@@ -11,11 +11,6 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
-#include "common/init/manager_impl.h"
-#include "common/network/cidr_range.h"
-#include "common/network/lc_trie.h"
-
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 #include "server/listener_impl.h"

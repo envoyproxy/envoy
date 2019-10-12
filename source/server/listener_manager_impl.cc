@@ -8,15 +8,11 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
-#include "common/network/connection_balancer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -30,9 +26,6 @@
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
-#include "absl/strings/match.h"
-#include "absl/strings/str_cat.h"
-
 namespace Envoy {
 namespace Server {
 namespace {
@@ -43,9 +36,8 @@ std::string toString(Network::Address::SocketType socket_type) {
     return "SocketType::Stream";
   case Network::Address::SocketType::Datagram:
     return "SocketType::Datagram";
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace

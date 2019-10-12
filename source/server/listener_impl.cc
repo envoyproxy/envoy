@@ -1,7 +1,5 @@
 #include "server/listener_impl.h"
 
-#include <algorithm>
-
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
