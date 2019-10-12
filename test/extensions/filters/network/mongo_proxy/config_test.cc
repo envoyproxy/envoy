@@ -6,6 +6,7 @@
 #include "extensions/filters/network/mongo_proxy/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
