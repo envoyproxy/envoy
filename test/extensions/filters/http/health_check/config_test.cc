@@ -1,9 +1,9 @@
+#include <string>
+
 #include "extensions/filters/http/health_check/config.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
-
-#include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -45,7 +45,8 @@ TEST(HealthCheckFilterConfig, BadHealthCheckFilterConfig) {
   )EOF";
 
   envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException, "status: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
+                          "status: Cannot find field");
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
@@ -82,7 +83,8 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context));
+  EXPECT_NO_THROW(
+      factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context));
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {

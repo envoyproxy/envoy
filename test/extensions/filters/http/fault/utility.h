@@ -1,7 +1,6 @@
+#include <string>
 
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
-
-#include <string>
 
 #include "test/test_common/utility.h"
 

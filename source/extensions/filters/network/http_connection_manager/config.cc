@@ -393,7 +393,8 @@ void HttpConnectionManagerConfig::processFilter(
           string_name);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       proto_config, context_.messageValidationVisitor(), factory);
-  Http::FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  Http::FilterFactoryCb callback =
+      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   is_terminal = factory.isTerminalFilter();
   filter_factories.push_back(callback);
 }
