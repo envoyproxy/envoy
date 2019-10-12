@@ -20,7 +20,9 @@ namespace {
 TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   const std::string yaml_string = R"EOF(
   pass_through_mode: true
-  endpoint: "/hc"
+  headers:
+    - name: ":path"
+      exact_match: "/hc"
   )EOF";
 
   envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
@@ -36,22 +38,23 @@ TEST(HealthCheckFilterConfig, HealthCheckFilter) {
 TEST(HealthCheckFilterConfig, BadHealthCheckFilterConfig) {
   const std::string yaml_string = R"EOF(
   pass_through_mode: true
-  endpoint: "/hc"
+  headers:
+    - name: ":path"
+      exact_match: "/hc"
   status: 500
   )EOF";
 
   envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
-  TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  HealthCheckFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException, "status: Cannot find field");
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   const std::string yaml_string = R"EOF(
-  pass_through_mode: true
-  cache_time: .234s
-  endpoint: foo
+  pass_through_mode: false
+  cache_time: 0.234s
+  headers:
+    - name: ":path"
+      exact_match: "/foo"
   )EOF";
 
   envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
@@ -67,8 +70,10 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
   const std::string yaml_string = R"EOF(
   pass_through_mode: true
-  cache_time: .234s
-  endpoint: foo
+  cache_time: 0.234s
+  headers:
+    - name: ":path"
+      exact_match: "/foo"
   )EOF";
 
   envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
