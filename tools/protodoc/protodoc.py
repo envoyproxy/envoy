@@ -466,6 +466,9 @@ class RstFormatVisitor(visitor.Visitor):
         type_context, enum_proto)
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+    # Skip messages synthesized to represent map types.
+    if msg_proto.options.map_entry:
+      return ''
     normal_msg_type = NormalizeTypeContextName(type_context.name)
     anchor = FormatAnchor(MessageCrossRefLabel(normal_msg_type))
     header = FormatHeader('-', normal_msg_type)

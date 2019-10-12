@@ -70,6 +70,13 @@ do
         exit 1
       fi
     done
+
+    # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
+    "$SCRIPT_DIR"/proto_format.sh check
+    if [[ $? -ne 0 ]]; then
+      exit 1
+    fi
+
     "$SCRIPT_DIR"/format_python_tools.sh check
     if [[ $? -ne 0 ]]; then
       exit 1

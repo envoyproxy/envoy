@@ -37,8 +37,8 @@ DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> d
                                                  HostSharedPtr host)
     : detector_(detector), host_(host),
       // add Success Rate monitors
-      external_origin_SR_monitor_(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE),
-      local_origin_SR_monitor_(
+      external_origin_sr_monitor_(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE),
+      local_origin_sr_monitor_(
           envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN) {
   // Setup method to call when putResult is invoked. Depending on the config's
   // split_external_local_origin_errors_ boolean value different method is called.
@@ -59,12 +59,12 @@ void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
 }
 
 void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
-  external_origin_SR_monitor_.updateCurrentSuccessRateBucket();
-  local_origin_SR_monitor_.updateCurrentSuccessRateBucket();
+  external_origin_sr_monitor_.updateCurrentSuccessRateBucket();
+  local_origin_sr_monitor_.updateCurrentSuccessRateBucket();
 }
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
-  external_origin_SR_monitor_.incTotalReqCounter();
+  external_origin_sr_monitor_.incTotalReqCounter();
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -87,7 +87,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
-    external_origin_SR_monitor_.incSuccessReqCounter();
+    external_origin_sr_monitor_.incSuccessReqCounter();
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
@@ -184,7 +184,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
   }
-  local_origin_SR_monitor_.incTotalReqCounter();
+  local_origin_sr_monitor_.incTotalReqCounter();
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
           "outlier_detection.consecutive_local_origin_failure",
@@ -200,8 +200,8 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
     return;
   }
 
-  local_origin_SR_monitor_.incTotalReqCounter();
-  local_origin_SR_monitor_.incSuccessReqCounter();
+  local_origin_sr_monitor_.incTotalReqCounter();
+  local_origin_sr_monitor_.incSuccessReqCounter();
 
   resetConsecutiveLocalOriginFailure();
 }
@@ -260,8 +260,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger) {
   // Insert success rate initial numbers for each type of SR detector
-  external_origin_SR_num_ = {-1, -1};
-  local_origin_SR_num_ = {-1, -1};
+  external_origin_sr_num_ = {-1, -1};
+  local_origin_sr_num_ = {-1, -1};
 }
 
 DetectorImpl::~DetectorImpl() {

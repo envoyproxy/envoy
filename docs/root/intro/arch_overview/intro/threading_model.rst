@@ -11,3 +11,16 @@ largely single threaded (embarrassingly parallel) with a small amount of more co
 coordination between the worker threads. Generally Envoy is written to be 100% non-blocking and for
 most workloads we recommend configuring the number of worker threads to be equal to the number of
 hardware threads on the machine.
+
+Listener connection balancing
+-----------------------------
+
+By default, there is no coordination between worker threads. This means that all worker threads
+independently attempt to accept connections on each listener and rely on the kernel to perform
+adequate balancing between threads. For most workloads, the kernel does a very good job of
+balancing incoming connections. However, for some workloads, particularly those that have a small
+number of very long lived connections (e.g., service mesh HTTP2/gRPC egress), it may be desirable
+to have Envoy forcibly balance connections between worker threads. To support this behavior,
+Envoy allows for different types of :ref:`connection balancing
+<envoy_api_field_Listener.connection_balance_config>` to be configured on each :ref:`listener
+<arch_overview_listeners>`.
