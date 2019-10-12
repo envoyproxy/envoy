@@ -22,7 +22,6 @@
 #include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"

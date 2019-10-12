@@ -31,7 +31,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
         "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",

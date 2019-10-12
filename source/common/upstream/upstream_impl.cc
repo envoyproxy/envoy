@@ -22,7 +22,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/config/protocol_json.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
