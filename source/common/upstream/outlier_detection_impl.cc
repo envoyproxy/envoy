@@ -333,9 +333,7 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   ASSERT_OR_LOG_AND(num_ejections > 0, return );
   auto last_ejection_time = monitor->lastEjectionTime();
   ASSERT_OR_LOG_AND(last_ejection_time, return );
-  if (now < last_ejection_time.value()) {
-    return;
-  }
+  ASSERT(now >= last_ejection_time.value());
 
   auto base_eject_time = std::chrono::milliseconds(runtime_.snapshot().getInteger(
       "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
