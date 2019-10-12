@@ -8,6 +8,7 @@
 
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -49,8 +50,13 @@ AsyncClientImpl::~AsyncClientImpl() {
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
+  return this->send(std::move(request), callbacks, options, Tracing::NullSpan::instance());
+}
+
+AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+                                            const AsyncClient::RequestOptions& options, Tracing::Span& parent_span) {
   AsyncRequestImpl* async_request =
-      new AsyncRequestImpl(std::move(request), *this, callbacks, options);
+      new AsyncRequestImpl(std::move(request), *this, callbacks, options, parent_span);
   async_request->initialize();
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
@@ -232,8 +238,12 @@ void AsyncStreamImpl::resetStream() {
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
-                                   const AsyncClient::RequestOptions& options)
+                                   const AsyncClient::RequestOptions& options,
+                                   Tracing::Span& parent_span)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
+  child_span_ = parent_span.spawnChild(
+        Tracing::EgressConfig::get(), "async " + parent.cluster_->name() + " egress",
+        parent.dispatcher().timeSource().systemTime());
 }
 
 void AsyncRequestImpl::initialize() {
@@ -246,7 +256,15 @@ void AsyncRequestImpl::initialize() {
   // TODO(mattklein123): Support request trailers.
 }
 
-void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
+void AsyncRequestImpl::onComplete() {
+  callbacks_.onSuccess(std::move(response_));
+
+  if (child_span_ != nullptr) {
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
+                                                     this->response_->trailers(), this->streamInfo(),
+                                                     Tracing::EgressConfig::get());
+  }
+}
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
@@ -267,11 +285,28 @@ void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
     callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+
+    if (child_span_ != nullptr) {
+      // Add tags about reset.
+      child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
+    }
+  }
+
+  if (child_span_ != nullptr) {
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
+                                                     this->response_->trailers(), this->streamInfo(),
+                                                     Tracing::EgressConfig::get());
   }
 }
 
 void AsyncRequestImpl::cancel() {
   cancelled_ = true;
+
+  if (child_span_ != nullptr) {
+    child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
+  }
+
   reset();
 }
 

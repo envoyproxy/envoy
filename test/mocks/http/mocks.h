@@ -313,6 +313,11 @@ public:
     return send_(request, callbacks, args);
   }
 
+  // Http::AsyncClient with tracing
+  Request* send(MessagePtr&& request, Callbacks& callbacks, const RequestOptions& args, Tracing::Span&) override {
+    return send_(request, callbacks, args);
+  }
+
   MOCK_METHOD3(send_,
                Request*(MessagePtr& request, Callbacks& callbacks, const RequestOptions& args));
 

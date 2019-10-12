@@ -52,6 +52,11 @@ public:
   Request* send(MessagePtr&& request, Callbacks& callbacks,
                 const AsyncClient::RequestOptions& options) override;
 
+  // Http::AsyncClient with tracing
+  Request* send(MessagePtr&& request, Callbacks& callbacks,
+                const AsyncClient::RequestOptions& options,
+                Tracing::Span& parent_span) override;
+
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -89,6 +94,7 @@ public:
 protected:
   bool remoteClosed() { return remote_closed_; }
   void closeLocal(bool end_stream);
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
 
@@ -311,7 +317,6 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -394,7 +399,7 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncClient::StreamCallbacks {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const AsyncClient::RequestOptions& options);
+                   const AsyncClient::RequestOptions& options, Tracing::Span& parent_span);
 
   // AsyncClient::Request
   void cancel() override;
@@ -423,6 +428,7 @@ private:
   AsyncClient::Callbacks& callbacks_;
   std::unique_ptr<MessageImpl> response_;
   bool cancelled_{};
+  Tracing::SpanPtr child_span_;
 
   friend class AsyncClientImpl;
 };
