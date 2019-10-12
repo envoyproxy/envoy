@@ -27,9 +27,10 @@ TEST(FaultFilterConfigTest, ValidateFail) {
 TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   const std::string yaml_string = R"EOF(
   delay:
-    type: fixed
-    fixed_delay_percent: 100
-    fixed_duration: 5s
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
   )EOF";
 
   const auto proto_config = convertYamlStrToProtoConfig(yaml_string);

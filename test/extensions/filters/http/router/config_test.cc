@@ -19,7 +19,7 @@ namespace HttpFilters {
 namespace RouterFilter {
 namespace {
 
-TEST(RouterFilterConfigTest, RouterFilterInJson) {
+TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
   const std::string yaml_string = R"EOF(
   dynamic_stats: true
   start_child_span: true
@@ -37,15 +37,12 @@ TEST(RouterFilterConfigTest, RouterFilterInJson) {
 
 TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
   const std::string yaml_string = R"EOF(
-  dynamic_stats: true,
+  dynamic_stats: true
   route: {}
   )EOF";
 
   envoy::config::filter::http::router::v2::Router proto_config;
-  TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  RouterFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context), Json::Exception);
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException, "route: Cannot find field");
 }
 
 TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
