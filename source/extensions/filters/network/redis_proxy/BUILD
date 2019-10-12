@@ -116,7 +116,6 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:filter_json_lib",
         "//source/extensions/common/redis:redirection_mgr_lib",

@@ -1,7 +1,5 @@
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include "envoy/registry/registry.h"
-
 #include "common/config/filter_json.h"
 
 #include "extensions/common/redis/redirection_mgr_impl.h"
