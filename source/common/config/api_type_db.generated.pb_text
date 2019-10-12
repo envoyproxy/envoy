@@ -7724,6 +7724,55 @@ types {
   }
 }
 types {
+  key: "envoy.type.metadata.v2.MetadataLocate"
+  value {
+    qualified_package: "envoy.type.metadata.v2"
+    proto_path: "envoy/type/metadata/v2/metadata.proto"
+  }
+}
+types {
+  key: "envoy.type.metadata.v2.MetadataLocate.PathSegment"
+  value {
+    qualified_package: "envoy.type.metadata.v2"
+    proto_path: "envoy/type/metadata/v2/metadata.proto"
+  }
+}
+types {
+  key: "envoy.type.tracing.v2.CustomTag"
+  value {
+    qualified_package: "envoy.type.tracing.v2"
+    proto_path: "envoy/type/tracing/v2/custom_tag.proto"
+  }
+}
+types {
+  key: "envoy.type.tracing.v2.CustomTag.Environment"
+  value {
+    qualified_package: "envoy.type.tracing.v2"
+    proto_path: "envoy/type/tracing/v2/custom_tag.proto"
+  }
+}
+types {
+  key: "envoy.type.tracing.v2.CustomTag.Header"
+  value {
+    qualified_package: "envoy.type.tracing.v2"
+    proto_path: "envoy/type/tracing/v2/custom_tag.proto"
+  }
+}
+types {
+  key: "envoy.type.tracing.v2.CustomTag.Literal"
+  value {
+    qualified_package: "envoy.type.tracing.v2"
+    proto_path: "envoy/type/tracing/v2/custom_tag.proto"
+  }
+}
+types {
+  key: "envoy.type.tracing.v2.CustomTag.Metadata"
+  value {
+    qualified_package: "envoy.type.tracing.v2"
+    proto_path: "envoy/type/tracing/v2/custom_tag.proto"
+  }
+}
+types {
   key: "envoy.type.v3alpha.DoubleRange"
   value {
     qualified_package: "envoy.type.v3alpha"

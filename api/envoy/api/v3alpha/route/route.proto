@@ -10,7 +10,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/type/matcher/v3alpha/regex.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
-import "envoy/type/tracing/v3alpha/custom_tag.proto";
+import "envoy/type/tracing/v2/custom_tag.proto";
 import "envoy/type/v3alpha/percent.proto";
 import "envoy/type/v3alpha/range.proto";
 
@@ -1038,11 +1038,11 @@ message Tracing {
 
   // A list of custom tags with unique tag name to create tags for the active span.
   // It will take effect after merging with the :ref:`corresponding configuration
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.tracing.custom_tags>`
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`
   // configured in the HTTP connection manager. If two tags with the same name are configured
   // each in the HTTP connection manager and the route level, the one configured here takes
   // priority.
-  repeated type.tracing.v3alpha.CustomTag custom_tags = 4;
+  repeated type.tracing.v2.CustomTag custom_tags = 4;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against
