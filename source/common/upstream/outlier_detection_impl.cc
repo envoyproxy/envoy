@@ -332,7 +332,7 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   auto num_ejections = monitor->numEjections();
   ASSERT(num_ejections > 0);
   auto last_ejection_time = monitor->lastEjectionTime();
-  ASSERT_OR_LOG_AND(last_ejection_time, return );
+  RELEASE_ASSERT(last_ejection_time, "Optional last_ejection_time is unset");
   ASSERT(now >= last_ejection_time.value());
 
   auto base_eject_time = std::chrono::milliseconds(runtime_.snapshot().getInteger(

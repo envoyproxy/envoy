@@ -91,23 +91,7 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 // _ASSERT_VERBOSE, and this will call _ASSERT_VERBOSE,(__VA_ARGS__)
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
-
-// When compiled for debug, ASSERT_OR_LOG is simply an ASSERT. This
-// is similar in principle to Chromium's LOG(DFATAL):
-// https://chromium.googlesource.com/chromium/src/+/master/base/logging.h#149
-#define ASSERT_OR_LOG(expr) ASSERT(expr, "ASSERT_OR_LOG()")
-
-// Variant of ASSERT_OR_LOG where the call-site can specify an action to
-// take after logging, when compiled for optimization. The action might
-// be something like:
-//   - return from function
-//   - throw an exception
-//   - increment a stat counter
-//   - break out of a loop.
-#define ASSERT_OR_LOG_AND(expr, escape) ASSERT(expr, "ASSERT_OR_LOG_AND(" #escape ")")
-
 #else
-
 // This non-implementation ensures that its argument is a valid expression that can be statically
 // casted to a bool, but the expression is never evaluated and will be compiled away.
 #define ASSERT(X, ...)                                                                             \
@@ -115,21 +99,6 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
     constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
     (void)__assert_dummy_variable;                                                                 \
   } while (false)
-
-// When compiled for optimization, ASSERT_OR_LOG logs an error. See above for doc.
-#define ASSERT_OR_LOG(expr) ENVOY_LOG_MISC(error, "ASSERT_OR_LOG({})", #expr)
-
-// Note that ASSERT_OR_LOG_AND's multi-line definition is not wrapped in a
-// do/while because it's possible the caller may want to use 'break' as the
-// escape. This is safe because Envoy's enforced style is to use braces for all
-// conditionals, so there can be no mistaken binding of a trailing else. See
-// above for doc.
-#define ASSERT_OR_LOG_AND(expr, escape)                                                            \
-  if (!(expr)) {                                                                                   \
-    ENVOY_LOG_MISC(error, "ASSERT_OR_LOG_AND({}, {})", #expr, #escape);                            \
-    escape;                                                                                        \
-  }
-
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 /**
