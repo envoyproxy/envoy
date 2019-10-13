@@ -6,7 +6,6 @@ option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.route";
 
-import "envoy/api/v2/core/base.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/type/matcher/v3alpha/regex.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
