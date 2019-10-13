@@ -2,6 +2,10 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/type/http_status.pb.h"
+
 #include "test/mocks/upstream/mocks.h"
 
 namespace Envoy {

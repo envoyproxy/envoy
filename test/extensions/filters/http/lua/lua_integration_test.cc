@@ -1,3 +1,6 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"

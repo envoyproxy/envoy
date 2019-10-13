@@ -1,6 +1,7 @@
+#include "envoy/api/v2/route/route.pb.h"
+
 #pragma once
 
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/hash_policy.h"
 
 namespace Envoy {

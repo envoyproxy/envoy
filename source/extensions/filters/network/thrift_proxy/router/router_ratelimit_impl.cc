@@ -1,5 +1,6 @@
 #include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/ratelimit/ratelimit.h"
 

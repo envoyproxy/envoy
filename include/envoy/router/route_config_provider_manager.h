@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/json/json_object.h"

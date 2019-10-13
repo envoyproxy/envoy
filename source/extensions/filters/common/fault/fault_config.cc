@@ -1,5 +1,7 @@
 #include "extensions/filters/common/fault/fault_config.h"
 
+#include "envoy/config/filter/fault/v2/fault.pb.h"
+
 #include "common/protobuf/utility.h"
 
 namespace Envoy {

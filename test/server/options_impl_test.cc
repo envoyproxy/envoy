@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 

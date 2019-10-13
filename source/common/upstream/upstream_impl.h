@@ -11,8 +11,10 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"

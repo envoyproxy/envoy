@@ -20,5 +20,6 @@ envoy_cc_mock(
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_interface",
         "//test/mocks/secret:secret_mocks",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )

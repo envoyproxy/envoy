@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"

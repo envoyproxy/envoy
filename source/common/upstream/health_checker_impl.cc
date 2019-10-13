@@ -1,6 +1,10 @@
 #include "common/upstream/health_checker_impl.h"
 
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/server/health_checker_config.h"
+#include "envoy/type/http.pb.h"
+#include "envoy/type/range.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/empty_string.h"

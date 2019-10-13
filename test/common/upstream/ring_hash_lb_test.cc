@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/router/router.h"
 
 #include "common/network/utility.h"

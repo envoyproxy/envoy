@@ -1,3 +1,4 @@
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.validate.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
