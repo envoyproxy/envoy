@@ -16,6 +16,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "udpa/type/v1/typed_struct.pb.h"
 
 using testing::_;
 using testing::Ref;
@@ -293,6 +294,71 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
                             "cluster.dns_failure_refresh_rate must have max_interval greater than "
                             "or equal to the base_interval");
   }
+}
+
+void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const ProtobufWkt::Message& inner) {
+  udpa::type::v1::TypedStruct typed_struct;
+  (*typed_struct.mutable_type_url()) =
+      absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
+  MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
+  typed_config.PackFrom(typed_struct);
+}
+
+// Verify that udpa.type.v1.TypedStruct can be translated into google.protobuf.Struct
+TEST(UtilityTest, TypedStructToStruct) {
+  ProtobufWkt::Any typed_config;
+  ProtobufWkt::Struct untyped_struct;
+  (*untyped_struct.mutable_fields())["foo"].set_string_value("bar");
+  packTypedStructIntoAny(typed_config, untyped_struct);
+
+  ProtobufWkt::Struct out;
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                 ProtobufMessage::getStrictValidationVisitor(), out);
+
+  EXPECT_THAT(out, ProtoEq(untyped_struct));
+}
+
+// Verify that udpa.type.v1.TypedStruct can be translated into an arbitrary message of correct type
+TEST(UtilityTest, TypedStructToBootstrap) {
+  ProtobufWkt::Any typed_config;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  const std::string bootstrap_config_yaml = R"EOF(
+    admin:
+      access_log_path: /dev/null
+      address:
+        pipe:
+          path: "/"
+  )EOF";
+  TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
+  packTypedStructIntoAny(typed_config, bootstrap);
+
+  envoy::config::bootstrap::v2::Bootstrap out;
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_THAT(out, ProtoEq(bootstrap));
+}
+
+// Verify that translation from udpa.type.v1.TypedStruct into message of incorrect type fails
+TEST(UtilityTest, TypedStructToInvalidType) {
+  ProtobufWkt::Any typed_config;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  const std::string bootstrap_config_yaml = R"EOF(
+    admin:
+      access_log_path: /dev/null
+      address:
+        pipe:
+          path: "/"
+  )EOF";
+  TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
+  packTypedStructIntoAny(typed_config, bootstrap);
+
+  ProtobufWkt::Any out;
+  EXPECT_THROW_WITH_MESSAGE(
+      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                     ProtobufMessage::getStrictValidationVisitor(), out),
+      EnvoyException,
+      "Invalid proto type.\nExpected google.protobuf.Any\nActual: "
+      "envoy.config.bootstrap.v2.Bootstrap");
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
