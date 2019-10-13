@@ -368,19 +368,19 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   const TlsContextMatchCriteria& criteria = *tlsContextMatchCriteria();
 
   if (criteria.presented().has_value()) {
-    const bool peerPresented = stream_info.downstreamSslConnection() &&
-                               stream_info.downstreamSslConnection()->peerCertificatePresented();
-    matches &= criteria.presented().value() == peerPresented;
+    const bool peer_presented = stream_info.downstreamSslConnection() &&
+                                stream_info.downstreamSslConnection()->peerCertificatePresented();
+    matches &= criteria.presented().value() == peer_presented;
   }
 
   if (matches && criteria.expired().has_value()) {
     const SystemTime now = time_source_.systemTime();
-    const auto peerExpirationTime =
+    const auto peer_expiration_time =
         stream_info.downstreamSslConnection()->expirationPeerCertificate();
     // Treats no presented credentials as not expired
-    const bool peerExpired =
-        peerExpirationTime.has_value() ? now > peerExpirationTime.value() : false;
-    matches &= criteria.expired().value() == peerExpired;
+    const bool peer_expired =
+        peer_expiration_time.has_value() ? now > peer_expiration_time.value() : false;
+    matches &= criteria.expired().value() == peer_expired;
   }
 
   return matches;

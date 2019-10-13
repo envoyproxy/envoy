@@ -25,7 +25,7 @@
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
-#include "common/router/tlscontextmatchcriteria_impl.h"
+#include "common/router/tls_context_match_criteria_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/types/optional.h"

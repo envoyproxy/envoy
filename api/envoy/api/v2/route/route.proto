@@ -423,6 +423,8 @@ message RouteMatch {
 
   // If specified, the client tls context will be matched against the defined
   // match options.
+  //
+  // [#next-major-version: unify with RBAC]
   TlsContextMatchOptions tls_context = 11;
 }
 
