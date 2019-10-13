@@ -159,7 +159,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   EXPECT_EQ(0, decompressor.decompression_error_);
 }
 
-// Tests decompression_error_ set to true when decompression fails.
+// Tests decompression_error_ stores an error code when decompression fails..
 TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl accumulation_buffer;
