@@ -255,7 +255,10 @@ ClusterManagerImpl::ClusterManagerImpl(
   // the cluster will depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
-    if (cluster.type() != envoy::api::v2::Cluster::EDS) {
+    if (cluster.type() != envoy::api::v2::Cluster::EDS ||
+        (cluster.type() == envoy::api::v2::Cluster::EDS &&
+         cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
+             envoy::api::v2::core::ConfigSource::ConfigSourceSpecifierCase::kPath)) {
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
@@ -299,7 +302,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
-    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+    if (cluster.type() == envoy::api::v2::Cluster::EDS &&
+        cluster.eds_cluster_config().eds_config().config_source_specifier_case() !=
+            envoy::api::v2::core::ConfigSource::ConfigSourceSpecifierCase::kPath) {
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
