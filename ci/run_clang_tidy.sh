@@ -40,8 +40,15 @@ function exclude_chromium_url() {
   grep -v source/common/chromium_url/
 }
 
+# It gets a bit weird having the compilation database include the clang_tools
+# that end up consuming it, plus we have these tagged as manual builds for now
+# so they don't appear there anyway.
+function exclude_clang_tools() {
+  grep -v tools/clang_tools/
+}
+
 function filter_excludes() {
-  exclude_testdata | exclude_chromium_url | exclude_win32_impl
+  exclude_testdata | exclude_chromium_url | exclude_win32_impl | exclude_clang_tools
 }
 
 if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
