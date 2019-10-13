@@ -56,10 +56,10 @@ public:
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) override;
-  Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                   ResourcePriority priority, Http::Protocol protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Http::ConnectionPool::InstancePtr allocateConnPool(
+      Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+      Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsSharedPtr& transport_socket_options) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
@@ -68,7 +68,7 @@ public:
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
@@ -90,6 +90,9 @@ protected:
   Singleton::Manager& singleton_manager_;
 };
 
+// For friend declaration in ClusterManagerInitHelper.
+class ClusterManagerImpl;
+
 /**
  * This is a helper class used during cluster management initialization. Dealing with primary
  * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
@@ -100,8 +103,9 @@ public:
    * @param per_cluster_init_callback supplies the callback to call when a cluster has itself
    *        initialized. The cluster manager can use this for post-init processing.
    */
-  ClusterManagerInitHelper(const std::function<void(Cluster&)>& per_cluster_init_callback)
-      : per_cluster_init_callback_(per_cluster_init_callback) {}
+  ClusterManagerInitHelper(ClusterManager& cm,
+                           const std::function<void(Cluster&)>& per_cluster_init_callback)
+      : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
@@ -128,9 +132,14 @@ public:
   State state() const { return state_; }
 
 private:
+  // To enable invariant assertions on the cluster lists.
+  friend ClusterManagerImpl;
+
+  void initializeSecondaryClusters();
   void maybeFinishInitialize();
   void onClusterInit(Cluster& cluster);
 
+  ClusterManager& cm_;
   std::function<void(Cluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   std::function<void()> initialized_callback_;
@@ -197,13 +206,11 @@ public:
                                                          ResourcePriority priority,
                                                          Http::Protocol protocol,
                                                          LoadBalancerContext* context) override;
-  Tcp::ConnectionPool::Instance*
-  tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                        LoadBalancerContext* context,
-                        Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
-  Host::CreateConnectionData
-  tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
-                    Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
+  Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
+                                                       ResourcePriority priority,
+                                                       LoadBalancerContext* context) override;
+  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
+                                               LoadBalancerContext* context) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
@@ -217,7 +224,7 @@ public:
 
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
 
-  Config::GrpcMux& adsMux() override { return *ads_mux_; }
+  Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const std::string& localClusterName() const override { return local_cluster_name_; }
@@ -231,8 +238,12 @@ public:
 
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
+  // TODO(fredlas) remove once SotW and delta are unified.
+  bool xdsIsDelta() const override { return xds_is_delta_; }
+
 protected:
-  virtual void postThreadLocalHostRemoval(const Cluster& cluster, const HostVector& hosts_removed);
+  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
+                                               const HostVector& hosts_removed);
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,
                                             const HostVector& hosts_removed);
@@ -298,9 +309,8 @@ private:
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context);
 
-      Tcp::ConnectionPool::Instance*
-      tcpConnPool(ResourcePriority priority, LoadBalancerContext* context,
-                  Network::TransportSocketOptionsSharedPtr transport_socket_options);
+      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
+                                                 LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
@@ -419,9 +429,13 @@ private:
     // This is default constructed to the clock's epoch:
     // https://en.cppreference.com/w/cpp/chrono/time_point/time_point
     //
-    // This will usually be the computer's boot time, which means that given a not very large
-    // `Cluster.CommonLbConfig.update_merge_window`, the first update will trigger immediately
-    // (the expected behavior).
+    // Depending on your execution environment this value can be different.
+    // When running as host process: This will usually be the computer's boot time, which means that
+    // given a not very large `Cluster.CommonLbConfig.update_merge_window`, the first update will
+    // trigger immediately (the expected behavior). When running in some sandboxed environment this
+    // value can be set to the start time of the sandbox, which means that the delta calculated
+    // between now and the start time may fall within the
+    // `Cluster.CommonLbConfig.update_merge_window`, with the side effect to delay the first update.
     MonotonicTime last_updated_;
   };
 
@@ -459,7 +473,7 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  Config::GrpcMuxPtr ads_mux_;
+  Config::GrpcMuxSharedPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;
@@ -469,6 +483,7 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
+  bool xds_is_delta_{};
   Config::SubscriptionFactoryImpl subscription_factory_;
 };
 

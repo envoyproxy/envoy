@@ -82,11 +82,6 @@ TEST(Http2PlatformTest, Http2Log) {
   HTTP2_DLOG_EVERY_N(ERROR, 2) << "DLOG_EVERY_N(ERROR, 2)";
 }
 
-TEST(Http2PlatformTest, Http2MakeUnique) {
-  auto p = http2::Http2MakeUnique<int>(4);
-  EXPECT_EQ(4, *p);
-}
-
 TEST(Http2PlatformTest, Http2Optional) {
   http2::Http2Optional<int> opt;
   EXPECT_FALSE(opt.has_value());

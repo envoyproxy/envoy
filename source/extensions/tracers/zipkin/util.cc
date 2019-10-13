@@ -7,6 +7,7 @@
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
@@ -33,18 +34,7 @@ void Util::mergeJsons(std::string& target, const std::string& source,
 
 void Util::addArrayToJson(std::string& target, const std::vector<std::string>& json_array,
                           const std::string& field_name) {
-  std::string stringified_json_array = "[";
-
-  if (!json_array.empty()) {
-    stringified_json_array += json_array[0];
-    for (auto it = json_array.begin() + 1; it != json_array.end(); it++) {
-      stringified_json_array += ",";
-      stringified_json_array += *it;
-    }
-  }
-  stringified_json_array += "]";
-
-  mergeJsons(target, stringified_json_array, field_name);
+  mergeJsons(target, absl::StrCat("[", absl::StrJoin(json_array, ","), "]"), field_name);
 }
 
 uint64_t Util::generateRandom64(TimeSource& time_source) {

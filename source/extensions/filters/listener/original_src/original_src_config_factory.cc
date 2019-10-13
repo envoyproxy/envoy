@@ -14,9 +14,10 @@ namespace ListenerFilters {
 namespace OriginalSrc {
 
 Network::ListenerFilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& message, Server::Configuration::ListenerFactoryContext&) {
+    const Protobuf::Message& message, Server::Configuration::ListenerFactoryContext& context) {
   auto proto_config = MessageUtil::downcastAndValidate<
-      const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc&>(message);
+      const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc&>(
+      message, context.messageValidationVisitor());
   Config config(proto_config);
   return [config](Network::ListenerFilterManager& filter_manager) -> void {
     filter_manager.addAcceptFilter(std::make_unique<OriginalSrcFilter>(config));

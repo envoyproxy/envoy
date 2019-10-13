@@ -83,7 +83,7 @@ private:
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
   const std::string cluster_name_;
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;

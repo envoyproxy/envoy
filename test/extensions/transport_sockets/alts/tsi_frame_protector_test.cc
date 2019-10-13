@@ -12,11 +12,6 @@ namespace TransportSockets {
 namespace Alts {
 namespace {
 
-using testing::_;
-using testing::InSequence;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::SaveArg;
 using namespace std::string_literals;
 
 /**

@@ -24,9 +24,8 @@ envoy_sh_test(
     srcs = ["envoy_static_test.sh"],
     coverage = False,
     data = ["//source/exe:envoy-static"],
-    # NOTE: In some environments, ASAN causes dynamic linking no matter what, so don't run this
-    # test when doing ASAN.
-    tags = ["no_asan"],
+    # Sanitizers doesn't like statically linked lib(std)c++ and libgcc, skip this test in that context.
+    tags = ["no_san"],
 )
 
 envoy_sh_test(

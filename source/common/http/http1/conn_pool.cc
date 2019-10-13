@@ -25,9 +25,10 @@ namespace Http1 {
 
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options)
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
-      socket_options_(options),
+      socket_options_(options), transport_socket_options_(transport_socket_options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
@@ -70,7 +71,8 @@ void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& re
   host_->cluster().stats().upstream_rq_total_.inc();
   host_->stats().rq_total_.inc();
   client.stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, client);
-  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_);
+  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_,
+                        client.codec_client_->streamInfo());
 }
 
 void ConnPoolImpl::checkForDrained() {
@@ -302,8 +304,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
 
   parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
-  Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
+  Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
+      parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);

@@ -25,8 +25,9 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config), stats_prefix, context);
+    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                                 proto_config, context.messageValidationVisitor()),
+                                             stats_prefix, context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -41,7 +42,9 @@ public:
   createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
                                   Server::Configuration::FactoryContext& context) override {
     return createRouteSpecificFilterConfigTyped(
-        MessageUtil::downcastAndValidate<const RouteConfigProto&>(proto_config), context);
+        MessageUtil::downcastAndValidate<const RouteConfigProto&>(
+            proto_config, context.messageValidationVisitor()),
+        context);
   }
 
   std::string name() override { return name_; }

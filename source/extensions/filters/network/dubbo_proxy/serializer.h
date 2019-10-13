@@ -110,6 +110,7 @@ public:
  * SerializerFactoryBase provides a template for a trivial NamedSerializerConfigFactory.
  */
 template <class SerializerImpl> class SerializerFactoryBase : public NamedSerializerConfigFactory {
+public:
   SerializerPtr createSerializer() override { return std::make_unique<SerializerImpl>(); }
 
   std::string name() override { return name_; }

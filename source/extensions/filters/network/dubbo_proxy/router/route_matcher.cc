@@ -15,11 +15,8 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()) {
-  for (const auto& header_map : route.match().headers()) {
-    config_headers_.emplace_back(header_map);
-  }
-
+    : cluster_name_(route.route().cluster()),
+      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())) {
   if (route.route().cluster_specifier_case() ==
       envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteAction::kWeightedClusters) {
     total_cluster_weight_ = 0UL;

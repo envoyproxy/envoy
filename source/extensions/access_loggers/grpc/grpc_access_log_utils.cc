@@ -116,10 +116,16 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
+  // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.downstreamRemoteAddress(),
         *common_access_log.mutable_downstream_remote_address());
+  }
+  if (stream_info.downstreamDirectRemoteAddress() != nullptr) {
+    Network::Utility::addressToProtobufAddress(
+        *stream_info.downstreamDirectRemoteAddress(),
+        *common_access_log.mutable_downstream_direct_remote_address());
   }
   if (stream_info.downstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
@@ -128,7 +134,8 @@ void Utility::extractCommonAccessLogProperties(
   }
   if (stream_info.downstreamSslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
-    const auto* downstream_ssl_connection = stream_info.downstreamSslConnection();
+    const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
+        stream_info.downstreamSslConnection();
 
     tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
 

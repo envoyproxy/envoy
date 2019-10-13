@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/server:process_context_interface",
         "//include/envoy/thread:thread_interface",
     ],
 )

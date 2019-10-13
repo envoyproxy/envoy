@@ -166,14 +166,14 @@ class AuthenticatedMatcher : public Matcher {
 public:
   AuthenticatedMatcher(const envoy::config::rbac::v2::Principal_Authenticated& auth)
       : matcher_(auth.has_principal_name()
-                     ? absl::make_optional<Matchers::StringMatcher>(auth.principal_name())
+                     ? absl::make_optional<Matchers::StringMatcherImpl>(auth.principal_name())
                      : absl::nullopt) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  const absl::optional<Matchers::StringMatcher> matcher_;
+  const absl::optional<Matchers::StringMatcherImpl> matcher_;
 };
 
 /**
@@ -217,10 +217,10 @@ private:
  * Perform a match against the request server from the client's connection
  * request. This is typically TLS SNI.
  */
-class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcher {
+class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcherImpl {
 public:
   RequestedServerNameMatcher(const envoy::type::matcher::StringMatcher& requested_server_name)
-      : Envoy::Matchers::StringMatcher(requested_server_name) {}
+      : Envoy::Matchers::StringMatcherImpl(requested_server_name) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;

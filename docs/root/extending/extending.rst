@@ -19,6 +19,7 @@ types including:
 * :ref:`Stat sinks <arch_overview_statistics>`
 * :ref:`Tracers <arch_overview_tracing>`
 * Transport sockets
+* BoringSSL private key methods
 
 As of this writing there is no high level extension developer documentation. The
 :repo:`existing extensions <source/extensions>` are a good way to learn what is possible.

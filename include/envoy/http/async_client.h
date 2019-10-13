@@ -3,8 +3,11 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
+
+#include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 
@@ -158,6 +161,11 @@ public:
       send_xff = v;
       return *this;
     }
+    StreamOptions& setHashPolicy(
+        const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& v) {
+      hash_policy = v;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -177,6 +185,9 @@ public:
 
     // If true, x-forwarded-for header will be added.
     bool send_xff{true};
+
+    // Provides the hash policy for hashing load balancing strategies.
+    Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy> hash_policy;
   };
 
   /**
@@ -197,6 +208,11 @@ public:
     }
     RequestOptions& setSendXff(bool v) {
       StreamOptions::setSendXff(v);
+      return *this;
+    }
+    RequestOptions& setHashPolicy(
+        const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& v) {
+      StreamOptions::setHashPolicy(v);
       return *this;
     }
 

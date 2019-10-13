@@ -200,6 +200,10 @@ public:
     return &read_callbacks_->connection();
   }
 
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return transport_socket_options_;
+  }
+
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
   void readDisableUpstream(bool disable);
@@ -231,6 +235,8 @@ public:
     bool on_high_watermark_called_{false};
   };
 
+  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
+
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(Filter& parent) : parent_(parent) {}
@@ -260,8 +266,6 @@ protected:
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 
-  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
-
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
@@ -282,6 +286,7 @@ protected:
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
   StreamInfo::StreamInfoImpl stream_info_;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };

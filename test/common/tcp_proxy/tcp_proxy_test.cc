@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
+#include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
@@ -421,8 +422,7 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_,
-                    tcpConnPoolForCluster("fake_cluster", _, _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -433,7 +433,7 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
+      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
           .WillRepeatedly(Return(nullptr));
     }
 
@@ -821,21 +821,21 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_->onData(buffer, false);
 
   buffer.add("hello2");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_callbacks_->onUpstreamData(buffer, false);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
@@ -851,7 +851,7 @@ TEST_F(TcpProxyTest, IdleTimerDisabledDownstreamClose) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -865,7 +865,7 @@ TEST_F(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -879,21 +879,21 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_->onData(buffer, false);
 
   buffer.add("hello2");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_callbacks_->onUpstreamData(buffer, false);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
   // Mark the upstream connection as blocked.
@@ -947,9 +947,9 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
 
   const std::vector<std::string> uriSan{"someSan"};
-  Ssl::MockConnectionInfo mockConnectionInfo;
-  EXPECT_CALL(mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+  auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));
 
   setup(1, accessLogConfig("%DOWNSTREAM_PEER_URI_SAN%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -966,9 +966,9 @@ TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
 
   const std::string tlsSessionId{
       "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
-  Ssl::MockConnectionInfo mockConnectionInfo;
-  EXPECT_CALL(mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+  auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*mockConnectionInfo, sessionId()).WillOnce(ReturnRef(tlsSessionId));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));
 
   setup(1, accessLogConfig("%DOWNSTREAM_TLS_SESSION_ID%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -1010,6 +1010,21 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
                   "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
 }
 
+TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
+  setup(1);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  const std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+  auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(ReturnRef(session_id));
+  stream_info.setDownstreamSslConnection(ssl_info);
+  EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  raiseEventUpstreamConnected(0);
+  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamSslConnection());
+  EXPECT_EQ(session_id, filter_->getStreamInfo().upstreamSslConnection()->sessionId());
+}
+
 // Tests that upstream flush works properly with no idle timeout configured.
 TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
   setup(1);
@@ -1043,7 +1058,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
 
   NiceMock<Event::MockTimer>* idle_timer =
       new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(_));
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*upstream_connections_.at(0),
@@ -1056,7 +1071,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   filter_.reset();
   EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(1);
 
   // Simulate flush complete.
@@ -1075,7 +1090,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
 
   NiceMock<Event::MockTimer>* idle_timer =
       new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(_));
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*upstream_connections_.at(0),
@@ -1184,7 +1199,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1206,7 +1221,7 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _, _))
+              tcpConnPoolForCluster("filter_state_cluster", _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1226,17 +1241,54 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority,
-                          Upstream::LoadBalancerContext*,
-                          Network::TransportSocketOptionsSharedPtr transport_socket_options)
-                           -> Tcp::ConnectionPool::Instance* {
-        EXPECT_EQ(cluster, "fake_cluster");
-        EXPECT_NE(transport_socket_options, nullptr);
-        EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
-        EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
-        return nullptr;
-      }));
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+            EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
+            return nullptr;
+          }));
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
+}
+
+// Test that the tcp proxy override ALPN from FilterState if set
+TEST_F(TcpProxyRoutingTest, ApplicationProtocols) {
+  setup();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData(
+      Network::ApplicationProtocols::key(),
+      std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  // Expect filter to try to open a connection to a cluster with the transport socket options with
+  // override-application-protocol
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
+            return nullptr;
+          }));
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);

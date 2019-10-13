@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace HttpGrpc {
+namespace GrpcCommon {
 
 void validateProtoDescriptors() {
   const auto method = "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs";
@@ -17,7 +17,7 @@ void validateProtoDescriptors() {
   RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
                  "");
 };
-} // namespace HttpGrpc
+} // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy

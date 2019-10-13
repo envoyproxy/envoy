@@ -26,8 +26,6 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 namespace {
 
@@ -99,6 +97,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
+  EXPECT_TRUE(options->fakeSymbolTableEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -129,6 +128,7 @@ TEST_F(OptionsImplTest, SetAll) {
   bool hot_restart_disabled = options->hotRestartDisabled();
   bool signal_handling_enabled = options->signalHandlingEnabled();
   bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
+  bool fake_symbol_table_enabled = options->fakeSymbolTableEnabled();
 
   options->setBaseId(109876);
   options->setConcurrency(42);
@@ -155,6 +155,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setCpusetThreads(!options->cpusetThreadsEnabled());
   options->setAllowUnkownFields(true);
   options->setRejectUnknownFieldsDynamic(true);
+  options->setFakeSymbolTableEnabled(!options->fakeSymbolTableEnabled());
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -181,6 +182,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(!cpuset_threads_enabled, options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
+  EXPECT_EQ(!fake_symbol_table_enabled, options->fakeSymbolTableEnabled());
 
   // Validate that CommandLineOptions is constructed correctly.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -241,13 +243,15 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 5 options are not defined in proto, hence the count differs by 5.
+  // Currently the following 7 options are not defined in proto, hence the count differs by 7.
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
   // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
   // 5. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
-  EXPECT_EQ(options->count() - 5, command_line_options->GetDescriptor()->field_count());
+  // 6. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
+  // 7. hot restart version - print the hot restart version and exit.
+  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {

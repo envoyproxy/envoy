@@ -21,15 +21,10 @@
 
 using testing::_;
 using testing::ContainerEq;
-using testing::DoAll;
 using testing::Eq;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -63,7 +58,9 @@ public:
   // ClientFactory
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&) override {
+         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
+         Stats::Scope&, const std::string&) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};
@@ -101,7 +98,7 @@ protected:
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_.reset(new RedisCluster(
         cluster_config,
-        MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
+        TestUtility::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
         cluster_callback_));
@@ -158,8 +155,8 @@ protected:
     ON_CALL(random_, random()).WillByDefault(Return(0));
   }
 
-  void expectRedisResolve(bool createClient = false) {
-    if (createClient) {
+  void expectRedisResolve(bool create_client = false) {
+    if (create_client) {
       client_ = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
       EXPECT_CALL(*this, create_(_)).WillOnce(Return(client_));
       EXPECT_CALL(*client_, addConnectionCallbacks(_));
@@ -170,12 +167,12 @@ protected:
   }
 
   void expectClusterSlotResponse(NetworkFilters::Common::Redis::RespValuePtr&& response) {
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     pool_callbacks_->onResponse(std::move(response));
   }
 
   void expectClusterSlotFailure() {
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     pool_callbacks_->onFailure();
   }
 
@@ -646,7 +643,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   setupFromV2Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
-  EXPECT_CALL(*dns_timer, enableTimer(_));
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
 
   EXPECT_CALL(initialized_, ready());
@@ -657,7 +654,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
 
   // Does not recreate the timer on subsequent DNS resolve calls.
-  EXPECT_CALL(*dns_timer, enableTimer(_));
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   dns_timer->invokeCallback();
 

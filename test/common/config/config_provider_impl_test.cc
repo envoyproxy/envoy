@@ -629,6 +629,7 @@ public:
                           const std::string&,
                           const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
     DeltaDummyConfigSubscriptionSharedPtr subscription =
+
         getSubscription<DeltaDummyConfigSubscription>(
             config_source_proto, factory_context.initManager(),
             [&factory_context](const uint64_t manager_identifier,
@@ -709,6 +710,8 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
   subscription.onConfigUpdate(untyped_dummy_configs, "2");
   // NOTE: the config implementation is append only and _does not_ track updates/removals to the
   // config proto set, so the expectation is to double the size of the set.
+  EXPECT_EQ(provider1->config<const DummyConfig>().get(),
+            provider2->config<const DummyConfig>().get());
   EXPECT_EQ(provider1->config<const DummyConfig>()->numProtos(), 4);
   EXPECT_EQ(provider1->configProtoInfoVector<test::common::config::DummyConfig>().value().version_,
             "2");

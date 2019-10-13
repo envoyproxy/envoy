@@ -3,6 +3,8 @@
   roles:
     - role: config-gcc
       gcc_version: 7
+    - role: config-bazel
+      bazel_version: 0.28.1
   tasks:
     - name: Build envoy
       shell:

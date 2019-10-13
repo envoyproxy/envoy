@@ -13,6 +13,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,7 +21,6 @@
 
 using testing::_;
 using testing::An;
-using testing::InSequence;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
@@ -56,6 +56,7 @@ public:
   MOCK_METHOD0(generateRequestId, bool());
   MOCK_CONST_METHOD0(preserveExternalRequestId, bool());
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
+  MOCK_CONST_METHOD0(maxRequestHeadersCount, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
@@ -63,6 +64,8 @@ public:
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider*());
   MOCK_METHOD0(scopedRouteConfigProvider, Config::ConfigProvider*());
   MOCK_METHOD0(serverName, const std::string&());
+  MOCK_METHOD0(serverHeaderTransformation,
+               HttpConnectionManagerProto::ServerHeaderTransformation());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
@@ -99,7 +102,8 @@ public:
     envoy::type::FractionalPercent percent2;
     percent2.set_numerator(10000);
     percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false};
+    tracing_config_ = {
+        Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
@@ -185,6 +189,13 @@ TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
     Buffer::OwnedImpl data("PRI * HTTP/");
     EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data(" PRI * HTTP/2");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
 }
 
 // Verify external request and XFF is set when we are using remote address and the address is
@@ -224,6 +235,50 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoLegacyBehavior) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.trusted_forwarded_proto", "false"}});
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.trusted_forwarded_proto", "true"}});
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("https", headers.ForwardedProto()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is
@@ -729,9 +784,9 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
 
 // Test full sanitization of x-forwarded-client-cert.
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
   std::vector<Http::ClientCertDetailsType> details;
@@ -745,9 +800,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
 
 // Test that we sanitize and set x-forwarded-client-cert.
 TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
@@ -764,22 +819,22 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
 
 // The server (local) identity is foo.com/be. The client does not set XFCC.
 TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
   const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
-  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
   std::string expected_chain_pem(expected_pem + "%3D%3Dlmn%0Aop%3D");
-  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+  EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificateChain())
       .WillOnce(ReturnRef(expected_chain_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
-  EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
@@ -807,22 +862,22 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
   const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
-  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
   std::string expected_chain_pem(expected_pem + "%3D%3Dlmn%0Aop%3D");
-  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+  EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificateChain())
       .WillOnce(ReturnRef(expected_chain_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
-  EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
@@ -850,14 +905,14 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>()));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>()));
   std::string expected_sha("abcdefg");
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
@@ -879,22 +934,22 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
   const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(ssl, subjectPeerCertificate())
-      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  std::string peer_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
   const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("abcde=");
-  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
   std::string expected_chain_pem(expected_pem + "lmnop=");
-  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+  EXPECT_CALL(*ssl, urlEncodedPemEncodedPeerCertificateChain())
       .WillOnce(ReturnRef(expected_chain_pem));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
@@ -920,16 +975,16 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
   const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
-  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(ssl, subjectPeerCertificate())
-      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(std::vector<std::string>()));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  std::string peer_subject = "/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com";
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(std::vector<std::string>()));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
@@ -949,9 +1004,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
 
 // forward_only, append_forward and sanitize_set are only effective in mTLS connection.
 TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(false));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::ForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;
@@ -965,9 +1020,9 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
 
 // always_forward_only works regardless whether the connection is TLS/mTLS.
 TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
-  NiceMock<Ssl::MockConnectionInfo> ssl;
-  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
-  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(false));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AlwaysForwardOnly));
   std::vector<Http::ClientCertDetailsType> details;

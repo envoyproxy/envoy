@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/common/profiler:profiler_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/server/http:admin_lib",
@@ -28,7 +29,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:memory_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 

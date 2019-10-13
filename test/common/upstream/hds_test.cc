@@ -140,7 +140,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
       envoy::service::discovery::v2::Capability::TCP);
 
   EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node_));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(request), false));
   createHdsDelegate();
 }
@@ -148,7 +148,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
 // Test if processMessage processes endpoints from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageEndpoints) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -186,7 +186,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
 // Test if processMessage processes health checks from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageHealthChecks) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -223,7 +223,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -232,14 +232,14 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   message->mutable_interval()->set_seconds(1);
 
   // Process message
-  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
 }
 
 // Tests that SendResponse responds to the server in a timely fashion
 // given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalSendResponse) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -248,7 +248,7 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
   message->mutable_interval()->set_seconds(1);
 
   // Process message and send 2 responses
-  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(2);
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
@@ -256,7 +256,7 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
 }
 
 TEST_F(HdsTest, TestStreamConnectionFailure) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _))
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))
@@ -265,11 +265,11 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
       .WillOnce(Return(&async_stream_));
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1000005)).WillRepeatedly(Return(1234567));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(5)));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1567)));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2567)));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(4567)));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(25567)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(5), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1567), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2567), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(4567), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(25567), _));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
 
   // Test connection failure and retry
@@ -288,7 +288,7 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
 // a HealthCheckSpecifier message that contains a single endpoint
 // which times out
 TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -297,7 +297,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
-  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(2);
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection_, setBufferLimits(_));

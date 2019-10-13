@@ -24,6 +24,7 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -293,8 +294,8 @@ public:
 private:
   Network::Connection& connection_;
   Thread::MutexBasicLockable lock_;
-  Common::CallbackManager<> disconnect_callback_manager_ GUARDED_BY(lock_);
-  bool disconnected_ GUARDED_BY(lock_){};
+  Common::CallbackManager<> disconnect_callback_manager_ ABSL_GUARDED_BY(lock_);
+  bool disconnected_ ABSL_GUARDED_BY(lock_){};
   const bool allow_unexpected_disconnects_;
 };
 
@@ -339,7 +340,7 @@ public:
 private:
   SharedConnectionWrapper shared_connection_;
   Thread::MutexBasicLockable lock_;
-  bool parented_ GUARDED_BY(lock_);
+  bool parented_ ABSL_GUARDED_BY(lock_);
   const bool allow_unexpected_disconnects_;
 };
 
@@ -399,7 +400,7 @@ protected:
   bool initialized_{};
   Thread::CondVar connection_event_;
   Thread::MutexBasicLockable lock_;
-  bool half_closed_ GUARDED_BY(lock_){};
+  bool half_closed_ ABSL_GUARDED_BY(lock_){};
   Event::TestTimeSystem& time_system_;
 };
 
@@ -411,7 +412,8 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb);
+                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
+                     uint32_t max_request_headers_count);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -525,6 +527,7 @@ public:
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
                bool enable_half_close = false);
+
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system, bool enable_half_close = false);
@@ -540,7 +543,8 @@ public:
   testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+                        uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -605,13 +609,16 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
     FakeUpstream& parent_;
-    std::string name_;
+    const std::string name_;
+    Network::NopConnectionBalancerImpl connection_balancer_;
   };
 
   void threadRoutine();
-  SharedConnectionWrapper& consumeConnection() EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
@@ -624,11 +631,11 @@ private:
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);
+  std::list<QueuedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
-  std::list<QueuedConnectionWrapperPtr> consumed_connections_ GUARDED_BY(lock_);
+  std::list<QueuedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
   bool allow_unexpected_disconnects_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;

@@ -16,7 +16,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:dynamic_forward_proxy_cc",
+        "@envoy_api//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )
 

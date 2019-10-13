@@ -31,16 +31,16 @@ public:
 
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
-  void updateResources(const std::set<std::string>& update_to_these_names) override;
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override;
-  void onFetchFailure(const EnvoyException* e) override;
+  void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
 private:
-  void handleFailure(const EnvoyException* e);
+  void handleFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e);
   void disableInitFetchTimeoutTimer();
 
   std::string path_;

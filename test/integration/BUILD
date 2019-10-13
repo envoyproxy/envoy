@@ -33,15 +33,12 @@ envoy_cc_test_library(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/network/redis_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2:discovery_cc",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/api/v2:lds_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/service/discovery/v2:ads_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -57,12 +54,8 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2:discovery_cc",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/api/v2:lds_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/service/discovery/v2:ads_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -73,15 +66,14 @@ py_binary(
     python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
-        ":capture_fuzz_proto_py",
-        "@envoy_api//envoy/data/tap/v2alpha:transport_py",
+        ":capture_fuzz_proto_py_proto",
+        "@envoy_api//envoy/data/tap/v2alpha:pkg_py_proto",
     ],
 )
 
 envoy_proto_library(
     name = "capture_fuzz_proto",
     srcs = [":capture_fuzz.proto"],
-    require_py = 1,
 )
 
 envoy_cc_test(
@@ -100,8 +92,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -114,7 +105,7 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/integration/filters:eds_ready_filter_config_lib",
         "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -130,7 +121,7 @@ envoy_cc_test(
         "filter_manager_integration_test.h",
     ],
     deps = [
-        ":filter_manager_integration_proto_cc",
+        ":filter_manager_integration_proto_cc_proto",
         ":http_integration_lib",
         ":integration_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
@@ -163,7 +154,7 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -183,8 +174,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:discovery_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -222,8 +212,8 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/protobuf",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 
@@ -248,6 +238,32 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "http_subset_lb_integration_test",
+    srcs = [
+        "http_subset_lb_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/upstream:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "transport_socket_match_integration_test",
+    srcs = [
+        "transport_socket_match_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/common/upstream:utility_lib",
     ],
 )
 
@@ -310,8 +326,8 @@ envoy_cc_test(
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
@@ -434,6 +450,7 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
@@ -536,6 +553,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//test/integration/filters:udp_listener_echo_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
@@ -545,16 +563,20 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
+    # The symbol table cluster memory tests take a while to run specially under tsan.
+    # Shard it to avoid test timeout.
+    shard_count = 2,
     deps = [
         ":integration_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
@@ -567,7 +589,7 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -588,8 +610,8 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/service/discovery/v2:hds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -636,7 +658,7 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
     ],
 )
 
@@ -646,7 +668,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -818,7 +840,7 @@ envoy_cc_test_library(
     srcs = ["h1_fuzz.cc"],
     hdrs = ["h1_fuzz.h"],
     deps = [
-        ":capture_fuzz_proto_cc",
+        ":capture_fuzz_proto_cc_proto",
         ":http_integration_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",

@@ -16,6 +16,7 @@
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <regex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -328,6 +329,20 @@ bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges)
   return true;
 }
 
+// static
+bool TestUtility::gaugesZeroed(
+    const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges) {
+  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+  // gauges which default to the resource max.
+  std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  for (const auto& gauge : gauges) {
+    if (!std::regex_match(std::string(gauge.first), omitted) && gauge.second.get().value() != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -422,9 +437,11 @@ void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value
 
 void TestHeaderMapImpl::remove(const std::string& key) { remove(LowerCaseString(key)); }
 
-std::string TestHeaderMapImpl::get_(const std::string& key) { return get_(LowerCaseString(key)); }
+std::string TestHeaderMapImpl::get_(const std::string& key) const {
+  return get_(LowerCaseString(key));
+}
 
-std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
+std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
   const HeaderEntry* header = get(key);
   if (!header) {
     return EMPTY_STRING;

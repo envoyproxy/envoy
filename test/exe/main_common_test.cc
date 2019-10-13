@@ -30,13 +30,13 @@ namespace Envoy {
  * Captures common functions needed for invoking MainCommon. Generates a
  * unique --base-id setting based on the pid and a random number. Maintains
  * an argv array that is terminated with nullptr. Identifies the config
- * file relative to $TEST_RUNDIR.
+ * file relative to runfiles directory.
  */
 class MainCommonTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   MainCommonTest()
       : config_file_(TestEnvironment::temporaryFileSubstitute(
-            "/test/config/integration/google_com_proxy_port_0.v2.yaml", TestEnvironment::ParamMap(),
+            "test/config/integration/google_com_proxy_port_0.v2.yaml", TestEnvironment::ParamMap(),
             TestEnvironment::PortMap(), GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
@@ -240,7 +240,7 @@ protected:
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -253,7 +253,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
   // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -266,7 +266,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
   // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
   // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGINT);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -335,7 +335,7 @@ TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
   EXPECT_TRUE(admin_handler_was_called);
 
   // This just checks that some stat output was reported. We could pick any stat.
-  EXPECT_THAT(out, HasSubstr("access_log_file.reopen_failed"));
+  EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
 }
 
 // Class to track whether an object has been destroyed, which it does by bumping an atomic.

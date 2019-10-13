@@ -43,13 +43,12 @@ public:
   // Return success if the certs chain has only one fake certificate "Fake cert from [host_name]"
   // and its SCT is "Fake timestamp". Otherwise failure.
   quic::QuicAsyncStatus
-  VerifyCertChain(const std::string& hostname, const std::vector<std::string>& certs,
+  VerifyCertChain(const std::string& /*hostname*/, const std::vector<std::string>& certs,
                   const std::string& /*ocsp_response*/, const std::string& cert_sct,
                   const quic::ProofVerifyContext* /*context*/, std::string* /*error_details*/,
                   std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
                   std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) override {
-    std::string cert = absl::StrCat("Fake cert from ", hostname);
-    if (cert_sct == "Fake timestamp" && certs.size() == 1 && certs[0] == cert) {
+    if (cert_sct == "Fake timestamp" && certs.size() == 1 && certs[0] == "Fake cert") {
       return quic::QUIC_SUCCESS;
     }
     return quic::QUIC_FAILURE;

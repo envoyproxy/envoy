@@ -29,9 +29,11 @@ public:
                                   Envoy::Runtime::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher,
                                   HealthCheckEventLoggerPtr&& event_logger,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor)
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api)
       : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
-        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor) {}
+        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor), api_(api) {
+  }
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
@@ -40,6 +42,7 @@ public:
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return validation_visitor_;
   }
+  Api::Api& api() override { return api_; }
 
 private:
   Upstream::Cluster& cluster_;
@@ -48,14 +51,14 @@ private:
   Event::Dispatcher& dispatcher_;
   HealthCheckEventLoggerPtr event_logger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Api::Api& api_;
 };
 
-HealthCheckerSharedPtr
-HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_check_config,
-                             Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             AccessLog::AccessLogManager& log_manager,
-                             ProtobufMessage::ValidationVisitor& validation_visitor) {
+HealthCheckerSharedPtr HealthCheckerFactory::create(
+    const envoy::api::v2::core::HealthCheck& health_check_config, Upstream::Cluster& cluster,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+    AccessLog::AccessLogManager& log_manager,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   HealthCheckEventLoggerPtr event_logger;
   if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
@@ -81,7 +84,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
             health_check_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
-                                            std::move(event_logger), validation_visitor));
+                                            std::move(event_logger), validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   default:
@@ -210,7 +213,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Host, hostname_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
-  Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
+  Router::FilterUtility::setUpstreamScheme(
+      request_headers, host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource());
   stream_info.setDownstreamLocalAddress(local_address_);
   stream_info.setDownstreamRemoteAddress(local_address_);
@@ -611,7 +615,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
                                    parent_.service_method_.name(), absl::nullopt);
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
-  Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());
+
+  Router::FilterUtility::setUpstreamScheme(
+      headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());
 
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 

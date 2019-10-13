@@ -43,7 +43,18 @@ public:
    *
    * @param rq_latency is the clocked round-trip time for the request.
    */
-  virtual void recordLatencySample(const std::chrono::nanoseconds& rq_latency) PURE;
+  virtual void recordLatencySample(std::chrono::nanoseconds rq_latency) PURE;
+
+  /**
+   * Omit sampling an outstanding request and update the internal state of the controller to reflect
+   * request completion.
+   */
+  virtual void cancelLatencySample() PURE;
+
+  /**
+   * Returns the current concurrency limit.
+   */
+  virtual uint32_t concurrencyLimit() const PURE;
 };
 
 } // namespace ConcurrencyController

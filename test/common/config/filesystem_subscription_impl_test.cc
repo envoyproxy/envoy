@@ -6,7 +6,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::testing::Throw;
+using testing::Return;
+using testing::Throw;
 
 namespace Envoy {
 namespace Config {

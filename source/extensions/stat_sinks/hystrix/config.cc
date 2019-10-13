@@ -19,7 +19,8 @@ namespace Hystrix {
 Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                    Server::Instance& server) {
   const auto& hystrix_sink =
-      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::HystrixSink&>(config);
+      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::HystrixSink&>(
+          config, server.messageValidationContext().staticValidationVisitor());
   return std::make_unique<Hystrix::HystrixSink>(server, hystrix_sink.num_buckets());
 }
 

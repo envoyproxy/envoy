@@ -50,6 +50,7 @@ envoy_cc_library(
         ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
+        ":symbol_table_creator_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/stats:allocator_lib",
     ],
@@ -83,6 +84,15 @@ envoy_cc_library(
         ":metric_impl_lib",
         ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "recent_lookups_lib",
+    srcs = ["recent_lookups.cc"],
+    hdrs = ["recent_lookups.h"],
+    deps = [
+        "//source/common/common:assert_lib",
     ],
 )
 
@@ -136,7 +146,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
@@ -156,6 +166,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "symbol_table_creator_lib",
+    srcs = ["symbol_table_creator.cc"],
+    hdrs = ["symbol_table_creator.h"],
+    external_deps = ["abseil_base"],
+    deps = [
+        ":fake_symbol_table_lib",
+        ":symbol_table_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "fake_symbol_table_lib",
     hdrs = ["fake_symbol_table_impl.h"],
     deps = [":symbol_table_lib"],
@@ -168,6 +189,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/common:regex_lib",
     ],
 )
 
@@ -181,7 +203,7 @@ envoy_cc_library(
         "//source/common/common:perf_annotation_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
@@ -193,7 +215,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:matchers_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 

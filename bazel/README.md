@@ -65,6 +65,7 @@ for how to update or override dependencies.
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
+    XCode is also required to build Envoy on macOS.
     Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
     Apple LLVM version 9.1.0 (clang-902.0.30).
 
@@ -102,7 +103,7 @@ CI Docker image.
 
 ## Building Envoy with Remote Execution
 
-Envoy can also be built with Bazel [Remote Executioon](https://docs.bazel.build/versions/master/remote-execution.html),
+Envoy can also be built with Bazel [Remote Execution](https://docs.bazel.build/versions/master/remote-execution.html),
 part of the CI is running with the hosted [GCP RBE](https://blog.bazel.build/2018/10/05/remote-build-execution.html) service.
 
 To build Envoy with a remote build services, run Bazel with your remote build service flags and with `--config=remote-clang`.
@@ -288,7 +289,8 @@ be installed.
 # Running a single Bazel test under GDB
 
 ```
-tools/bazel-test-gdb //test/common/http:async_client_impl_test -c dbg
+bazel build -c dbg //test/common/http:async_client_impl_test
+gdb bazel-bin/test/common/http/async_client_impl_test
 ```
 
 Without the `-c dbg` Bazel option at the end of the command line the test
@@ -407,6 +409,8 @@ The following optional features can be disabled on the Bazel build command-line:
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
+* deprecated features with `--define deprecated_features=disabled`
+
 
 ## Enabling optional features
 

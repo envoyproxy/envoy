@@ -13,20 +13,20 @@ Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_p
 
 RedisCluster::RedisCluster(
     const envoy::api::v2::Cluster& cluster,
-    const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
+    const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
-    Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
+    Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api),
-      cluster_manager_(clusterManager),
+      cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(redisCluster, cluster_refresh_rate, 5000))),
+          PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
       cluster_refresh_timeout_(std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(redisCluster, cluster_refresh_timeout, 3000))),
+          PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_timeout, 3000))),
       dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
       load_assignment_(cluster.has_load_assignment()
@@ -34,7 +34,8 @@ RedisCluster::RedisCluster(
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
-      api_(api) {
+      auth_password_(
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -42,13 +43,6 @@ RedisCluster::RedisCluster(
       dns_discovery_resolve_targets_.emplace_back(new DnsDiscoveryResolveTarget(
           *this, host.socket_address().address(), host.socket_address().port_value()));
     }
-  }
-
-  auto options =
-      info()->extensionProtocolOptionsTyped<NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl>(
-          NetworkFilters::NetworkFilterNames::get().RedisProxy);
-  if (options) {
-    auth_password_datasource_ = options->auth_password_datasource();
   }
 }
 
@@ -168,7 +162,10 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolveRedis(); })),
-      client_factory_(client_factory), buffer_timeout_(0) {}
+      client_factory_(client_factory), buffer_timeout_(0),
+      redis_command_stats_(
+          NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
+              parent_.info()->statsScope().symbolTable())) {}
 
 // Convert the cluster slot IP/Port response to and address, return null if the response does not
 // match the expected type.
@@ -249,16 +246,9 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(host, dispatcher_, *this);
+    client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
+                                             parent_.info()->statsScope(), parent_.auth_password_);
     client->client_->addConnectionCallbacks(*client);
-    std::string auth_password =
-        Envoy::Config::DataSource::read(parent_.auth_password_datasource_, true, parent_.api_);
-    if (!auth_password.empty()) {
-      // Send an AUTH command to the upstream server.
-      client->client_->makeRequest(
-          Extensions::NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password),
-          null_pool_callbacks);
-    }
   }
 
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);

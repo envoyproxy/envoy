@@ -76,6 +76,10 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
+    // Refresh headers byte size before checking if allowed.
+    // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
+    // HeaderMap holds an accurate internal byte size count.
+    headers.refreshByteSize();
     if (shadow_engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(),
                                &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
@@ -105,6 +109,10 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   const auto engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
+    // Refresh headers byte size before checking if allowed.
+    // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
+    // HeaderMap holds an accurate internal byte size count.
+    headers.refreshByteSize();
     if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();

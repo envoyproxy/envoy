@@ -113,10 +113,8 @@ envoy_cc_test(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/type/matcher:metadata_cc",
-        "@envoy_api//envoy/type/matcher:number_cc",
-        "@envoy_api//envoy/type/matcher:string_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )
 
@@ -139,6 +137,15 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "regex_test",
+    srcs = ["regex_test.cc"],
+    deps = [
+        "//source/common/common:regex_lib",
         "//test/test_common:utility_lib",
     ],
 )

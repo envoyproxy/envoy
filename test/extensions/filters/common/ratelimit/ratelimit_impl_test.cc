@@ -20,12 +20,10 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
 using testing::Eq;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -68,7 +66,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
         .WillOnce(
             Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
                           Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                          const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+                          const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
               std::string service_name = "envoy.service.ratelimit.v2.RateLimitService";
               EXPECT_EQ(service_name, service_full_name);
               EXPECT_EQ("ShouldRateLimit", method_name);

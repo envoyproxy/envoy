@@ -41,14 +41,16 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   try {
     parseResponse(*response);
   } catch (EnvoyException& e) {
-    onFetchFailure(&e);
+    onFetchFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 
   requestComplete();
 }
 
-void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason) {
-  onFetchFailure(nullptr);
+void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
+  // Currently Http::AsyncClient::FailureReason only has one value: "Reset".
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  onFetchFailure(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
   requestComplete();
 }
 

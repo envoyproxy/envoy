@@ -30,6 +30,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
@@ -75,7 +76,7 @@ protected:
 
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
-    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000)));
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -104,7 +105,7 @@ protected:
     resolve_timer_->invokeCallback();
 
     // Should not cause any changes.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
@@ -136,7 +137,7 @@ protected:
     resolve_timer_->invokeCallback();
 
     // Should cause a change.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
@@ -154,7 +155,8 @@ protected:
     resolve_timer_->invokeCallback();
 
     // Empty should not cause any change.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    ON_CALL(random_, random()).WillByDefault(Return(6000));
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
     dns_callback_({});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
@@ -255,7 +257,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        EXPECT_CALL(*resolve_timer_, enableTimer(_));
+        EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
@@ -381,6 +383,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   name: name
   type: LOGICAL_DNS
   dns_refresh_rate: 4s
+  dns_failure_refresh_rate:
+    base_interval: 7s
+    max_interval: 10s
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
@@ -396,6 +401,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   name: name
   type: LOGICAL_DNS
   dns_refresh_rate: 4s
+  dns_failure_refresh_rate:
+    base_interval: 7s
+    max_interval: 10s
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set

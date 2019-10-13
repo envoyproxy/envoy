@@ -18,7 +18,7 @@ namespace Grpc {
 
 TEST(GrpcContextTest, ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool(*symbol_table_);
   const Stats::StatName service = pool.add("service");
   const Stats::StatName method = pool.add("method");
@@ -58,7 +58,7 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   Http::HeaderMapImpl headers;
   Http::HeaderEntry& path = headers.insertPath();
   path.value(std::string("/service_name/method_name"));
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table;
+  Stats::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
   absl::optional<Context::RequestNames> request_names = context.resolveServiceAndMethod(&path);
   EXPECT_TRUE(request_names);

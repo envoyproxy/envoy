@@ -5,7 +5,6 @@ package envoy.config.health_checker.redis.v2;
 option java_outer_classname = "RedisProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.health_checker.redis.v2";
-option go_package = "v2";
 
 // [#protodoc-title: Redis]
 // Redis health checker :ref:`configuration overview <config_health_checkers_redis>`.

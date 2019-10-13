@@ -51,11 +51,10 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
                                           log_manager, singleton_manager, time_system);
 
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  Stats::FakeSymbolTableImpl symbol_table;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
-  Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr, nullptr);
+  Host::CreateConnectionData data = cluster_manager->tcpConnForCluster("cluster", nullptr);
   EXPECT_EQ(nullptr, data.connection_);
   EXPECT_EQ(nullptr, data.host_description_);
 

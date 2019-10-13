@@ -570,6 +570,32 @@ to
 with the effect that the LDS stream will be directed to *some_ads_cluster* over
 the shared ADS channel.
 
+.. _config_overview_v2_delta:
+
+Delta endpoints
+---------------
+
+The REST, filesystem, and original gRPC xDS implementations all deliver "state of the world" updates:
+every CDS update must contain every cluster, with the absence of a cluster from an update implying
+that the cluster is gone. For Envoy deployments with huge amounts of resources and even a trickle of
+churn, these state-of-the-world updates can be cumbersome.
+
+As of 1.12.0, Envoy supports a "delta" variant of xDS (including ADS), where updates only contain
+resources added/changed/removed. Delta xDS is a gRPC (only) protocol. Delta uses different
+request/response protos than SotW (DeltaDiscovery{Request,Response}); see
+:repo:`discovery.proto <api/envoy/api/v2/discovery.proto>`. Conceptually, delta should be viewed as
+a new xDS transport type: there is static, filesystem, REST, gRPC-SotW, and now gRPC-delta.
+(Envoy's implementation of the gRPC-SotW/delta client happens to share most of its code between the
+two, and something similar is likely possible on the server side. However, they are in fact
+incompatible protocols.
+:ref:`The specification of the delta xDS protocol's behavior is here <xds_protocol_delta>`.)
+
+To use delta, simply set the api_type field of your
+:ref:`ApiConfigSource <envoy_api_msg_core.ApiConfigSource>` proto(s) to DELTA_GRPC.
+That works for both xDS and ADS; for ADS, it's the api_type field of
+:ref:`DynamicResources.ads_config <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>`,
+as described in the previous section.
+
 .. _config_overview_v2_mgmt_con_issues:
 
 Management Server Unreachability
@@ -599,35 +625,26 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
 
-.. _config_overview_v2_status:
+.. _subscription_statistics:
 
-Status
-------
+xDS subscription statistics
+---------------------------
 
-All features described in the :ref:`v2 API reference <envoy_api_reference>` are
-implemented unless otherwise noted. In the v2 API reference and the
-`v2 API repository
-<https://github.com/envoyproxy/data-plane-api/tree/master>`_, all protos are
-*frozen* unless they are tagged as *draft* or *experimental*. Here, *frozen*
-means that we will not break wire format compatibility.
+Envoy discovers its various dynamic resources via discovery
+services referred to as *xDS*. Resources are requested via :ref:`subscriptions <xds_protocol>`,
+by specifying a filesystem path to watch, initiating gRPC streams or polling a REST-JSON URL.
 
-*Frozen* protos may be further extended, e.g. by adding new fields, in a
-manner that does not break `backwards compatibility
-<https://developers.google.com/protocol-buffers/docs/overview#how-do-they-work>`_.
-Fields in the above protos may be later deprecated, subject to the
-:repo:`breaking change policy
-<CONTRIBUTING.md#breaking-change-policy>`,
-when their related functionality is no longer required. While frozen APIs
-have their wire format compatibility preserved, we reserve the right to change
-proto namespaces, file locations and nesting relationships, which may cause
-breaking code changes. We will aim to minimize the churn here.
+The following statistics are generated for all subscriptions.
 
-Protos tagged *draft*, meaning that they are near finalized, are
-likely to be at least partially implemented in Envoy but may have wire format
-breaking changes made prior to freezing.
+.. csv-table::
+ :header: Name, Type, Description
+ :widths: 1, 1, 2
 
-Protos tagged *experimental*, have the same caveats as draft protos
-and may have major changes made prior to Envoy implementation and freezing.
-
-The current open v2 API issues are tracked `here
-<https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3A%22v2+API%22>`_.
+ config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
+ init_fetch_timeout, Counter, Total :ref:`initial fetch timeouts <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`
+ update_attempt, Counter, Total API fetches attempted
+ update_success, Counter, Total API fetches completed successfully
+ update_failure, Counter, Total API fetches that failed because of network errors
+ update_rejected, Counter, Total API fetches that failed because of schema/validation errors
+ version, Gauge, Hash of the contents from the last successful API fetch
+ control_plane.connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server

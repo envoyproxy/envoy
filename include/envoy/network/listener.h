@@ -7,13 +7,14 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Network {
 
-class UdpListenerFilterManager;
+class ActiveUdpListenerFactory;
 
 /**
  * A configuration for an individual listener.
@@ -90,6 +91,18 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return factory pointer if listening on UDP socket, otherwise return
+   * nullptr.
+   */
+  virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
+
+  /**
+   * @return the connection balancer for this listener. All listeners have a connection balancer,
+   *         though the implementation may be a NOP balancer.
+   */
+  virtual ConnectionBalancer& connectionBalancer() PURE;
 };
 
 /**
@@ -102,18 +115,8 @@ public:
   /**
    * Called when a new connection is accepted.
    * @param socket supplies the socket that is moved into the callee.
-   * @param hand_off_restored_destination_connections is true when the socket was first accepted by
-   * another listener and is redirected to a new listener. The recipient should not redirect the
-   * socket any further.
    */
-  virtual void onAccept(ConnectionSocketPtr&& socket,
-                        bool hand_off_restored_destination_connections = true) PURE;
-
-  /**
-   * Called when a new connection is accepted.
-   * @param new_connection supplies the new connection that is moved into the callee.
-   */
-  virtual void onNewConnection(ConnectionPtr&& new_connection) PURE;
+  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 };
 
 /**
@@ -234,6 +237,8 @@ public:
    */
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
 };
+
+using UdpListenerPtr = std::unique_ptr<UdpListener>;
 
 /**
  * Thrown when there is a runtime error creating/binding a listener.

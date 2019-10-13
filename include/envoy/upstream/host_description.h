@@ -1,13 +1,18 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/stats/primitive_stats_macros.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -26,14 +31,24 @@ namespace Upstream {
   COUNTER(rq_success)                                                                              \
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_total)                                                                                \
-  GAUGE(cx_active, Accumulate)                                                                     \
-  GAUGE(rq_active, Accumulate)
+  GAUGE(cx_active)                                                                                 \
+  GAUGE(rq_active)
 
 /**
  * All per host stats defined. @see stats_macros.h
  */
 struct HostStats {
-  ALL_HOST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
+
+  // Provide access to name,counter pairs.
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters() const {
+    return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
+  }
+
+  // Provide access to name,gauge pairs.
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges() const {
+    return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
+  }
 };
 
 class ClusterInfo;
@@ -87,6 +102,11 @@ public:
   virtual const std::string& hostname() const PURE;
 
   /**
+   * @return the transport socket factory responsible for this host.
+   */
+  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+
+  /**
    * @return the address used to connect to the host.
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
@@ -94,7 +114,7 @@ public:
   /**
    * @return host specific stats.
    */
-  virtual const HostStats& stats() const PURE;
+  virtual HostStats& stats() const PURE;
 
   /**
    * @return the locality of the host (deployment specific). This will be the default instance if
@@ -124,6 +144,40 @@ public:
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
+
+#define ALL_TRANSPORT_SOCKET_MATCH_STATS(COUNTER) COUNTER(total_match_count)
+
+/**
+ * The stats for transport socket match.
+ */
+struct TransportSocketMatchStats {
+  ALL_TRANSPORT_SOCKET_MATCH_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Library to determine what transport socket configuration to use for a given host.
+ */
+class TransportSocketMatcher {
+public:
+  struct MatchData {
+    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
+              std::string name)
+        : factory_(factory), stats_(stats), name_(std::move(name)) {}
+    Network::TransportSocketFactory& factory_;
+    TransportSocketMatchStats& stats_;
+    std::string name_;
+  };
+  virtual ~TransportSocketMatcher() = default;
+
+  /**
+   * Resolve the transport socket configuration for a particular host.
+   * @param metadata the metadata of the given host.
+   * @return the match information of the transport socket selected.
+   */
+  virtual MatchData resolve(const envoy::api::v2::core::Metadata& metadata) const PURE;
+};
+
+using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
 
 } // namespace Upstream
 } // namespace Envoy

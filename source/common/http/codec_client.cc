@@ -62,6 +62,7 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
 void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
+    connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
     connected_ = true;
   }
 
@@ -140,14 +141,15 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(*connection_,
-                                                           host->cluster().statsScope(), *this);
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+        *connection_, host->cluster().statsScope(), *this,
+        host->cluster().maxResponseHeadersCount());
     break;
   }
   case Type::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().statsScope(), host->cluster().http2Settings(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
     break;
   }
   }

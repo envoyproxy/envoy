@@ -13,22 +13,24 @@ namespace Envoy {
 const std::string& VersionInfo::revision() {
   CONSTRUCT_ON_FIRST_USE(std::string, build_scm_revision);
 }
+
 const std::string& VersionInfo::revisionStatus() {
   CONSTRUCT_ON_FIRST_USE(std::string, build_scm_status);
 }
 
-std::string VersionInfo::version() {
-  return fmt::format("{}/{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER, revisionStatus(),
+const std::string& VersionInfo::version() {
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format("{}/{}/{}/{}/{}", revision(),
+                                                  BUILD_VERSION_NUMBER, revisionStatus(),
 #ifdef NDEBUG
-                     "RELEASE",
+                                                  "RELEASE",
 #else
-                     "DEBUG",
+                                                  "DEBUG",
 #endif
 #ifdef ENVOY_SSL_VERSION
-                     ENVOY_SSL_VERSION
+                                                  ENVOY_SSL_VERSION
 #else
-                     "no-ssl"
+                                                  "no-ssl"
 #endif
-  );
+                                                  ));
 }
 } // namespace Envoy

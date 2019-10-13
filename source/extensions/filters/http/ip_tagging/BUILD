@@ -22,7 +22,8 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:lc_trie_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
+        "//source/common/stats:symbol_table_lib",
+        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
     ],
 )
 

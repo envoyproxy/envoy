@@ -22,8 +22,8 @@ class CdsApiImpl : public CdsApi,
                    Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
-  static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                          Stats::Scope& scope,
+  static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+                          ClusterManager& cm, Stats::Scope& scope,
                           ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::CdsApi
@@ -43,11 +43,12 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource, validation_visitor_).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
   }
 
-  CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
+  CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+             ClusterManager& cm, Stats::Scope& scope,
+             ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;

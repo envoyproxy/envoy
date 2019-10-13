@@ -8,7 +8,7 @@
 #if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
 #include <filesystem>
 #elif defined __has_include
-#if __has_include(<experimental/filesystem>)
+#if __has_include(<experimental/filesystem>) && !defined(__APPLE__)
 #include <experimental/filesystem>
 #endif
 #endif
@@ -34,6 +34,8 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using bazel::tools::cpp::runfiles::Runfiles;
+
 namespace Envoy {
 namespace {
 
@@ -44,7 +46,7 @@ std::string makeTempDir(char* name_template) {
                                                  name_template, strerror(errno)));
 #if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   std::__fs::filesystem::create_directories(dirname);
-#elif defined __cpp_lib_experimental_filesystem
+#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
   std::experimental::filesystem::create_directories(dirname);
 #endif
 #else
@@ -102,7 +104,7 @@ void TestEnvironment::createParentPath(const std::string& path) {
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
-#elif defined __cpp_lib_experimental_filesystem
+#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
   std::experimental::filesystem::create_directories(
       std::experimental::filesystem::path(path).parent_path());
 #else
@@ -120,7 +122,7 @@ void TestEnvironment::removePath(const std::string& path) {
     return;
   }
   std::__fs::filesystem::remove_all(std::__fs::filesystem::path(path));
-#elif defined __cpp_lib_experimental_filesystem
+#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
   if (!std::experimental::filesystem::exists(path)) {
     return;
   }
@@ -189,8 +191,14 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
-const std::string& TestEnvironment::runfilesDirectory() {
-  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_RUNDIR"));
+std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
+  RELEASE_ASSERT(runfiles_ != nullptr, "");
+  return runfiles_->Rlocation(workspace);
+}
+
+std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
+  RELEASE_ASSERT(runfiles_ != nullptr, "");
+  return runfiles_->Rlocation(absl::StrCat(workspace, "/", path));
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {
@@ -361,5 +369,9 @@ void TestEnvironment::unsetEnvVar(const std::string& name) {
   ASSERT_EQ(0, rc);
 #endif
 }
+
+void TestEnvironment::setRunfiles(Runfiles* runfiles) { runfiles_ = runfiles; }
+
+Runfiles* TestEnvironment::runfiles_{};
 
 } // namespace Envoy

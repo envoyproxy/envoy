@@ -25,8 +25,6 @@ def envoy_copts(repository, test = False):
         # https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
         "-D_WIN32_WINNT=0x0602",
         "-DNTDDI_VERSION=0x06020000",
-        "-DCARES_STATICLIB",
-        "-DNGHTTP2_STATICLIB",
     ]
 
     return select({
@@ -57,6 +55,9 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_object_dump_on_signal_trace": [],
                "//conditions:default": ["-DENVOY_OBJECT_TRACE_ON_DUMP"],
            }) + select({
+               repository + "//bazel:disable_deprecated_features": ["-DENVOY_DISABLE_DEPRECATED_FEATURES"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + select({
@@ -74,7 +75,7 @@ def envoy_external_dep_path(dep):
 
 def envoy_linkstatic():
     return select({
-        "@envoy//bazel:asan_build": 0,
+        "@envoy//bazel:dynamic_link_tests": 0,
         "//conditions:default": 1,
     })
 
@@ -84,6 +85,13 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
+    })
+
+def envoy_stdlib_deps():
+    return select({
+        "@envoy//bazel:asan_build": ["@envoy//bazel:dynamic_stdlib"],
+        "@envoy//bazel:tsan_build": ["@envoy//bazel:dynamic_stdlib"],
+        "//conditions:default": ["@envoy//bazel:static_stdlib"],
     })
 
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.

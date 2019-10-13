@@ -26,8 +26,6 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Property;
-using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
@@ -143,27 +141,6 @@ public:
   State state() const override { return State::Initializing; }
 };
 
-class InitializingInstanceImpl : public InstanceImpl {
-private:
-  InitializingInitManager init_manager_{"Server"};
-
-public:
-  InitializingInstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address,
-                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
-                           Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory,
-                           Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system,
-                           std::unique_ptr<ProcessContext> process_context)
-      : InstanceImpl(options, time_system, local_address, hooks, restarter, store, access_log_lock,
-                     component_factory, std::move(random_generator), tls, thread_factory,
-                     file_system, std::move(process_context)) {}
-
-  Init::Manager& initManager() override { return init_manager_; }
-};
-
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTestBase {
 protected:
@@ -178,25 +155,16 @@ protected:
     if (process_object_ != nullptr) {
       process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
     }
-    if (use_intializing_instance) {
-      server_ = std::make_unique<InitializingInstanceImpl>(
-          options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-          std::move(process_context_));
+    init_manager_ = use_intializing_instance ? std::make_unique<InitializingInitManager>("Server")
+                                             : std::make_unique<Init::ManagerImpl>("Server");
 
-    } else {
-      server_ = std::make_unique<InstanceImpl>(
-          options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-          std::move(process_context_));
-    }
-
+    server_ = std::make_unique<InstanceImpl>(
+        *init_manager_, options_, test_time_.timeSystem(),
+        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+        std::move(process_context_));
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
@@ -208,8 +176,9 @@ protected:
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
-        options_, test_time_.timeSystem(),
+        *init_manager_, options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
@@ -221,21 +190,26 @@ protected:
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
                                     const bool use_intializing_instance) {
     absl::Notification started;
+    absl::Notification post_init;
 
     auto server_thread = Thread::threadFactoryForTest().createThread([&] {
       initialize(bootstrap_path, use_intializing_instance);
       auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
                                                       [&] { started.Notify(); });
+      auto post_init_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit,
+                                                        [&] { post_init.Notify(); });
       auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                                        [&](Event::PostCb) { FAIL(); });
       shutdown_handle = nullptr; // unregister callback
       server_->run();
       startup_handle = nullptr;
+      post_init_handle = nullptr;
       server_ = nullptr;
       thread_local_ = nullptr;
     });
 
     started.WaitForNotification();
+    post_init.WaitForNotification();
     return server_thread;
   }
 
@@ -253,6 +227,8 @@ protected:
   DangerousDeprecatedTestTime test_time_;
   ProcessObject* process_object_ = nullptr;
   std::unique_ptr<ProcessContextImpl> process_context_;
+  std::unique_ptr<Init::Manager> init_manager_;
+
   std::unique_ptr<InstanceImpl> server_;
 };
 
@@ -313,6 +289,16 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   server_thread->join();
 }
 
+// Validates that the "server.version" is updated with stats_server_version_override from bootstrap.
+TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
+  auto server_thread = startTestServer("test/server/proxy_version_bootstrap.yaml", true);
+
+  EXPECT_EQ(100012001, TestUtility::findGauge(stats_store_, "server.version")->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -323,8 +309,8 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
-  bool startup = false, shutdown = false, shutdown_with_completion = false;
-  absl::Notification started, shutdown_begin, completion_block, completion_done;
+  bool startup = false, post_init = false, shutdown = false, shutdown_with_completion = false;
+  absl::Notification started, post_init_fired, shutdown_begin, completion_block, completion_done;
 
   // Run the server in a separate thread so we can test different lifecycle stages.
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
@@ -333,11 +319,15 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       startup = true;
       started.Notify();
     });
-    auto handle2 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+    auto handle2 = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit, [&] {
+      post_init = true;
+      post_init_fired.Notify();
+    });
+    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
       shutdown_begin.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
@@ -345,22 +335,27 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                                server_->dispatcher().post(completion_cb);
                                                completion_done.Notify();
                                              });
-    auto handle4 =
+    auto handle5 =
         server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] { FAIL(); });
-    handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    handle5 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                         [&](Event::PostCb) { FAIL(); });
-    handle4 = nullptr;
+    handle5 = nullptr;
 
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
     handle3 = nullptr;
+    handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
   });
 
   started.WaitForNotification();
   EXPECT_TRUE(startup);
+  EXPECT_FALSE(shutdown);
+
+  post_init_fired.WaitForNotification();
+  EXPECT_TRUE(post_init);
   EXPECT_FALSE(shutdown);
 
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -575,6 +570,11 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   EXPECT_EQ("No admin layer specified", response_body);
 }
 
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
+                            EnvoyException, "Invalid runtime entry value for foo");
+}
+
 // Validate invalid runtime in bootstrap is rejected.
 TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
@@ -696,7 +696,7 @@ TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
 }
 
 // Custom header bootstrap succeeds.
-TEST_P(ServerInstanceImplTest, CusomHeaderBoostrap) {
+TEST_P(ServerInstanceImplTest, CustomHeaderBootstrap) {
   options_.config_path_ = TestEnvironment::writeStringToFileForTest(
       "custom.yaml", "header_prefix: \"x-envoy\"\nstatic_resources:\n");
   options_.service_cluster_name_ = "some_cluster_name";
@@ -754,9 +754,10 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 // an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
-          options_, test_time_.timeSystem(),
+          *init_manager_, options_, test_time_.timeSystem(),
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
@@ -836,8 +837,8 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
 
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
 
-  ProcessContext& context = server_->processContext();
-  auto& object_from_context = dynamic_cast<TestObject&>(context.get());
+  auto context = server_->processContext();
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
   EXPECT_EQ(&object_from_context, &object);
   EXPECT_TRUE(object_from_context.boolean_flag_);
 

@@ -75,6 +75,11 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
     current_shard_vector = shard_vector_;
   }
 
+  // This can get called by cluster initialization before the Redis Cluster topology is resolved.
+  if (!current_shard_vector) {
+    return;
+  }
+
   auto shard_vector = std::make_shared<std::vector<RedisShardSharedPtr>>();
 
   for (auto const& shard : *current_shard_vector) {
@@ -156,8 +161,8 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   return shard->master();
 }
 
-namespace {
-bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request) {
+bool RedisLoadBalancerContextImpl::isReadRequest(
+    const NetworkFilters::Common::Redis::RespValue& request) {
   if (request.type() != NetworkFilters::Common::Redis::RespType::Array) {
     return false;
   }
@@ -166,16 +171,22 @@ bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request) {
       first.type() != NetworkFilters::Common::Redis::RespType::BulkString) {
     return false;
   }
-  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(first.asString());
+  std::string to_lower_string(first.asString());
+  toLowerTable().toLowerCase(to_lower_string);
+  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(to_lower_string);
 }
-} // namespace
+
+const ToLowerTable& RedisLoadBalancerContextImpl::toLowerTable() {
+  static auto* table = new ToLowerTable();
+  return *table;
+}
 
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
-    const std::string& key, bool enabled_hashtagging, bool use_crc16,
+    const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
     const NetworkFilters::Common::Redis::RespValue& request,
     NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
-    : hash_key_(use_crc16 ? Crc16::crc16(hashtag(key, enabled_hashtagging))
-                          : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
+    : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
+                                 : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
       is_read_(isReadRequest(request)), read_policy_(read_policy) {}
 
 // Inspired by the redis-cluster hashtagging algorithm

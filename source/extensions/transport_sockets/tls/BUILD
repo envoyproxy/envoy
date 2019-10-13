@@ -38,6 +38,8 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl/private_key:private_key_callbacks_interface",
+        "//include/envoy/ssl/private_key:private_key_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -67,7 +69,7 @@ envoy_cc_library(
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 
@@ -90,6 +92,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_config_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/ssl/private_key:private_key_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
@@ -98,7 +101,9 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:certs_cc",
+        "//source/common/stats:symbol_table_lib",
+        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 

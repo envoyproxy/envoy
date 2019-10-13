@@ -90,7 +90,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
-        "@envoy_api//envoy/type:http_status_cc",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -164,6 +164,7 @@ envoy_cc_library(
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:scopes_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:admin_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stats:stats_interface",
@@ -177,11 +178,13 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
+        "//source/common/common:regex_lib",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:utility_lib",
+        "//source/common/router:config_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -208,6 +211,17 @@ envoy_cc_library(
     name = "exception_lib",
     hdrs = ["exception.h"],
     deps = ["//include/envoy/http:header_map_interface"],
+)
+
+envoy_cc_library(
+    name = "hash_policy_lib",
+    srcs = ["hash_policy.cc"],
+    hdrs = ["hash_policy.h"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/http:hash_policy_interface",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -305,8 +319,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:http_uri_cc",
-        "@envoy_api//envoy/api/v2/core:protocol_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -323,8 +336,8 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/route:route_cc",
-        "@envoy_api//envoy/type:range_cc",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 

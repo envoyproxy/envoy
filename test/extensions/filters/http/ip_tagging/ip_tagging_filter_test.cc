@@ -16,7 +16,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -52,11 +51,11 @@ ip_tags:
 
   ~IpTaggingFilterTest() override { filter_->onDestroy(); }
 
+  NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
   std::unique_ptr<IpTaggingFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Buffer::OwnedImpl data_;
-  NiceMock<Stats::MockStore> stats_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
 

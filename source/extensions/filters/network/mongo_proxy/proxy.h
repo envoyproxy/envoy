@@ -25,6 +25,7 @@
 
 #include "extensions/filters/common/fault/fault_config.h"
 #include "extensions/filters/network/mongo_proxy/codec.h"
+#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
 #include "extensions/filters/network/mongo_proxy/utility.h"
 
 namespace Envoy {
@@ -110,7 +111,7 @@ public:
               AccessLogSharedPtr access_log,
               const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision, TimeSource& time_system,
-              bool emit_dynamic_metadata);
+              bool emit_dynamic_metadata, const MongoStatsSharedPtr& stats);
   ~ProxyFilter() override;
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -164,9 +165,17 @@ private:
                                                  POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
 
-  void chargeQueryStats(const std::string& prefix, QueryMessageInfo::QueryType query_type);
-  void chargeReplyStats(ActiveQuery& active_query, const std::string& prefix,
+  // Increment counters related to queries. 'names' is passed by non-const
+  // reference so the implementation can mutate it without copying, though it
+  // always restores it to its prior state prior to return.
+  void chargeQueryStats(Stats::StatNameVec& names, QueryMessageInfo::QueryType query_type);
+
+  // Add samples to histograms related to replies. 'names' is passed by
+  // non-const reference so the implementation can mutate it without copying,
+  // though it always restores it to its prior state prior to return.
+  void chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec& names,
                         const ReplyMessage& message);
+
   void doDecode(Buffer::Instance& buffer);
   void logMessage(Message& message, bool full);
   void onDrainClose();
@@ -176,7 +185,6 @@ private:
 
   std::unique_ptr<Decoder> decoder_;
   std::string stat_prefix_;
-  Stats::Scope& scope_;
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;
   const Network::DrainDecision& drain_decision_;
@@ -191,6 +199,7 @@ private:
   Event::TimerPtr drain_close_timer_;
   TimeSource& time_source_;
   const bool emit_dynamic_metadata_;
+  MongoStatsSharedPtr mongo_stats_;
 };
 
 class ProdProxyFilter : public ProxyFilter {
