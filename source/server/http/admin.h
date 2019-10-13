@@ -331,13 +331,10 @@ private:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-<<<<<<< HEAD
     envoy::api::v2::core::TrafficDirection direction() const override {
       return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
     }
-=======
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
->>>>>>> master
 
     AdminImpl& parent_;
     const std::string name_;

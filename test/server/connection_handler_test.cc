@@ -82,13 +82,10 @@ public:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
-<<<<<<< HEAD
     envoy::api::v2::core::TrafficDirection direction() const override {
       return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
     }
-=======
     Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
->>>>>>> master
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;

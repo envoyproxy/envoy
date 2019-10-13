@@ -609,17 +609,11 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-<<<<<<< HEAD
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-      return udp_listener_factory_.get();
-    }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::api::v2::core::TrafficDirection direction() const override {
       return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
     }
-=======
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
->>>>>>> master
 
     FakeUpstream& parent_;
     const std::string name_;

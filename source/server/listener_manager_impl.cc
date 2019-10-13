@@ -537,6 +537,13 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   } else {
     name = server_.random().uuid();
   }
+  if (listnerStopped(config)) {
+    ENVOY_LOG(
+        debug,
+        "listener {} can not be added because listeners in the traffic direction {} are stopped",
+        name, envoy::api::v2::core::TrafficDirection_Name(config.traffic_direction()));
+    return false;
+  }
   const uint64_t hash = MessageUtil::hash(config);
   ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
 
@@ -784,6 +791,18 @@ uint64_t ListenerManagerImpl::numConnections() {
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener) {
   ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
   for (const auto& worker : workers_) {
+    if (listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
+      inbound_listeners_stopped_ = true;
+    }
+    if (listener.direction() == envoy::api::v2::core::TrafficDirection::OUTBOUND) {
+      outbound_listeners_stopped_ = true;
+    }
+    auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+    // Destroy a warming listener directly.
+    if (existing_warming_listener != warming_listeners_.end()) {
+      (*existing_warming_listener)->debugLog("removing warming listener");
+      warming_listeners_.erase(existing_warming_listener);
+    }
     worker->stopListener(listener);
   }
 }

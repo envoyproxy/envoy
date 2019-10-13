@@ -167,6 +167,15 @@ private:
     stats_.total_listeners_warming_.set(warming_listeners_.size());
     stats_.total_listeners_active_.set(active_listeners_.size());
   }
+  bool listnerStopped(const envoy::api::v2::Listener& config) {
+    // Currently all listeners in a given direction are stopped because of the way admin
+    // drain_listener functionality is implemented. So it is OK to check traffic direction. This
+    // needs to be revisited, if that changes - if we support drain by listener name,for example.
+    return (config.traffic_direction() == envoy::api::v2::core::TrafficDirection::INBOUND &&
+            inbound_listeners_stopped_) ||
+           (config.traffic_direction() == envoy::api::v2::core::TrafficDirection::OUTBOUND &&
+            outbound_listeners_stopped_);
+  }
 
   /**
    * Mark a listener for draining. The listener will no longer be considered active but will remain
@@ -197,12 +206,14 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
+  bool inbound_listeners_stopped_{};
+  bool outbound_listeners_stopped_{};
   Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
-};
+}; // namespace Server
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
