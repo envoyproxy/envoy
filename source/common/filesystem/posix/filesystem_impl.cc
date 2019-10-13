@@ -101,7 +101,8 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // TODO(htuch): Optimize this as a hash lookup if we grow any further.
   if (absl::StartsWith(canonical_path.rc_, "/dev") ||
       absl::StartsWith(canonical_path.rc_, "/sys") ||
-      absl::StartsWith(canonical_path.rc_, "/proc")) {
+      (absl::StartsWith(canonical_path.rc_, "/proc") && (path != "/proc/sys/fs/file-max") &&
+       (path != "/proc/sys/fs/inotify/max_user_watches"))) {
     return true;
   }
   return false;

@@ -9,6 +9,8 @@
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
+#include "exe/platform_checks.h"
+
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
@@ -46,6 +48,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                std::unique_ptr<ProcessContext> process_context)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
       file_system_(file_system), stats_allocator_(symbol_table_) {
+
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -86,6 +89,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                                          restarter_->logLock());
     break;
   }
+
+  check_platform_settings(file_system);
 }
 
 void MainCommonBase::configureComponentLogLevels() {

@@ -57,7 +57,8 @@ envoy_cc_library(
     ],
     deps = [
         ":envoy_main_common_lib",
-    ] + envoy_cc_platform_dep("platform_impl_lib"),
+    ] + envoy_cc_platform_dep("platform_impl_lib")
+      + envoy_cc_platform_dep("platform_checks_lib"),
 )
 
 envoy_cc_library(
@@ -80,7 +81,8 @@ envoy_cc_library(
             "//source/common/signal:sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_impl_lib"),
+    }) + envoy_cc_platform_dep("platform_checks_lib")
+       + envoy_cc_platform_dep("platform_impl_lib"),
 )
 
 envoy_cc_library(
@@ -94,6 +96,16 @@ envoy_cc_library(
         "//source/common/http/http2:nghttp2_lib",
         "//source/server:proto_descriptors_lib",
     ] + envoy_google_grpc_external_deps(),
+)
+
+envoy_cc_posix_library(
+    name = "platform_checks_lib",
+    hdrs = ["posix/platform_checks.h"],
+    strip_include_prefix = "posix",
+    deps = [
+     	"//source/common/common:assert_lib",
+	"//source/common/filesystem:filesystem_lib"
+    ],	
 )
 
 envoy_cc_posix_library(
@@ -113,6 +125,15 @@ envoy_cc_win32_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "//source/common/filesystem:filesystem_lib",
+    ],
+)
+
+envoy_cc_win32_library(
+    name = "platform_checks_lib",
+    hdrs = ["win32/platform_checks.h"],
+    strip_include_prefix = "win32",
+    deps = [
         "//source/common/filesystem:filesystem_lib",
     ],
 )
