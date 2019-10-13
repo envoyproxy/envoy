@@ -36,7 +36,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   // Self address should be initialized by now. It's time to install filters.
   connectionSocket()->setLocalAddress(quicAddressToEnvoyAddressInstance(self_address()));
   connectionSocket()->setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportSocketNames::get().Quic);
+      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
   ASSERT(filter_chain_ == nullptr);
   filter_chain_ = listener_config_.filterChainManager().findFilterChain(*connectionSocket());
   if (filter_chain_ == nullptr) {

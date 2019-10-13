@@ -16,7 +16,7 @@ envoy_cc_library(
         ":message_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/route:route_cc",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 

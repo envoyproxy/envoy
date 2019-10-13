@@ -7,13 +7,13 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Network {
 
-class UdpListenerFilterManager;
 class ActiveUdpListenerFactory;
 
 /**
@@ -102,6 +102,12 @@ public:
    * @return traffic direction of the listener.
    */
   virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
+
+  /**
+   * @return the connection balancer for this listener. All listeners have a connection balancer,
+   *         though the implementation may be a NOP balancer.
+   */
+  virtual ConnectionBalancer& connectionBalancer() PURE;
 };
 
 /**
@@ -114,18 +120,8 @@ public:
   /**
    * Called when a new connection is accepted.
    * @param socket supplies the socket that is moved into the callee.
-   * @param hand_off_restored_destination_connections is true when the socket was first accepted by
-   * another listener and is redirected to a new listener. The recipient should not redirect the
-   * socket any further.
    */
-  virtual void onAccept(ConnectionSocketPtr&& socket,
-                        bool hand_off_restored_destination_connections = true) PURE;
-
-  /**
-   * Called when a new connection is accepted.
-   * @param new_connection supplies the new connection that is moved into the callee.
-   */
-  virtual void onNewConnection(ConnectionPtr&& new_connection) PURE;
+  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 };
 
 /**

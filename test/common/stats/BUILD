@@ -172,7 +172,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 

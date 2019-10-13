@@ -7,6 +7,16 @@
 namespace Envoy {
 namespace Upstream {
 
+/**
+ * TODO(lilika): Add API knob for RetryInitialDelayMilliseconds
+ * and RetryMaxDelayMilliseconds, instead of hardcoding them.
+ *
+ * Parameters of the jittered backoff strategy that defines how often
+ * we retry to establish a stream to the management server
+ */
+static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
+static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
+
 HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
@@ -19,7 +29,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
       async_client_(std::move(async_client)), dispatcher_(dispatcher), runtime_(runtime),
-      store_stats(stats), ssl_context_manager_(ssl_context_manager), random_(random),
+      store_stats_(stats), ssl_context_manager_(ssl_context_manager), random_(random),
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
       local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager), tls_(tls),
       validation_visitor_(validation_visitor), api_(api) {
@@ -54,7 +64,7 @@ void HdsDelegate::setHdsStreamResponseTimer() {
 
 void HdsDelegate::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  stream_ = async_client_->start(service_method_, *this);
+  stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
     ENVOY_LOG(warn, "Unable to establish new stream");
     handleFailure();
@@ -148,7 +158,7 @@ void HdsDelegate::processMessage(
 
     // Create HdsCluster
     hds_clusters_.emplace_back(new HdsCluster(admin_, runtime_, cluster_config, bind_config,
-                                              store_stats, ssl_context_manager_, false,
+                                              store_stats_, ssl_context_manager_, false,
                                               info_factory_, cm_, local_info_, dispatcher_, random_,
                                               singleton_manager_, tls_, validation_visitor_, api_));
 
@@ -236,9 +246,11 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::TransportSocketFactoryPtr socket_factory =
       Upstream::createTransportSocketFactory(params.cluster_, factory_context);
+  auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
+      params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
 
   return std::make_unique<ClusterInfoImpl>(
-      params.cluster_, params.bind_config_, params.runtime_, std::move(socket_factory),
+      params.cluster_, params.bind_config_, params.runtime_, std::move(socket_matcher),
       std::move(scope), params.added_via_api_, params.validation_visitor_, factory_context);
 }
 

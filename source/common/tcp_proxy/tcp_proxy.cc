@@ -19,14 +19,13 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+#include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
-
-using ::Envoy::Network::UpstreamServerName;
 
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
@@ -368,14 +367,9 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  if (downstreamConnection() &&
-      downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
-          UpstreamServerName::key())) {
-    const auto& original_requested_server_name =
-        downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
-            UpstreamServerName::key());
-    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
-        original_requested_server_name.value());
+  if (downstreamConnection()) {
+    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+        downstreamConnection()->streamInfo().filterState());
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
