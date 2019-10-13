@@ -17,6 +17,14 @@ load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
 envoy_package()
 
 envoy_cc_test(
+    name = "api_type_db_test",
+    srcs = ["api_type_db_test.cc"],
+    deps = [
+        "//source/common/config:api_type_db_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "delta_subscription_impl_test",
     srcs = ["delta_subscription_impl_test.cc"],
     deps = [

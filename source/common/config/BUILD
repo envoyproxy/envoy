@@ -22,6 +22,31 @@ envoy_cc_library(
     ],
 )
 
+# Pack API type database text file into a char* string that can be referenced
+# at the C++ level.
+genrule(
+    name = "api_type_db_genrule",
+    srcs = ["api_type_db.generated.pb_text"],
+    outs = ["api_type_db_def.generated.cc"],
+    cmd = """
+      (echo 'namespace Envoy { namespace Config { const char* ApiTypeDbPbText = R\"EOF('; \\
+          cat $(SRCS); echo ')EOF\";}}') > $@
+    """,
+)
+
+envoy_cc_library(
+    name = "api_type_db_lib",
+    srcs = [
+        "api_type_db.cc",
+        "api_type_db_def.generated.cc",
+    ],
+    hdrs = ["api_type_db.h"],
+    deps = [
+        "//source/common/protobuf",
+        "//tools/type_whisperer:api_type_db_proto_cc_proto",
+    ],
+)
+
 envoy_cc_library(
     name = "base_json_lib",
     srcs = ["base_json.cc"],
