@@ -7,7 +7,6 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-// TODO(magmarco): fuzz test this function
 bool wildcardMatch(absl::string_view pattern, absl::string_view input) {
   if (pattern.empty()) {
     return input.empty();

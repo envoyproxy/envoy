@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -32,5 +33,14 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "xray_fuzz_test",
+    srcs = ["fuzz_test.cc"],
+    corpus = "wildcard_matcher_corpus",
+    deps = [
+        "//source/extensions/tracers/xray:xray_lib",
     ],
 )
