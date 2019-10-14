@@ -23,9 +23,18 @@ namespace Network {
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
+    : DnsResolverImpl::DnsResolverImpl(dispatcher, resolvers, false) {}
+
+DnsResolverImpl::DnsResolverImpl(
+    Event::Dispatcher& dispatcher,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   ares_options options;
+  if (use_tcp_for_dns_lookups) {
+    options.flags = ARES_FLAG_USEVC;
+  }
 
   initializeChannel(&options, 0);
 

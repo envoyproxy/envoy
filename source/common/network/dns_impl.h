@@ -29,6 +29,9 @@ class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::I
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+  DnsResolverImpl(Event::Dispatcher& dispatcher,
+                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                  const bool use_tcp_for_dns_lookups);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
