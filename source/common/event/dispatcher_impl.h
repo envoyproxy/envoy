@@ -115,8 +115,7 @@ private:
   std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
-  Thread::MutexBasicLockable time_lock_;
-  MonotonicTime approximate_monotonic_time_ ABSL_GUARDED_BY(time_lock_);
+  MonotonicTime approximate_monotonic_time_;
 };
 
 } // namespace Event

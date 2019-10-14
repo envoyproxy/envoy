@@ -32,7 +32,6 @@ TEST(EnvoyQuicClockTest, TestNow) {
   time_system.sleep(std::chrono::microseconds(10));
   EXPECT_EQ(mono_time + 1000000 + 10, (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000 + 10, clock.WallNow().ToUNIXMicroseconds());
-  EXPECT_EQ(clock.Now(), clock.Now());
 
   // Advance time by 2ms.
   time_system.sleep(std::chrono::milliseconds(2));

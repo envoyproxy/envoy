@@ -196,14 +196,10 @@ void DispatcherImpl::run(RunType type) {
 }
 
 void DispatcherImpl::updateApproximateMonotonicTime() {
-  Thread::LockGuard lock(time_lock_);
   approximate_monotonic_time_ = timeSource().monotonicTime();
 }
 
-MonotonicTime DispatcherImpl::approximateMonotonicTime() {
-  Thread::LockGuard lock(time_lock_);
-  return approximate_monotonic_time_;
-}
+MonotonicTime DispatcherImpl::approximateMonotonicTime() { return approximate_monotonic_time_; }
 
 void DispatcherImpl::runPostCallbacks() {
   while (true) {
