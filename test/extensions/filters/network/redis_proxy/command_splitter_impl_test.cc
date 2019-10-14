@@ -16,12 +16,8 @@
 #include "test/test_common/simulated_time_system.h"
 
 using testing::_;
-using testing::ByRef;
 using testing::DoAll;
-using testing::ElementsAreArray;
-using testing::Eq;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Pointee;
 using testing::Property;
@@ -394,11 +390,11 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.error").value());
 };
 
-MATCHER_P(CompositeArrayEq, rhs, "") {
+MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
   const Common::Redis::RespValueSharedPtr& obj = arg;
   EXPECT_TRUE(obj->type() == Common::Redis::RespType::CompositeArray);
   EXPECT_EQ(obj->asCompositeArray().size(), rhs.size());
-  std::vector<std::string> array(obj->asCompositeArray().size());
+  std::vector<std::string> array;
   for (auto const& entry : obj->asCompositeArray()) {
     array.emplace_back(entry.asString());
   }
@@ -417,8 +413,7 @@ public:
     Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
     makeBulkStringArray(*request, request_strings);
 
-    std::vector<std::vector<std::string>> tmp_expected_requests(num_gets);
-    expected_requests_.swap(tmp_expected_requests);
+    expected_requests_.reserve(num_gets);
     pool_callbacks_.resize(num_gets);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_gets);
     pool_requests_.swap(tmp_pool_requests);
@@ -624,7 +619,7 @@ public:
     Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
     makeBulkStringArray(*request, request_strings);
 
-    expected_requests_.resize(num_sets);
+    expected_requests_.reserve(num_sets);
     pool_callbacks_.resize(num_sets);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_sets);
     pool_requests_.swap(tmp_pool_requests);
@@ -751,7 +746,7 @@ public:
     Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
     makeBulkStringArray(*request, request_strings);
 
-    expected_requests_.resize(num_commands);
+    expected_requests_.reserve(num_commands);
     pool_callbacks_.resize(num_commands);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_commands);
     pool_requests_.swap(tmp_pool_requests);

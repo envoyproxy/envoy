@@ -187,7 +187,7 @@ RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
     break;
   }
   case RespType::Integer: {
-    integer_ = std::move(other.integer_);
+    integer_ = other.integer_;
     break;
   }
   case RespType::Null:
@@ -225,7 +225,7 @@ RespValue& RespValue::operator=(const RespValue& other) {
   return *this;
 }
 
-RespValue& RespValue::operator=(RespValue&& other) {
+RespValue& RespValue::operator=(RespValue&& other) noexcept {
   if (&other == this) {
     return *this;
   }
@@ -247,7 +247,7 @@ RespValue& RespValue::operator=(RespValue&& other) {
     break;
   }
   case RespType::Integer: {
-    integer_ = std::move(other.integer_);
+    integer_ = other.integer_;
     break;
   }
   case RespType::Null:

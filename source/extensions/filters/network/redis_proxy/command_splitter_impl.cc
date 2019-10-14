@@ -82,9 +82,10 @@ SplitRequestPtr SimpleRequest::create(Router& router,
 
   const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
   if (route) {
-    request_ptr->handle_ = makeRequest(route, incoming_request->asArray()[0].asString(),
-                                       incoming_request->asArray()[1].asString(),
-                                       std::move(incoming_request), *request_ptr);
+    Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+    request_ptr->handle_ =
+        makeRequest(route, base_request->asArray()[0].asString(),
+                    base_request->asArray()[1].asString(), base_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -111,9 +112,10 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
 
   const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (route) {
-    request_ptr->handle_ = makeRequest(route, incoming_request->asArray()[0].asString(),
-                                       incoming_request->asArray()[3].asString(),
-                                       std::move(incoming_request), *request_ptr);
+    Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+    request_ptr->handle_ =
+        makeRequest(route, base_request->asArray()[0].asString(),
+                    base_request->asArray()[3].asString(), base_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
