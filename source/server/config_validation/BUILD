@@ -36,6 +36,7 @@ envoy_cc_library(
         "//include/envoy/http:async_client_interface",
         "//include/envoy/http:message_interface",
         "//source/common/common:assert_lib",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
 

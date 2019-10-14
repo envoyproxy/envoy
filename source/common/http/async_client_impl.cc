@@ -260,11 +260,9 @@ void AsyncRequestImpl::initialize() {
 void AsyncRequestImpl::onComplete() {
   callbacks_.onSuccess(std::move(response_));
 
-  if (child_span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(
-        *child_span_, &this->response_->headers(), this->response_->trailers(), this->streamInfo(),
-        Tracing::EgressConfig::get());
-  }
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
+                                                   this->response_->trailers(), this->streamInfo(),
+                                                   Tracing::EgressConfig::get());
 }
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
@@ -287,26 +285,20 @@ void AsyncRequestImpl::onReset() {
     // In this case we don't have a valid response so we do need to raise a failure.
     callbacks_.onFailure(AsyncClient::FailureReason::Reset);
 
-    if (child_span_ != nullptr) {
-      // Add tags about reset.
-      child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-      child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
-    }
+    // Add tags about reset.
+    child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
   }
 
-  if (child_span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(
-        *child_span_, &this->response_->headers(), this->response_->trailers(), this->streamInfo(),
-        Tracing::EgressConfig::get());
-  }
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
+                                                   this->response_->trailers(), this->streamInfo(),
+                                                   Tracing::EgressConfig::get());
 }
 
 void AsyncRequestImpl::cancel() {
   cancelled_ = true;
 
-  if (child_span_ != nullptr) {
-    child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
-  }
+  child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
 
   reset();
 }

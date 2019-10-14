@@ -4,6 +4,7 @@
 
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/assert.h"
 
@@ -24,6 +25,11 @@ public:
   // Http::AsyncClient
   AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,
                              const RequestOptions&) override;
+
+  // Http::AsyncClient with tracing
+  Request* send(MessagePtr&& request, Callbacks& callbacks, const AsyncClient::RequestOptions&,
+                Tracing::Span&) override;
+
   AsyncClient::Stream* start(StreamCallbacks& callbacks, const StreamOptions&) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
