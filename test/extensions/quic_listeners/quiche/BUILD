@@ -93,6 +93,8 @@ envoy_cc_test(
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@com_googlesource_quiche//:quic_test_tools_server_session_base_peer",
+        "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
     ],
 )
 

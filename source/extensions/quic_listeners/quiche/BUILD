@@ -98,6 +98,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",
         "//source/common/http:codec_helper_lib",
     ],
@@ -211,6 +212,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_simulated_watermark_buffer_lib",
     hdrs = ["envoy_quic_simulated_watermark_buffer.h"],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_library(

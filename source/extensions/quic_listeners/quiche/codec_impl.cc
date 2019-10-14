@@ -16,6 +16,7 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
   for (auto& it : quic_server_session_.stream_map()) {
     if (!it.second->is_static()) {
+      ENVOY_LOG(debug, "runHighWatermarkCallbacks on stream {}", it.first);
       dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runHighWatermarkCallbacks();
     }
   }
@@ -24,6 +25,7 @@ void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWat
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   for (const auto& it : quic_server_session_.stream_map()) {
     if (!it.second->is_static()) {
+      ENVOY_LOG(debug, "runLowWatermarkCallbacks on stream {}", it.first);
       dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runLowWatermarkCallbacks();
     }
   }

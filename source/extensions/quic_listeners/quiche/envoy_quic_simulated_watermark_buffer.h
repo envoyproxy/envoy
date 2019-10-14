@@ -2,6 +2,8 @@
 
 #include <functional>
 
+#include "common/common/assert.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {

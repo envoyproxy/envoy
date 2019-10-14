@@ -31,14 +31,14 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSp
                                              quic::StreamType type)
     : quic::QuicSpdyServerStreamBase(id, session, type),
       EnvoyQuicStream(
-          session->config()->GetInitialStreamFlowControlWindowToSend(),
+          2 * GetQuicFlag(FLAGS_quic_buffered_data_threshold),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
                                              quic::QuicSpdySession* session, quic::StreamType type)
     : quic::QuicSpdyServerStreamBase(pending, session, type),
       EnvoyQuicStream(
-          session->config()->GetInitialStreamFlowControlWindowToSend(),
+          session->config()->ReceivedInitialStreamFlowControlWindowBytes(),
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
