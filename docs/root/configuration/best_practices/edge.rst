@@ -63,6 +63,8 @@ The following is a YAML example of the above recommendation.
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             use_remote_address: true
+            common_http_protocol_options:
+              idle_timeout: 840s
             http2_protocol_options:
               max_concurrent_streams: 100
               initial_stream_window_size: 65536 # 64 KiB
