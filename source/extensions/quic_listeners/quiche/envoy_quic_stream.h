@@ -41,7 +41,7 @@ public:
       }
     }
 
-    if (status_changed && !in_encode_data_callstack_) {
+    if (status_changed && !in_decode_data_callstack_) {
       switchStreamBlockState(disable);
     }
   }
@@ -77,7 +77,7 @@ protected:
   int32_t read_disable_counter_{0};
   // If true, switchStreamBlockState() should be deferred till this variable
   // becomes false.
-  bool in_encode_data_callstack_{false};
+  bool in_decode_data_callstack_{false};
 
 private:
   // Not owned.

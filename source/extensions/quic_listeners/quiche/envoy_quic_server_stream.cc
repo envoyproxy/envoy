@@ -123,8 +123,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 void EnvoyQuicServerStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   ASSERT(read_disable_counter_ == 0);
-  ASSERT(!in_encode_data_callstack_);
-  in_encode_data_callstack_ = true;
+  ASSERT(!in_decode_data_callstack_);
+  in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
@@ -155,7 +155,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   }
 
   if (!sequencer()->IsClosed()) {
-    in_encode_data_callstack_ = false;
+    in_decode_data_callstack_ = false;
     if (read_disable_counter_ > 0) {
       // If readDisable() was ever called during decodeData() and it meant to disable
       // reading from downstream, the call must have been deferred. Call it now.
@@ -172,7 +172,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
     MarkTrailersConsumed();
   }
   OnFinRead();
-  in_encode_data_callstack_ = false;
+  in_decode_data_callstack_ = false;
 }
 
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
