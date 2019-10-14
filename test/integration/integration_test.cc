@@ -116,13 +116,13 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   upstream_request_->encodeData(512, true);
 
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
   // Wait for the response to be read by the codec client.
   response->waitForEndStream();
 
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
-
-  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
