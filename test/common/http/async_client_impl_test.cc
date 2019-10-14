@@ -1025,9 +1025,10 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
   client_.send(std::move(message_), callbacks_,
-               AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(40)), parent_span_);
+               AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(40)),
+               parent_span_);
 
-    EXPECT_CALL(*child_span,
+  EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
