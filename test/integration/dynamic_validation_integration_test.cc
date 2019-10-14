@@ -129,6 +129,33 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
 }
 
+// Network filters in LDS config using TypedStruct with unknown fields are rejected if and only if
+// strict.
+TEST_P(DynamicValidationIntegrationTest, LdsFilterRejectedTypedStruct) {
+  allow_lds_rejection_ = true;
+  api_filesystem_config_ = {
+      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.cds.yaml",
+      "test/config/integration/server_xds.eds.yaml",
+      "test/config/integration/server_xds.lds.with_unknown_field.typed_struct.yaml",
+      "test/config/integration/server_xds.rds.yaml",
+  };
+  initialize();
+  if (reject_unknown_dynamic_fields_) {
+    EXPECT_EQ(0, test_server_->counter("listener_manager.lds.update_success")->value());
+    // LDS API parsing will reject due to unknown HCM field.
+    EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_rejected")->value());
+    EXPECT_EQ(nullptr, test_server_->counter("http.router.rds.route_config_0.update_success"));
+    EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
+  } else {
+    EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("server.dynamic_unknown_fields")->value());
+  }
+  EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
+}
+
 // Unknown fields in RDS cause config load failure if and only if strict.
 TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
   api_filesystem_config_ = {
