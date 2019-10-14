@@ -62,6 +62,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
     default_port = 443;
   }
 
+  const auto& host_rewrite = route_entry->hostRewrite();
+  if (!host_rewrite.empty()) {
+    headers.Host()->value(host_rewrite);
+  }
+
   // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded ports.
   // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
   //                     not obvious to the user if something is misconfigured. We should see if

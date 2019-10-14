@@ -245,6 +245,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
+    const std::string& hostRewrite() const override { return EMPTY_STRING; }
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
     const Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }

@@ -412,6 +412,7 @@ public:
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
+  const std::string& hostRewrite() const override { return host_rewrite_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -516,6 +517,7 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
+    const std::string& hostRewrite() const override { return parent_->hostRewrite(); }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }

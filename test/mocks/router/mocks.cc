@@ -88,6 +88,7 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, hostRewrite()).WillByDefault(ReturnRef(host_rewrite_));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;

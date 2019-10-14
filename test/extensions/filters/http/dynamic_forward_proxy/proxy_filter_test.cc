@@ -170,6 +170,25 @@ TEST_F(ProxyFilterTest, NoCluster) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
+TEST_F(ProxyFilterTest, HostRewrite) {
+  InSequence s;
+
+  callbacks_.route_->route_entry_.host_rewrite_ = "bar";
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 80, _))
+      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
 } // namespace
 } // namespace DynamicForwardProxy
 } // namespace HttpFilters

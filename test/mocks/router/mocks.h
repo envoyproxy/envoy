@@ -307,6 +307,7 @@ public:
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
+  MOCK_CONST_METHOD0(hostRewrite, const std::string&());
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
@@ -334,6 +335,7 @@ public:
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::api::v2::core::Metadata metadata_;
   UpgradeMap upgrade_map_;
+  std::string host_rewrite_;
 };
 
 class MockDecorator : public Decorator {

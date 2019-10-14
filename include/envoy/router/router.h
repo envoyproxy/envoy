@@ -652,6 +652,11 @@ public:
   virtual bool autoHostRewrite() const PURE;
 
   /**
+   * @return bool non empty if the :authority header should be overwritten with this value.
+   */
+  virtual const std::string& hostRewrite() const PURE;
+
+  /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
    * selecting an upstream host
    */
