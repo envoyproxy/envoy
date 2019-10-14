@@ -1,5 +1,7 @@
 #include "extensions/tracers/xray/xray_tracer_impl.h"
 
+#include "common/common/macros.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -23,10 +25,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
 
-  (void)config;
-  (void)operation_name;
-  (void)start_time;
-  (void)tracing_decision;
+  UNREFERENCED_PARAMETER(config);
+  UNREFERENCED_PARAMETER(operation_name);
+  UNREFERENCED_PARAMETER(start_time);
+  UNREFERENCED_PARAMETER(tracing_decision);
   const SamplingRequest request{request_headers.Host()->value().getStringView(),
                                 request_headers.Method()->value().getStringView(),
                                 request_headers.Path()->value().getStringView()};

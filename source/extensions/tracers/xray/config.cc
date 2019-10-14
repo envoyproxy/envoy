@@ -26,8 +26,7 @@ XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2::XRayCon
     sampling_rules_json =
         Config::DataSource::read(proto_config.sampling_rule_manifest(), true, server.api());
   } catch (EnvoyException& e) {
-    ENVOY_LOG(error, "Could not read custom sampling rule json file: {}, because of {}.",
-              proto_config.sampling_rule_manifest().filename(), e.what());
+    ENVOY_LOG(error, "Failed to read sampling rules manifest because of {}.", e.what());
   }
 
   XRayConfiguration xconfig(proto_config.daemon_endpoint(), proto_config.segment_name(),
