@@ -232,9 +232,10 @@ public:
     const std::string Delete{"DELETE"};
     const std::string Get{"GET"};
     const std::string Head{"HEAD"};
+    const std::string Options{"OPTIONS"};
+    const std::string Patch{"PATCH"};
     const std::string Post{"POST"};
     const std::string Put{"PUT"};
-    const std::string Options{"OPTIONS"};
     const std::string Trace{"TRACE"};
   } MethodValues;
 

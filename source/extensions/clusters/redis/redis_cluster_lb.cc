@@ -161,8 +161,8 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   return shard->master();
 }
 
-namespace {
-bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request) {
+bool RedisLoadBalancerContextImpl::isReadRequest(
+    const NetworkFilters::Common::Redis::RespValue& request) {
   const NetworkFilters::Common::Redis::RespValue* command = nullptr;
   if (request.type() == NetworkFilters::Common::Redis::RespType::Array) {
     command = &(request.asArray()[0]);
@@ -176,16 +176,22 @@ bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request) {
       command->type() != NetworkFilters::Common::Redis::RespType::BulkString) {
     return false;
   }
-  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(command->asString());
+  std::string to_lower_string(command->asString());
+  toLowerTable().toLowerCase(to_lower_string);
+  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(to_lower_string);
 }
-} // namespace
+
+const ToLowerTable& RedisLoadBalancerContextImpl::toLowerTable() {
+  static auto* table = new ToLowerTable();
+  return *table;
+}
 
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
-    const std::string& key, bool enabled_hashtagging, bool use_crc16,
+    const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
     const NetworkFilters::Common::Redis::RespValue& request,
     NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
-    : hash_key_(use_crc16 ? Crc16::crc16(hashtag(key, enabled_hashtagging))
-                          : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
+    : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
+                                 : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
       is_read_(isReadRequest(request)), read_policy_(read_policy) {}
 
 // Inspired by the redis-cluster hashtagging algorithm

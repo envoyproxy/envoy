@@ -1,20 +1,39 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
+import glob
 import json
 import os
+import shlex
 import subprocess
+from pathlib import Path
 
 
+# This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
 def generateCompilationDatabase(args):
+  # We need to download all remote outputs for generated source code, we don't care about built
+  # binaries so just always strip and use dynamic link to minimize download size.
+  bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
+      "-c", "fastbuild", "--build_tag_filters=-manual",
+      "--experimental_remote_download_outputs=all", "--strip=always",
+      "--define=dynamic_link_tests=true"
+  ]
   if args.run_bazel_build:
-    subprocess.check_call(
-        ["bazel", "build", "--build_tag_filters=-manual", "--jobs=" + os.environ.get('NUM_CPUS')] +
-        args.bazel_targets)
+    subprocess.check_call(["bazel", "build"] + bazel_options + args.bazel_targets)
 
-  gen_compilation_database_sh = os.path.join(os.path.realpath(os.path.dirname(__file__)),
-                                             "../bazel/gen_compilation_database.sh")
-  subprocess.check_call([gen_compilation_database_sh] + args.bazel_targets)
+  subprocess.check_call(["bazel", "build"] + bazel_options + [
+      "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
+      "--output_groups=compdb_files"
+  ] + args.bazel_targets)
+
+  execroot = subprocess.check_output(["bazel", "info", "execution_root"] +
+                                     bazel_options).decode().strip()
+
+  compdb = []
+  for compdb_file in Path(execroot).glob("**/*.compile_commands.json"):
+    compdb.extend(json.loads("[" + compdb_file.read_text().replace("__EXEC_ROOT__", execroot) +
+                             "]"))
+  return compdb
 
 
 def isHeader(filename):
@@ -61,14 +80,9 @@ def modifyCompileCommand(target, args):
   return target
 
 
-def fixCompilationDatabase(args):
-  with open("compile_commands.json", "r") as db_file:
-    db = json.load(db_file)
-
+def fixCompilationDatabase(args, db):
   db = [modifyCompileCommand(target, args) for target in db if isCompileTarget(target, args)]
 
-  # Remove to avoid writing into symlink
-  os.remove("compile_commands.json")
   with open("compile_commands.json", "w") as db_file:
     json.dump(db, db_file, indent=2)
 
@@ -84,5 +98,4 @@ if __name__ == "__main__":
                       nargs='*',
                       default=["//source/...", "//test/...", "//tools/..."])
   args = parser.parse_args()
-  generateCompilationDatabase(args)
-  fixCompilationDatabase(args)
+  fixCompilationDatabase(args, generateCompilationDatabase(args))

@@ -21,6 +21,24 @@ public:
   void testRouterRequestAndResponseWithHedgedPerTryTimeout(uint64_t request_size,
                                                            uint64_t response_size,
                                                            bool first_request_wins);
+
+  void initialize() override {
+    if (respect_expected_rq_timeout) {
+      config_helper_.addConfigModifier(
+          [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                  hcm) {
+            envoy::config::filter::http::router::v2::Router router_config;
+            router_config.set_respect_expected_rq_timeout(respect_expected_rq_timeout);
+            TestUtility::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
+          });
+    }
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void enableRespectExpectedRqTimeout(bool enable) { respect_expected_rq_timeout = enable; }
+
+  bool respect_expected_rq_timeout{false};
 };
 
 } // namespace Envoy

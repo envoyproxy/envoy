@@ -1,106 +1,94 @@
 #include "common/config/delta_subscription_impl.h"
 
-#include "common/common/assert.h"
-#include "common/common/backoff_strategy.h"
-#include "common/common/token_bucket_impl.h"
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-
 namespace Envoy {
 namespace Config {
 
-DeltaSubscriptionImpl::DeltaSubscriptionImpl(
-    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
-    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-    absl::string_view type_url, Runtime::RandomGenerator& random, Stats::Scope& scope,
-    const RateLimitSettings& rate_limit_settings, SubscriptionCallbacks& callbacks,
-    SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout)
-    : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   rate_limit_settings),
-      type_url_(type_url), local_info_(local_info), callbacks_(callbacks), stats_(stats),
-      dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {}
+DeltaSubscriptionImpl::DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
+                                             SubscriptionCallbacks& callbacks,
+                                             SubscriptionStats stats,
+                                             std::chrono::milliseconds init_fetch_timeout,
+                                             bool is_aggregated)
+    : context_(std::move(context)), type_url_(type_url), callbacks_(callbacks), stats_(stats),
+      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
 
-void DeltaSubscriptionImpl::pause() { state_->pause(); }
-void DeltaSubscriptionImpl::resume() {
-  state_->resume();
-  trySendDiscoveryRequests();
-}
-
-// Config::Subscription
-void DeltaSubscriptionImpl::start(const std::set<std::string>& resource_names) {
-  state_ = std::make_unique<DeltaSubscriptionState>(
-      type_url_, resource_names, callbacks_, local_info_, init_fetch_timeout_, dispatcher_, stats_);
-  grpc_stream_.establishNewStream();
-  updateResources(resource_names);
-}
-
-void DeltaSubscriptionImpl::updateResources(const std::set<std::string>& update_to_these_names) {
-  state_->updateResourceInterest(update_to_these_names);
-  // Tell the server about our new interests, if there are any.
-  trySendDiscoveryRequests();
-}
-
-// Config::GrpcStreamCallbacks
-void DeltaSubscriptionImpl::onStreamEstablished() {
-  state_->markStreamFresh();
-  trySendDiscoveryRequests();
-}
-
-void DeltaSubscriptionImpl::onEstablishmentFailure() { state_->handleEstablishmentFailure(); }
-
-void DeltaSubscriptionImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
-  ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
-            message->system_version_info());
-  kickOffAck(state_->handleResponse(*message));
-}
-
-void DeltaSubscriptionImpl::onWriteable() { trySendDiscoveryRequests(); }
-
-void DeltaSubscriptionImpl::kickOffAck(UpdateAck ack) {
-  ack_queue_.push(ack);
-  trySendDiscoveryRequests();
-}
-
-// Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
-// whether we *want* to send a DeltaDiscoveryRequest).
-bool DeltaSubscriptionImpl::canSendDiscoveryRequest() {
-  if (state_->paused()) {
-    ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url_);
-    return false;
-  } else if (!grpc_stream_.grpcStreamAvailable()) {
-    ENVOY_LOG(trace, "No stream available to send a DiscoveryRequest for {}.", type_url_);
-    return false;
-  } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
-    ENVOY_LOG(trace, "{} DiscoveryRequest hit rate limit; will try later.", type_url_);
-    return false;
+DeltaSubscriptionImpl::~DeltaSubscriptionImpl() {
+  if (watch_) {
+    context_->removeWatch(type_url_, watch_);
   }
-  return true;
 }
 
-// Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
-// a subscription update. (Does not check whether we *can* send a DeltaDiscoveryRequest).
-bool DeltaSubscriptionImpl::wantToSendDiscoveryRequest() {
-  return !ack_queue_.empty() || state_->subscriptionUpdatePending();
-}
+void DeltaSubscriptionImpl::pause() { context_->pause(type_url_); }
 
-void DeltaSubscriptionImpl::trySendDiscoveryRequests() {
-  while (wantToSendDiscoveryRequest() && canSendDiscoveryRequest()) {
-    envoy::api::v2::DeltaDiscoveryRequest request = state_->getNextRequest();
-    if (!ack_queue_.empty()) {
-      const UpdateAck& ack = ack_queue_.front();
-      request.set_response_nonce(ack.nonce_);
-      if (ack.error_detail_.code() != Grpc::Status::GrpcStatus::Ok) {
-        // Don't needlessly make the field present-but-empty if status is ok.
-        request.mutable_error_detail()->CopyFrom(ack.error_detail_);
-      }
-      ack_queue_.pop();
-    }
-    ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request.DebugString());
-    grpc_stream_.sendMessage(request);
+void DeltaSubscriptionImpl::resume() { context_->resume(type_url_); }
+
+// Config::DeltaSubscription
+void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
+  // ADS initial request batching relies on the users of the GrpcMux *not* calling start on it,
+  // whereas non-ADS xDS users must call it themselves.
+  if (!is_aggregated_) {
+    context_->start();
   }
-  grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
+  watch_ = context_->addOrUpdateWatch(type_url_, watch_, resources, *this, init_fetch_timeout_);
+  stats_.update_attempt_.inc();
+}
+
+void DeltaSubscriptionImpl::updateResourceInterest(
+    const std::set<std::string>& update_to_these_names) {
+  watch_ = context_->addOrUpdateWatch(type_url_, watch_, update_to_these_names, *this,
+                                      init_fetch_timeout_);
+  stats_.update_attempt_.inc();
+}
+
+// Config::SubscriptionCallbacks
+void DeltaSubscriptionImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+    const std::string& version_info) {
+  stats_.update_attempt_.inc();
+  callbacks_.onConfigUpdate(resources, version_info);
+  stats_.update_success_.inc();
+  stats_.version_.set(HashUtil::xxHash64(version_info));
+}
+
+void DeltaSubscriptionImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
+  stats_.update_attempt_.inc();
+  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  stats_.update_success_.inc();
+  stats_.version_.set(HashUtil::xxHash64(system_version_info));
+}
+
+void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
+                                                 const EnvoyException* e) {
+  switch (reason) {
+  case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
+    // This is a gRPC-stream-level establishment failure, not an xDS-protocol-level failure.
+    // So, don't onConfigUpdateFailed() here. Instead, allow a retry of the gRPC stream.
+    // If init_fetch_timeout_ is non-zero, the server will continue startup after that timeout.
+    stats_.update_failure_.inc();
+    // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
+    // as attempts.
+    stats_.update_attempt_.inc();
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
+    stats_.init_fetch_timeout_.inc();
+    // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
+    // as attempts.
+    stats_.update_attempt_.inc();
+    callbacks_.onConfigUpdateFailed(reason, e);
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
+    // We expect Envoy exception to be thrown when update is rejected.
+    ASSERT(e != nullptr);
+    stats_.update_rejected_.inc();
+    callbacks_.onConfigUpdateFailed(reason, e);
+    break;
+  }
+}
+
+std::string DeltaSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
+  return callbacks_.resourceName(resource);
 }
 
 } // namespace Config

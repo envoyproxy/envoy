@@ -248,9 +248,9 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(
     return nullptr;
   }
 
-  const bool use_crc16 = is_redis_cluster_;
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
-      key, parent_.config_.enableHashtagging(), use_crc16, *request, parent_.config_.readPolicy());
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, parent_.config_.enableHashtagging(),
+                                                           is_redis_cluster_, *request,
+                                                           parent_.config_.readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;

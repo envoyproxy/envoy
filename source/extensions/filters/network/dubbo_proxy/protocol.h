@@ -129,6 +129,7 @@ public:
  * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+public:
   ProtocolPtr createProtocol(SerializationType serialization_type) override {
     auto protocol = std::make_unique<ProtocolImpl>();
     protocol->initSerializer(serialization_type);

@@ -144,14 +144,14 @@ private:
 /**
  * This is the actual full standalone server which stitches together various common components.
  */
-class InstanceImpl : Logger::Loggable<Logger::Id::main>,
-                     public Instance,
-                     public ServerLifecycleNotifier {
+class InstanceImpl final : Logger::Loggable<Logger::Id::main>,
+                           public Instance,
+                           public ServerLifecycleNotifier {
 public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(const Options& options, Event::TimeSystem& time_system,
+  InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -227,7 +227,7 @@ private:
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime. This init manager is populated with LdsApi targets.
-  Init::ManagerImpl init_manager_{"Server"};
+  Init::Manager& init_manager_;
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:
   // - There may be active filter chains referencing it in listener_manager_.

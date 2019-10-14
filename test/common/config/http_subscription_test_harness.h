@@ -106,10 +106,10 @@ public:
     subscription_->start(cluster_names);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) override {
+  void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResources(cluster_names);
+    subscription_->updateResourceInterest(cluster_names);
     timer_cb_();
   }
 

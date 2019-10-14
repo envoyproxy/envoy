@@ -22,7 +22,7 @@ message RateLimit {
 
   // Specifies the rate limit configuration stage. Each configured rate limit filter performs a
   // rate limit check using descriptors configured in the
-  // :ref:`envoy_api_msg_config.filter.network.thrift_proxy.v3alpha.RouteAction` for the request.
+  // :ref:`envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.RouteAction` for the request.
   // Only those entries with a matching stage number are used for a given filter. If not set, the
   // default stage number is 0.
   //

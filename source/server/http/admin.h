@@ -27,6 +27,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -113,6 +114,7 @@ public:
   bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
+  uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
@@ -326,11 +328,13 @@ private:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
+    Network::NopConnectionBalancerImpl connection_balancer_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
@@ -366,6 +370,7 @@ private:
   NullScopedRouteConfigProvider scoped_route_config_provider_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
+  const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;

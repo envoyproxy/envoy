@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -10,7 +11,9 @@
 #include "common/common/fmt.h"
 
 #include "absl/base/attributes.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Registry {
@@ -39,25 +42,26 @@ public:
    * Return all registered factories in a comma delimited list.
    */
   static std::string allFactoryNames() {
-    std::vector<std::string> ret;
+    std::vector<absl::string_view> ret;
     ret.reserve(factories().size());
     for (const auto& factory : factories()) {
       ret.push_back(factory.first);
     }
+    std::sort(ret.begin(), ret.end());
 
     return absl::StrJoin(ret, ",");
   }
 
   /**
-   * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
+   * Gets the current map of factory implementations.
    */
-  static std::map<std::string, Base*>& factories() {
-    static auto* factories = new std::map<std::string, Base*>;
+  static absl::flat_hash_map<std::string, Base*>& factories() {
+    static auto* factories = new absl::flat_hash_map<std::string, Base*>;
     return *factories;
   }
 
-  static void registerFactory(Base& factory) {
-    auto result = factories().emplace(std::make_pair(factory.name(), &factory));
+  static void registerFactory(Base& factory, absl::string_view name) {
+    auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
@@ -66,7 +70,7 @@ public:
   /**
    * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    */
-  static Base* getFactory(const std::string& name) {
+  static Base* getFactory(absl::string_view name) {
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;
@@ -100,7 +104,7 @@ private:
    * Remove a factory by name. This method should only be used for testing purposes.
    * @param name is the name of the factory to remove.
    */
-  static void removeFactoryForTest(const std::string& name) {
+  static void removeFactoryForTest(absl::string_view name) {
     auto result = factories().erase(name);
     RELEASE_ASSERT(result == 1, "");
   }
@@ -115,14 +119,34 @@ private:
  * standard use of this class is static instantiation within a linked implementation's translation
  * unit. For an example of a typical use case, @see NamedNetworkFilterConfigFactory.
  *
- * Example registration: static Registry::RegisterFactory<SpecificFactory, BaseFactory> registered_;
+ * Example registration: REGISTER_FACTORY(SpecificFactory, BaseFactory);
+ *                       REGISTER_FACTORY(SpecificFactory, BaseFactory){"deprecated_name"};
  */
 template <class T, class Base> class RegisterFactory {
 public:
   /**
    * Constructor that registers an instance of the factory with the FactoryRegistry.
    */
-  RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
+  RegisterFactory() {
+    ASSERT(!instance_.name().empty());
+    FactoryRegistry<Base>::registerFactory(instance_, instance_.name());
+  }
+
+  /**
+   * Constructor that registers an instance of the factory with the FactoryRegistry along with
+   * deprecated names.
+   */
+  explicit RegisterFactory(std::initializer_list<absl::string_view> deprecated_names) {
+    if (!instance_.name().empty()) {
+      FactoryRegistry<Base>::registerFactory(instance_, instance_.name());
+    } else {
+      ASSERT(deprecated_names.size() != 0);
+    }
+    for (auto deprecated_name : deprecated_names) {
+      ASSERT(!deprecated_name.empty());
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name);
+    }
+  }
 
 private:
   T instance_{};

@@ -69,6 +69,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
     : retriable_headers_(
           Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
+      retriable_request_headers_(
+          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_request_headers())),
       validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
@@ -381,11 +383,19 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
-  // Append user-specified request headers in the following order: route-level headers, virtual
-  // host level headers and finally global connection manager level headers.
-  request_headers_parser_->evaluateHeaders(headers, stream_info);
-  vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
-  vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
+  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
+    // Append user-specified request headers from most to least specific: route-level headers,
+    // virtual host level headers and finally global connection manager level headers.
+    request_headers_parser_->evaluateHeaders(headers, stream_info);
+    vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
+    vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
+  } else {
+    // Most specific mutations take precedence.
+    vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
+    vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
+    request_headers_parser_->evaluateHeaders(headers, stream_info);
+  }
+
   if (!host_rewrite_.empty()) {
     headers.Host()->value(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
@@ -406,11 +416,18 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  // Append user-specified response headers in the following order: route-level headers, virtual
-  // host level headers and finally global connection manager level headers.
-  response_headers_parser_->evaluateHeaders(headers, stream_info);
-  vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
-  vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
+  if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
+    // Append user-specified request headers from most to least specific: route-level headers,
+    // virtual host level headers and finally global connection manager level headers.
+    response_headers_parser_->evaluateHeaders(headers, stream_info);
+    vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
+    vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
+  } else {
+    // Most specific mutations take precedence.
+    vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
+    vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
+    response_headers_parser_->evaluateHeaders(headers, stream_info);
+  }
 }
 
 absl::optional<RouteEntryImplBase::RuntimeData>
@@ -445,11 +462,14 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,
-                                                         const absl::string_view& new_scheme,
-                                                         const absl::string_view& new_port) const {
+                                                         absl::string_view new_scheme,
+                                                         absl::string_view new_port) const {
 
   absl::string_view request_host = headers.Host()->value().getStringView();
   size_t host_end;
+  if (request_host.empty()) {
+    return request_host;
+  }
   // Detect if IPv6 URI
   if (request_host[0] == '[') {
     host_end = request_host.rfind("]:");
@@ -1065,7 +1085,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                        Server::Configuration::FactoryContext& factory_context,
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
-      uses_vhds_(config.has_vhds()) {
+      uses_vhds_(config.has_vhds()),
+      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {
   route_matcher_ = std::make_unique<RouteMatcher>(
       config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
