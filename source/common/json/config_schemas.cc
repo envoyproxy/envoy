@@ -670,13 +670,6 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "host_redirect" : {"type" : "string"},
       "path_redirect" : {"type" : "string"},
       "prefix_rewrite" : {"type" : "string"},
-      "regex_rewrite" : {
-        "type" : "object",
-        "properties" : {
-          "pattern": {"type" : "string"},
-          "substitution" : {"type" : "integer"}
-        }
-      },
       "host_rewrite" : {"type" : "string"},
       "auto_host_rewrite" : {"type" : "boolean"},
       "case_sensitive" : {"type" : "boolean"},

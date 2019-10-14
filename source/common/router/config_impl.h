@@ -362,7 +362,7 @@ private:
 class PathRewriter {
 public:
   virtual bool apply() const = 0;
-  virtual std::string rewrite(std::string path, const std::string& matched_path,
+  virtual std::string rewrite(std::string path, const absl::string_view matched_path,
                               bool case_sensitive) const = 0;
   virtual ~PathRewriter(){};
 };
@@ -376,8 +376,12 @@ public:
 
   bool apply() const { return !prefix_.empty(); }
 
-  std::string rewrite(std::string path, const std::string& matched_path,
+  std::string rewrite(std::string path, const absl::string_view matched_path,
                       bool case_sensitive) const {
+    ENVOY_LOG_MISC(debug, "the matched path is: {}", matched_path);
+    ENVOY_LOG_MISC(debug, "the path is: {}", path);
+    ENVOY_LOG_MISC(debug, "the case sensitivity is: {}", case_sensitive);
+    ENVOY_LOG_MISC(debug, "the prefix in PrefixPathRewriter is: {}", prefix_);
     ASSERT(case_sensitive ? absl::StartsWith(path, matched_path)
                           : absl::StartsWithIgnoreCase(path, matched_path));
     return path.replace(0, matched_path.size(), prefix_);
@@ -394,16 +398,16 @@ private:
  */
 class RegexPathRewriter : public PathRewriter {
 public:
-  RegexPathRewriter(std::string pattern, std::string substitution)
+  RegexPathRewriter(std::string pattern, absl::string_view substitution)
       : PathRewriter(), pattern_(pattern), substitution_(substitution) {}
 
   bool apply() const { return !substitution_.empty(); }
 
-  std::string rewrite(std::string path, const std::string& matched_path,
+  std::string rewrite(std::string path, const absl::string_view matched_path,
                       bool case_sensitive) const {
     ASSERT(case_sensitive ? absl::StartsWith(path, matched_path)
                           : absl::StartsWithIgnoreCase(path, matched_path));
-    return std::regex_replace(matched_path, pattern_, substitution_);
+    return std::regex_replace(matched_path.data(), pattern_, substitution_);
   }
 
   ~RegexPathRewriter(){};
@@ -418,18 +422,15 @@ private:
  */
 class RewriteBuilder {
 public:
-  static PathRewriter& build(const envoy::api::v2::route::Route& route) {
+  static std::unique_ptr<PathRewriter> build(const envoy::api::v2::route::Route& route) {
     if (!route.redirect().prefix_rewrite().empty()) {
-      static PrefixPathRewriter p(route.redirect().prefix_rewrite());
-      return p;
+        return std::unique_ptr<PathRewriter>(new PrefixPathRewriter(route.redirect().prefix_rewrite()));
     }
     if (!route.route().prefix_rewrite().empty()) {
-      static PrefixPathRewriter p(route.route().prefix_rewrite());
-      return p;
+        return std::unique_ptr<PathRewriter>(new PrefixPathRewriter(route.route().prefix_rewrite()));
     }
-    static RegexPathRewriter p(route.route().regex_rewrite().pattern(),
-                               route.route().regex_rewrite().substitution());
-    return p;
+      return std::unique_ptr<PathRewriter>(new RegexPathRewriter(route.route().regex_rewrite().pattern(),
+                               route.route().regex_rewrite().substitution()));
   };
 };
 
@@ -535,7 +536,7 @@ protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
   const std::string host_rewrite_;
-  const PathRewriter& path_rewriter_;
+  std::unique_ptr<PathRewriter> path_rewriter_;
   bool include_vh_rate_limits_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
@@ -543,7 +544,7 @@ protected:
   /**
    * returns the path rewriter instance for the route
    */
-  const PathRewriter& getPathRewriter() const { return path_rewriter_; }
+  const PathRewriter* getPathRewriter() const { return path_rewriter_.get(); }
 
   void finalizePathHeader(Http::HeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;

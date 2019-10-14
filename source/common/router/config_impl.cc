@@ -471,16 +471,16 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
-  const PathRewriter& path_rewriter = getPathRewriter();
+  auto path_rewriter = getPathRewriter();
 
-  if (!path_rewriter.apply()) {
+  if (!path_rewriter->apply()) {
     return;
   } else {
     std::string path(headers.Path()->value().getStringView());
     if (insert_envoy_original_path) {
         headers.setEnvoyOriginalPath(path);
     }
-    headers.setPath()->value(path_rewriter.rewrite(path, matched_path, case_sensitive_));
+    headers.setPath()->value(path_rewriter->rewrite(path, matched_path, case_sensitive_));
   }
 }
 
