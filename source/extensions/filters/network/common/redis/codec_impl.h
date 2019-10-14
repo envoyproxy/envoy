@@ -9,11 +9,63 @@
 
 #include "extensions/filters/network/common/redis/codec.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
+
+class FragementRespValue : public RespValue {
+public:
+  FragementRespValue(RespValueSharedPtr base, const RespValue& command, const uint64_t start,
+                     const uint64_t end)
+      : base_(std::move(base)), command_(command), start_(start), end_(end) {
+    type(RespType::Array);
+  }
+
+  ~FragementRespValue() override {}
+
+  struct FragementRespValueConstIterator {
+    FragementRespValueConstIterator(const RespValue& command, const std::vector<RespValue>& array,
+                                    uint64_t index)
+        : command_(command), array_(array), index_(index), first_(true) {}
+    const RespValue& operator*() { return first_ ? command_ : array_[index_]; }
+    FragementRespValueConstIterator operator++() {
+      if (first_) {
+        first_ = false;
+      } else {
+        index_++;
+      }
+      return *this;
+    }
+    bool operator!=(const FragementRespValueConstIterator& rhs) const {
+      return &command_ != &(rhs.command_) || &array_ != &rhs.array_ || index_ != rhs.index_;
+    }
+
+    const RespValue& command_;
+    const std::vector<RespValue>& array_;
+    uint64_t index_;
+    bool first_;
+  };
+
+  FragementRespValueConstIterator begin() const noexcept {
+    return {command_, base_->asArray(), start_};
+  }
+
+  FragementRespValueConstIterator end() const noexcept {
+    return {command_, base_->asArray(), end_};
+  }
+
+  uint64_t size() const { return end_ - start_ + 1; }
+
+private:
+  const RespValueSharedPtr base_;
+  const RespValue& command_;
+  const uint64_t start_;
+  const uint64_t end_;
+};
 
 /**
  * Decoder implementation of https://redis.io/topics/protocol
@@ -85,7 +137,8 @@ public:
   void encode(const RespValue& value, Buffer::Instance& out) override;
 
 private:
-  void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);
+  void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);;
+  void encodeCompositeArray(const RespValue::CompositeArray& array, Buffer::Instance& out);
   void encodeBulkString(const std::string& string, Buffer::Instance& out);
   void encodeError(const std::string& string, Buffer::Instance& out);
   void encodeInteger(int64_t integer, Buffer::Instance& out);

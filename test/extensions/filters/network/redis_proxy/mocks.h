@@ -42,19 +42,31 @@ private:
 
 namespace ConnPool {
 
+class MockPoolCallbacks : public PoolCallbacks {
+public:
+  MockPoolCallbacks();
+  ~MockPoolCallbacks() override;
+
+  void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
+  void onFailure() override { onFailure_(); }
+
+  MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
+  MOCK_METHOD0(onFailure_, void());
+};
+
 class MockInstance : public Instance {
 public:
   MockInstance();
   ~MockInstance() override;
 
   MOCK_METHOD3(makeRequest,
-               Common::Redis::Client::PoolRequest*(
-                   const std::string& hash_key, const Common::Redis::RespValue& request,
-                   Common::Redis::Client::PoolCallbacks& callbacks));
+               Common::Redis::Client::PoolRequest*(const std::string& hash_key,
+                                                   Common::Redis::RespValueSharedPtr request,
+                                                   PoolCallbacks& callbacks));
   MOCK_METHOD3(makeRequestToHost,
-               Common::Redis::Client::PoolRequest*(
-                   const std::string& host_address, const Common::Redis::RespValue& request,
-                   Common::Redis::Client::PoolCallbacks& callbacks));
+               Common::Redis::Client::PoolRequest*(const std::string& host_address,
+                                                   Common::Redis::RespValueSharedPtr request,
+                                                   PoolCallbacks& callbacks));
 };
 
 } // namespace ConnPool

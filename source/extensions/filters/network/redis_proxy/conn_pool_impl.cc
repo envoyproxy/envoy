@@ -15,6 +15,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
+namespace {
+// null_pool_callbacks is used for requests that must be filtered and not redirected such as
+// "asking".
+DoNothingPoolCallbacks null_pool_callbacks;
+// null_pool_callbacks is used for requests that must be filtered and not redirected such as
+// "asking".
+Common::Redis::Client::DoNothingPoolCallbacks null_client_callbacks;
+} // namespace
 
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
@@ -33,15 +41,15 @@ InstanceImpl::InstanceImpl(
 }
 
 Common::Redis::Client::PoolRequest*
-InstanceImpl::makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-                          Common::Redis::Client::PoolCallbacks& callbacks) {
+InstanceImpl::makeRequest(const std::string& key, Common::Redis::RespValueSharedPtr request,
+                          PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, request, callbacks);
 }
 
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequestToHost(const std::string& host_address,
-                                const Common::Redis::RespValue& request,
-                                Common::Redis::Client::PoolCallbacks& callbacks) {
+                                Common::Redis::RespValueSharedPtr request,
+                                PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
 }
 
@@ -61,6 +69,9 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
 InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
   if (host_set_member_update_cb_handle_ != nullptr) {
     host_set_member_update_cb_handle_->remove();
+  }
+  while (!pending_requests_.empty()) {
+    pending_requests_.pop_front();
   }
   while (!client_map_.empty()) {
     client_map_.begin()->second->redis_client_->close();
@@ -199,9 +210,38 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
 }
 
 Common::Redis::Client::PoolRequest*
-InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
-                                           const Common::Redis::RespValue& request,
-                                           Common::Redis::Client::PoolCallbacks& callbacks) {
+InstanceImpl::ThreadLocalPool::makeRequestInternal(const Upstream::HostConstSharedPtr& host,
+                                                   Common::Redis::RespValueSharedPtr request,
+                                                   PoolCallbacks& callbacks) {
+  pending_requests_.emplace_back(*this, request, callbacks);
+  PendingRequest& pending_request = pending_requests_.back();
+  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
+  pending_request.request_handler_ =
+      client->redis_client_->makeRequest(*(pending_request.incoming_request_), pending_request);
+  if (pending_request.request_handler_) {
+    return &pending_request;
+  } else {
+    onRequestCompleted();
+    return nullptr;
+  }
+}
+
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool::makeRequestInternal(const Upstream::HostConstSharedPtr& host,
+                                                   PendingRequest& pending_request) {
+  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
+  pending_request.request_handler_ =
+      client->redis_client_->makeRequest(*(pending_request.incoming_request_), pending_request);
+  if (pending_request.request_handler_) {
+    return &pending_request;
+  } else {
+    onRequestCompleted();
+    return nullptr;
+  }
+}
+
+Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(
+    const std::string& key, Common::Redis::RespValueSharedPtr request, PoolCallbacks& callbacks) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
@@ -210,21 +250,16 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
 
   const bool use_crc16 = is_redis_cluster_;
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
-      key, parent_.config_.enableHashtagging(), use_crc16, request, parent_.config_.readPolicy());
+      key, parent_.config_.enableHashtagging(), use_crc16, *request, parent_.config_.readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
   }
-
-  ThreadLocalActiveClientPtr& client = threadLocalActiveClient(host);
-
-  return client->redis_client_->makeRequest(request, callbacks);
+  return makeRequestInternal(host, request, callbacks);
 }
 
-Common::Redis::Client::PoolRequest*
-InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address,
-                                                 const Common::Redis::RespValue& request,
-                                                 Common::Redis::Client::PoolCallbacks& callbacks) {
+Upstream::HostConstSharedPtr
+InstanceImpl::ThreadLocalPool::getHost(const std::string& host_address) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
@@ -288,9 +323,50 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     it = host_address_map_.find(host_address_map_key);
   }
 
-  ThreadLocalActiveClientPtr& client = threadLocalActiveClient(it->second);
+  return it->second;
+}
 
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address,
+                                                 Common::Redis::RespValueSharedPtr request,
+                                                 PoolCallbacks& callbacks) {
+  const Upstream::HostConstSharedPtr host = getHost(host_address);
+  if (!host) {
+    return nullptr;
+  }
+  return makeRequestInternal(host, request, callbacks);
+}
+
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool::makeRequestToHostInternal(const std::string& host_address,
+                                                         PendingRequest& pending_request) {
+  const Upstream::HostConstSharedPtr host = getHost(host_address);
+  if (!host) {
+    return nullptr;
+  }
+  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
+  return client->redis_client_->makeRequest(*(pending_request.incoming_request_), pending_request);
+}
+
+Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestToHostInternal(
+    const std::string& host_address, const Common::Redis::RespValue& request,
+    Common::Redis::Client::ClientCallbacks& callbacks) {
+  const Upstream::HostConstSharedPtr host = getHost(host_address);
+  if (!host) {
+    return nullptr;
+  }
+  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
   return client->redis_client_->makeRequest(request, callbacks);
+}
+
+void InstanceImpl::ThreadLocalPool::onRequestCompleted() {
+  ASSERT(!pending_requests_.empty());
+
+  // The response we got might not be in order, so flush out what we can. (A new response may
+  // unlock several out of order responses).
+  while (!pending_requests_.empty() && !pending_requests_.front().request_handler_) {
+    pending_requests_.pop_front();
+  }
 }
 
 void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent event) {
@@ -314,6 +390,70 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
       }
     }
   }
+}
+
+InstanceImpl::PendingRequest::PendingRequest(InstanceImpl::ThreadLocalPool& parent,
+                                             Common::Redis::RespValueSharedPtr incoming_request,
+                                             PoolCallbacks& pool_callbacks)
+    : parent_(parent), incoming_request_(incoming_request), pool_callbacks_(pool_callbacks) {}
+
+InstanceImpl::PendingRequest::~PendingRequest() {
+  if (request_handler_) {
+    request_handler_->cancel();
+    request_handler_ = nullptr;
+    // If we have to cancel the request on the client, then we'll treat this as failure for pool
+    // callback
+    pool_callbacks_.onFailure();
+  }
+}
+
+void InstanceImpl::PendingRequest::onResponse(Common::Redis::RespValuePtr&& response) {
+  request_handler_ = nullptr;
+  pool_callbacks_.onResponse(std::move(response));
+  parent_.onRequestCompleted();
+}
+
+void InstanceImpl::PendingRequest::onFailure() {
+  request_handler_ = nullptr;
+  pool_callbacks_.onFailure();
+  parent_.onRequestCompleted();
+}
+
+bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value) {
+  std::vector<absl::string_view> err;
+  bool ask_redirection = false;
+  if (Common::Redis::Utility::redirectionArgsInvalid(incoming_request_.get(), *value, err,
+                                                     ask_redirection)) {
+    onResponse(std::move(value));
+    return false;
+  }
+
+  // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash key
+  // slot (err[1]), and IP address and TCP port separated by a colon (err[2]).
+  const std::string host_address = std::string(err[2]);
+
+  // Prepend request with an asking command if redirected via an ASK error. The returned handle is
+  // not important since there is no point in being able to cancel the request. The use of
+  // null_pool_callbacks ensures the transparent filtering of the Redis server's response to the
+  // "asking" command; this is fine since the server either responds with an OK or an error message
+  // if cluster support is not enabled (in which case we should not get an ASK redirection error).
+  if (ask_redirection &&
+      !parent_.makeRequestToHostInternal(
+          host_address, Common::Redis::Utility::AskingRequest::instance(), null_client_callbacks)) {
+    onResponse(std::move(value));
+    return false;
+  }
+  request_handler_ = parent_.makeRequestToHostInternal(host_address, *this);
+  if (!request_handler_) {
+    onResponse(std::move(value));
+  }
+  return (request_handler_ != nullptr);
+}
+
+void InstanceImpl::PendingRequest::cancel() {
+  request_handler_->cancel();
+  request_handler_ = nullptr;
+  parent_.onRequestCompleted();
 }
 
 } // namespace ConnPool

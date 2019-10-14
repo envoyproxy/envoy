@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::ContainerEq;
 using testing::InSequence;
 
 namespace Envoy {
@@ -35,6 +36,25 @@ public:
   void makeArray(RespValue& value, const std::vector<RespValue> items) {
     value.type(RespType::Array);
     value.asArray().insert(value.asArray().end(), items.begin(), items.end());
+  }
+
+  void verifyMoves(RespValue& value) {
+    RespValue copy = value;
+    RespValue move(std::move(copy));
+    EXPECT_TRUE(value == move);
+
+    RespValue move_assign = std::move(move);
+    EXPECT_TRUE(value == move_assign);
+  }
+
+  void validateIterator(RespValue& value, const std::vector<std::string>& strings) {
+    EXPECT_EQ(RespType::CompositeArray, value.type());
+    EXPECT_EQ(value.asCompositeArray().size(), strings.size());
+    std::vector<std::string> values;
+    for (const RespValue& part : value.asCompositeArray()) {
+      values.emplace_back(part.asString());
+    }
+    EXPECT_THAT(values, ContainerEq(strings));
   }
 };
 
@@ -115,6 +135,64 @@ TEST_F(RedisRespValueTest, EqualityTestingAndCopyingTest) {
   EXPECT_EQ(value8.type(), RespType::Integer);
   value8 = null_value;
   EXPECT_EQ(value8.type(), RespType::Null);
+}
+
+TEST_F(RedisRespValueTest, MoveOperationsTest) {
+  InSequence s;
+
+  RespValue array_value, bulkstring_value, simplestring_value, error_value, integer_value,
+      null_value;
+  makeBulkStringArray(array_value, {"get", "foo", "bar", "now"});
+  bulkstring_value.type(RespType::BulkString);
+  bulkstring_value.asString() = "foo";
+  simplestring_value.type(RespType::SimpleString);
+  simplestring_value.asString() = "bar";
+  error_value.type(RespType::Error);
+  error_value.asString() = "error";
+  integer_value.type(RespType::Integer);
+  integer_value.asInteger() = 123;
+
+  verifyMoves(array_value);
+  verifyMoves(bulkstring_value);
+  verifyMoves(simplestring_value);
+  verifyMoves(error_value);
+  verifyMoves(integer_value);
+  verifyMoves(null_value);
+}
+
+TEST_F(RedisRespValueTest, SwapTest) {
+  InSequence s;
+
+  RespValue value1, value2, value3;
+
+  makeBulkStringArray(value1, {"get", "foo", "bar", "now"});
+  makeBulkStringArray(value2, {"get", "foo", "bar", "now"});
+  makeBulkStringArray(value3, {"get", "foo", "bar", "later"});
+
+  std::swap(value2, value3);
+  EXPECT_TRUE(value1 == value3);
+
+  std::swap(value3, value3);
+  EXPECT_TRUE(value1 == value3);
+}
+
+TEST_F(RedisRespValueTest, IteratorTest) {
+  InSequence s;
+
+  RespValueSharedPtr base = std::make_shared<RespValue>();
+  makeBulkStringArray(*base, {"get", "foo", "bar", "now"});
+
+  RespValue command;
+  command.type(RespType::SimpleString);
+  command.asString() = "get";
+
+  RespValue value1{base, command, 1, 1};
+  RespValue value2{base, command, 2, 2};
+  RespValue value3{base, command, 3, 3};
+
+  validateIterator(value1, {"get", "foo"});
+  validateIterator(value2, {"get", "bar"});
+  validateIterator(value3, {"get", "now"});
 }
 
 class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {

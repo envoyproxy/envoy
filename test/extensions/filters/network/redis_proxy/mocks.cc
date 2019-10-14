@@ -19,6 +19,9 @@ MockRoute::~MockRoute() = default;
 
 namespace ConnPool {
 
+MockPoolCallbacks::MockPoolCallbacks() = default;
+MockPoolCallbacks::~MockPoolCallbacks() = default;
+
 MockInstance::MockInstance() = default;
 MockInstance::~MockInstance() = default;
 

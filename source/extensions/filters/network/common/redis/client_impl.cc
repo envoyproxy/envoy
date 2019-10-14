@@ -7,6 +7,8 @@ namespace Common {
 namespace Redis {
 namespace Client {
 namespace {
+// null_pool_callbacks is used for requests that must be filtered and not redirected such as
+// "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
 
@@ -97,7 +99,7 @@ void ClientImpl::flushBufferAndResetTimer() {
   connection_->write(encoder_buffer_, false);
 }
 
-PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
+PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
   const bool empty_buffer = encoder_buffer_.length() == 0;
@@ -212,7 +214,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   }
   request.aggregate_request_timer_->complete();
 
-  PoolCallbacks& callbacks = request.callbacks_;
+  ClientCallbacks& callbacks = request.callbacks_;
 
   // We need to ensure the request is popped before calling the callback, since the callback might
   // result in closing the connection.
@@ -224,15 +226,14 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     bool redirected = false;
     if (err.size() == 3) {
       if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
-        redirected = callbacks.onRedirection(*value);
+        redirected = callbacks.onRedirection(std::move(value));
         if (redirected) {
           host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
         } else {
           host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
         }
       }
-    }
-    if (!redirected) {
+    } else {
       callbacks.onResponse(std::move(value));
     }
   } else {
@@ -251,7 +252,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   putOutlierEvent(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS);
 }
 
-ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,
+ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks,
                                            Stats::StatName command)
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(

@@ -16,6 +16,25 @@ namespace RedisProxy {
 namespace ConnPool {
 
 /**
+ * Outbound request callbacks.
+ */
+class PoolCallbacks {
+public:
+  virtual ~PoolCallbacks() = default;
+
+  /**
+   * Called when a pipelined response is received.
+   * @param value supplies the response which is now owned by the callee.
+   */
+  virtual void onResponse(Common::Redis::RespValuePtr&& value) PURE;
+
+  /**
+   * Called when a network/protocol error occurs and there is no response.
+   */
+  virtual void onFailure() PURE;
+};
+
+/**
  * A redis connection pool. Wraps M connections to N upstream hosts, consistent hashing,
  * pipelining, failure handling, etc.
  */
@@ -31,9 +50,9 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual Common::Redis::Client::PoolRequest*
-  makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request,
-              Common::Redis::Client::PoolCallbacks& callbacks) PURE;
+  virtual Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
+                                                          Common::Redis::RespValueSharedPtr request,
+                                                          PoolCallbacks& callbacks) PURE;
 
   /**
    * Makes a redis request based on IP address and TCP port of the upstream host (e.g., moved/ask
@@ -46,8 +65,8 @@ public:
    *         for some reason.
    */
   virtual Common::Redis::Client::PoolRequest*
-  makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
-                    Common::Redis::Client::PoolCallbacks& callbacks) PURE;
+  makeRequestToHost(const std::string& host_address, Common::Redis::RespValueSharedPtr request,
+                    PoolCallbacks& callbacks) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;
