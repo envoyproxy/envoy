@@ -30,11 +30,16 @@ The following is a YAML example of the above recommendation.
         # TODO: Tune for your system.
         max_heap_size_bytes: 2147483648 # 2 GiB
     actions:
-    - name: "envoy.overload_actions.stop_accepting_requests"
+    - name: "envoy.overload_actions.shrink_heap"
       triggers:
       - name: "envoy.resource_monitors.fixed_heap"
         threshold:
           value: 0.95
+    - name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+      - name: "envoy.resource_monitors.fixed_heap"
+        threshold:
+          value: 0.98
 
   static_resources:
     listeners:
