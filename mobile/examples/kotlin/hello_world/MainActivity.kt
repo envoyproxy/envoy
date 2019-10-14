@@ -27,9 +27,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
 private const val ENVOY_SERVER_HEADER = "server"
-private const val REQUEST_AUTHORITY = "s3.amazonaws.com"
-private const val REQUEST_PATH = "/api.lyft.com/static/demo/hello_world.txt"
-private const val REQUEST_SCHEME = "http"
+private const val REQUEST_AUTHORITY = "api.lyft.com"
+private const val REQUEST_PATH = "/ping"
+private const val REQUEST_SCHEME = "https"
 
 class MainActivity : Activity() {
   private val thread = HandlerThread(REQUEST_HANDLER_THREAD_NAME)

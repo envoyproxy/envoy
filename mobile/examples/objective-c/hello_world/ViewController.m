@@ -6,9 +6,9 @@
 #pragma mark - Constants
 
 NSString *_CELL_ID = @"cell-id";
-NSString *_REQUEST_AUTHORITY = @"s3.amazonaws.com";
-NSString *_REQUEST_PATH = @"/api.lyft.com/static/demo/hello_world.txt";
-NSString *_REQUEST_SCHEME = @"http";
+NSString *_REQUEST_AUTHORITY = @"api.lyft.com";
+NSString *_REQUEST_PATH = @"/ping";
+NSString *_REQUEST_SCHEME = @"https";
 
 #pragma mark - ViewController
 
