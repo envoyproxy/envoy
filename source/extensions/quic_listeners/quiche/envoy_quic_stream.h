@@ -51,7 +51,7 @@ public:
     addCallbacks_(callbacks);
   }
   void removeCallbacks(Http::StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
-  uint32_t bufferLimit() override { return quic::kStreamReceiveWindowLimit; }
+  uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
 
   // Needs to be called during quic stream creation before the stream receives
   // any headers and data.
@@ -82,10 +82,13 @@ protected:
 private:
   // Not owned.
   Http::StreamDecoder* decoder_{nullptr};
-  // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
-  // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
-  // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
-  // send buffer.
+  // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
+  // upon crossing high and low wathermarks.
+  // Its high watermark is also the buffer limit of stream read/write filters in
+  // HCM.
+  // There is no receiv buffer simulation because Quic stream's
+  // OnBodyDataAvailable() hands all the ready-to-use request data from stream sequencer to HCM
+  // directly and buffers them in filters if needed. Itself doesn't buffer request data.
   EnvoyQuicSimulatedWatermarkBuffer send_buffer_simulation_;
 };
 

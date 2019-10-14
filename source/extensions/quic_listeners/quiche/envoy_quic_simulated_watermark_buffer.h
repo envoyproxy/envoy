@@ -24,6 +24,8 @@ public:
     ASSERT((high_watermark == 0 && low_watermark == 0) || (high_watermark_ > low_watermark_));
   }
 
+  uint32_t highWatermark() const { return high_watermark_; }
+
   void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_above_high_watermark_ && bytes_buffered > high_watermark_) {
       // Just exceeds high watermark.
