@@ -30,9 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MainActivity extends Activity {
   private static final String REQUEST_HANDLER_THREAD_NAME = "hello_envoy_java";
   private static final String ENVOY_SERVER_HEADER = "server";
-  private static final String REQUEST_AUTHORITY = "s3.amazonaws.com";
-  private static final String REQUEST_PATH = "/api.lyft.com/static/demo/hello_world.txt";
-  private static final String REQUEST_SCHEME = "http";
+  private static final String REQUEST_AUTHORITY = "api.lyft.com";
+  private static final String REQUEST_PATH = "/ping";
+  private static final String REQUEST_SCHEME = "https";
 
   private Envoy envoy;
   private RecyclerView recyclerView;

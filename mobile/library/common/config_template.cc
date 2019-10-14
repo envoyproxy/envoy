@@ -8,6 +8,7 @@ static_resources:
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
     dns_lookup_family: V4_ONLY
+    http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: base
@@ -32,6 +33,7 @@ R"(
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
     dns_lookup_family: V4_ONLY
+    http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: base_wlan
@@ -42,6 +44,7 @@ R"(
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
     dns_lookup_family: V4_ONLY
+    http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: base_wwan
