@@ -6,7 +6,7 @@ import re
 
 # Key-value annotation regex.
 ANNOTATION_REGEX = re.compile('\[#([\w-]+?):(.*?)\]\s?', re.DOTALL)
-# Annotation line regex, including redudant prefix and suffix whitespaces.
+# Annotation line regex, including redundant prefix and suffix whitespaces.
 ANNOTATION_LINE_REGEX_FORMAT = '[^\S\r\n]*\[#%s:.*?\][^\S\r\n]*\n?'
 
 ANNOTATION_LINE_FORMAT = ' [#%s:%s]\n'
