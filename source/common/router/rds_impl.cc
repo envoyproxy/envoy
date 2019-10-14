@@ -180,7 +180,6 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     : subscription_(std::move(subscription)),
       config_update_info_(subscription_->routeConfigUpdate()),
       factory_context_(factory_context.getServerFactoryContext(/*is_dynamic=*/true)),
-      // provider_init_manager_(factory_context.initManager()),
       tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {

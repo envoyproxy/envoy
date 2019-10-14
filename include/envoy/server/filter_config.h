@@ -102,7 +102,15 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class ServerFactoryContext;
+/**
+ * ServerFactoryContext is an specialization of common interface for downstream and upstream network
+ * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
+ * across listeners.
+ */
+class ServerFactoryContext : public virtual CommonFactoryContext {
+public:
+  ~ServerFactoryContext() override = default;
+};
 
 /**
  * Context passed to network and HTTP filters to access server resources.
@@ -113,7 +121,12 @@ class FactoryContext : public virtual CommonFactoryContext {
 public:
   ~FactoryContext() override = default;
 
+  /**
+   * @param is_dynamic true if the validationVisitor() is for dynamic configuration.
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
   virtual ServerFactoryContext& getServerFactoryContext(bool is_dynamic) const PURE;
+
   /**
    * @return AccessLogManager for use by the entire server.
    */
@@ -187,12 +200,6 @@ public:
    * process context. Will be unset when running in validation mode.
    */
   virtual OptProcessContextRef processContext() PURE;
-};
-
-// ServerFactoryContext should live at least as long as lifetime of server.
-class ServerFactoryContext : public virtual CommonFactoryContext {
-public:
-  ~ServerFactoryContext() override = default;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
