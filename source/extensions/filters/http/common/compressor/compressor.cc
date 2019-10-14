@@ -78,8 +78,9 @@ const std::map<std::string, uint32_t> CompressorFilterConfig::registeredCompress
   // when there are two gzip filters using different compression levels for different content sizes.
   // In such case we ignore duplicates (or different filters for the same encoding) registered last.
   for (const auto& item : temp) {
-    if (encodings.count(item.first)) {
-      if (encodings.at(item.first) > item.second) {
+    auto enc = encodings.find(item.first);
+    if (enc != encodings.end()) {
+      if (enc->second > item.second) {
         encodings[item.first] = item.second;
       }
     } else {
