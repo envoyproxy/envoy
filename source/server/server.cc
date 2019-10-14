@@ -198,6 +198,15 @@ void InstanceImpl::flushStatsInternal() {
       sslContextManager().daysUntilFirstCertExpires());
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
+
+  // Compute the total number of lookups and track it as a stat.
+  const Stats::SymbolTable& symbol_table = stats_store_.symbolTable();
+  const uint64_t total = symbol_table.getRecentLookups([](absl::string_view, uint64_t) {});
+  const uint64_t prev_total = server_stats_->stats_recent_lookups_.value();
+  if (total > prev_total) {
+    server_stats_->stats_recent_lookups_.add(total - prev_total);
+  }
+
   InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {

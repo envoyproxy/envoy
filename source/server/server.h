@@ -49,9 +49,10 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
-  COUNTER(static_unknown_fields)                                                                   \
-  COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(debug_assertion_failures)                                                                \
+  COUNTER(dynamic_unknown_fields)                                                                  \
+  COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(stats_recent_lookups)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
