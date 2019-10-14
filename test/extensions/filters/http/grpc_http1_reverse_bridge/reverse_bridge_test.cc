@@ -47,8 +47,8 @@ protected:
 TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
-
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                      {"content-length", "25"},
@@ -112,6 +112,7 @@ TEST_F(ReverseBridgeTest, NoGrpcRequest) {
   initialize();
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/json"}, {"content-length", "10"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -159,6 +160,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                      {"content-length", "25"},
@@ -218,6 +220,7 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                      {"content-length", "25"},
@@ -298,6 +301,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
@@ -377,6 +381,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
@@ -450,6 +455,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});

@@ -20,6 +20,12 @@ public:
       const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig& config,
       const std::string& stat_prefix,
       Envoy::Server::Configuration::FactoryContext& context) override;
+
+private:
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig&
+          proto_config,
+      Server::Configuration::FactoryContext& context) override;
 };
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters

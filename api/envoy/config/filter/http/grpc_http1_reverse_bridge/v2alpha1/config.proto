@@ -24,5 +24,10 @@ message FilterConfig {
   // simple binary encoded protobuf.
   bool withhold_grpc_frames = 2;
 
+  // If true, It disables filter at route level
+  // The order is:
+  // - the routeEntry() (for config that's applied on weighted clusters)
+  // - the route
+  // - and finally from the virtual host object (routeEntry()->virtualhost()).
   bool disabled = 3;
 }
