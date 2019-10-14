@@ -117,7 +117,7 @@ message HealthCheck {
     // :ref:`use_http2
     // <envoy_api_field_core.HealthCheck.HttpHealthCheck.use_http2>` in light of
     // HTTP3.
-    CodecClientType codec_client_type = 10;
+    CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
   }
 
   message TcpHealthCheck {

@@ -106,7 +106,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
-      codec_client_type_(codecClientType(config.http_health_check().codec_client_type())) {
+      codec_client_type_(codecClientType(
+         config.http_health_check().use_http2() ? envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP2
+                             : config.http_health_check().codec_client_type())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
