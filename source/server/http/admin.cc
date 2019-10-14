@@ -712,8 +712,6 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
 Http::Code AdminImpl::handlerStatsRecentLookups(absl::string_view, Http::HeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
   Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
-  /*response_headers.insertContentType().value().setReference(
-    Http::Headers::get().ContentTypeValues.TextUtf8);*/
   std::string table;
   const uint64_t total =
       symbol_table.getRecentLookups([&table](absl::string_view name, uint64_t count) {

@@ -354,10 +354,11 @@ modify different aspects of the server:
   Envoy has updated (counters incremented at least once, gauges changed at least once,
   and histograms added to at least once)
 
-  .. http:get:: /stats?recentlookups
+  .. http:get:: /stats/recentlookups
 
   This endpoint is intended for Envoy developers debugging potential contention issues
-  in the stats system.
+  in the stats system. In order to use this API you must first enable it by POSTing to
+  `/stats/recentlookups/enable`.
 
   It emits a table of stat names that were recently accessed as strings by Envoy. In
   general, strings should be converted into StatNames, counters, gauges, and histograms
@@ -369,6 +370,29 @@ modify different aspects of the server:
   See :repo:`source/docs/stats.md` for more details.
 
   Note also that actual mutex contention can be tracked via :http:get:`/contention`.
+
+  .. http:post:: /stats/recentlookups/enable
+
+  Turns on collection of recent lookup of stat-names, thus enabling
+  `/stats/recentlookups`.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  .. http:post:: /stats/recentlookups/disable
+
+  Turns off collection of recent lookup of stat-names, thus disabling
+  `/stats/recentlookups` and clearing any outstanding data.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  .. http:post:: /stats/recentlookups/clear
+
+  Clearing any outstanding lookups. If called when recent lookup
+  collection is enabled, this clears all the data, but collection
+  continues. If called when recent lookup collection is disabled,
+  there is no effect, as disabling collection clears the data.
+
+  See :repo:`source/docs/stats.md` for more details.
 
 .. _operations_admin_interface_runtime:
 
