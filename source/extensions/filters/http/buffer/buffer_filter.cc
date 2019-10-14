@@ -95,6 +95,15 @@ Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end
 }
 
 Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::HeaderMap&) {
+  // request_headers_ is initialized iff plugin is enabled.
+  if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
+    ASSERT(!settings_->disabled());
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.buffer_filter_populate_content_length")) {
+      request_headers_->insertContentLength().value(content_length_);
+    }
+  }
+
   return Http::FilterTrailersStatus::Continue;
 }
 
