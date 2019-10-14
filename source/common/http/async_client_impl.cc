@@ -285,10 +285,19 @@ void AsyncRequestImpl::onReset() {
     // Add tags about reset.
     child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
+  }
+
+  // Finalize the span based on whether we received a response or not
+  if (this->remoteClosed()) {
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(
         *child_span_, &this->response_->headers(), this->response_->trailers(), this->streamInfo(),
         Tracing::EgressConfig::get());
+  } else {
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(
+        *child_span_, nullptr, nullptr, this->streamInfo(), Tracing::EgressConfig::get());
+  }
 
+  if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
     callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   }
@@ -299,9 +308,6 @@ void AsyncRequestImpl::cancel() {
 
   // Add tags about the cancellation
   child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
-                                                   this->response_->trailers(), this->streamInfo(),
-                                                   Tracing::EgressConfig::get());
 
   reset();
 }
