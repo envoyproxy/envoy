@@ -25,9 +25,9 @@ envoy_cc_library(
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/api/v2/ratelimit:ratelimit_cc",
-        "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
-        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+        "@envoy_api//envoy/api/v2/ratelimit:pkg_cc_proto",
+        "@envoy_api//envoy/config/ratelimit/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
     ],
 )
 
@@ -40,7 +40,7 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/stats:symbol_table_lib",
-        "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
+        "@envoy_api//envoy/config/ratelimit/v2:pkg_cc_proto",
     ],
 )
 

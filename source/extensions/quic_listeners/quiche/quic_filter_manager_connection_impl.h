@@ -43,7 +43,6 @@ public:
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
-  std::chrono::milliseconds delayedCloseTimeout() const override;
   void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }

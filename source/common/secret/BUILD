@@ -19,8 +19,8 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 
@@ -32,7 +32,7 @@ envoy_cc_library(
         "//include/envoy/secret:secret_provider_interface",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 

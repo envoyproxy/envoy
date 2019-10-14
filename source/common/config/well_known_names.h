@@ -61,6 +61,8 @@ class MetadataFilterValues {
 public:
   // Filter namespace for built-in load balancer.
   const std::string ENVOY_LB = "envoy.lb";
+  // Filter namespace for built-in transport socket match in cluster.
+  const std::string ENVOY_TRANSPORT_SOCKET_MATCH = "envoy.transport_socket_match";
 };
 
 using MetadataFilters = ConstSingleton<MetadataFilterValues>;

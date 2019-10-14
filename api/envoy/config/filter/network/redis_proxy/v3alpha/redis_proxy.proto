@@ -124,11 +124,11 @@ message RedisProxy {
         // mirror.
         //
         // Parsing this field is implemented such that the runtime key's data may be represented
-        // as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
-        // as JSON/YAML and may also be represented as an integer with the assumption that the value
-        // is an integral percentage out of 100. For instance, a runtime key lookup returning the
-        // value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
-        // HUNDRED.
+        // as a :ref:`FractionalPercent <envoy_api_msg_type.v3alpha.FractionalPercent>` proto
+        // represented as JSON/YAML and may also be represented as an integer with the assumption
+        // that the value is an integral percentage out of 100. For instance, a runtime key lookup
+        // returning the value "42" would parse as a `FractionalPercent` whose numerator is 42 and
+        // denominator is HUNDRED.
         api.v3alpha.core.RuntimeFractionalPercent runtime_fraction = 2;
 
         // Set this to TRUE to only mirror write commands, this is effectively replicating the
@@ -220,8 +220,8 @@ message RedisProxy {
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
-// :ref:`extension_protocol_options<envoy_api_field_Cluster.extension_protocol_options>`, keyed
-// by the name `envoy.redis_proxy`.
+// :ref:`extension_protocol_options<envoy_api_field_api.v3alpha.Cluster.extension_protocol_options>`,
+// keyed by the name `envoy.redis_proxy`.
 message RedisProtocolOptions {
   // Upstream server password as defined by the `requirepass directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.

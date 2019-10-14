@@ -65,4 +65,9 @@ message Router {
       }
     }
   }];
+
+  // If not set, ingress Envoy will ignore
+  // :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress
+  // Envoy, when deriving timeout for upstream cluster.
+  bool respect_expected_rq_timeout = 6;
 }

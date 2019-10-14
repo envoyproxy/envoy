@@ -40,6 +40,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/trace/v2:trace_cc",
+        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )

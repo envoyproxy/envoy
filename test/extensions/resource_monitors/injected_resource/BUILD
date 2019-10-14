@@ -36,6 +36,6 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/injected_resource:config",
         "//source/server:resource_monitor_config_lib",
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:injected_resource_cc",
+        "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:pkg_cc_proto",
     ],
 )
