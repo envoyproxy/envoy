@@ -33,6 +33,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )

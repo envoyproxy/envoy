@@ -35,5 +35,6 @@ envoy_cc_library(
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
         "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:pkg_cc_proto",
     ],
 )

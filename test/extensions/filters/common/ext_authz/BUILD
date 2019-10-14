@@ -30,6 +30,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -39,6 +40,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

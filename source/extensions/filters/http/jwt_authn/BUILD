@@ -71,6 +71,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -82,6 +83,7 @@ envoy_cc_library(
         ":verifier_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:config_lib",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -93,7 +95,6 @@ envoy_cc_library(
         ":authenticator_lib",
         ":extractor_lib",
         "//include/envoy/http:header_map_interface",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
