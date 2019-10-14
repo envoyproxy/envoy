@@ -4,8 +4,33 @@ from collections import namedtuple
 
 from tools.api_proto_plugin import annotations
 
-# A comment is a (raw comment, annotation map) pair.
-Comment = namedtuple('Comment', ['raw', 'xformed', 'annotations'])
+
+class Comment(object):
+  """Wrapper for comment"""
+
+  def __init__(self, comment, file_level_annotations=None):
+    self.raw = comment
+    self.annotations = annotations.ExtractAnnotations(self.raw, file_level_annotations)
+
+  def transform(self, annotation_xforms):
+    """Transform comment with annotation transformers. The annotation will be replaced with new value
+    returned by the transformer. If the transformer returns None, then the annotation will be removed.
+    All transformed annotations will be appended to the end of comment.
+
+    Args:
+    annotation_xforms: a dict of transformers for annotations in leading comment.
+    """
+    xformed = self.raw
+    for annotation, xform in sorted(annotation_xforms.items()):
+      original_annotation = self.annotations.get(annotation)
+      xformed_annotation = xform(original_annotation)
+      if original_annotation is not None:
+        xformed = annotations.WithoutAnnotation(xformed, annotation)
+        del self.annotations[annotation]
+      if xformed_annotation is not None:
+        xformed += annotations.FormatAnnotation(annotation, xformed_annotation)
+        self.annotations[annotation] = xformed_annotation
+    self.raw = xformed
 
 
 class SourceCodeInfo(object):
@@ -60,34 +85,20 @@ class SourceCodeInfo(object):
 
   # TODO(htuch): consider integrating comment lookup with overall
   # FileDescriptorProto, perhaps via two passes.
-  def LeadingCommentPathLookup(self, path, annotation_xforms=None):
+  def LeadingCommentPathLookup(self, path):
     """Lookup leading comment by path in SourceCodeInfo.
 
     Args:
       path: a list of path indexes as per
         https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
-      annotation_xforms: a dict of transformers to process annotation extracted
 
     Returns:
       Comment object.
     """
     location = self.LocationPathLookup(path)
-    if location is None:
-      return Comment('', '', {})
-    raw = xformed = location.leading_comments
-    annotation_map = annotations.ExtractAnnotations(raw, self.file_level_annotations)
-    if annotation_xforms:
-      for annotation, xform in sorted(annotation_xforms.items()):
-        original_annotation = annotation_map.get(annotation)
-        xformed_annotation = xform(original_annotation)
-        if original_annotation is not None:
-          xformed = annotations.WithoutAnnotation(xformed, annotation)
-          del annotation_map[annotation]
-        if xformed_annotation is not None:
-          xformed += annotations.FormatAnnotation(annotation, xformed_annotation)
-          annotation_map[annotation] = xformed_annotation
-
-    return Comment(raw, xformed, annotation_map)
+    if location is not None:
+      return Comment(location.leading_comments, self.file_level_annotations)
+    return Comment('', None)
 
   def LeadingDetachedCommentsPathLookup(self, path):
     """Lookup leading detached comments by path in SourceCodeInfo.
@@ -253,14 +264,6 @@ class TypeContext(object):
   def leading_comment(self):
     """Leading comment for type context."""
     return self.source_code_info.LeadingCommentPathLookup(self.path)
-
-  def leading_comment_xform_with(self, annotation_xforms):
-    """Leading comment transformed with annotation transformers for type context.
-
-    Args:
-      annotation_xforms: a dict of transformers for annotations in leading comment.
-    """
-    return self.source_code_info.LeadingCommentPathLookup(self.path, annotation_xforms)
 
   @property
   def leading_detached_comments(self):

@@ -124,8 +124,10 @@ def FormatTypeContextComments(type_context, annotation_xforms=None):
   Returns:
     Tuple of formatted leading and trailing comment blocks.
   """
-  leading_comment = type_context.leading_comment_xform_with(annotation_xforms)
-  leading = FormatComments(list(type_context.leading_detached_comments) + [leading_comment.xformed])
+  leading_comment = type_context.leading_comment
+  if annotation_xforms:
+    leading_comment.transform(annotation_xforms)
+  leading = FormatComments(list(type_context.leading_detached_comments) + [leading_comment.raw])
   trailing = FormatBlock(FormatComments([type_context.trailing_comment]))
   return leading, trailing
 
