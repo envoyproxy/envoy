@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
-        "//source/common/common:assert_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 

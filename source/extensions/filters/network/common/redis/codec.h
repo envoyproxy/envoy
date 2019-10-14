@@ -30,7 +30,8 @@ public:
   RespValue() : type_(RespType::Null) {}
 
   RespValue(std::shared_ptr<RespValue> base_array, const RespValue& command, const uint64_t start,
-                  const uint64_t end) : type_(RespType::CompositeArray) {
+            const uint64_t end)
+      : type_(RespType::CompositeArray) {
     new (&composite_array_) CompositeArray(std::move(base_array), command, start, end);
   }
   virtual ~RespValue() { cleanup(); }
@@ -50,8 +51,9 @@ public:
   class CompositeArray {
   public:
     CompositeArray() = default;
-    CompositeArray(std::shared_ptr<RespValue> base_array, const RespValue& command, const uint64_t start,
-    const uint64_t end) : base_array_(std::move(base_array)), command_(&command), start_(start), end_(end) {
+    CompositeArray(std::shared_ptr<RespValue> base_array, const RespValue& command,
+                   const uint64_t start, const uint64_t end)
+        : base_array_(std::move(base_array)), command_(&command), start_(start), end_(end) {
       ASSERT(command.type() == RespType::BulkString || command.type() == RespType::SimpleString);
       ASSERT(base_array_ != nullptr);
       ASSERT(base_array_->type() == RespType::Array);
@@ -88,12 +90,17 @@ public:
     };
 
     CompositeArrayConstIterator begin() const noexcept {
-      return (command_ && base_array_) ? CompositeArrayConstIterator{command_, base_array_->asArray(), start_, true} : CompositeArrayConstIterator::empty();
+      return (command_ && base_array_)
+                 ? CompositeArrayConstIterator{command_, base_array_->asArray(), start_, true}
+                 : CompositeArrayConstIterator::empty();
     }
 
     CompositeArrayConstIterator end() const noexcept {
-      return (command_ && base_array_) ? CompositeArrayConstIterator{command_, base_array_->asArray(), end_+1, false} : CompositeArrayConstIterator::empty();
+      return (command_ && base_array_)
+                 ? CompositeArrayConstIterator{command_, base_array_->asArray(), end_ + 1, false}
+                 : CompositeArrayConstIterator::empty();
     }
+
   private:
     std::shared_ptr<RespValue> base_array_;
     const RespValue* command_;

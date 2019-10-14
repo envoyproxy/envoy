@@ -64,11 +64,13 @@ public:
 
   void move(Common::Redis::RespValueSharedPtr request) {
     for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
-//      auto single_set = std::make_shared<Common::Redis::RespValue>();
-//      single_set->type(Common::Redis::RespType::CompositeArray);
-//      single_set->asCompositeArray().initialize(request, Common::Redis::Utility::SetRequest::instance(), i, i + 2);
+      //      auto single_set = std::make_shared<Common::Redis::RespValue>();
+      //      single_set->type(Common::Redis::RespType::CompositeArray);
+      //      single_set->asCompositeArray().initialize(request,
+      //      Common::Redis::Utility::SetRequest::instance(), i, i + 2);
 
-      auto single_set = std::make_shared<Common::Redis::RespValue>(request, Common::Redis::Utility::SetRequest::instance(), i, i + 2);
+      auto single_set = std::make_shared<Common::Redis::RespValue>(
+          request, Common::Redis::Utility::SetRequest::instance(), i, i + 2);
     }
   }
 
@@ -87,7 +89,6 @@ public:
       single_mset.asArray()[2].asString() = request->asArray()[i + 1].asString();
     }
   }
-
 };
 } // namespace RedisProxy
 } // namespace NetworkFilters

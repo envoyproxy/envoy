@@ -137,7 +137,8 @@ public:
   void encode(const RespValue& value, Buffer::Instance& out) override;
 
 private:
-  void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);;
+  void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);
+  ;
   void encodeCompositeArray(const RespValue::CompositeArray& array, Buffer::Instance& out);
   void encodeBulkString(const std::string& string, Buffer::Instance& out);
   void encodeError(const std::string& string, Buffer::Instance& out);

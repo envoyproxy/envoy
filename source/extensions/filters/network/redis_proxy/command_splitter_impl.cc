@@ -311,8 +311,8 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    auto single_fragment = std::make_shared<Common::Redis::RespValue>(
-        base_request, base_request->asArray()[0], i, i);
+    auto single_fragment =
+        std::make_shared<Common::Redis::RespValue>(base_request, base_request->asArray()[0], i, i);
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", base_request->asArray()[0].asString(),
               single_fragment->toString());
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());

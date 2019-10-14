@@ -289,17 +289,19 @@ bool RespValue::operator==(const RespValue& other) const {
   return result;
 }
 
-uint32_t RespValue::CompositeArray::size() const {
-  return end_ - start_ + 2;
-}
+uint32_t RespValue::CompositeArray::size() const { return end_ - start_ + 2; }
 
 bool RespValue::CompositeArray::operator==(const RespValue::CompositeArray& other) const {
-  return base_array_ == other.base_array_ && command_ == other.command_ && start_ == other.start_ && end_ == other.end_;
+  return base_array_ == other.base_array_ && command_ == other.command_ && start_ == other.start_ &&
+         end_ == other.end_;
 }
 
-const RespValue& RespValue::CompositeArray::CompositeArrayConstIterator::operator*() { return first_ ? *command_ : array_[index_]; }
+const RespValue& RespValue::CompositeArray::CompositeArrayConstIterator::operator*() {
+  return first_ ? *command_ : array_[index_];
+}
 
-RespValue::CompositeArray::CompositeArrayConstIterator& RespValue::CompositeArray::CompositeArrayConstIterator::operator++() {
+RespValue::CompositeArray::CompositeArrayConstIterator&
+RespValue::CompositeArray::CompositeArrayConstIterator::operator++() {
   if (first_) {
     first_ = false;
   } else {
@@ -308,13 +310,16 @@ RespValue::CompositeArray::CompositeArrayConstIterator& RespValue::CompositeArra
   return *this;
 }
 
-bool RespValue::CompositeArray::CompositeArrayConstIterator::operator!=(const CompositeArrayConstIterator& rhs) const {
-  return command_ != (rhs.command_) || &array_ != &(rhs.array_) || index_ != rhs.index_ || first_ != rhs.first_;
+bool RespValue::CompositeArray::CompositeArrayConstIterator::
+operator!=(const CompositeArrayConstIterator& rhs) const {
+  return command_ != (rhs.command_) || &array_ != &(rhs.array_) || index_ != rhs.index_ ||
+         first_ != rhs.first_;
 }
 
-const RespValue::CompositeArray::CompositeArrayConstIterator& RespValue::CompositeArray::CompositeArrayConstIterator::empty() {
-  static const RespValue::CompositeArray::CompositeArrayConstIterator* instance = new RespValue::CompositeArray::CompositeArrayConstIterator(
-      nullptr, {}, 0, false);
+const RespValue::CompositeArray::CompositeArrayConstIterator&
+RespValue::CompositeArray::CompositeArrayConstIterator::empty() {
+  static const RespValue::CompositeArray::CompositeArrayConstIterator* instance =
+      new RespValue::CompositeArray::CompositeArrayConstIterator(nullptr, {}, 0, false);
   return *instance;
 }
 
@@ -587,7 +592,8 @@ void EncoderImpl::encodeArray(const std::vector<RespValue>& array, Buffer::Insta
   }
 }
 
-void EncoderImpl::encodeCompositeArray(const RespValue::CompositeArray& composite_array, Buffer::Instance& out) {
+void EncoderImpl::encodeCompositeArray(const RespValue::CompositeArray& composite_array,
+                                       Buffer::Instance& out) {
   char buffer[32];
   char* current = buffer;
   *current++ = '*';
