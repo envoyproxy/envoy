@@ -1007,6 +1007,38 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
 }
 
+TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder&,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
+  expectSuccess(504);
+
+  timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+  EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
+      .WillOnce(Return(child_span));
+  client_.send(std::move(message_), callbacks_,
+               AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(40)), parent_span_);
+
+    EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("504")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UT")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
+      .Times(AnyNumber());
+  EXPECT_CALL(*child_span, finishSpan());
+  timer_->invokeCallback();
+}
+
 TEST_F(AsyncClientImplTest, DisableTimer) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
