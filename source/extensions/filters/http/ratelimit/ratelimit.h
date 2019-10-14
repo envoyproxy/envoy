@@ -114,7 +114,8 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // RateLimit::RequestCallbacks
-  void complete(Filters::Common::RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers,
+  void complete(Filters::Common::RateLimit::LimitStatus status,
+                Http::HeaderMapPtr&& response_headers,
                 Http::HeaderMapPtr&& request_headers_to_add) override;
 
 private:
@@ -123,8 +124,8 @@ private:
                                     std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
                                     const Http::HeaderMap& headers) const;
-  void addResponseHeaders(Http::HeaderMap& headers);
-  void addRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
+  void populateResponseHeaders(Http::HeaderMap& response_headers);
+  void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
 
   Http::Context& httpContext() { return config_->httpContext(); }
 
