@@ -105,22 +105,22 @@ public:
   void onMessage(AbstractResponseSharedPtr response) override;
 
   /**
-   * When request could not be recognised, increase unknown request count.
+   * If request could not be recognized, increase unknown request count.
    */
   void onFailedParse(RequestParseFailureSharedPtr) override;
 
   /**
-   * When response could not be recognised, increase unknown response count.
+   * If response could not be recognized, increase unknown response count.
    */
   void onFailedParse(ResponseMetadataSharedPtr) override;
 
   /**
-   * When exceptions occurred while deserializing request, increase request failure count.
+   * If exceptions occurred while deserializing request, increase request failure count.
    */
   void onRequestException() override;
 
   /**
-   * When exceptions occurred while deserializing response, increase response failure count.
+   * If exceptions occurred while deserializing response, increase response failure count.
    */
   void onResponseException() override;
 
