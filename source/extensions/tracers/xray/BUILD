@@ -40,6 +40,7 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":xray_lib",
+        "//source/common/config:datasource_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
     ],
