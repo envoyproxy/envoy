@@ -197,7 +197,6 @@ private:
   // manager. For example, RDS, or in the future KDS. Once a listener is done warming it will
   // be transitioned to active.
   ListenerList warming_listeners_;
-
   // Draining listeners are listeners that are in the process of being drained and removed. They
   // go through two phases where first the workers stop accepting new connections and existing
   // connections are drained. Then after that time period the listener is removed from all workers
@@ -212,7 +211,7 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
-}; // namespace Server
+};
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.

@@ -154,8 +154,8 @@ public:
   virtual bool removeListener(const std::string& name) PURE;
 
   /*
-   * Stops listeners from accepting new connections without actually removing it. This is
-   * used by /drain_listeners admin endpoint. This methods directly stops the listeners on workers.
+   * Stops listeners from accepting new connections without actually removing them. This is
+   * used by /drain_listeners admin endpoint. This method directly stops the listeners on workers.
    * Once a listener is stopped, any listener modifications are not allowed.
    * @param inbound_only if true stops all the inbound listeners and stops all listeners if false.
    * @return true if any listeners have been stopped.
