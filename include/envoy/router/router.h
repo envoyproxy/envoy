@@ -510,8 +510,6 @@ public:
   virtual ~TlsContextMatchCriteria() = default;
 
   virtual const absl::optional<bool>& presented() const PURE;
-
-  virtual const absl::optional<bool>& expired() const PURE;
 };
 
 /**

@@ -16,11 +16,8 @@ public:
 
   const absl::optional<bool>& presented() const override { return presented_; }
 
-  const absl::optional<bool>& expired() const override { return expired_; }
-
 private:
   absl::optional<bool> presented_;
-  absl::optional<bool> expired_;
 };
 
 } // namespace Router

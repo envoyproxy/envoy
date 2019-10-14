@@ -9,10 +9,6 @@ TlsContextMatchCriteriaImpl::TlsContextMatchCriteriaImpl(
   if (options.has_presented()) {
     presented_ = options.presented().value();
   }
-
-  if (options.has_expired()) {
-    expired_ = options.expired().value();
-  }
 }
 
 } // namespace Router
