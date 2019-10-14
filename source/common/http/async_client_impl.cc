@@ -258,11 +258,11 @@ void AsyncRequestImpl::initialize() {
 }
 
 void AsyncRequestImpl::onComplete() {
-  callbacks_.onSuccess(std::move(response_));
-
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
                                                    this->response_->trailers(), this->streamInfo(),
                                                    Tracing::EgressConfig::get());
+
+  callbacks_.onSuccess(std::move(response_));
 }
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
@@ -282,17 +282,20 @@ void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
 
 void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
-    // In this case we don't have a valid response so we do need to raise a failure.
-    callbacks_.onFailure(AsyncClient::FailureReason::Reset);
-
     // Add tags about reset.
     child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
   }
 
+  // Finish span
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &this->response_->headers(),
                                                    this->response_->trailers(), this->streamInfo(),
                                                    Tracing::EgressConfig::get());
+
+  if (!cancelled_) {
+    // In this case we don't have a valid response so we do need to raise a failure.
+    callbacks_.onFailure(AsyncClient::FailureReason::Reset);
+  }
 }
 
 void AsyncRequestImpl::cancel() {
