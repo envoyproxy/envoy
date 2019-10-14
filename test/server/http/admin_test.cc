@@ -36,6 +36,7 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::EndsWith;
 using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -46,6 +47,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -726,6 +728,37 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                            admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
                                                               data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+}
+
+TEST_P(AdminInstanceTest, StatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_LOG_CONTAINS(
+      "error", "Invalid regex: ",
+      EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
+}
+
+TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_LOG_CONTAINS(
+      "error", ": *.ptest",
+      EXPECT_EQ(Http::Code::BadRequest,
+                getCallback("/stats?format=prometheus&filter=*.ptest", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {

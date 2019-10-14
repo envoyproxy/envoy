@@ -6,7 +6,6 @@
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
@@ -35,12 +34,10 @@ namespace Router {
 namespace {
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
-parseHttpConnectionManagerFromJson(const std::string& json_string) {
+parseHttpConnectionManagerFromYaml(const std::string& yaml_string) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
       http_connection_manager;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::FilterJson::translateHttpConnectionManager(*json_object_ptr,
-                                                            http_connection_manager);
+  TestUtility::loadFromYaml(yaml_string, http_connection_manager);
   return http_connection_manager;
 }
 
@@ -75,26 +72,26 @@ public:
   ~RdsImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
   void setup() {
-    const std::string config_json = R"EOF(
-    {
-      "rds": {
-        "api_type": "REST",
-        "cluster": "foo_cluster",
-        "route_config_name": "foo_route_config",
-        "refresh_delay_ms": 1000
-      },
-      "codec_type": "auto",
-      "stat_prefix": "foo",
-      "filters": [
-        { "name": "http_dynamo_filter", "config": {} }
-      ]
-    }
+    const std::string config_yaml = R"EOF(
+rds:
+  config_source:
+    api_config_source:
+      api_type: REST
+      cluster_names:
+      - foo_cluster
+      refresh_delay: 1s
+  route_config_name: foo_route_config
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: http_dynamo_filter
+  config: {}
     )EOF";
 
     EXPECT_CALL(factory_context_.init_manager_, add(_));
-    rds_ =
-        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                        factory_context_, "foo.", *route_config_provider_manager_);
+    rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
+                                           factory_context_, "foo.",
+                                           *route_config_provider_manager_, false);
     rds_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     factory_context_.init_manager_.initialize(init_watcher_);
@@ -112,21 +109,19 @@ public:
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
-  const std::string config_json = R"EOF(
-    {
-      "rds": {},
-      "route_config": {},
-      "codec_type": "auto",
-      "stat_prefix": "foo",
-      "filters": [
-        { "name": "http_dynamo_filter", "config": {} }
-      ]
-    }
+  const std::string config_yaml = R"EOF(
+rds: {}
+route_config: {}
+codec_type: auto
+stat_prefix: foo
+http_filters:
+- name: http_dynamo_filter
+  config: {}
     )EOF";
 
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
                                                factory_context_, "foo.",
-                                               *route_config_provider_manager_),
+                                               *route_config_provider_manager_, false),
                EnvoyException);
 }
 
@@ -225,7 +220,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
 
   setup();
 
-  std::string response1_json = R"EOF(
+  const std::string response1_json = R"EOF(
 {
   "version_info": "1",
   "resources": [
@@ -264,7 +259,7 @@ public:
     rds_.set_route_config_name("foo_route_config");
     rds_.mutable_config_source()->set_path("foo_path");
     provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
-        rds_, factory_context_, "foo_prefix.", factory_context_.initManager());
+        rds_, factory_context_, "foo_prefix.", factory_context_.initManager(), false);
     rds_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -304,7 +299,7 @@ dynamic_route_configs:
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump.DebugString());
 
-  std::string config_yaml = R"EOF(
+  const std::string config_yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -416,7 +411,7 @@ virtual_hosts:
                                                                                      "1");
 
   RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, factory_context_, "foo_prefix", factory_context_.initManager());
+      rds_, factory_context_, "foo_prefix", factory_context_.initManager(), false);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -430,7 +425,7 @@ virtual_hosts:
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, factory_context_, "foo_prefix", factory_context_.initManager());
+      rds2, factory_context_, "foo_prefix", factory_context_.initManager(), false);
   EXPECT_NE(provider3, provider_);
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(route_configs,
                                                                                      "provider3");

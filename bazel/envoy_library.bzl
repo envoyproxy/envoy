@@ -7,7 +7,7 @@ load(
     "envoy_linkstatic",
 )
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
@@ -22,8 +22,12 @@ def _tcmalloc_external_deps(repository):
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
 # all envoy targets pass through an envoy-declared skylark function where they can be modified
 # before being passed to a native bazel function.
-def envoy_basic_cc_library(name, **kargs):
-    native.cc_library(name = name, **kargs)
+def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
+    native.cc_library(
+        name = name,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
+        **kargs
+    )
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
@@ -121,15 +125,8 @@ def envoy_include_prefix(path):
 
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, external_deps = [], **kwargs):
-    external_proto_deps = []
-    external_cc_proto_deps = []
-    if "api_httpbody_protos" in external_deps:
-        external_cc_proto_deps.append("@com_google_googleapis//google/api:httpbody_cc_proto")
-        external_proto_deps.append("@com_google_googleapis//google/api:httpbody_proto")
-    api_proto_library(
+    api_cc_py_proto_library(
         name,
-        external_cc_proto_deps = external_cc_proto_deps,
-        external_proto_deps = external_proto_deps,
         # Avoid generating .so, we don't need it, can interfere with builds
         # such as OSS-Fuzz.
         linkstatic = 1,

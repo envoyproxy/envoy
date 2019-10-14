@@ -130,7 +130,6 @@ public:
     ASSERT(delayed_close_timer_ == nullptr && ioHandle().isOpen());
     delayed_close_timeout_ = timeout;
   }
-  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 protected:
   void closeSocket(ConnectionEvent close_type);

@@ -141,14 +141,15 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(*connection_,
-                                                           host->cluster().statsScope(), *this);
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+        *connection_, host->cluster().statsScope(), *this,
+        host->cluster().maxResponseHeadersCount());
     break;
   }
   case Type::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().statsScope(), host->cluster().http2Settings(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
     break;
   }
   }

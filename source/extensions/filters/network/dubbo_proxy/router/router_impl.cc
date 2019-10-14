@@ -65,7 +65,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this, nullptr);
+      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(

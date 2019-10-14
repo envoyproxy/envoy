@@ -16,9 +16,9 @@ import "google/protobuf/wrappers.proto";
 // specified individually for each defined priority.
 message CircuitBreakers {
   // A Thresholds defines CircuitBreaker settings for a
-  // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`.
+  // :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`.
   message Thresholds {
-    // The :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`
+    // The :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.
     // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
     // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
@@ -53,10 +53,11 @@ message CircuitBreakers {
     google.protobuf.UInt32Value max_connection_pools = 7;
   }
 
-  // If multiple :ref:`Thresholds<envoy_api_msg_cluster.CircuitBreakers.Thresholds>`
-  // are defined with the same :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`,
-  // the first one in the list is used. If no Thresholds is defined for a given
-  // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`, the default values
+  // If multiple :ref:`Thresholds<envoy_api_msg_api.v3alpha.cluster.CircuitBreakers.Thresholds>`
+  // are defined with the same
+  // :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`, the first one in the
+  // list is used. If no Thresholds is defined for a given
+  // :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`, the default values
   // are used.
   repeated Thresholds thresholds = 1;
 }

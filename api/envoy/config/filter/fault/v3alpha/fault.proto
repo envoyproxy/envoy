@@ -6,7 +6,8 @@ option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.fault.v3alpha";
 
-import "envoy/type/percent.proto";
+import "envoy/config/filter/fault/v2/fault.proto";
+import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -48,7 +49,7 @@ message FaultDelay {
   }
 
   // The percentage of operations/connections/requests on which the delay will be injected.
-  type.FractionalPercent percentage = 4;
+  type.v3alpha.FractionalPercent percentage = 4;
 }
 
 // Describes a rate limit to be applied.
@@ -76,5 +77,5 @@ message FaultRateLimit {
   }
 
   // The percentage of operations/connections/requests on which the rate limit will be injected.
-  type.FractionalPercent percentage = 2;
+  type.v3alpha.FractionalPercent percentage = 2;
 }

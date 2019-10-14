@@ -16,11 +16,12 @@ ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& messag
                                               Buffer::InstancePtr&& response);
 RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
-                             RawAsyncStreamCallbacks& callbacks);
+                             RawAsyncStreamCallbacks& callbacks,
+                             const Http::AsyncClient::StreamOptions& options);
 AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
                           const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
                           Tracing::Span& parent_span,
-                          const absl::optional<std::chrono::milliseconds>& timeout);
+                          const Http::AsyncClient::RequestOptions& options);
 
 } // namespace Internal
 
@@ -100,13 +101,15 @@ public:
   virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
                              const Protobuf::Message& request,
                              AsyncRequestCallbacks<Response>& callbacks, Tracing::Span& parent_span,
-                             const absl::optional<std::chrono::milliseconds>& timeout) {
+                             const Http::AsyncClient::RequestOptions& options) {
     return Internal::sendUntyped(client_.get(), service_method, request, callbacks, parent_span,
-                                 timeout);
+                                 options);
   }
   virtual AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
-                                     AsyncStreamCallbacks<Response>& callbacks) {
-    return AsyncStream<Request>(Internal::startUntyped(client_.get(), service_method, callbacks));
+                                     AsyncStreamCallbacks<Response>& callbacks,
+                                     const Http::AsyncClient::StreamOptions& options) {
+    return AsyncStream<Request>(
+        Internal::startUntyped(client_.get(), service_method, callbacks, options));
   }
 
   AsyncClient* operator->() { return this; }

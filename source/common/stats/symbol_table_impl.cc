@@ -380,6 +380,7 @@ void SymbolTableImpl::debugPrint() const {
 #endif
 
 SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
+  ASSERT(!absl::EndsWith(name, "."));
   Encoding encoding;
   addTokensToEncoding(name, encoding);
   auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
@@ -549,8 +550,14 @@ StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
 }
 
 StatName StatNameSet::getDynamic(absl::string_view token) {
-  Stats::StatName stat_name = getBuiltin(token, StatName());
-  if (stat_name.empty()) {
+  // We duplicate most of the getBuiltin implementation so that we can detect
+  // the difference between "not found" and "found empty stat name".
+  const auto iter = builtin_stat_names_.find(token);
+  if (iter != builtin_stat_names_.end()) {
+    return iter->second;
+  }
+
+  {
     // Other tokens require holding a lock for our local cache.
     absl::MutexLock lock(&mutex_);
     Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
@@ -558,9 +565,8 @@ StatName StatNameSet::getDynamic(absl::string_view token) {
       stat_name_ref = pool_.add(token);
       recent_lookups_.lookup(token);
     }
-    stat_name = stat_name_ref;
+    return stat_name_ref;
   }
-  return stat_name;
 }
 
 uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) const {

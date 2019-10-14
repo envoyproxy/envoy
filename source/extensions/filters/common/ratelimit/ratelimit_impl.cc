@@ -56,7 +56,8 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   envoy::service::ratelimit::v2::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
-  request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
+  request_ = async_client_->send(service_method_, request, *this, parent_span,
+                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
 void GrpcClientImpl::onSuccess(

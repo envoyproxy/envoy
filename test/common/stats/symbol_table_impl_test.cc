@@ -81,7 +81,7 @@ INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
 TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
-  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
+  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", ".x"};
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -101,8 +101,8 @@ TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
 }
 
 TEST_P(StatNameTest, TestUnusualDelimitersRoundtrip) {
-  const std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
-                                               ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
+  const std::vector<std::string> stat_names = {".x",   "..x",    "...x",    "foo",     "foo.x",
+                                               ".foo", ".foo.x", ".foo..x", "..foo.x", "..foo..x"};
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -556,6 +556,13 @@ TEST_P(StatNameTest, StatNameSet) {
   const Stats::StatName dynamic = set->getDynamic("dynamic");
   EXPECT_EQ("dynamic", table_->toString(dynamic));
   EXPECT_EQ(dynamic.data(), set->getDynamic("dynamic").data());
+
+  // Make sure blanks are always the same.
+  const Stats::StatName blank = set->getDynamic("");
+  EXPECT_EQ("", table_->toString(blank));
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic(absl::string_view()).data());
 
   // There's another corner case for the same "dynamic" name from a
   // different set. Here we will get a different StatName object
