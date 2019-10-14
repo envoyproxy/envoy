@@ -82,6 +82,9 @@ void Coverage::printMissingTests(const std::set<std::string>& missing_route_name
 
 double Coverage::getCumulativeCoverage(const std::set<std::string>& all_route_names,
                                        const std::set<std::string>& missing_route_names) {
+  // defined_covered_route_names refers to routes that were defined in the config and
+  // covered by tests, whereas covered_routes_ refers to all routes (incl. undefined)
+  // covered by tests.
   std::set<std::string> defined_covered_route_names;
   std::set_difference(
       all_route_names.begin(), all_route_names.end(), missing_route_names.begin(),
