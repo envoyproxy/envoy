@@ -266,6 +266,8 @@ void AsyncRequestImpl::onComplete() {
 }
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  this->streamInfo().response_code_ = static_cast<uint32_t>(response_code);
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
@@ -273,6 +275,7 @@ void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
   if (!response_->body()) {
     response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
+  this->streamInfo().addBytesReceived(data.length());
   response_->body()->move(data);
 }
 

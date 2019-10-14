@@ -93,7 +93,7 @@ public:
 protected:
   bool remoteClosed() { return remote_closed_; }
   void closeLocal(bool end_stream);
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
 
