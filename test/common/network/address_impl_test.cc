@@ -338,9 +338,9 @@ TEST(PipeInstanceTest, BadAddress) {
 
 // Validate that embedded nulls in abstract socket addresses are included and represented with '@'.
 TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
-#if defined(__linux__)
   std::string embedded_null("@/foo/bar");
   embedded_null[5] = '\0'; // Set embedded null.
+#if defined(__linux__)
   PipeInstance address(embedded_null);
   EXPECT_EQ("@/foo@bar", address.asString());
   EXPECT_EQ("@/foo@bar", address.asStringView());
