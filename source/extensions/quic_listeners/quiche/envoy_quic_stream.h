@@ -83,10 +83,10 @@ private:
   // Not owned.
   Http::StreamDecoder* decoder_{nullptr};
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
-  // upon crossing high and low wathermarks.
+  // upon crossing high and low watermarks.
   // Its high watermark is also the buffer limit of stream read/write filters in
   // HCM.
-  // There is no receiv buffer simulation because Quic stream's
+  // There is no receive buffer simulation because Quic stream's
   // OnBodyDataAvailable() hands all the ready-to-use request data from stream sequencer to HCM
   // directly and buffers them in filters if needed. Itself doesn't buffer request data.
   EnvoyQuicSimulatedWatermarkBuffer send_buffer_simulation_;
