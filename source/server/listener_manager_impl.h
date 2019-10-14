@@ -136,7 +136,7 @@ public:
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
-  void stopListener(Network::ListenerConfig& listener) override;
+  bool shutdownListeners(bool inbound_only) override;
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
   void stopWorkers() override;
@@ -167,14 +167,13 @@ private:
     stats_.total_listeners_warming_.set(warming_listeners_.size());
     stats_.total_listeners_active_.set(active_listeners_.size());
   }
-  bool listnerStopped(const envoy::api::v2::Listener& config) {
+  bool listenersStopped(const envoy::api::v2::Listener& config) {
     // Currently all listeners in a given direction are stopped because of the way admin
-    // drain_listener functionality is implemented. So it is OK to check traffic direction. This
-    // needs to be revisited, if that changes - if we support drain by listener name,for example.
-    return (config.traffic_direction() == envoy::api::v2::core::TrafficDirection::INBOUND &&
-            inbound_listeners_stopped_) ||
-           (config.traffic_direction() == envoy::api::v2::core::TrafficDirection::OUTBOUND &&
-            outbound_listeners_stopped_);
+    // drain_listener functionality is implemented. This needs to be revisited, if that changes - if
+    // we support drain by listener name,for example.
+    return (all_listeners_stopped_ ||
+            (inbound_listeners_stopped_ &&
+             config.traffic_direction() == envoy::api::v2::core::TrafficDirection::INBOUND));
   }
 
   /**
@@ -207,7 +206,7 @@ private:
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
   bool inbound_listeners_stopped_{};
-  bool outbound_listeners_stopped_{};
+  bool all_listeners_stopped_{};
   Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;

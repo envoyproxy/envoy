@@ -1111,8 +1111,8 @@ filter_chains:
   checkStats(2, 1, 2, 0, 0, 0);
 }
 
-// Validates that StopListener functionality works correctly.
-TEST_F(ListenerManagerImplTest, StopListener) {
+// Validates that ShutdownListener functionality works correctly for inbound listeners.
+TEST_F(ListenerManagerImplTest, ShutdownListenerInbound) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1143,7 +1143,7 @@ filter_chains:
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListener(manager_->listeners()[0]);
+  manager_->shutdownListeners(true);
 
   // Validate that adding a listener in stopped listener's traffic direction is not allowed.
   const std::string listener_bar_yaml = R"EOF(
@@ -1159,8 +1159,54 @@ filter_chains:
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true));
 }
 
+// Validates that ShutdownListener functionality works correctly.
+TEST_F(ListenerManagerImplTest, ShutdownListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  checkStats(1, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  manager_->shutdownListeners(false);
+
+  // Validate that adding a listener is not allowed after all listeners are stopped.
+  const std::string listener_bar_yaml = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1235
+filter_chains:
+- filters: []
+  )EOF";
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true));
+}
+
 // Validate that stopping a warming listener, removes directly from warming listener list.
-TEST_F(ListenerManagerImplTest, StopWarmingListener) {
+TEST_F(ListenerManagerImplTest, ShutdownWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1213,7 +1259,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->stopListener(manager_->listeners()[0]);
+  manager_->shutdownListeners(true);
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {

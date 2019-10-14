@@ -154,12 +154,13 @@ public:
   virtual bool removeListener(const std::string& name) PURE;
 
   /*
-   * Stops a listener from accepting new connections without actually removing it. This is
+   * Stops listeners from accepting new connections without actually removing it. This is
    * used by /drain_listeners admin endpoint. This methods directly stops the listeners on workers.
    * Once a listener is stopped, any listener modifications are not allowed.
-   * @param name supplies the listener config to stop.
+   * @param inbound_only if true stops all the inbound listeners and stops all listeners if false.
+   * @return true if any listeners have been stopped.
    */
-  virtual void stopListener(Network::ListenerConfig& listener) PURE;
+  virtual bool shutdownListeners(bool inbound_only) PURE;
 
   /**
    * Start all workers accepting new connections on all added listeners.

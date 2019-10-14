@@ -537,7 +537,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   } else {
     name = server_.random().uuid();
   }
-  if (listnerStopped(config)) {
+  if (listenersStopped(config)) {
     ENVOY_LOG(
         debug,
         "listener {} can not be added because listeners in the traffic direction {} are stopped",
@@ -788,23 +788,31 @@ uint64_t ListenerManagerImpl::numConnections() {
   return num_connections;
 }
 
-void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener) {
-  ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
-  for (const auto& worker : workers_) {
-    if (listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
-      inbound_listeners_stopped_ = true;
-    }
-    if (listener.direction() == envoy::api::v2::core::TrafficDirection::OUTBOUND) {
-      outbound_listeners_stopped_ = true;
-    }
-    auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
-    // Destroy a warming listener directly.
-    if (existing_warming_listener != warming_listeners_.end()) {
-      (*existing_warming_listener)->debugLog("removing warming listener");
-      warming_listeners_.erase(existing_warming_listener);
-    }
-    worker->stopListener(listener);
+bool ListenerManagerImpl::shutdownListeners(bool inbound_only) {
+  bool listeners_stopped = false;
+  if (inbound_only) {
+    inbound_listeners_stopped_ = true;
+  } else {
+    all_listeners_stopped_ = true;
   }
+  for (Network::ListenerConfig& listener : listeners()) {
+    for (const auto& worker : workers_) {
+      if (!inbound_only ||
+          listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
+        listeners_stopped = true;
+        ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
+
+        auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+        // Destroy a warming listener directly.
+        if (existing_warming_listener != warming_listeners_.end()) {
+          (*existing_warming_listener)->debugLog("removing warming listener");
+          warming_listeners_.erase(existing_warming_listener);
+        }
+        worker->stopListener(listener);
+      }
+    }
+  }
+  return listeners_stopped;
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {

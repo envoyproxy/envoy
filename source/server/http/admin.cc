@@ -701,15 +701,7 @@ Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderM
                                             Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   const bool inbound_only = params.find("inboundonly") != params.end();
-  bool listeners_matched = false;
-  for (Network::ListenerConfig& listener : server_.listenerManager().listeners()) {
-    if (!inbound_only || listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
-      server_.listenerManager().stopListener(listener);
-      listeners_matched = true;
-    }
-  }
-
-  if (listeners_matched) {
+  if (server_.listenerManager().shutdownListeners(inbound_only)) {
     response.add("OK\n");
   } else {
     response.add("No listeners matched\n");
