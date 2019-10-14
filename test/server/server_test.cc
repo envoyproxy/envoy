@@ -462,7 +462,8 @@ protected:
 
 TEST_P(ServerStatsTest, FlushStats) {
   initialize("test/server/empty_bootstrap.yaml");
-  Stats::Counter& recent_lookups = stats_store_.counter("server.stats_recent_lookups");
+  Stats::Gauge& recent_lookups =
+      stats_store_.gauge("server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
   EXPECT_EQ(0, recent_lookups.value());
   flushStats();
   uint64_t strobed_recent_lookups = recent_lookups.value();
