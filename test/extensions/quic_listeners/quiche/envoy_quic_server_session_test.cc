@@ -539,7 +539,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   stream2->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
   stream2->encodeHeaders(response_headers, false);
-  // This reponse will trigger both stream and connection's send buffer watermark upper limits.
+  // This response will trigger both stream and connection's send buffer watermark upper limits.
   Buffer::OwnedImpl buffer2(response);
   EXPECT_CALL(network_connection_callbacks_, onAboveWriteBufferHighWatermark)
       .WillOnce(Invoke(
