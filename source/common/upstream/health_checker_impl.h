@@ -133,8 +133,7 @@ private:
     return envoy::data::core::v2alpha::HealthCheckerType::HTTP;
   }
 
-  Http::CodecClient::Type
-  codecClientType(const envoy::api::v2::core::HealthCheck::HttpHealthCheck::CodecClientType type);
+  Http::CodecClient::Type codecClientType(const envoy::type::CodecClientType type);
 
   const std::string path_;
   const std::string host_value_;

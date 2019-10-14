@@ -2129,7 +2129,7 @@ TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH1HealthChecking) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
- const std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -2142,18 +2142,18 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
       use_http2: false
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
-    health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
-          onHostStatus(host, changed_state);
-        });
- EXPECT_EQ(Http::CodecClient::Type::HTTP1, health_checker_->codecClientType());
+  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                      dispatcher_, runtime_, random_,
+                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_->addHostCheckCompleteCb(
+      [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        onHostStatus(host, changed_state);
+      });
+  EXPECT_EQ(Http::CodecClient::Type::HTTP1, health_checker_->codecClientType());
 }
 
 TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
- const std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -2166,14 +2166,14 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
       use_http2: true
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
-                                                        HealthCheckEventLoggerPtr(event_logger_)));
-    health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
-          onHostStatus(host, changed_state);
-        });
- EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
+  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                      dispatcher_, runtime_, random_,
+                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_->addHostCheckCompleteCb(
+      [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        onHostStatus(host, changed_state);
+      });
+  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {

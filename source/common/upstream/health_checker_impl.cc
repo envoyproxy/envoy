@@ -106,9 +106,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
-      codec_client_type_(codecClientType(
-         config.http_health_check().use_http2() ? envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP2
-                             : config.http_health_check().codec_client_type())) {
+      codec_client_type_(codecClientType(config.http_health_check().use_http2()
+                                             ? envoy::type::HTTP2
+                                             : config.http_health_check().codec_client_type())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -341,17 +341,17 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(
-    const envoy::api::v2::core::HealthCheck::HttpHealthCheck::CodecClientType type) {
+Http::CodecClient::Type
+HttpHealthCheckerImpl::codecClientType(const envoy::type::CodecClientType type) {
   switch (type) {
-  case envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP3:
+  case envoy::type::HTTP3:
     return Http::CodecClient::Type::HTTP3;
-  case envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP2:
+  case envoy::type::HTTP2:
     return Http::CodecClient::Type::HTTP2;
-  case envoy::api::v2::core::HealthCheck::HttpHealthCheck::HTTP1:
+  case envoy::type::HTTP1:
     return Http::CodecClient::Type::HTTP1;
   default:
-    PANIC(fmt::format("Unknown codec client type {}", type));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
