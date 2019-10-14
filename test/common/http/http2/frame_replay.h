@@ -60,8 +60,8 @@ public:
   const std::string injector_name_;
 };
 
-// Wrapper for HTTP/2 client codec supporting injection of frames and expecting on
-// the behaviors of callbacks and the request decoder.
+// Holds mock and environment placeholders for an HTTP/2 client codec. Sets up expectations for
+// the behavior of callbacks and the request decoder.
 class ClientCodecFrameInjector : public CodecFrameInjector {
 public:
   ClientCodecFrameInjector();
@@ -73,8 +73,8 @@ public:
   MockStreamCallbacks client_stream_callbacks_;
 };
 
-// Wrapper for HTTP/2 server codec supporting injection of frames and expecting on
-// the behaviors of callbacks and the request decoder.
+// Holds mock and environment placeholders for an HTTP/2 server codec. Sets up expectations for
+// the behavior of callbacks and the request decoder.
 class ServerCodecFrameInjector : public CodecFrameInjector {
 public:
   ServerCodecFrameInjector();
