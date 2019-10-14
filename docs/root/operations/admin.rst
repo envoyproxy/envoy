@@ -356,16 +356,21 @@ modify different aspects of the server:
 
   .. http:get:: /stats/recentlookups
 
-  This endpoint is intended for Envoy developers debugging potential contention issues
-  in the stats system. In order to use this API you must first enable it by POSTing to
-  `/stats/recentlookups/enable`.
+  This endpoint helps Envoy developers debug potential contention
+  issues in the stats system. Initially, only the count of StatName
+  lookups is acumulated, not the specific names that are being looked
+  up. In order to see specific recent requests, you must enable the
+  feature by POSTing to `/stats/recentlookups/enable`. There may be
+  approximately 40-100 nanoseconds of added overhead per lookup.
 
-  It emits a table of stat names that were recently accessed as strings by Envoy. In
-  general, strings should be converted into StatNames, counters, gauges, and histograms
-  by Envoy code only during startup or when receiving a new configuration via xDS. This
-  is because when stats are looked up as strings they must take a global symbol table
-  lock. During startup this is expected, but in response to user requests on high
-  core-count machines, this can cause performance issues due to mutex contention.
+  When enabled, this endpoint emits a table of stat names that were
+  recently accessed as strings by Envoy. Ideally, strings should be
+  converted into StatNames, counters, gauges, and histograms by Envoy
+  code only during startup or when receiving a new configuration via
+  xDS. This is because when stats are looked up as strings they must
+  take a global symbol table lock. During startup this is acceptable,
+  but in response to user requests on high core-count machines, this
+  can cause performance issues due to mutex contention.
 
   See :repo:`source/docs/stats.md` for more details.
 
@@ -381,14 +386,16 @@ modify different aspects of the server:
   .. http:post:: /stats/recentlookups/disable
 
   Turns off collection of recent lookup of stat-names, thus disabling
-  `/stats/recentlookups` and clearing any outstanding data.
+  `/stats/recentlookups`. It also clears the list of lookups. However,
+  the total count, visible as stat `server.stats_recent_lookups`, is
+  not cleared, and continues to accumulate.
 
   See :repo:`source/docs/stats.md` for more details.
 
   .. http:post:: /stats/recentlookups/clear
 
-  Clearing any outstanding lookups. If called when recent lookup
-  collection is enabled, this clears all the data, but collection
+  Clears all outstanding lookups and counts. If called when recent lookup
+  collection is enabled, this clears all the, but collection
   continues. If called when recent lookup collection is disabled,
   there is no effect, as disabling collection clears the data.
 
