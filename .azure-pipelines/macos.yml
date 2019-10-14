@@ -9,6 +9,15 @@ jobs:
     vmImage: 'macos-latest'
 
   steps:
+  - task: Xcode@5
+    inputs:
+      actions: 'build'
+      scheme: ''
+      sdk: 'macosx'
+      configuration: 'Release'
+      xcWorkspacePath: 'envoy.xcodeproj'
+      xcodeVersion: 11
+
   - script: ./ci/mac_ci_setup.sh
     displayName: 'Install dependencies'
 
