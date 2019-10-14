@@ -23,9 +23,7 @@ The following is a YAML example of the above recommendation.
 .. code-block:: yaml
 
   overload_manager:
-    refresh_interval:
-      seconds: 0
-      nanos: 250000000 # 0.25s
+    refresh_interval: 0.25s
     resource_monitors:
     - name: "envoy.resource_monitors.fixed_heap"
       config:
