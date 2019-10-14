@@ -25,6 +25,16 @@ namespace {
 class RequestFrameCommentTest : public ::testing::Test {};
 class ResponseFrameCommentTest : public ::testing::Test {};
 
+// Creates and sets up a stream to reply to.
+void setupStream(ClientCodecFrameInjector& codec, TestClientConnectionImpl& connection) {
+  codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
+  codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
+  // Setup a single stream to inject frames as a reply to.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  codec.request_encoder_->encodeHeaders(request_headers, true);
+}
+
 // Validate that a simple Huffman encoded request HEADERS frame can be decoded.
 TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
   FileFrame header{"request_header_corpus/simple_example_huffman"};
@@ -81,13 +91,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
   TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
                                       codec.stats_store_, codec.settings_,
                                       Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
-  // Create a new stream.
-  codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
-  codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
-  // Setup a single stream to inject frames as a reply to.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  codec.request_encoder_->encodeHeaders(request_headers, true);
+  setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -165,13 +169,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
   TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
                                       codec.stats_store_, codec.settings_,
                                       Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
-  // Create a new stream.
-  codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
-  codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
-  // Setup a single stream to inject frames as a reply to.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  codec.request_encoder_->encodeHeaders(request_headers, true);
+  setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -233,13 +231,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
                                           codec.stats_store_, codec.settings_,
                                           Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
-      // Create a new stream.
-      codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
-      codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
-      // Setup a single stream to inject frames as a reply to.
-      TestHeaderMapImpl request_headers;
-      HttpTestUtility::addDefaultHeaders(request_headers);
-      codec.request_encoder_->encodeHeaders(request_headers, true);
+      setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -309,17 +301,10 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
-
       TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
                                           codec.stats_store_, codec.settings_,
                                           Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
-      // Create a new stream.
-      codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
-      codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
-      // Setup a single stream to inject frames as a reply to.
-      TestHeaderMapImpl request_headers;
-      HttpTestUtility::addDefaultHeaders(request_headers);
-      codec.request_encoder_->encodeHeaders(request_headers, true);
+      setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);

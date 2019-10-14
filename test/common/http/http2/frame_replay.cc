@@ -67,9 +67,6 @@ CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
 }
 
 ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("server") {
-  EXPECT_CALL(client_callbacks_, onGoAway()).Times(testing::AnyNumber());
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(client_stream_callbacks_, onResetStream(_, _)).Times(testing::AnyNumber());
   ON_CALL(client_connection_, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(
@@ -80,15 +77,12 @@ ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("serve
 }
 
 ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("client") {
-  EXPECT_CALL(server_callbacks_, onGoAway()).Times(testing::AnyNumber());
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(testing::AnyNumber());
-
   EXPECT_CALL(server_callbacks_, newStream(_, _))
       .WillRepeatedly(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
         encoder.getStream().addCallbacks(server_stream_callbacks_);
         return request_decoder_;
       }));
+
   ON_CALL(server_connection_, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(
