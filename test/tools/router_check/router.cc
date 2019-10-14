@@ -117,6 +117,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
  
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
     headers_finalized_ = false;
+    uint32_t route_index = 0;
     Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                   factory_context_->dispatcher().timeSource());
     ToolConfig tool_config = ToolConfig::create(check_config);

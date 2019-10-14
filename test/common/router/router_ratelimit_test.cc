@@ -112,8 +112,6 @@ virtual_hosts:
   )EOF";
 
   setupTest(yaml);
-<<<<<<< d4fa470da75791976807d911333f066ecfcd09b8
-
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0, route_index_)
                     ->routeEntry()

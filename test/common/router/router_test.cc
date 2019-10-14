@@ -4174,14 +4174,15 @@ TEST_F(RouterTest, NoopRoutesToStreamInfo) {
 
   std::string expected_routes = "noop-route-1;";
   EXPECT_CALL(callbacks_.stream_info_, setNoopRouteNames(expected_routes));
-
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
+  
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
 

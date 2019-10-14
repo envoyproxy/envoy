@@ -133,9 +133,9 @@ struct StreamInfoImpl : public StreamInfo {
     route_name_ = std::string(route_name);
   }
   
-  void setNoopRouteNames(std::string noop_route_names) { noop_route_names_ = noop_route_names; }
+  void setNoopRouteNames(std::string noop_route_names) override { noop_route_names_ = noop_route_names; }
 
-  const std::string& getNoopRouteNames() const { return noop_route_names_; }
+  const std::string& getNoopRouteNames() const override{ return noop_route_names_; }
 
   const std::string& getRouteName() const override { return route_name_; }
 

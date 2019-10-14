@@ -1053,7 +1053,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
 
   while( route_index <routes_.size() ) {
        RouteEntryImplBaseConstSharedPtr route = routes_[route_index]; 
-       RouteConstSharedPtr route_entry = route->matches(headers, random_value);
+       RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
        route_index++;
        if (nullptr != route_entry) {
           return route_entry;
@@ -1097,18 +1097,11 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
 }
 
 RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
-<<<<<<< d4fa470da75791976807d911333f066ecfcd09b8
                                         const StreamInfo::StreamInfo& stream_info,
-                                        uint64_t random_value) const {
-  const VirtualHostImpl* virtual_host = findVirtualHost(headers);
-  if (virtual_host) {
-    return virtual_host->getRouteFromEntries(headers, stream_info, random_value);
-=======
                                         uint64_t random_value, uint32_t &route_index) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
-    return virtual_host->getRouteFromEntries(headers, random_value, route_index);
->>>>>>> noop changes
+    return virtual_host->getRouteFromEntries(headers, stream_info, random_value, route_index);
   } else {
     return nullptr;
   }

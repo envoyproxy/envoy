@@ -80,8 +80,8 @@ public:
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
   const std::string& routeName() const override { return route_name_; }
-  bool noop() const { return false;} 
-  bool addRouteNameToStreamInfo() const { return false;}
+  bool noop() const override{ return false;} 
+  bool addRouteNameToStreamInfo() const override{ return false;}
 private:
   const std::string route_name_;
 };
@@ -789,7 +789,7 @@ public:
                ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info, uint64_t random_value, uint32_t &) const;
+                            const StreamInfo::StreamInfo& , uint64_t random_value, uint32_t &) const;
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
@@ -831,7 +831,7 @@ public:
 
   // Router::Config
   RouteConstSharedPtr route(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t random_value, uint32_t &route_index) const override {
-    return route_matcher_->route(headers, random_value, route_index);
+    return route_matcher_->route(headers, stream_info, random_value, route_index);
   }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
