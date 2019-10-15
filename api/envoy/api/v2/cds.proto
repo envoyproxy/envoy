@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 45]
+// [#comment:next free field: 46]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -667,7 +667,7 @@ message Cluster {
   //[#not-implemented-hide:]
   //[#next-major-version: reconcile DNS options in a single message]
   // Always use TCP queries instead of UDP queries for DNS lookups.
-  bool use_tcp_for_dns_lookups = 43;
+  bool use_tcp_for_dns_lookups = 45;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via

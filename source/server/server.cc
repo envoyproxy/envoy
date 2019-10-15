@@ -67,7 +67,7 @@ InstanceImpl::InstanceImpl(
       handler_(new ConnectionHandlerImpl(*dispatcher_, "main_thread")),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
-      dns_resolver_(dispatcher_->createDnsResolver({})),
+      dns_resolver_(dispatcher_->createDnsResolver({}, false)),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       terminated_(false),

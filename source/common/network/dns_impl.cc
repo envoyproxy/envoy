@@ -22,11 +22,6 @@ namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
-    : DnsResolverImpl::DnsResolverImpl(dispatcher, resolvers, false) {}
-
-DnsResolverImpl::DnsResolverImpl(
-    Event::Dispatcher& dispatcher,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),

@@ -24,7 +24,7 @@ public:
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers, const bool use_tcp_for_dns_lookups) override;
   Network::ListenerPtr createListener(Network::Socket&, Network::ListenerCallbacks&,
                                       bool bind_to_port,
                                       bool hand_off_restored_destination_connections) override;

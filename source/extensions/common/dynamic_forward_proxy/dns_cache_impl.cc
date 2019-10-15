@@ -16,7 +16,7 @@ DnsCacheImpl::DnsCacheImpl(
     const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(main_thread_dispatcher.createDnsResolver({})), tls_slot_(tls.allocateSlot()),
+      resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),

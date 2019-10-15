@@ -53,7 +53,7 @@ public:
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers, const bool use_tcp_for_dns_lookups) override;
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;

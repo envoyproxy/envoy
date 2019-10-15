@@ -86,7 +86,7 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::api::v2::Cluster& cluster
     }
     // todo use this
     // const bool use_tcp_for_dns_lookups = cluster.use_tcp_for_dns_lookups();
-    return context.dispatcher().createDnsResolver(resolvers);
+    return context.dispatcher().createDnsResolver(resolvers, false);
   }
 
   return context.dnsResolver();
