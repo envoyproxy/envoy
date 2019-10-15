@@ -29,8 +29,8 @@ const std::regex& getStartTimeNewlinePattern(){
     CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
 const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "\n")};
 
-// Helper that handles the case when the downstream ConnectionInfo is missing or if the desired value is
-// empty.
+// Helper that handles the case when the downstream ConnectionInfo is missing or if the desired
+// value is empty.
 StreamInfoFormatter::FieldExtractor downstreamSslInfoStringExtractor(
     std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
   return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
@@ -47,8 +47,8 @@ StreamInfoFormatter::FieldExtractor downstreamSslInfoStringExtractor(
   };
 }
 
-// Helper that handles the case when the upstream ConnectionInfo is missing or if the desired value is
-// empty.
+// Helper that handles the case when the upstream ConnectionInfo is missing or if the desired value
+// is empty.
 StreamInfoFormatter::FieldExtractor upstreamSslInfoStringExtractor(
     std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
   return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
