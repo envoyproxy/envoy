@@ -407,6 +407,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
+  // If there's a route specific limit and it's smaller than general downstream
+  // limits, apply the new cap.
   retry_shadow_buffer_limit_ =
       std::min(retry_shadow_buffer_limit_, route_entry_->retryShadowBufferLimit());
   callbacks_->streamInfo().setRouteName(route_entry_->routeName());
@@ -664,6 +666,9 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   // As the decoder filter only pushes back via watermarks once data has reached
   // it, it can latch the current buffer limit and does not need to update the
   // limit if another filter increases it.
+  //
+  // The default is "do not limit".  If there are configured (non-zero) buffer
+  // limits, apply them here.
   if (callbacks_->decoderBufferLimit() != 0) {
     retry_shadow_buffer_limit_ = callbacks_->decoderBufferLimit();
   }
