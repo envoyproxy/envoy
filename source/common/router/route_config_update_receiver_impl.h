@@ -48,7 +48,7 @@ public:
     return route_config_proto_;
   }
   SystemTime lastUpdated() const override { return last_updated_; }
-  const std::set<std::string>& aliasesInLastVhdsUpdate() { return aliases_in_last_update_; }
+  const std::set<std::string>& aliasesInLastVhdsUpdate() override { return aliases_in_last_update_; }
 
 private:
   TimeSource& time_source_;

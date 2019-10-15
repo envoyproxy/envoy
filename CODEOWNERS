@@ -91,3 +91,5 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher
 /*/extensions/filters/network/echo @htuch @alyssawilk
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
+# support for on-demand VHDS requests
+/*/extensions/filters/http/on_demand @dmitri-d
