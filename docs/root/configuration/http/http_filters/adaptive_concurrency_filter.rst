@@ -84,6 +84,19 @@ at an unnecessary small value if the sampleRTT and minRTT are close to each othe
 Because the headroom value is so necessary to the proper function for the gradient controller, the
 headroom value is unconfigurable and pinned to the square-root of the concurrency limit.
 
+Limitations
+-----------
+The adaptive concurrency filter's control loop relies on latency measurements
+and adjustments to the concurrency limit based on those measurements. Because of
+this, the filter must operate in conditions where it has full control over
+request concurrency. This means that:
+
+    1. The filter works as intended in the filter chain for a local cluster.
+
+    2. The filter must be able to limit the concurrency for a cluster. This means
+       there must not be requests destined for a cluster that are not decoded by
+       the adaptive concurrency filter.
+
 Example Configuration
 ---------------------
 An example filter configuration can be found below. Not all fields are required and many of the
