@@ -92,7 +92,7 @@ private:
                           public Common::Redis::Client::PoolRequest {
     PendingRequest(ThreadLocalPool& parent, Common::Redis::RespValueSharedPtr incoming_request,
                    PoolCallbacks& pool_callbacks);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // Common::Redis::Client::ClientCallbacks
     void onResponse(Common::Redis::RespValuePtr&& response) override;
@@ -124,8 +124,6 @@ private:
     Common::Redis::Client::PoolRequest*
     makeRequestInternal(const Upstream::HostConstSharedPtr& host,
                         Common::Redis::RespValueSharedPtr request, PoolCallbacks& callbacks);
-    Common::Redis::Client::PoolRequest*
-    makeRequestInternal(const Upstream::HostConstSharedPtr& host, PendingRequest& pending_request);
     Common::Redis::Client::PoolRequest*
     makeRequestToHostInternal(const std::string& host_address,
                               const Common::Redis::RespValue& request,

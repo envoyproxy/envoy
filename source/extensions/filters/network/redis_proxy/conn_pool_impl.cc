@@ -18,9 +18,6 @@ namespace ConnPool {
 namespace {
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
 // "asking".
-DoNothingPoolCallbacks null_pool_callbacks;
-// null_pool_callbacks is used for requests that must be filtered and not redirected such as
-// "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_client_callbacks;
 } // namespace
 
@@ -215,20 +212,6 @@ InstanceImpl::ThreadLocalPool::makeRequestInternal(const Upstream::HostConstShar
                                                    PoolCallbacks& callbacks) {
   pending_requests_.emplace_back(*this, request, callbacks);
   PendingRequest& pending_request = pending_requests_.back();
-  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
-  pending_request.request_handler_ =
-      client->redis_client_->makeRequest(*(pending_request.incoming_request_), pending_request);
-  if (pending_request.request_handler_) {
-    return &pending_request;
-  } else {
-    onRequestCompleted();
-    return nullptr;
-  }
-}
-
-Common::Redis::Client::PoolRequest*
-InstanceImpl::ThreadLocalPool::makeRequestInternal(const Upstream::HostConstSharedPtr& host,
-                                                   PendingRequest& pending_request) {
   ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
   pending_request.request_handler_ =
       client->redis_client_->makeRequest(*(pending_request.incoming_request_), pending_request);
