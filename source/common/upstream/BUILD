@@ -4,7 +4,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
@@ -373,6 +372,7 @@ envoy_cc_library(
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",
+        ":transport_socket_match_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
@@ -392,6 +392,20 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_socket_match_lib",
+    srcs = ["transport_socket_match_impl.cc"],
+    deps = [
+        ":upstream_includes",
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
@@ -418,7 +432,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "upstream_includes",
-    hdrs = ["upstream_impl.h"],
+    hdrs = [
+        "transport_socket_match_impl.h",
+        "upstream_impl.h",
+    ],
     external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",

@@ -61,15 +61,13 @@ private:
   std::unique_ptr<envoy::HotRestartMessage> parseProtoAndResetState();
   void initRecvBufIfNewMessage();
 
-  // An int in [0, MAX_CONCURRENT_PROCESSES). As hot restarts happen, each next process gets the
+  // An int in [0, MaxConcurrentProcesses). As hot restarts happen, each next process gets the
   // next of 0,1,2,0,1,...
   // A HotRestartingBase's domain socket's name contains its base_id_ value, and so we can use
   // this value to determine which domain socket name to treat as our parent, and which to treat as
   // our child. (E.g. if we are 2, 1 is parent and 0 is child).
   const uint64_t base_id_;
   int my_domain_socket_{-1};
-
-  const uint64_t MaxSendmsgSize = 4096;
 
   // State for the receiving half of the protocol.
   //

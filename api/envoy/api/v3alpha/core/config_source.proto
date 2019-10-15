@@ -72,14 +72,14 @@ message ApiConfigSource {
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
-// set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
+// set in :ref:`ConfigSource <envoy_api_msg_api.v3alpha.core.ConfigSource>` can be used to
 // specify that ADS is to be used.
 message AggregatedConfigSource {
 }
 
 // [#not-implemented-hide:]
 // Self-referencing config source options. This is currently empty, but when
-// set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
+// set in :ref:`ConfigSource <envoy_api_msg_api.v3alpha.core.ConfigSource>` can be used to
 // specify that other data can be obtained from the same server.
 message SelfConfigSource {
 }
@@ -97,7 +97,7 @@ message RateLimitSettings {
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
 // <config_cluster_manager>`, :ref:`routes
-// <envoy_api_msg_RouteConfiguration>`, :ref:`endpoints
+// <envoy_api_msg_api.v3alpha.RouteConfiguration>`, :ref:`endpoints
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.

@@ -145,6 +145,8 @@ MockConnectionSocket::MockConnectionSocket()
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
+MockConnectionSocket::~MockConnectionSocket() = default;
+
 MockListener::MockListener() = default;
 MockListener::~MockListener() { onDestroy(); }
 
@@ -155,15 +157,6 @@ MockIp::MockIp() = default;
 MockIp::~MockIp() = default;
 
 MockResolvedAddress::~MockResolvedAddress() = default;
-
-MockTransportSocket::MockTransportSocket() {
-  ON_CALL(*this, setTransportSocketCallbacks(_))
-      .WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }));
-}
-MockTransportSocket::~MockTransportSocket() = default;
-
-MockTransportSocketFactory::MockTransportSocketFactory() = default;
-MockTransportSocketFactory::~MockTransportSocketFactory() = default;
 
 MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
   ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
@@ -185,6 +178,9 @@ MockUdpListenerReadFilter::~MockUdpListenerReadFilter() = default;
 
 MockUdpListenerFilterManager::MockUdpListenerFilterManager() = default;
 MockUdpListenerFilterManager::~MockUdpListenerFilterManager() = default;
+
+MockConnectionBalancer::MockConnectionBalancer() = default;
+MockConnectionBalancer::~MockConnectionBalancer() = default;
 
 } // namespace Network
 } // namespace Envoy

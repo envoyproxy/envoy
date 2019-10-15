@@ -61,7 +61,7 @@ message RouteMatch {
   //   This does not invert matching done as part of the :ref:`headers field
   //   <envoy_api_field_config.filter.network.thrift_proxy.v3alpha.RouteMatch.headers>` field. To
   //   invert header matching, see :ref:`invert_match
-  //   <envoy_api_field_route.HeaderMatcher.invert_match>`.
+  //   <envoy_api_field_api.v3alpha.route.HeaderMatcher.invert_match>`.
   bool invert = 3;
 
   // Specifies a set of headers that the route should match on. The router will check the request’s
