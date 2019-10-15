@@ -108,7 +108,8 @@ public:
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers, const bool use_tcp_for_dns_lookups) PURE;
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                    const bool use_tcp_for_dns_lookups) PURE;
 
   /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
