@@ -341,14 +341,15 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 }
 
 Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
-  if (read_callbacks_->connection().streamInfo().protocol()) {
-    // Only QUIC connection's stream_info_ specifies protocol.
-    Buffer::OwnedImpl dummy;
-    codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
-    ASSERT(codec_->protocol() == Protocol::Http3);
-    stats_.named_.downstream_cx_http3_total_.inc();
-    stats_.named_.downstream_cx_http3_active_.inc();
+  if (!read_callbacks_->connection().streamInfo().protocol()) {
+    return Network::FilterStatus::Continue;
   }
+  // Only QUIC connection's stream_info_ specifies protocol.
+  Buffer::OwnedImpl dummy;
+  codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
+  ASSERT(codec_->protocol() == Protocol::Http3);
+  stats_.named_.downstream_cx_http3_total_.inc();
+  stats_.named_.downstream_cx_http3_active_.inc();
   return Network::FilterStatus::StopIteration;
 }
 
