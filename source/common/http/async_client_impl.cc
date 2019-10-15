@@ -51,7 +51,7 @@ AsyncClientImpl::~AsyncClientImpl() {
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
-      new AsyncRequestImpl(std::move(request), *this, callbacks, options, parent_span);
+      new AsyncRequestImpl(std::move(request), *this, callbacks, options);
   async_request->initialize();
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
@@ -233,12 +233,16 @@ void AsyncStreamImpl::resetStream() {
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
-                                   const AsyncClient::RequestOptions& options,
-                                   Tracing::Span& parent_span)
+                                   const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
-  child_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
-                                       "async " + parent.cluster_->name() + " egress",
-                                       parent.dispatcher().timeSource().systemTime());
+
+  if (nullptr != options.parent_span_) {
+    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(),
+                                                   "async " + parent.cluster_->name() + " egress",
+                                                   parent.dispatcher().timeSource().systemTime());
+  } else {
+    child_span_ = Tracing::SpanPtr{new Tracing::NullSpan()};
+  }
 }
 
 void AsyncRequestImpl::initialize() {

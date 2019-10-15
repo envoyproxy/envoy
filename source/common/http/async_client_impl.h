@@ -394,7 +394,7 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncClient::StreamCallbacks {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const AsyncClient::RequestOptions& options, Tracing::Span& parent_span);
+                   const AsyncClient::RequestOptions& options);
 
   // AsyncClient::Request
   void cancel() override;

@@ -185,7 +185,8 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
       .WillOnce(Return(child_span));
   expectSuccess(200);
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions(), parent_span_);
+  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
@@ -814,8 +815,8 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
 
-  AsyncClient::Request* request =
-      client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions(), parent_span_);
+  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  AsyncClient::Request* request = client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
@@ -872,7 +873,8 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions(), parent_span_);
+  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(callbacks_, onFailure(_));
   EXPECT_CALL(*child_span,
@@ -1024,9 +1026,11 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
-  client_.send(std::move(message_), callbacks_,
-               AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(40)),
-               parent_span_);
+
+  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions()
+                                             .setParentSpan(parent_span_)
+                                             .setTimeout(std::chrono::milliseconds(40));
+  client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
