@@ -163,6 +163,8 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_ty
     return Http::Protocol::Http2;
   case Http::CodecClient::Type::HTTP3:
     return Http::Protocol::Http3;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
