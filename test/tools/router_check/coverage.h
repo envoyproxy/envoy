@@ -7,8 +7,10 @@
 namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {
 public:
-  RouteCoverage(const Envoy::Router::RouteEntry* route, const std::string route_name) : route_entry_(route), direct_response_entry_(nullptr), route_name_(route_name){};		
-  RouteCoverage(const Envoy::Router::DirectResponseEntry* route, const std::string route_name) : route_entry_(nullptr), direct_response_entry_(route), route_name_(route_name){};		
+  RouteCoverage(const Envoy::Router::RouteEntry* route, const std::string route_name)
+      : route_entry_(route), direct_response_entry_(nullptr), route_name_(route_name){};
+  RouteCoverage(const Envoy::Router::DirectResponseEntry* route, const std::string route_name)
+      : route_entry_(nullptr), direct_response_entry_(route), route_name_(route_name){};
 
   double report();
   void setClusterCovered() { cluster_covered_ = true; }
@@ -18,7 +20,9 @@ public:
   void setHostRewriteCovered() { host_rewrite_covered_ = true; }
   void setRedirectPathCovered() { redirect_path_covered_ = true; }
   bool covers(const Envoy::Router::RouteEntry* route) { return route_entry_ == route; }
-  bool covers(const Envoy::Router::DirectResponseEntry* route) { return direct_response_entry_ == route; }
+  bool covers(const Envoy::Router::DirectResponseEntry* route) {
+    return direct_response_entry_ == route;
+  }
   const std::string routeName() { return route_name_; };
 
 private:

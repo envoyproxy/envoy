@@ -17,9 +17,8 @@ double RouteCoverage::report() {
 
 std::vector<bool> RouteCoverage::coverageFields() {
   if (route_entry_ != nullptr) {
-    return std::vector<bool>{cluster_covered_,   virtual_cluster_covered_,
-                             virtual_host_covered_, path_rewrite_covered_,
-                             host_rewrite_covered_};
+    return std::vector<bool>{cluster_covered_, virtual_cluster_covered_, virtual_host_covered_,
+                             path_rewrite_covered_, host_rewrite_covered_};
   } else if (direct_response_entry_ != nullptr) {
     return std::vector<bool>{redirect_path_covered_};
   } else {
@@ -88,12 +87,13 @@ double Coverage::detailedReport() {
   return 100 * cumulative_coverage / num_routes;
 }
 
-void Coverage::printMissingTests(const std::set<std::string>& all_route_names, const std::set<std::string>& covered_route_names) {
+void Coverage::printMissingTests(const std::set<std::string>& all_route_names,
+                                 const std::set<std::string>& covered_route_names) {
   std::set<std::string> missing_route_names;
-  std::set_difference(all_route_names.begin(), all_route_names.end(),
-    covered_route_names.begin(), covered_route_names.end(),
-    std::inserter(missing_route_names, missing_route_names.end()));
-  
+  std::set_difference(all_route_names.begin(), all_route_names.end(), covered_route_names.begin(),
+                      covered_route_names.end(),
+                      std::inserter(missing_route_names, missing_route_names.end()));
+
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
       if (missing_route_names.find(route.name()) != missing_route_names.end()) {
@@ -115,7 +115,7 @@ RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
       }
     }
     std::unique_ptr<RouteCoverage> new_coverage =
-      std::make_unique<RouteCoverage>(route_entry, route_name);
+        std::make_unique<RouteCoverage>(route_entry, route_name);
     covered_routes_.push_back(std::move(new_coverage));
     return coveredRoute(route);
   } else if (route.directResponseEntry() != nullptr) {
@@ -127,7 +127,7 @@ RouteCoverage& Coverage::coveredRoute(const Envoy::Router::Route& route) {
       }
     }
     std::unique_ptr<RouteCoverage> new_coverage =
-      std::make_unique<RouteCoverage>(direct_response_entry, route_name);
+        std::make_unique<RouteCoverage>(direct_response_entry, route_name);
     covered_routes_.push_back(std::move(new_coverage));
     return coveredRoute(route);
   }
