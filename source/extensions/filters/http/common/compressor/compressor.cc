@@ -299,8 +299,6 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   if (transfer_encoding) {
     for (absl::string_view header_value :
-         // TODO(gsagula): add Http::HeaderMap::string_view() so string length doesn't need to be
-         // computed twice. Find all other sites where this can be improved.
          StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
       if (StringUtil::caseCompare(trimmed_value, config_->contentEncoding()) ||
