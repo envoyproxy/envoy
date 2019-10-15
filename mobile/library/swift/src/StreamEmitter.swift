@@ -26,15 +26,9 @@ public protocol StreamEmitter: CancelableStream {
   @discardableResult
   func sendMetadata(_ metadata: [String: [String]]) -> StreamEmitter
 
-  /// End the stream after sending any provided trailers.
+  /// End the stream.
   ///
-  /// - parameter trailers: Trailers to send over the stream.
-  func close(trailers: [String: [String]])
-}
-
-extension StreamEmitter {
-  /// Convenience function for ending the stream without sending any trailers.
-  public func close() {
-    self.close(trailers: [:])
-  }
+  /// - parameter trailers: Trailers with which to close the stream.
+  //                        If nil, stream will be closed with an empty data frame.
+  func close(trailers: [String: [String]]?)
 }

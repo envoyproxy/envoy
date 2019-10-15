@@ -84,7 +84,7 @@ class EnvoyClientTest {
   }
 
   @Test
-  fun `closing stream sends empty trailers to the underlying stream`() {
+  fun `closing stream sends empty data to the underlying stream`() {
     `when`(engine.startStream(any())).thenReturn(stream)
     val envoy = Envoy(engine, config)
 
@@ -97,9 +97,9 @@ class EnvoyClientTest {
             .build(),
         ResponseHandler(Executor {}))
 
-    emitter.close()
+    emitter.close(null)
 
-    verify(stream).sendTrailers(emptyMap())
+    verify(stream).sendData(ByteBuffer.allocate(0), true)
   }
 
   @Test
