@@ -7,12 +7,8 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 
 import "envoy/api/v3alpha/core/base.proto";
-<<<<<<< HEAD
-import "envoy/type/http.proto";
-import "envoy/type/range.proto";
-=======
+import "envoy/type/v3alpha/http.proto";
 import "envoy/type/v3alpha/range.proto";
->>>>>>> master
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -105,15 +101,15 @@ message HealthCheck {
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
-
     // semantics of :ref:`Int64Range <envoy_api_msg_type.v3alpha.Int64Range>`.
     repeated type.v3alpha.Int64Range expected_statuses = 9;
 
     // Use specified application protocol for health checks. This is to replace
     // :ref:`use_http2
-    // <envoy_api_field_core.HealthCheck.HttpHealthCheck.use_http2>` in light of
+    // <envoy_api_field_api.v3alpha.core.HealthCheck.HttpHealthCheck.use_http2>` in light of
     // HTTP3.
-    type.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
+    type.v3alpha.CodecClientType codec_client_type = 10
+        [(validate.rules).enum = {defined_only: true}];
   }
 
   message TcpHealthCheck {
