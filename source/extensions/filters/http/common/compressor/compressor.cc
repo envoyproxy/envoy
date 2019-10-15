@@ -298,7 +298,7 @@ bool CompressorFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
 bool CompressorFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   if (transfer_encoding) {
-    for (auto header_value :
+    for (absl::string_view header_value :
          // TODO(gsagula): add Http::HeaderMap::string_view() so string length doesn't need to be
          // computed twice. Find all other sites where this can be improved.
          StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
