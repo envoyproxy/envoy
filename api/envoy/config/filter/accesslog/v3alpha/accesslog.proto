@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v3alpha";
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/route/route.proto";
-import "envoy/type/percent.proto";
+import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -133,7 +133,7 @@ message RuntimeFilter {
   string runtime_key = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The default sampling percentage. If not specified, defaults to 0% with denominator of 100.
-  type.FractionalPercent percent_sampled = 2;
+  type.v3alpha.FractionalPercent percent_sampled = 2;
 
   // By default, sampling pivots on the header
   // :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` being present. If

@@ -10,10 +10,6 @@ ANNOTATION_REGEX = re.compile('\[#([\w-]+?):(.*?)\]\s?', re.DOTALL)
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'
 
-# Not implemented yet annotation on leading comments, leading to insertion of
-# warning on field.
-NOT_IMPLEMENTED_WARN_ANNOTATION = 'not-implemented-warn'
-
 # Not implemented yet annotation on leading comments, leading to hiding of
 # field.
 NOT_IMPLEMENTED_HIDE_ANNOTATION = 'not-implemented-hide'
@@ -25,21 +21,17 @@ NEXT_MAJOR_VERSION_ANNOTATION = 'next-major-version'
 # Comment. Just used for adding text that will not go into the docs at all.
 COMMENT_ANNOTATION = 'comment'
 
-# proto compatibility status.
-PROTO_STATUS_ANNOTATION = 'proto-status'
-
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
-    NOT_IMPLEMENTED_WARN_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
-    PROTO_STATUS_ANNOTATION,
 ])
 
 # These can propagate from file scope to message/enum scope (and be overridden).
 INHERITED_ANNOTATIONS = set([
-    PROTO_STATUS_ANNOTATION,
+    # Nothing here right now, this used to be PROTO_STATUS_ANNOTATION. Retaining
+    # this capability for potential future use.
 ])
 
 

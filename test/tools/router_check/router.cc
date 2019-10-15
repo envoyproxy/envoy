@@ -119,8 +119,8 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     std::string test_name = check_config->getString("test_name", "");
     tests_.emplace_back(test_name, std::vector<std::string>{});
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
-    using checkerFunc = std::function<bool(ToolConfig&, const std::string&)>;
-    const std::unordered_map<std::string, checkerFunc> checkers = {
+    using CheckerFunc = std::function<bool(ToolConfig&, const std::string&)>;
+    const std::unordered_map<std::string, CheckerFunc> checkers = {
         {"cluster_name",
          [this](auto&... params) -> bool { return this->compareCluster(params...); }},
         {"virtual_cluster_name",
@@ -180,7 +180,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
        validation_config.tests()) {
-    active_runtime = check_config.input().runtime();
+    active_runtime_ = check_config.input().runtime();
     headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
@@ -189,9 +189,9 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tests_.emplace_back(test_name, std::vector<std::string>{});
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
-    using checkerFunc =
+    using CheckerFunc =
         std::function<bool(ToolConfig&, const envoy::RouterCheckToolSchema::ValidationAssert&)>;
-    checkerFunc checkers[] = {
+    CheckerFunc checkers[] = {
         [this](auto&... params) -> bool { return this->compareCluster(params...); },
         [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); },
         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); },
@@ -450,7 +450,7 @@ void RouterCheckTool::printResults() {
 bool RouterCheckTool::runtimeMock(const std::string& key,
                                   const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime.empty() && active_runtime.compare(key) == 0 &&
+  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 

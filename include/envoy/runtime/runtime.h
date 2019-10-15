@@ -206,6 +206,15 @@ public:
   virtual double getDouble(const std::string& key, double default_value) const PURE;
 
   /**
+   * Fetch a boolean runtime key.
+   * @param key supplies the key to fetch.
+   * @param default_value supplies the value to return if the key does not exist or it does not
+   *        contain a boolean.
+   * @return bool the runtime value or the default value.
+   */
+  virtual bool getBoolean(absl::string_view key, bool default_value) const PURE;
+
+  /**
    * Fetch the OverrideLayers that provide values in this snapshot. Layers are ordered from bottom
    * to top; for instance, the second layer's entries override the first layer's entries, and so on.
    * Any layer can add a key in addition to overriding keys in layers below. The layer vector is

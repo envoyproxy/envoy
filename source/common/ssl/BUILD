@@ -18,7 +18,7 @@ envoy_cc_library(
         "//include/envoy/ssl/private_key:private_key_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 
@@ -31,6 +31,6 @@ envoy_cc_library(
         "//include/envoy/ssl:certificate_validation_context_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )

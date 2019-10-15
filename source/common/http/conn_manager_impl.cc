@@ -212,10 +212,6 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
       read_callbacks_->connection().readDisable(false);
     }
   }
-
-  if (connection_idle_timer_ && streams_.empty()) {
-    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
-  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -238,6 +234,10 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
+
+  if (connection_idle_timer_ && streams_.empty()) {
+    connection_idle_timer_->enableTimer(config_.idleTimeout().value());
+  }
 }
 
 StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
@@ -284,6 +284,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     }
   }
 
+  // TODO(alyssawilk) clean this up after #8352 is well vetted.
   bool redispatch;
   do {
     redispatch = false;
@@ -505,6 +506,18 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
+  // Refresh byte sizes of the HeaderMaps before logging.
+  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
+  // HeaderMap holds an accurate internal byte size count.
+  if (request_headers_ != nullptr) {
+    request_headers_->refreshByteSize();
+  }
+  if (response_headers_ != nullptr) {
+    response_headers_->refreshByteSize();
+  }
+  if (response_trailers_ != nullptr) {
+    response_trailers_->refreshByteSize();
+  }
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                     stream_info_);
@@ -519,9 +532,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(),
-                                             response_headers_.get(), response_trailers_.get(),
-                                             stream_info_, *this);
+    Tracing::HttpTracerUtility::finalizeDownstreamSpan(
+        *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+        stream_info_, *this);
   }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
@@ -716,14 +729,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                      StreamInfo::ResponseCodeDetails::get().MissingHost);
       return;
     }
-  }
-
-  ASSERT(connection_manager_.config_.maxRequestHeadersKb() > 0);
-  if (request_headers_->byteSize() > (connection_manager_.config_.maxRequestHeadersKb() * 1024)) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
-    return;
   }
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
@@ -1084,7 +1089,8 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::DecodeHeaders) ||
-      (state_.filter_call_state_ & FilterCallState::DecodeData)) {
+      (state_.filter_call_state_ & FilterCallState::DecodeData) ||
+      ((state_.filter_call_state_ & FilterCallState::DecodeTrailers) && !filter.canIterate())) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.decoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
@@ -1555,7 +1561,8 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
-      (state_.filter_call_state_ & FilterCallState::EncodeData)) {
+      (state_.filter_call_state_ & FilterCallState::EncodeData) ||
+      ((state_.filter_call_state_ & FilterCallState::EncodeTrailers) && !filter.canIterate())) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.encoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
@@ -2251,6 +2258,9 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
           parent_.is_head_request_);
       parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
+      ENVOY_STREAM_LOG(
+          debug, "Resetting stream. Response data too large and headers have already been sent",
+          *this);
       resetStream();
     }
   }

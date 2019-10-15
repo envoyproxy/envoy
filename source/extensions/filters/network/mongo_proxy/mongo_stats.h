@@ -15,7 +15,7 @@ namespace MongoProxy {
 
 class MongoStats {
 public:
-  MongoStats(Stats::Scope& scope, const std::string& prefix);
+  MongoStats(Stats::Scope& scope, absl::string_view prefix);
 
   void incCounter(const std::vector<Stats::StatName>& names);
   void recordHistogram(const std::vector<Stats::StatName>& names, uint64_t sample);
@@ -27,16 +27,16 @@ public:
    * that have not been remembered as builtins in the constructor.
    */
   Stats::StatName getBuiltin(const std::string& str, Stats::StatName fallback) {
-    return stat_name_set_.getBuiltin(str, fallback);
+    return stat_name_set_->getBuiltin(str, fallback);
   }
 
-  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_.getDynamic(str); }
+  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_->getDynamic(str); }
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
 
   Stats::Scope& scope_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNameSetPtr stat_name_set_;
 
 public:
   const Stats::StatName prefix_;

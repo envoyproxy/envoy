@@ -13,6 +13,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/resolver_impl.h"
@@ -192,16 +193,20 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
                                  ? Network::Utility::TCP_SCHEME
                                  : Network::Utility::UDP_SCHEME;
   const std::string addr = absl::StrCat(scheme, address->asString());
-  const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-  if (fd != -1) {
-    ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
-    if (socket_type == Network::Address::SocketType::Stream) {
-      return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
-    } else {
-      return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
+
+  if (bind_to_port) {
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
+    if (fd != -1) {
+      ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+      Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+      if (socket_type == Network::Address::SocketType::Stream) {
+        return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+      } else {
+        return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
+      }
     }
   }
+
   if (socket_type == Network::Address::SocketType::Stream) {
     return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
   } else {
@@ -318,6 +323,14 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   // TCP specific setup.
+  if (config.has_connection_balance_config()) {
+    // Currently exact balance is the only supported type and there are no options.
+    ASSERT(config.connection_balance_config().has_exact_balance());
+    connection_balancer_ = std::make_unique<Network::ExactConnectionBalancerImpl>();
+  } else {
+    connection_balancer_ = std::make_unique<Network::NopConnectionBalancerImpl>();
+  }
+
   if (config.has_tcp_fast_open_queue_length()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
         config.tcp_fast_open_queue_length().value()));

@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_google_grpc_external_deps",
     "envoy_package",
     "envoy_select_google_grpc",
 )
@@ -162,13 +163,12 @@ envoy_cc_library(
     name = "google_grpc_context_lib",
     srcs = ["google_grpc_context.cc"],
     hdrs = ["google_grpc_context.h"],
-    external_deps = ["grpc"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:macros",
         "//source/common/common:thread_lib",
-    ],
+    ] + envoy_google_grpc_external_deps(),
 )
 
 envoy_cc_library(

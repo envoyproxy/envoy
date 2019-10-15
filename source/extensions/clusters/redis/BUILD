@@ -26,6 +26,7 @@ envoy_cc_library(
         ":crc16_lib",
         "//include/envoy/upstream:thread_local_cluster_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/common:to_lower_table_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters:well_known_names",
@@ -66,6 +67,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/redis_proxy:config_interface",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/config/cluster/redis:redis_cluster_cc",
+        "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
     ],
 )

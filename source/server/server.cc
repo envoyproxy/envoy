@@ -47,16 +47,14 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address,
-                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
-                           Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory,
-                           Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system,
-                           std::unique_ptr<ProcessContext> process_context)
-    : workers_started_(false), shutdown_(false), options_(options),
+InstanceImpl::InstanceImpl(
+    Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
+    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
+    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
+    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
+    : init_manager_(init_manager), workers_started_(false), shutdown_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
@@ -309,12 +307,18 @@ void InstanceImpl::initialize(const Options& options,
 
   InstanceImpl::failHealthcheck(false);
 
+  // Check if bootstrap has server version override set, if yes, we should use that as
+  // 'server.version' stat.
   uint64_t version_int;
-  if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-    throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+  if (bootstrap_.stats_server_version_override().value() > 0) {
+    version_int = bootstrap_.stats_server_version_override().value();
+  } else {
+    if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+    }
   }
-
   server_stats_->version_.set(version_int);
+
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
@@ -396,7 +400,13 @@ void InstanceImpl::initialize(const Options& options,
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config()) {
-    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
+    const bool is_delta =
+        bootstrap_.dynamic_resources().lds_config().api_config_source().api_type() ==
+            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
+        (bootstrap_.dynamic_resources().has_ads_config() &&
+         bootstrap_.dynamic_resources().ads_config().api_type() ==
+             envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(), is_delta);
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
@@ -510,14 +520,18 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
-    cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
+    if (cm.adsMux()) {
+      cm.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+    }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
-    cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
+    if (cm.adsMux()) {
+      cm.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration);
+    }
   });
 }
 

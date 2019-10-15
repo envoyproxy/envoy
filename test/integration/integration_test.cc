@@ -51,19 +51,29 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 // Make sure we have correctly specified per-worker performance stats.
-// TODO(mattklein123): We should flesh this test out to a) actually use more than 1 worker and
-// b) do some real requests and verify things work correctly on a per-worker basis. I will do this
-// in my next change when I add optional CX balancing as it well then be easier to write a
-// deterministic test.
-TEST_P(IntegrationTest, PerWorkerStats) {
+TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
+  concurrency_ = 2;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_connection_balance_config()->mutable_exact_balance();
+  });
   initialize();
 
   // Per-worker listener stats.
-  if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_NE(nullptr, test_server_->counter("listener.127.0.0.1_0.worker_0.downstream_cx_total"));
-  } else {
-    EXPECT_NE(nullptr, test_server_->counter("listener.[__1]_0.worker_0.downstream_cx_total"));
-  }
+  auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
+      test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
+      test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_1.downstream_cx_total", cx_total);
+    } else {
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_0.downstream_cx_active", cx_active);
+      test_server_->waitForGaugeEq("listener.[__1]_0.worker_1.downstream_cx_active", cx_active);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_0.downstream_cx_total", cx_total);
+      test_server_->waitForCounterEq("listener.[__1]_0.worker_1.downstream_cx_total", cx_total);
+    }
+  };
+  check_listener_stats(0, 0);
 
   // Main thread admin listener stats.
   EXPECT_NE(nullptr, test_server_->counter("listener.admin.main_thread.downstream_cx_total"));
@@ -71,6 +81,15 @@ TEST_P(IntegrationTest, PerWorkerStats) {
   // Per-thread watchdog stats.
   EXPECT_NE(nullptr, test_server_->counter("server.main_thread.watchdog_miss"));
   EXPECT_NE(nullptr, test_server_->counter("server.worker_0.watchdog_miss"));
+  EXPECT_NE(nullptr, test_server_->counter("server.worker_1.watchdog_miss"));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+  check_listener_stats(1, 1);
+
+  codec_client_->close();
+  codec_client2->close();
+  check_listener_stats(0, 1);
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
@@ -398,6 +417,32 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAlive) {
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
+}
+
+TEST_P(IntegrationTest, Pipeline) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::string response;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n");
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      },
+      version_);
+  // First response should be success.
+  while (response.find("200") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Second response should be 400 (no host)
+  while (response.find("400") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  connection.close();
 }
 
 TEST_P(IntegrationTest, NoHost) {

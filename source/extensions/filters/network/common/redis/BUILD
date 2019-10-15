@@ -69,7 +69,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
 )
 

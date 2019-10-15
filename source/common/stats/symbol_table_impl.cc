@@ -206,6 +206,20 @@ void SymbolTableImpl::free(const StatName& stat_name) {
     }
   }
 }
+
+StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
+  Thread::LockGuard lock(lock_);
+  // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
+  StatNameSetPtr stat_name_set(new StatNameSet(*this, name));
+  stat_name_sets_.insert(stat_name_set.get());
+  return stat_name_set;
+}
+
+void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
+  Thread::LockGuard lock(lock_);
+  stat_name_sets_.erase(&stat_name_set);
+}
+
 Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   Symbol result;
   auto encode_find = encode_map_.find(sv);
@@ -287,6 +301,7 @@ void SymbolTableImpl::debugPrint() const {
 #endif
 
 SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
+  ASSERT(!absl::EndsWith(name, "."));
   Encoding encoding;
   addTokensToEncoding(name, encoding);
   auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
@@ -429,9 +444,12 @@ void StatNameList::clear(SymbolTable& symbol_table) {
   storage_.reset();
 }
 
-StatNameSet::StatNameSet(SymbolTable& symbol_table) : pool_(symbol_table) {
+StatNameSet::StatNameSet(SymbolTable& symbol_table, absl::string_view name)
+    : name_(std::string(name)), symbol_table_(symbol_table), pool_(symbol_table) {
   builtin_stat_names_[""] = StatName();
 }
+
+StatNameSet::~StatNameSet() { symbol_table_.forgetSet(*this); }
 
 void StatNameSet::rememberBuiltin(absl::string_view str) {
   StatName stat_name;
@@ -453,17 +471,22 @@ StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
 }
 
 StatName StatNameSet::getDynamic(absl::string_view token) {
-  Stats::StatName stat_name = getBuiltin(token, StatName());
-  if (stat_name.empty()) {
+  // We duplicate most of the getBuiltin implementation so that we can detect
+  // the difference between "not found" and "found empty stat name".
+  const auto iter = builtin_stat_names_.find(token);
+  if (iter != builtin_stat_names_.end()) {
+    return iter->second;
+  }
+
+  {
     // Other tokens require holding a lock for our local cache.
     absl::MutexLock lock(&mutex_);
     Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
     if (stat_name_ref.empty()) { // Note that builtin_stat_names_ already has one for "".
       stat_name_ref = pool_.add(token);
     }
-    stat_name = stat_name_ref;
+    return stat_name_ref;
   }
-  return stat_name;
 }
 
 } // namespace Stats
