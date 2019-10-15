@@ -68,17 +68,18 @@ def ExtractAnnotations(s, inherited_annotations=None):
 
 
 def XformAnnotation(s, annotation_xforms):
-  """Return transformed comment with annotation transformers.
+  """Return transformed string with annotation transformers.
 
-  The annotation will be replaced with new value
-  returned by the transformer. If the transformer returns None, then the annotation will be removed.
-  All transformed annotations will be appended to the end of comment.
+  The annotation will be replaced with the new value returned by the transformer.
+  If the transformer returns None, then the annotation will be removed.
+  If the annotation presented in transformers doesn't exist in the original string,
+  a new annotation will be appended to the end of string.
 
   Args:
-    annotation_xforms: a dict of transformers for annotations in leading comment.
+    annotation_xforms: a dict of transformers for annotations.
 
   Returns:
-    transformed comment string.
+    transformed string.
   """
   present_annotations = set()
 
