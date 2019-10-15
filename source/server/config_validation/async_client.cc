@@ -10,11 +10,6 @@ AsyncClient::Request* ValidationAsyncClient::send(MessagePtr&&, Callbacks&, cons
   return nullptr;
 }
 
-AsyncClient::Request* ValidationAsyncClient::send(MessagePtr&&, Callbacks&, const RequestOptions&,
-                                                  Tracing::Span&) {
-  return nullptr;
-}
-
 AsyncClient::Stream* ValidationAsyncClient::start(StreamCallbacks&, const StreamOptions&) {
   return nullptr;
 }

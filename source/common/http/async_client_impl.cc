@@ -50,12 +50,6 @@ AsyncClientImpl::~AsyncClientImpl() {
 
 AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
-  return this->send(std::move(request), callbacks, options, Tracing::NullSpan::instance());
-}
-
-AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
-                                            const AsyncClient::RequestOptions& options,
-                                            Tracing::Span& parent_span) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, options, parent_span);
   async_request->initialize();

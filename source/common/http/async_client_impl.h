@@ -52,10 +52,6 @@ public:
   Request* send(MessagePtr&& request, Callbacks& callbacks,
                 const AsyncClient::RequestOptions& options) override;
 
-  // Http::AsyncClient with tracing
-  Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const AsyncClient::RequestOptions& options, Tracing::Span& parent_span) override;
-
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }

@@ -235,21 +235,6 @@ public:
                         const RequestOptions& options) PURE;
 
   /**
-   * Send an HTTP request asynchronously with tracing.
-   * Creates a child span and populates tags for the request/response.
-   * @param request the request to send.
-   * @param callbacks the callbacks to be notified of request status.
-   * @param options the data struct to control the request sending.
-   * @param parent_span the span to create a child for.
-   * @return a request handle or nullptr if no request could be created. NOTE: In this case
-   *         onFailure() has already been called inline. The client owns the request and the
-   *         handle should just be used to cancel.
-   */
-
-  virtual Request* send(MessagePtr&& request, Callbacks& callbacks, const RequestOptions& options,
-                        Tracing::Span& parent_span) PURE;
-
-  /**
    * Start an HTTP stream asynchronously.
    * @param callbacks the callbacks to be notified of stream status.
    * @param options the data struct to control the stream.
