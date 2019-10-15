@@ -101,7 +101,7 @@ message RateLimitResponse {
   // descriptors failed and/or what the currently configured limits are for all of them.
   repeated DescriptorStatus statuses = 2;
 
-  // [#next-major-version: rename to response_headers]
+  // [#next-major-version: rename to response_headers_to_add]
   repeated api.v3alpha.core.HeaderValue headers = 3;
 
   // A list of headers to add to the request when forwarded

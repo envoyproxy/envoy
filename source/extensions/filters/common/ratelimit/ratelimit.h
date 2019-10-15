@@ -42,7 +42,7 @@ public:
    * Called when a limit request is complete. The resulting status,
    * response headers and request headers to be forwarded to the upstream are supplied.
    */
-  virtual void complete(LimitStatus status, Http::HeaderMapPtr&& response_headers,
+  virtual void complete(LimitStatus status, Http::HeaderMapPtr&& response_headers_to_add,
                         Http::HeaderMapPtr&& request_headers_to_add) PURE;
 };
 

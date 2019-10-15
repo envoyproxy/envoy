@@ -34,12 +34,12 @@ namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  void complete(LimitStatus status, Http::HeaderMapPtr&& headers,
+  void complete(LimitStatus status, Http::HeaderMapPtr&& response_headers_to_add,
                 Http::HeaderMapPtr&& request_headers_to_add) override {
-    complete_(status, headers.get(), request_headers_to_add.get());
+    complete_(status, response_headers_to_add.get(), request_headers_to_add.get());
   }
 
-  MOCK_METHOD3(complete_, void(LimitStatus status, const Http::HeaderMap* headers,
+  MOCK_METHOD3(complete_, void(LimitStatus status, const Http::HeaderMap* response_headers_to_add,
                                const Http::HeaderMap* request_headers_to_add));
 };
 

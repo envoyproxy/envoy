@@ -127,10 +127,10 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& response_headers,
+                      Http::HeaderMapPtr&& response_headers_to_add,
                       Http::HeaderMapPtr&& request_headers_to_add) {
   state_ = State::Complete;
-  response_headers_to_add_ = std::move(response_headers);
+  response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
   Stats::StatName empty_stat_name;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();

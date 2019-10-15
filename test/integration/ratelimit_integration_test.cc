@@ -125,13 +125,13 @@ public:
   }
 
   void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
-                             const Http::HeaderMapImpl& response_headers,
+                             const Http::HeaderMapImpl& response_headers_to_add,
                              const Http::HeaderMapImpl& request_headers_to_add) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v2::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
 
-    response_headers.iterate(
+    response_headers_to_add.iterate(
         [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
           auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
                             ->mutable_headers()
