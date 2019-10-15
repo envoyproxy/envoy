@@ -197,57 +197,49 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
     return false;
   }
 
-  std::sort(pairs.begin(), pairs.end(),
-            [&allowed_compressors](const EncPair& a, const EncPair& b) -> bool {
-              if (a.second == b.second && allowed_compressors.count(std::string(a.first)) &&
-                  allowed_compressors.count(std::string(b.first))) {
-                // In case a user specified more than one encodings with the same quality value
-                // select the one which is registered first in Envoy's config.
-                return allowed_compressors[std::string(a.first)] <
-                       allowed_compressors[std::string(b.first)];
-              }
-              return a.second > b.second;
-            });
-
+  EncPair choice{Http::Headers::get().AcceptEncodingValues.Identity, 0};
   for (const auto pair : pairs) {
-    if (allowed_compressors.count(std::string(pair.first))) {
-      if (StringUtil::caseCompare(config_->contentEncoding(), pair.first)) {
-        config_->stats().header_compressor_used_.inc();
-        // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
-        if (StringUtil::caseCompare("gzip", pair.first)) {
-          config_->stats().header_gzip_.inc();
-        }
-        return true;
-      } else {
-        config_->stats().header_compressor_overshadowed_.inc();
-        return false;
-      }
+    if ((pair.second > choice.second) &&
+        (allowed_compressors.count(std::string(pair.first)) ||
+         pair.first == Http::Headers::get().AcceptEncodingValues.Identity ||
+         pair.first == Http::Headers::get().AcceptEncodingValues.Wildcard)) {
+      choice = pair;
     }
+  }
 
-    // The "identity" encoding (no compression) is always available.
-    if (pair.first == Http::Headers::get().AcceptEncodingValues.Identity) {
-      if (pair.second > 0) {
-        config_->stats().header_identity_.inc();
-      } else {
-        config_->stats().header_not_valid_.inc();
-      }
-      return false;
-    }
+  if (!choice.second) {
+    config_->stats().header_not_valid_.inc();
+    return false;
+  }
 
-    // If wildcard is given then use which ever compressor is registered first.
-    if (pair.first == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-      if (pair.second > 0 && !allowed_compressors.empty()) {
-        config_->stats().header_wildcard_.inc();
-        auto first_registered = std::min_element(
-            allowed_compressors.begin(), allowed_compressors.end(),
-            [](const std::pair<std::string, uint32_t>& a,
-               const std::pair<std::string, uint32_t>& b) -> bool { return a.second < b.second; });
-        return StringUtil::caseCompare(config_->contentEncoding(), first_registered->first);
-      } else {
-        config_->stats().header_not_valid_.inc();
-        return false;
-      }
+  // The "identity" encoding (no compression) is always available.
+  if (choice.first == Http::Headers::get().AcceptEncodingValues.Identity) {
+    config_->stats().header_identity_.inc();
+    return false;
+  }
+
+  // If wildcard is given then use which ever compressor is registered first.
+  if (choice.first == Http::Headers::get().AcceptEncodingValues.Wildcard) {
+    if (!allowed_compressors.empty()) {
+      config_->stats().header_wildcard_.inc();
+      auto first_registered = std::min_element(
+          allowed_compressors.begin(), allowed_compressors.end(),
+          [](const std::pair<std::string, uint32_t>& a,
+             const std::pair<std::string, uint32_t>& b) -> bool { return a.second < b.second; });
+      return StringUtil::caseCompare(config_->contentEncoding(), first_registered->first);
     }
+  }
+
+  if (StringUtil::caseCompare(config_->contentEncoding(), choice.first)) {
+    config_->stats().header_compressor_used_.inc();
+    // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
+    if (StringUtil::caseCompare("gzip", choice.first)) {
+      config_->stats().header_gzip_.inc();
+    }
+    return true;
+  } else if (!allowed_compressors.empty()) {
+    config_->stats().header_compressor_overshadowed_.inc();
+    return false;
   }
 
   config_->stats().header_not_valid_.inc();
