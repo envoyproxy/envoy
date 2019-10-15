@@ -3592,7 +3592,9 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(stream_, resetStream(_));
-  decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
+  EXPECT_LOG_CONTAINS(
+      "debug", "Resetting stream. Response data too large and headers have already been sent",
+      decoder_filters_[0]->callbacks_->encodeData(fake_response, false););
 
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
