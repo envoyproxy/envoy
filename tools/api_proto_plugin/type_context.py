@@ -6,31 +6,24 @@ from tools.api_proto_plugin import annotations
 
 
 class Comment(object):
-  """Wrapper for comment"""
+  """Wrapper for proto source comments."""
 
   def __init__(self, comment, file_level_annotations=None):
     self.raw = comment
+    self.file_level_annotations = file_level_annotations
     self.annotations = annotations.ExtractAnnotations(self.raw, file_level_annotations)
 
-  def transform(self, annotation_xforms):
-    """Transform comment with annotation transformers. The annotation will be replaced with new value
-    returned by the transformer. If the transformer returns None, then the annotation will be removed.
-    All transformed annotations will be appended to the end of comment.
+  def getCommentWithTransforms(self, annotation_xforms):
+    """Return transformed comment with annotation transformers.
 
     Args:
-    annotation_xforms: a dict of transformers for annotations in leading comment.
+      annotation_xforms: a dict of transformers for annotations in leading comment.
+
+    Returns:
+      transformed Comment object.
     """
-    xformed = self.raw
-    for annotation, xform in sorted(annotation_xforms.items()):
-      original_annotation = self.annotations.get(annotation)
-      xformed_annotation = xform(original_annotation)
-      if original_annotation is not None:
-        xformed = annotations.WithoutAnnotation(xformed, annotation)
-        del self.annotations[annotation]
-      if xformed_annotation is not None:
-        xformed += annotations.FormatAnnotation(annotation, xformed_annotation)
-        self.annotations[annotation] = xformed_annotation
-    self.raw = xformed
+    return Comment(annotations.XformAnnotation(self.raw, annotation_xforms),
+                   self.file_level_annotations)
 
 
 class SourceCodeInfo(object):
