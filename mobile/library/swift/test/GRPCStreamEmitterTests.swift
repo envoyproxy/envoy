@@ -20,7 +20,7 @@ private final class MockEmitter: StreamEmitter {
     return self
   }
 
-  func close(trailers: [String: [String]]) {}
+  func close(trailers: [String: [String]]?) {}
   func cancel() {}
 }
 
