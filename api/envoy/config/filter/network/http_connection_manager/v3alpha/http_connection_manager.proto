@@ -24,7 +24,7 @@ import "validate/validate.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 36]
+// [#comment:next free field: 37]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -297,6 +297,13 @@ message HttpConnectionManager {
   // request is sent upstream (i.e. all decoding filters have processed the request), OR when the
   // response is initiated. If not specified or set to 0, this timeout is disabled.
   google.protobuf.Duration request_timeout = 28;
+
+  // The maximum duration of a connection. The duration is defined as a period since a connection
+  // was established. If not set, there is no max duration. When max_connection_duration is reached
+  // the connection will be closed. If the connection is an HTTP/2 connection a drain sequence will
+  // occur prior to closing the connection. See :ref:`drain_timeout
+  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.drain_timeout>`.
+  google.protobuf.Duration max_connection_duration = 36;
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.
