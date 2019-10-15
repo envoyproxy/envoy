@@ -7,8 +7,8 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/type/range.proto";
 import "envoy/type/http.proto";
+import "envoy/type/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -109,8 +109,7 @@ message HealthCheck {
     // :ref:`use_http2
     // <envoy_api_field_core.HealthCheck.HttpHealthCheck.use_http2>` in light of
     // HTTP3.
-    envoy.type.CodecClientType codec_client_type = 10
-        [(validate.rules).enum = {defined_only: true}];
+    type.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
   }
 
   message TcpHealthCheck {
