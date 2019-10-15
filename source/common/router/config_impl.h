@@ -172,6 +172,7 @@ public:
   const absl::optional<envoy::api::v2::route::HedgePolicy>& hedgePolicy() const {
     return hedge_policy_;
   }
+  uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -212,6 +213,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_attempt_count_;
   absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
   absl::optional<envoy::api::v2::route::HedgePolicy> hedge_policy_;

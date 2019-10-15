@@ -183,7 +183,9 @@ private:
       return nullptr;
     }
     bool includeAttemptCount() const override { return false; }
-
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };

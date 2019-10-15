@@ -145,6 +145,11 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
+
+  // The maximum bytes which will be buffered for retries and shadowing.
+  // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
+  // value of this and the listener per_connection_buffer_limit_bytes.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -232,7 +237,7 @@ message Route {
   Tracing tracing = 15;
 
   // The maximum bytes which will be buffered for retries and shadowing.
-  // The bytes actually buffered will be the minimum value of this and the
+  // If set, the bytes actually buffered will be the minimum value of this and the
   // listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
 }

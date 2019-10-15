@@ -436,6 +436,16 @@ public:
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCount() const PURE;
+
+  /**
+   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
+   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
+   *         as other limits may apply.
+   *         If a per route limit exists, it takes precedence over this configuration.
+   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
+   *         rather than no limit applies.
+   */
+  virtual uint32_t retryShadowBufferLimit() const PURE;
 };
 
 /**

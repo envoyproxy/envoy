@@ -230,6 +230,7 @@ public:
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   MOCK_METHOD0(retryHostPredicate, Upstream::RetryHostPredicateSharedPtr());
+  MOCK_CONST_METHOD0(retryShadowBufferLimit, uint32_t());
 
   Stats::StatName statName() const override {
     stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
