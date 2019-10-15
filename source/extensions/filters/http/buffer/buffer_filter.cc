@@ -79,14 +79,8 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap& headers, 
 Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   content_length_ += data.length();
   if (end_stream || settings_->disabled()) {
-    // request_headers_ is initialized iff plugin is enabled.
-    if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
-      ASSERT(!settings_->disabled());
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.buffer_filter_populate_content_length")) {
-        request_headers_->insertContentLength().value(content_length_);
-      }
-    }
+    maybeAddContentLength();
+
     return Http::FilterDataStatus::Continue;
   }
 
@@ -95,6 +89,16 @@ Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end
 }
 
 Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::HeaderMap&) {
+  maybeAddContentLength();
+
+  return Http::FilterTrailersStatus::Continue;
+}
+
+void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  callbacks_ = &callbacks;
+}
+
+void BufferFilter::maybeAddContentLength() {
   // request_headers_ is initialized iff plugin is enabled.
   if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
     ASSERT(!settings_->disabled());
@@ -103,12 +107,6 @@ Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::HeaderMap&) {
       request_headers_->insertContentLength().value(content_length_);
     }
   }
-
-  return Http::FilterTrailersStatus::Continue;
-}
-
-void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  callbacks_ = &callbacks;
 }
 
 } // namespace BufferFilter
