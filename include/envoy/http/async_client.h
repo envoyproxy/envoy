@@ -228,7 +228,7 @@ public:
 
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.
-    Tracing::Span* parent_span_;
+    Tracing::Span* parent_span_{nullptr};
   };
 
   /**
