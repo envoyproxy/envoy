@@ -261,6 +261,7 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
   if (oc_config.ocagent_exporter_enabled()) {
     ::opencensus::exporters::trace::OcAgentOptions opts;
     opts.address = oc_config.ocagent_address();
+    opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::OcAgentExporter::Register(std::move(opts));
   }
 }

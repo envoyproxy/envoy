@@ -113,6 +113,7 @@ public:
  * TransportFactoryBase provides a template for a trivial NamedTransportConfigFactory.
  */
 template <class TransportImpl> class TransportFactoryBase : public NamedTransportConfigFactory {
+public:
   TransportPtr createTransport() override { return std::move(std::make_unique<TransportImpl>()); }
 
   std::string name() override { return name_; }

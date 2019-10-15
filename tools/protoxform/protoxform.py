@@ -16,9 +16,13 @@ import re
 import subprocess
 
 from tools.api_proto_plugin import plugin
+from tools.api_proto_plugin import traverse
 from tools.api_proto_plugin import visitor
 from tools.protoxform import migrate
 from tools.protoxform import options
+from tools.protoxform import utils
+from tools.type_whisperer import type_whisperer
+from tools.type_whisperer.types_pb2 import Types
 
 from google.api import annotations_pb2
 from google.protobuf import text_format
@@ -114,6 +118,20 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   Returns:
     Formatted proto header as a string.
   """
+  # Load the type database.
+  typedb = utils.LoadTypeDb()
+  # Figure out type dependencies in this .proto.
+  types = Types()
+  text_format.Merge(traverse.TraverseFile(file_proto, type_whisperer.TypeWhispererVisitor()), types)
+  type_dependencies = sum([list(t.type_dependencies) for t in types.types.values()], [])
+  for service in file_proto.service:
+    for m in service.method:
+      type_dependencies.extend([m.input_type[1:], m.output_type[1:]])
+  # Determine the envoy/ import paths from type deps.
+  envoy_proto_paths = set(
+      typedb.types[t].proto_path
+      for t in type_dependencies
+      if t.startswith('envoy.') and typedb.types[t].proto_path != file_proto.name)
 
   def CamelCase(s):
     return ''.join(t.capitalize() for t in re.split('[\._]', s))
@@ -140,14 +158,16 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options += ['option java_generic_services = true;']
   options_block = FormatBlock('\n'.join(options))
 
-  envoy_imports = []
+  envoy_imports = list(envoy_proto_paths)
   google_imports = []
   infra_imports = []
   misc_imports = []
 
   for d in file_proto.dependency:
     if d.startswith('envoy/'):
-      envoy_imports.append(d)
+      # We ignore existing envoy/ imports, since these are computed explicitly
+      # from type_dependencies.
+      pass
     elif d.startswith('google/'):
       google_imports.append(d)
     elif d.startswith('validate/'):
@@ -412,6 +432,9 @@ class ProtoFormatVisitor(visitor.Visitor):
                                            formatted_options, reserved_fields, joined_values)
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+    # Skip messages synthesized to represent map types.
+    if msg_proto.options.map_entry:
+      return ''
     if options.HasHideOption(msg_proto.options):
       return ''
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)

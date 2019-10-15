@@ -213,6 +213,12 @@ public:
   virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const PURE;
 
   /**
+   * @return std::vector<Http::HeaderMatcherSharedPt>& list of request header
+   * matchers that will be checked before enabling retries.
+   */
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const PURE;
+
+  /**
    * @return absl::optional<std::chrono::milliseconds> base retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> baseInterval() const PURE;
@@ -846,6 +852,13 @@ public:
    * @return whether router configuration uses VHDS.
    */
   virtual bool usesVhds() const PURE;
+
+  /**
+   * @return bool whether most specific header mutations should take precedence. The default
+   * evaluation order is route level, then virtual host level and finally global connection
+   * manager level.
+   */
+  virtual bool mostSpecificHeaderMutationsWins() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

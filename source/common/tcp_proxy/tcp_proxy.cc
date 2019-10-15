@@ -19,14 +19,13 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+#include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
-
-using ::Envoy::Network::UpstreamServerName;
 
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
@@ -56,7 +55,7 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
 Config::SharedConfig::SharedConfig(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
-    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
+    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     idle_timeout_ =
@@ -368,20 +367,13 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options;
-
-  if (downstreamConnection() &&
-      downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
-          UpstreamServerName::key())) {
-    const auto& original_requested_server_name =
-        downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
-            UpstreamServerName::key());
-    transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
-        original_requested_server_name.value());
+  if (downstreamConnection()) {
+    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+        downstreamConnection()->streamInfo().filterState());
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this, transport_socket_options);
+      cluster_name, Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.

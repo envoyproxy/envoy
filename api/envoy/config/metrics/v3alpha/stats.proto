@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.metrics.v3alpha";
 
 import "envoy/api/v3alpha/core/address.proto";
-import "envoy/type/matcher/string.proto";
+import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -78,7 +78,7 @@ message StatsMatcher {
   // However, StatsMatcher can be used to limit the creation of families of stats in order to
   // conserve memory. Stats can either be disabled entirely, or they can be
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
-  // <envoy_api_msg_type.matcher.StringMatcher>` protos:
+  // <envoy_api_msg_type.matcher.v3alpha.StringMatcher>` protos:
   //
   // * If `reject_all` is set to `true`, no stats will be instantiated. If `reject_all` is set to
   //   `false`, all stats will be instantiated.
@@ -149,11 +149,11 @@ message StatsMatcher {
 
     // Exclusive match. All stats are enabled except for those matching one of the supplied
     // StringMatcher protos.
-    type.matcher.ListStringMatcher exclusion_list = 2;
+    type.matcher.v3alpha.ListStringMatcher exclusion_list = 2;
 
     // Inclusive match. No stats are enabled except for those matching one of the supplied
     // StringMatcher protos.
-    type.matcher.ListStringMatcher inclusion_list = 3;
+    type.matcher.v3alpha.ListStringMatcher inclusion_list = 3;
   }
 }
 

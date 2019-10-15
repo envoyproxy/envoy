@@ -27,6 +27,16 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "runtime_features_test",
+    srcs = ["runtime_features_test.cc"],
+    deps = [
+        "//source/common/runtime:runtime_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
     data = glob(["test_data/**"]) + ["filesystem_setup.sh"],

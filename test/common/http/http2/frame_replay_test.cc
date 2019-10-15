@@ -56,9 +56,9 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
-  TestServerConnectionImpl connection(codec.server_connection_, codec.server_callbacks_,
-                                      codec.stats_store_, codec.settings_,
-                                      Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+  TestServerConnectionImpl connection(
+      codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -88,9 +88,9 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
-  TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
-                                      codec.stats_store_, codec.settings_,
-                                      Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+  TestClientConnectionImpl connection(
+      codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -132,9 +132,9 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
-  TestServerConnectionImpl connection(codec.server_connection_, codec.server_callbacks_,
-                                      codec.stats_store_, codec.settings_,
-                                      Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+  TestServerConnectionImpl connection(
+      codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -166,9 +166,9 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
-  TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
-                                      codec.stats_store_, codec.settings_,
-                                      Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+  TestClientConnectionImpl connection(
+      codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   setupStream(codec, connection);
 
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -195,9 +195,9 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
-      TestServerConnectionImpl connection(codec.server_connection_, codec.server_callbacks_,
-                                          codec.stats_store_, codec.settings_,
-                                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+      TestServerConnectionImpl connection(
+          codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
       codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -228,9 +228,9 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
-      TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
-                                          codec.stats_store_, codec.settings_,
-                                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+      TestClientConnectionImpl connection(
+          codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
       setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -263,9 +263,9 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
-      TestServerConnectionImpl connection(codec.server_connection_, codec.server_callbacks_,
-                                          codec.stats_store_, codec.settings_,
-                                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+      TestServerConnectionImpl connection(
+          codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
       codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
       codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
@@ -301,9 +301,9 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
-      TestClientConnectionImpl connection(codec.client_connection_, codec.client_callbacks_,
-                                          codec.stats_store_, codec.settings_,
-                                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+      TestClientConnectionImpl connection(
+          codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
       setupStream(codec, connection);
 
       codec.write(WellKnownFrames::defaultSettingsFrame(), connection);

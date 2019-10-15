@@ -330,6 +330,7 @@ abcd
 absl
 accessor
 accessors
+acks
 acls
 addr
 agg
@@ -435,6 +436,7 @@ deletable
 deleter
 delim
 deque
+deprecations
 dereference
 dereferences
 dereferencing
@@ -644,6 +646,7 @@ paren
 parentid
 parsers
 passthroughs
+pausable
 pcall
 pcap
 pclose
@@ -685,6 +688,7 @@ rc
 readded
 readv
 realloc
+rebalanced
 rebalancing
 rebuffer
 recurse
@@ -818,6 +822,7 @@ unordered
 unowned
 unparented
 unpause
+unpaused
 unpopulated
 unprotect
 unref

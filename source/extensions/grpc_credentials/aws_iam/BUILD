@@ -28,6 +28,6 @@ envoy_cc_library(
         "//source/extensions/filters/http/common/aws:signer_impl_lib",
         "//source/extensions/filters/http/common/aws:utility_lib",
         "//source/extensions/grpc_credentials:well_known_names",
-        "@envoy_api//envoy/config/grpc_credential/v2alpha:aws_iam_cc",
+        "@envoy_api//envoy/config/grpc_credential/v2alpha:pkg_cc_proto",
     ],
 )

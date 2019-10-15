@@ -25,7 +25,7 @@ struct NullVm : public WasmVm {
   NullVm(const NullVm& other) : plugin_name_(other.plugin_name_) {}
 
   // WasmVm
-  absl::string_view vm() override { return WasmVmNames::get().Null; }
+  absl::string_view runtime() override { return WasmRuntimeNames::get().Null; }
   bool cloneable() override { return true; };
   WasmVmPtr clone() override;
   bool load(const std::string& code, bool allow_precompiled) override;
