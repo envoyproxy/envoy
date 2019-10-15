@@ -10,17 +10,17 @@ namespace Common {
 namespace Wasm {
 
 /**
- * Well-known wasm VM names.
- * NOTE: New wasm VMs should use the well known name: envoy.wasm.vm.name.
+ * Well-known wasm runtime names.
+ * NOTE: New wasm runtimes should use the well known name: envoy.wasm.runtime.name.
  */
-class WasmVmValues {
+class WasmRuntimeValues {
 public:
   // Null sandbox: modules must be compiled into envoy and registered name is given in the
   // DataSource.inline_string.
-  const std::string Null = "envoy.wasm.vm.null";
+  const std::string Null = "envoy.wasm.runtime.null";
 };
 
-using WasmVmNames = ConstSingleton<WasmVmValues>;
+using WasmRuntimeNames = ConstSingleton<WasmRuntimeValues>;
 
 } // namespace Wasm
 } // namespace Common

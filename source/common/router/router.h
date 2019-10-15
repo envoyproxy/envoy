@@ -114,9 +114,9 @@ public:
   };
 
   /**
-   * Set the :scheme header based on the properties of the upstream cluster.
+   * Set the :scheme header based on whether the underline transport is secure.
    */
-  static void setUpstreamScheme(Http::HeaderMap& headers, const Upstream::ClusterInfo& cluster);
+  static void setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport);
 
   /**
    * Determine whether a request should be shadowed.
