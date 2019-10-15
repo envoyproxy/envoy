@@ -27,7 +27,7 @@ namespace Http {
   COUNTER(downstream_cx_http1_total)                                                               \
   COUNTER(downstream_cx_http2_total)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
-  COUNTER(downstream_cx_lifetime_timeout)                                                          \
+  COUNTER(downstream_cx_max_duration_reached)                                                      \
   COUNTER(downstream_cx_overload_disable_keepalive)                                                \
   COUNTER(downstream_cx_protocol_error)                                                            \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
@@ -230,9 +230,9 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
-   * @return optional lifetime timeout for incoming connection manager connections.
+   * @return optional maximum connection duration timeout for manager connections.
    */
-  virtual absl::optional<std::chrono::milliseconds> lifetimeTimeout() const PURE;
+  virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
    * @return maximum request headers size the connection manager will accept.

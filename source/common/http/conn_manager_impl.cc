@@ -138,10 +138,10 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
-  if (config_.lifetimeTimeout()) {
-    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-        [this]() -> void { onConnectionLifetimeTimeout(); });
-    connection_idle_timer_->enableTimer(config_.lifetimeTimeout().value());
+  if (config_.maxConnectionDuration()) {
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onConnectionDurationTimeout(); });
+    connection_duration_timer_->enableTimer(config_.maxConnectionDuration().value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_.delayedCloseTimeout());
@@ -373,6 +373,11 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       connection_idle_timer_.reset();
     }
 
+    if (connection_duration_timer_) {
+      connection_duration_timer_->disableTimer();
+      connection_duration_timer_.reset();
+    }
+
     if (drain_timer_) {
       drain_timer_->disableTimer();
       drain_timer_.reset();
@@ -410,9 +415,9 @@ void ConnectionManagerImpl::onIdleTimeout() {
   }
 }
 
-void ConnectionManagerImpl::onConnectionLifetimeTimeout() {
-  ENVOY_CONN_LOG(debug, "lifetime timeout", read_callbacks_->connection());
-  stats_.named_.downstream_cx_lifetime_timeout_.inc();
+void ConnectionManagerImpl::onConnectionDurationTimeout() {
+  ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
+  stats_.named_.downstream_cx_max_duration_reached_.inc();
   if (!codec_) {
     // TODO(oleg): figure out if following is true for closing non-idle connections.
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
