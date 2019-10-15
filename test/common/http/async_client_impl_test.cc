@@ -185,7 +185,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
       .WillOnce(Return(child_span));
   expectSuccess(200);
 
-  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
@@ -815,7 +815,7 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
 
-  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   AsyncClient::Request* request = client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
@@ -873,7 +873,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
 
-  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(callbacks_, onFailure(_));
@@ -1027,9 +1027,9 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   EXPECT_CALL(parent_span_, spawnChild_(_, "async fake_cluster egress", _))
       .WillOnce(Return(child_span));
 
-  AsyncClient::RequestOptions& options = AsyncClient::RequestOptions()
-                                             .setParentSpan(parent_span_)
-                                             .setTimeout(std::chrono::milliseconds(40));
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
+                                            .setParentSpan(parent_span_)
+                                            .setTimeout(std::chrono::milliseconds(40));
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
