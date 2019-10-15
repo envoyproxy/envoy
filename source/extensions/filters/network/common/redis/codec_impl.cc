@@ -183,7 +183,7 @@ RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    string_ = std::move(other.string_);
+    new (&string_) std::string(std::move(other.string_));
     break;
   }
   case RespType::Integer: {
