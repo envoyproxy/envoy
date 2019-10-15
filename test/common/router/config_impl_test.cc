@@ -51,7 +51,9 @@ public:
   TestConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                  Server::Configuration::ServerFactoryContext& factory_context,
                  bool validate_clusters_default)
-      : ConfigImpl(config, factory_context, validate_clusters_default), config_(config) {}
+      : ConfigImpl(config, factory_context, ProtobufMessage::getNullValidationVisitor(),
+                   validate_clusters_default),
+        config_(config) {}
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
     absl::optional<std::string> corpus_path =
@@ -6056,7 +6058,8 @@ public:
     }
     Router::RouteSpecificFilterConfigConstSharedPtr
     createRouteSpecificFilterConfig(const Protobuf::Message& message,
-                                    Server::Configuration::ServerFactoryContext&) override {
+                                    Server::Configuration::ServerFactoryContext&,
+                                    ProtobufMessage::ValidationVisitor&) override {
       auto obj = std::make_shared<DerivedFilterConfig>();
       obj->config_.MergeFrom(message);
       return obj;

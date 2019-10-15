@@ -132,7 +132,8 @@ private:
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const uint64_t manager_identifier,
-      Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      ProtobufMessage::ValidationVisitor& validator_, Init::Manager& init_manager,
       const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
       bool is_delta);
 
@@ -143,6 +144,7 @@ private:
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
   Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
   Init::Manager& init_manager_;
   Init::TargetImpl init_target_;
   Stats::ScopePtr scope_;
@@ -153,7 +155,6 @@ private:
   std::unordered_set<RouteConfigProvider*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Common::CallbackManager<> update_callback_manager_;
 
   friend class RouteConfigProviderManagerImpl;
@@ -195,6 +196,7 @@ private:
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
   Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
 
   friend class RouteConfigProviderManagerImpl;

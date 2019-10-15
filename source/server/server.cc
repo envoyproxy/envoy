@@ -75,8 +75,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      dynamic_server_context_(*this, /*is_dynamic=*/true),
-      static_server_context_(*this, /*is_dynamic=*/false) {
+      server_context_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -427,7 +426,7 @@ void InstanceImpl::initialize(const Options& options,
         *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
         *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
         *local_info_, *admin_, *singleton_manager_, thread_local_,
-        dynamic_server_context_.messageValidationVisitor(), *api_);
+        messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {

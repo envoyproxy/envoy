@@ -34,7 +34,7 @@ FaultFilterFactory::createFilterFactory(const Json::Object& json_config,
 Router::RouteSpecificFilterConfigConstSharedPtr
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::config::filter::http::fault::v2::HTTPFault& config,
-    Server::Configuration::ServerFactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const Fault::FaultSettings>(config);
 }
 

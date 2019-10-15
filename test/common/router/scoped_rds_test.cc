@@ -58,7 +58,7 @@ class ScopedRoutesTestBase : public testing::Test {
 protected:
   ScopedRoutesTestBase() {
     ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(context_init_manager_));
-    ON_CALL(factory_context_, getServerFactoryContext(_))
+    ON_CALL(factory_context_, getServerFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
 
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));

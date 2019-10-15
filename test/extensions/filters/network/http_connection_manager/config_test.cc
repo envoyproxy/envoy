@@ -37,7 +37,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   HttpConnectionManagerConfigTest() {
-    ON_CALL(context_, getServerFactoryContext(_)).WillByDefault(ReturnRef(server_context_));
+    ON_CALL(context_, getServerFactoryContext()).WillByDefault(ReturnRef(server_context_));
   }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;

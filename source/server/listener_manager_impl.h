@@ -232,8 +232,8 @@ public:
                ProtobufMessage::ValidationVisitor& validation_visitor);
   ~ListenerImpl() override;
 
-  Configuration::ServerFactoryContext& getServerFactoryContext(bool is_dynamic) const override {
-    return parent_.server_.serverFactoryContext(is_dynamic);
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+    return parent_.server_.serverFactoryContext();
   }
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.

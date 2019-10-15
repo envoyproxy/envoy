@@ -160,7 +160,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
-  ON_CALL(*this, serverFactoryContext(_)).WillByDefault(ReturnRef(*server_factory_context_));
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
 }
 
 MockInstance::~MockInstance() = default;

@@ -100,18 +100,13 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
-
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
-
-  Configuration::ServerFactoryContext& serverFactoryContext(bool is_dynamic) override {
-    return is_dynamic ? dynamic_server_context_ : static_server_context_;
-  }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
@@ -200,8 +195,7 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
-  ServerFactoryContextImpl dynamic_server_context_;
-  ServerFactoryContextImpl static_server_context_;
+  ServerFactoryContextImpl server_context_;
 };
 
 } // namespace Server

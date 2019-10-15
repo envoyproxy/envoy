@@ -397,7 +397,7 @@ public:
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_METHOD0(messageValidationContext, ProtobufMessage::ValidationContext&());
-  MOCK_METHOD1(serverFactoryContext, Configuration::ServerFactoryContext&(bool));
+  MOCK_METHOD0(serverFactoryContext, Configuration::ServerFactoryContext&());
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -494,7 +494,7 @@ public:
   MockFactoryContext();
   ~MockFactoryContext() override;
 
-  MOCK_CONST_METHOD1(getServerFactoryContext, ServerFactoryContext&(bool));
+  MOCK_CONST_METHOD0(getServerFactoryContext, ServerFactoryContext&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());

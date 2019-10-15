@@ -46,7 +46,7 @@ class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() {
     // For server_factory_context
-    ON_CALL(mock_factory_context_, getServerFactoryContext(_))
+    ON_CALL(mock_factory_context_, getServerFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
     ON_CALL(mock_factory_context_, scope()).WillByDefault(ReturnRef(scope_));

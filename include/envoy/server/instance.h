@@ -226,12 +226,9 @@ public:
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
-   * @param for_dynamic_messsage_validation true if the returned ServerFactoryContext contains
-   * validation visitor is for dynamic configuration.
    * @return Configuration::ServerFactoryContext& factory context for filters.
    */
-  virtual Configuration::ServerFactoryContext&
-  serverFactoryContext(bool for_dynamic_messsage_validation) PURE;
+  virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
 };
 
 } // namespace Server

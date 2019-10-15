@@ -122,10 +122,9 @@ public:
   ~FactoryContext() override = default;
 
   /**
-   * @param is_dynamic true if the validationVisitor() is for dynamic configuration.
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& getServerFactoryContext(bool is_dynamic) const PURE;
+  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
@@ -444,7 +443,8 @@ public:
    * config. Returned object will be stored in the loaded route configuration.
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&) {
+  createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) {
     return nullptr;
   }
 
