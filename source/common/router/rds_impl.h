@@ -133,7 +133,7 @@ private:
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor& validator_, Init::Manager& init_manager,
+      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
       const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
       bool is_delta);
 
