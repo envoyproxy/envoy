@@ -676,6 +676,7 @@ private:
   // connection. When there are active streams it is disarmed in favor of each stream's
   // stream_idle_timer_.
   Event::TimerPtr connection_idle_timer_;
+  // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;

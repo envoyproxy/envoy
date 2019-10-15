@@ -419,9 +419,7 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   stats_.named_.downstream_cx_max_duration_reached_.inc();
   if (!codec_) {
-    // TODO(oleg): figure out if following is true for closing non-idle connections.
-    // No need to delay close after flushing since an idle timeout has already fired. Attempt to
-    // write out buffered data one last time and issue a local close if successful.
+    // Attempt to write out buffered data one last time and issue a local close if successful.
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
