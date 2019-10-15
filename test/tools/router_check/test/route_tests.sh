@@ -17,7 +17,7 @@ do
 done
 
 # Testing coverage flag passes
-COVERAGE_CMD="${PATH_BIN} ${PATH_CONFIG}/TestRoutes.yaml ${PATH_CONFIG}/TestRoutes.golden.json --details -f "
+COVERAGE_CMD="${PATH_BIN} ${PATH_CONFIG}/Redirect.yaml ${PATH_CONFIG}/Redirect.golden.json --details -f "
 TEST_OUTPUT=$($COVERAGE_CMD "1.0")
 COVERAGE_OUTPUT=$($COVERAGE_CMD "1.0" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
 if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: "* ]] ; then

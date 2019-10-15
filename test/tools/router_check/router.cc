@@ -220,8 +220,7 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
     actual = tool_config.route_->routeEntry()->clusterName();
   }
   const bool matches = compareResults(actual, expected, "cluster_name");
-  if (matches && (tool_config.route_->routeEntry() != nullptr ||
-                  tool_config.route_->directResponseEntry() != nullptr)) {
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
     coverage_.markClusterCovered(*tool_config.route_);
   }
   return matches;
@@ -248,8 +247,7 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches = compareResults(actual, expected, "virtual_cluster_name");
-  if (matches && (tool_config.route_->routeEntry() != nullptr ||
-                  tool_config.route_->directResponseEntry() != nullptr)) {
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
     coverage_.markVirtualClusterCovered(*tool_config.route_);
   }
   return matches;
@@ -273,8 +271,7 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches = compareResults(actual, expected, "virtual_host_name");
-  if (matches && (tool_config.route_->routeEntry() != nullptr ||
-                  tool_config.route_->directResponseEntry() != nullptr)) {
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
     coverage_.markVirtualHostCovered(*tool_config.route_);
   }
   return matches;
@@ -305,8 +302,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   const bool matches = compareResults(actual, expected, "path_rewrite");
-  if (matches && (tool_config.route_->routeEntry() != nullptr ||
-                  tool_config.route_->directResponseEntry() != nullptr)) {
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
     coverage_.markPathRewriteCovered(*tool_config.route_);
   }
   return matches;
@@ -337,8 +333,7 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
   const bool matches = compareResults(actual, expected, "host_rewrite");
-  if (matches && (tool_config.route_->routeEntry() != nullptr ||
-                  tool_config.route_->directResponseEntry() != nullptr)) {
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
     coverage_.markHostRewriteCovered(*tool_config.route_);
   }
   return matches;
@@ -362,8 +357,7 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
   }
 
   const bool matches = compareResults(actual, expected, "path_redirect");
-  if (matches && (tool_config.route_->routeEntry() != nullptr ||
-                  tool_config.route_->directResponseEntry() != nullptr)) {
+  if (matches && tool_config.route_->directResponseEntry() != nullptr) {
     coverage_.markRedirectPathCovered(*tool_config.route_);
   }
   return matches;
