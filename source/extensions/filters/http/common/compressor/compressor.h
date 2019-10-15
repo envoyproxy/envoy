@@ -90,11 +90,12 @@ private:
     Thread::MutexBasicLockable mutex_;
     std::map<CompressorFilterConfig*, uint32_t> compressors_ ABSL_GUARDED_BY(mutex_);
     uint32_t registration_count_ ABSL_GUARDED_BY(mutex_){0};
+    std::map<std::string, uint32_t> encodings_ ABSL_GUARDED_BY(mutex_);
   };
 
   static CompressorRegistry& compressorRegistry();
-
   CompressorRegistry& compressor_registry_;
+  void updateRegisteredEncodings() ABSL_EXCLUSIVE_LOCKS_REQUIRED(compressor_registry_.mutex_);
 
   uint32_t content_length_;
 

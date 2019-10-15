@@ -38,12 +38,32 @@ CompressorFilterConfig::CompressorFilterConfig(
   Thread::LockGuard lock(compressor_registry_.mutex_);
   compressor_registry_.compressors_.insert({this, compressor_registry_.registration_count_});
   compressor_registry_.registration_count_++;
+  updateRegisteredEncodings();
 }
 
 CompressorFilterConfig::~CompressorFilterConfig() {
   Thread::LockGuard lock(compressor_registry_.mutex_);
   ASSERT(compressor_registry_.compressors_.count(this) > 0);
   compressor_registry_.compressors_.erase(this);
+  updateRegisteredEncodings();
+}
+
+void CompressorFilterConfig::updateRegisteredEncodings() {
+  compressor_registry_.encodings_.clear();
+
+  // There could be many compressors registered for the same content encoding, e.g. consider a case
+  // when there are two gzip filters using different compression levels for different content sizes.
+  // In such case we ignore duplicates (or different filters for the same encoding) registered last.
+  for (const auto& item : compressor_registry_.compressors_) {
+    auto enc = compressor_registry_.encodings_.find(item.first->content_encoding_);
+    if (enc != compressor_registry_.encodings_.end()) {
+      if (enc->second > item.second) {
+        compressor_registry_.encodings_[item.first->content_encoding_] = item.second;
+      }
+    } else {
+      compressor_registry_.encodings_.insert({item.first->content_encoding_, item.second});
+    }
+  }
 }
 
 StringUtil::CaseUnorderedSet
@@ -63,32 +83,8 @@ CompressorFilterConfig::CompressorRegistry& CompressorFilterConfig::compressorRe
 }
 
 const std::map<std::string, uint32_t> CompressorFilterConfig::registeredCompressors() const {
-  std::map<std::string, uint32_t> encodings;
-  std::vector<std::pair<std::string, uint32_t>> temp;
-
-  {
-    // Make a temp copy to release the lock earlier.
-    Thread::LockGuard lock(compressor_registry_.mutex_);
-    for (const auto& item : compressor_registry_.compressors_) {
-      temp.push_back({item.first->contentEncoding(), item.second});
-    }
-  }
-
-  // There could be many compressors registered for the same content encoding, e.g. consider a case
-  // when there are two gzip filters using different compression levels for different content sizes.
-  // In such case we ignore duplicates (or different filters for the same encoding) registered last.
-  for (const auto& item : temp) {
-    auto enc = encodings.find(item.first);
-    if (enc != encodings.end()) {
-      if (enc->second > item.second) {
-        encodings[item.first] = item.second;
-      }
-    } else {
-      encodings.insert({item.first, item.second});
-    }
-  }
-
-  return encodings;
+  Thread::LockGuard lock(compressor_registry_.mutex_);
+  return compressor_registry_.encodings_;
 }
 
 CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
