@@ -25,7 +25,7 @@ message FilterConfig {
 // Per route Configuration for the dynamic forward proxy HTTP filter.
 message PerRouteConfig {
   // Indicates that before DNS lookup, the host header will be swapped with
-  // this value. If this not set or empty, the original host header value
+  // this value. If not set or empty, the original host header value
   // will be used and no rewrite will happen.
   string host_rewrite = 1;
 }

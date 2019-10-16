@@ -20,9 +20,10 @@ must be configured together and point to the same DNS cache parameters for Envoy
 HTTP dynamic forward proxy.
 
 This filter supports :ref:`host rewrite <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig>`
-via the per_filter_config field to provide virtual host-specific or route-specific rewrites. This
-can be used to rewrite the host header with the provided value before DNS lookup, thus allowing to route
-traffic to the rewritten host when forwarding. See the example below within the configured routes.
+via the :ref:`virtual host's per_filter_config <envoy_api_field_route.VirtualHost.per_filter_config>` or the
+:ref:`route's per_filter_config <envoy_api_field_route.Route.per_filter_config>`. This can be used to rewrite
+the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
+host when forwarding. See the example below within the configured routes.
 
 .. note::
 
