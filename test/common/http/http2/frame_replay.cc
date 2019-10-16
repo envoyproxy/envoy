@@ -67,11 +67,6 @@ CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
 }
 
 ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("server") {
-  auto client = std::make_unique<TestClientConnectionImpl>(
-      client_connection_, client_callbacks_, stats_store_, settings_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
-  request_encoder_ = &client->newStream(response_decoder_);
-  connection_ = std::move(client);
   ON_CALL(client_connection_, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(
@@ -79,22 +74,15 @@ ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("serve
             Hex::encode(static_cast<uint8_t*>(data.linearize(data.length())), data.length()));
         data.drain(data.length());
       }));
-  request_encoder_->getStream().addCallbacks(client_stream_callbacks_);
-  // Setup a single stream to inject frames as a reply to.
-  TestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  request_encoder_->encodeHeaders(request_headers, true);
 }
 
 ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("client") {
-  connection_ = std::make_unique<TestServerConnectionImpl>(
-      server_connection_, server_callbacks_, stats_store_, settings_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   EXPECT_CALL(server_callbacks_, newStream(_, _))
       .WillRepeatedly(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
         encoder.getStream().addCallbacks(server_stream_callbacks_);
         return request_decoder_;
       }));
+
   ON_CALL(server_connection_, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
         ENVOY_LOG_MISC(
@@ -104,12 +92,12 @@ ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("clien
       }));
 }
 
-void CodecFrameInjector::write(const Frame& frame) {
+void CodecFrameInjector::write(const Frame& frame, Http::Connection& connection) {
   Buffer::OwnedImpl buffer;
   buffer.add(frame.data(), frame.size());
   ENVOY_LOG_MISC(trace, "{} write: {}", injector_name_, Hex::encode(frame.data(), frame.size()));
   while (buffer.length() > 0) {
-    connection_->dispatch(buffer);
+    connection.dispatch(buffer);
   }
 }
 
