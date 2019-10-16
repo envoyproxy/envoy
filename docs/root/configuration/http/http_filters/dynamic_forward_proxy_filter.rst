@@ -19,6 +19,11 @@ as well as the :ref:`dynamic forward proxy cluster
 must be configured together and point to the same DNS cache parameters for Envoy to operate as an
 HTTP dynamic forward proxy.
 
+This filter supports :ref:`host rewrite <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig>`
+via the per_filter_config field to provide virtual host-specific or route-specific rewrites. This
+can be used to rewrite the host header with the provided value before DNS lookup, thus allowing to route
+traffic to the rewritten host when forwarding. See the example below within the configured routes.
+
 .. note::
 
   Configuring a :ref:`tls_context <envoy_api_field_Cluster.tls_Context>` on the cluster with
@@ -55,6 +60,13 @@ HTTP dynamic forward proxy.
               - name: local_service
                 domains: ["*"]
                 routes:
+                - match:
+                    prefix: "/force-host-rewrite"
+                  route:
+                    cluster: dynamic_forward_proxy_cluster
+                  per_filter_config:
+                    envoy.filters.http.dynamic_forward_proxy:
+                      host_rewrite: www.example.org
                 - match:
                     prefix: "/"
                   route:
