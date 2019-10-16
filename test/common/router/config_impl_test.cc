@@ -5825,7 +5825,8 @@ virtual_hosts:
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
-    EXPECT_EQ("server_peer-cert-presented", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("server_peer-cert-presented",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
 
   {
@@ -5835,7 +5836,8 @@ virtual_hosts:
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
-    EXPECT_EQ("server_peer-cert-not-presented", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("server_peer-cert-not-presented",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
 
   {
@@ -5844,8 +5846,10 @@ virtual_hosts:
     EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(false));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
-    EXPECT_EQ("server_peer-cert-no-tls-context-match", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
 
   {
@@ -5854,8 +5858,21 @@ virtual_hosts:
     EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
-    EXPECT_EQ("server_peer-cert-no-tls-context-match", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    std::shared_ptr<Ssl::MockConnectionInfo> connection_info;
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
 }
 
