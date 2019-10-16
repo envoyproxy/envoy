@@ -216,7 +216,7 @@ public:
                                     secret_provider_context.localInfo());
     return std::make_shared<TlsSessionTicketKeysSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-                secret_provider_context.dispatcher().timeSource(),
+        secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         *secret_provider_context.initManager(), destructor_cb);
   }
@@ -228,8 +228,8 @@ public:
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              Stats::Store& stats, Init::Manager& init_manager,
                              std::function<void()> destructor_cb)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor, stats,
-               init_manager, std::move(destructor_cb)) {}
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::TlsSessionTicketKeys* secret() const override {
@@ -241,7 +241,7 @@ public:
   }
 
   Common::CallbackHandle* addValidationCallback(
-      std::function<void(const envoy::api::v2::auth::TlsSessionTicketKeys&)> callback) {
+      std::function<void(const envoy::api::v2::auth::TlsSessionTicketKeys&)> callback) override {
     return validation_callback_manager_.add(callback);
   }
 

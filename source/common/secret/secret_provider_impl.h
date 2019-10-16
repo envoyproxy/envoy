@@ -59,6 +59,11 @@ public:
     return tls_session_ticket_keys_.get();
   }
 
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::api::v2::auth::TlsSessionTicketKeys&)>) override {
+    return nullptr;
+  }
+
   Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
 
 private:

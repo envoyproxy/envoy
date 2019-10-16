@@ -146,9 +146,8 @@ TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret)
                             "Duplicate static CertificateValidationContext secret name abc.com");
 }
 
-// Validate that secret manager throws an exception when adding static secret of a type that is not
-// supported.
-TEST_F(SecretManagerImplTest, NotImplementedException) {
+// Validate that secret manager adds static STKs secret successfully.
+TEST_F(SecretManagerImplTest, SessionTicketKeysLoadSuccess) {
   envoy::api::v2::auth::Secret secret_config;
 
   const std::string yaml =
@@ -156,15 +155,47 @@ TEST_F(SecretManagerImplTest, NotImplementedException) {
 name: "abc.com"
 session_ticket_keys:
   keys:
-    - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+    - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/keys.bin"
 )EOF";
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
 
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_EQ(secret_manager->findStaticTlsSessionTicketKeysContextProvider("undefined"), nullptr);
+  ASSERT_NE(secret_manager->findStaticTlsSessionTicketKeysContextProvider("abc.com"), nullptr);
+
+  const ::envoy::api::v2::auth::TlsSessionTicketKeys session_ticket_keys(
+      *secret_manager->findStaticTlsSessionTicketKeysContextProvider("abc.com")->secret());
+  const std::string keys_path =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/keys.bin";
+  EXPECT_EQ(session_ticket_keys.keys_size(), 1);
+  EXPECT_EQ(session_ticket_keys.keys()[0].filename(), TestEnvironment::substitute(keys_path));
+}
+
+// Validate that secret manager throws an exception when adding duplicated static STKs secret.
+TEST_F(SecretManagerImplTest, DuplicateSessionTicketKeysSecret) {
+  envoy::api::v2::auth::Secret secret_config;
+
+  const std::string yaml =
+      R"EOF(
+name: "abc.com"
+session_ticket_keys:
+  keys:
+    - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/keys.bin"
+)EOF";
+
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_NE(secret_manager->findStaticTlsSessionTicketKeysContextProvider("abc.com"), nullptr);
   EXPECT_THROW_WITH_MESSAGE(secret_manager->addStaticSecret(secret_config), EnvoyException,
-                            "Secret type not implemented");
+                            "Duplicate static TlsSessionTicketKeys secret name abc.com");
 }
 
 // Validate that secret manager deduplicates dynamic TLS certificate secret provider.

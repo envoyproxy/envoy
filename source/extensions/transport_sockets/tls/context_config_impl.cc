@@ -117,7 +117,7 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
     const auto& sds_secret_config = config.session_ticket_keys_sds_secret_config();
     if (sds_secret_config.has_sds_config()) {
       // Fetch dynamic secret.
-        *dynamic_sds = true;
+      *dynamic_sds = true;
       return factory_context.secretManager().findOrCreateTlsSessionTicketKeysContextProvider(
           sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
     } else {
@@ -363,15 +363,14 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
-      session_ticket_keys_provider_(
-          getTlsSessionTicketKeysConfigProvider(factory_context, config, &session_ticket_keys_dynamic_sds_)) {
+      session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(
+          factory_context, config, &session_ticket_keys_dynamic_sds_)) {
   if (session_ticket_keys_provider_ != nullptr && session_ticket_keys_dynamic_sds_) {
     // Validate tls session ticket keys early to reject bad sds updates.
-    stk_validation_callback_handle_ =
-        dynamic_cast<Secret::TlsSessionTicketKeysSdsApi*>(session_ticket_keys_provider_.get())
-            ->addValidationCallback([this](const envoy::api::v2::auth::TlsSessionTicketKeys& keys) {
-              getSessionTicketKeys(keys);
-            });
+    stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(
+        [this](const envoy::api::v2::auth::TlsSessionTicketKeys& keys) {
+          getSessionTicketKeys(keys);
+        });
   }
 
   // Load inline or static secrets.
