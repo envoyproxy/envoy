@@ -15,7 +15,7 @@ function usage() {
 FIXTURE_DIR="${TEST_TMPDIR}"
 mkdir -p "${FIXTURE_DIR}"
 
-DRIVER_DIR="${TEST_RUNDIR}/test/extensions/filters/network/thrift_proxy/driver"
+DRIVER_DIR="${TEST_SRCDIR}/envoy/test/extensions/filters/network/thrift_proxy/driver"
 
 if [[ -z "${TEST_UDSDIR}" ]]; then
     TEST_UDSDIR=`mktemp -d /tmp/envoy_test_thrift.XXXXXX`

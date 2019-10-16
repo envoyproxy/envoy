@@ -436,6 +436,7 @@ deletable
 deleter
 delim
 deque
+deprecations
 dereference
 dereferences
 dereferencing
@@ -687,6 +688,7 @@ rc
 readded
 readv
 realloc
+rebalanced
 rebalancing
 rebuffer
 recurse

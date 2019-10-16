@@ -63,7 +63,7 @@ public:
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, const std::string& per_handler_stat_prefix);
 
   // Network::ConnectionHandler
-  uint64_t numConnections() override { return num_connections_; }
+  uint64_t numConnections() override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
   void addListener(Network::ListenerConfig& config) override;
@@ -73,11 +73,6 @@ public:
   void disableListeners() override;
   void enableListeners() override;
   const std::string& statPrefix() override { return per_handler_stat_prefix_; }
-
-  Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
-
-  Network::ConnectionHandler::ActiveListener*
-  findActiveListenerByAddress(const Network::Address::Instance& address);
 
   /**
    * Wrapper for an active listener owned by this handler.
@@ -102,31 +97,42 @@ public:
   };
 
 private:
-  struct ActiveConnection;
-  using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
-  struct ActiveSocket;
-  using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
+  struct ActiveTcpConnection;
+  using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
+  struct ActiveTcpSocket;
+  using ActiveTcpSocketPtr = std::unique_ptr<ActiveTcpSocket>;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.
    */
-  class ActiveTcpListener : public Network::ListenerCallbacks, public ActiveListenerImplBase {
+  class ActiveTcpListener : public Network::ListenerCallbacks,
+                            public ActiveListenerImplBase,
+                            public Network::BalancedConnectionHandler {
   public:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
     ~ActiveTcpListener() override;
+    void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
+                        bool hand_off_restored_destination_connections, bool rebalanced);
+    void decNumConnections() {
+      ASSERT(num_listener_connections_ > 0);
+      --num_listener_connections_;
+    }
 
     // Network::ListenerCallbacks
-    void onAccept(Network::ConnectionSocketPtr&& socket,
-                  bool hand_off_restored_destination_connections) override;
-    void onNewConnection(Network::ConnectionPtr&& new_connection) override;
+    void onAccept(Network::ConnectionSocketPtr&& socket) override;
+
+    // Network::BalancedConnectionHandler
+    uint64_t numConnections() const override { return num_listener_connections_; }
+    void incNumConnections() override { ++num_listener_connections_; }
+    void post(Network::ConnectionSocketPtr&& socket) override;
 
     /**
      * Remove and destroy an active connection.
      * @param connection supplies the connection to remove.
      */
-    void removeConnection(ActiveConnection& connection);
+    void removeConnection(ActiveTcpConnection& connection);
 
     /**
      * Create a new connection from a socket accepted by the listener.
@@ -134,19 +140,23 @@ private:
     void newConnection(Network::ConnectionSocketPtr&& socket);
 
     ConnectionHandlerImpl& parent_;
-    std::list<ActiveSocketPtr> sockets_;
-    std::list<ActiveConnectionPtr> connections_;
+    std::list<ActiveTcpSocketPtr> sockets_;
+    std::list<ActiveTcpConnectionPtr> connections_;
+
+    // The number of connections currently active on this listener. This is typically used for
+    // connection balancing across per-handler listeners.
+    std::atomic<uint64_t> num_listener_connections_{};
   };
 
   /**
-   * Wrapper for an active connection owned by this handler.
+   * Wrapper for an active TCP connection owned by this handler.
    */
-  struct ActiveConnection : LinkedObject<ActiveConnection>,
-                            public Event::DeferredDeletable,
-                            public Network::ConnectionCallbacks {
-    ActiveConnection(ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection,
-                     TimeSource& time_system);
-    ~ActiveConnection() override;
+  struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
+                               public Event::DeferredDeletable,
+                               public Network::ConnectionCallbacks {
+    ActiveTcpConnection(ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection,
+                        TimeSource& time_system);
+    ~ActiveTcpConnection() override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -165,22 +175,33 @@ private:
   };
 
   /**
-   * Wrapper for an active accepted socket owned by this handler.
+   * Wrapper for an active accepted TCP socket owned by this handler.
    */
-  struct ActiveSocket : public Network::ListenerFilterManager,
-                        public Network::ListenerFilterCallbacks,
-                        LinkedObject<ActiveSocket>,
-                        public Event::DeferredDeletable {
-    ActiveSocket(ActiveTcpListener& listener, Network::ConnectionSocketPtr&& socket,
-                 bool hand_off_restored_destination_connections)
+  struct ActiveTcpSocket : public Network::ListenerFilterManager,
+                           public Network::ListenerFilterCallbacks,
+                           LinkedObject<ActiveTcpSocket>,
+                           public Event::DeferredDeletable {
+    ActiveTcpSocket(ActiveTcpListener& listener, Network::ConnectionSocketPtr&& socket,
+                    bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           iter_(accept_filters_.end()) {
       listener_.stats_.downstream_pre_cx_active_.inc();
     }
-    ~ActiveSocket() override {
+    ~ActiveTcpSocket() override {
       accept_filters_.clear();
       listener_.stats_.downstream_pre_cx_active_.dec();
+
+      // If the underlying socket is no longer attached, it means that it has been transferred to
+      // an active connection. In this case, the active connection will decrement the number
+      // of listener connections.
+      // TODO(mattklein123): In general the way we account for the number of listener connections
+      // is incredibly fragile. Revisit this by potentially merging ActiveTcpSocket and
+      // ActiveTcpConnection, having a shared object which does accounting (but would require
+      // another allocation, etc.).
+      if (socket_ != nullptr) {
+        listener_.decNumConnections();
+      }
     }
 
     void onTimeout();
@@ -206,12 +227,15 @@ private:
     Event::TimerPtr timer_;
   };
 
+  Network::ConnectionHandler::ActiveListener*
+  findActiveListenerByAddress(const Network::Address::Instance& address);
+
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr,
                       Network::ConnectionHandler::ActiveListenerPtr>>
       listeners_;
-  std::atomic<uint64_t> num_connections_{};
+  std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
 };
 

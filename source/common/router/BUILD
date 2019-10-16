@@ -73,7 +73,7 @@ envoy_cc_library(
         "//source/common/config:rds_json_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -123,7 +123,7 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:route_config_update_impl_lib",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 
@@ -152,9 +152,9 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:route_config_update_impl_lib",
         "//source/common/router:vhds_lib",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 
@@ -170,8 +170,8 @@ envoy_cc_library(
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:scopes_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "@envoy_api//envoy/api/v2:srds_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 
@@ -192,8 +192,8 @@ envoy_cc_library(
         "//source/common/config:config_provider_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
-        "@envoy_api//envoy/api/v2:srds_cc",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -261,10 +261,12 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/network:application_protocol_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
+        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
     ],
 )
 

@@ -14,28 +14,30 @@ namespace Http {
 namespace Http2 {
 namespace {
 
-void Replay(const Frame& frame) {
-  ServerCodecFrameInjector codec;
-  codec.write(WellKnownFrames::clientConnectionPrefaceFrame());
-  codec.write(WellKnownFrames::defaultSettingsFrame());
-  codec.write(WellKnownFrames::initialWindowUpdateFrame());
-  EXPECT_CALL(codec.server_callbacks_, onGoAway()).Times(AnyNumber());
-  EXPECT_CALL(codec.request_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
-  EXPECT_CALL(codec.server_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
+void Replay(const Frame& frame, ServerCodecFrameInjector& codec) {
+  // Create the server connection containing the nghttp2 session.
+  TestServerConnectionImpl connection(
+      codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+  codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
+  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
   try {
-    codec.write(frame);
+    codec.write(frame, connection);
   } catch (const CodecProtocolException& e) {
   }
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+  // Create static objects.
+  static ServerCodecFrameInjector codec;
   Frame frame;
   frame.assign(buf, buf + len);
   // Replay with the fuzzer bytes.
-  Replay(frame);
+  Replay(frame, codec);
   // Try again, but fixup the HEADERS frame to make it a valid HEADERS.
   FrameUtils::fixupHeaders(frame);
-  Replay(frame);
+  Replay(frame, codec);
 }
 
 } // namespace

@@ -290,11 +290,6 @@ public:
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
-   * @return std::chrono::milliseconds The delayed close timeout value.
-   */
-  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
-
-  /**
    * @return std::string the failure reason of the underlying transport socket, if no failure
    *         occurred an empty string is returned.
    */

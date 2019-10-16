@@ -172,6 +172,11 @@ public:
   virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
 
   /**
+   * @return the optional overridden application protocols.
+   */
+  virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
+
+  /**
    * @param vector of bytes to which the option should append hash key data that will be used
    *        to separate connections based on the option. Any data already in the key vector must
    *        not be modified.

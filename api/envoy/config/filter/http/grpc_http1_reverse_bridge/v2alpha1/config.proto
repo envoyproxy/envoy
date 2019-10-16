@@ -16,7 +16,7 @@ import "validate/validate.proto";
 message FilterConfig {
   // The content-type to pass to the upstream when the gRPC bridge filter is applied.
   // The filter will also validate that the upstream responds with the same content type.
-  string content_type = 1 [(validate.rules).string.min_bytes = 1];
+  string content_type = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // If true, Envoy will assume that the upstream doesn't understand gRPC frames and
   // strip the gRPC frame from the request, and add it back in to the response. This will

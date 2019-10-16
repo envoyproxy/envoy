@@ -36,7 +36,6 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
   // headers.
   envoy::api::v2::RouteConfiguration clean_config =
       replaceInvalidHeaders<envoy::api::v2::RouteConfiguration>(route_config);
-  // Replace invalid characters from
   auto internal_only_headers = clean_config.mutable_internal_only_headers();
   std::for_each(internal_only_headers->begin(), internal_only_headers->end(),
                 [](std::string& n) { n = Fuzz::replaceInvalidCharacters(n); });
@@ -69,9 +68,9 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
 
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
+  static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  static NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   try {
-    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
     TestUtility::validate(input.config());
     ConfigImpl config(cleanRouteConfig(input.config()), factory_context, true);
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(input.headers());

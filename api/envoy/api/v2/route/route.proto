@@ -28,7 +28,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 17]
+// [#comment:next free field: 18]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -942,10 +942,13 @@ message RetryPolicy {
   // describes Envoy's back-off algorithm.
   RetryBackOff retry_back_off = 8;
 
-  // HTTP headers that trigger a retry if present in the response. A retry will be
+  // HTTP response headers that trigger a retry if present in the response. A retry will be
   // triggered if any of the header matches match the upstream response headers.
   // The field is only consulted if 'retriable-headers' retry policy is active.
   repeated HeaderMatcher retriable_headers = 9;
+
+  // HTTP headers which must be present in the request for retries to be attempted.
+  repeated HeaderMatcher retriable_request_headers = 10;
 }
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
