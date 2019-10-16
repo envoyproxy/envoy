@@ -59,6 +59,7 @@ TEST(XRayWildcardTest, OnlyGlob) {
   ASSERT_TRUE(wildcardMatch("*", "12354"));
   ASSERT_TRUE(wildcardMatch("*", "UPPERCASE"));
   ASSERT_TRUE(wildcardMatch("*", "miXEDcaSe"));
+  ASSERT_TRUE(wildcardMatch("*******", "Envoy"));
 }
 
 TEST(XRayWildcardTest, LengthAtLeastTwo) {
