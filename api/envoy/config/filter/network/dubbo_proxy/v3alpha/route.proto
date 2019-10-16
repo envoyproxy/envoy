@@ -7,8 +7,8 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.dubbo_proxy.v3alpha";
 
 import "envoy/api/v3alpha/route/route.proto";
-import "envoy/type/matcher/string.proto";
-import "envoy/type/range.proto";
+import "envoy/type/matcher/v3alpha/string.proto";
+import "envoy/type/v3alpha/range.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -92,12 +92,12 @@ message MethodMatch {
       //
       // * For range [-10,0), route will match for header value -1, but not for 0,
       //   "somestring", 10.9, "-1somestring"
-      type.Int64Range range_match = 4;
+      type.v3alpha.Int64Range range_match = 4;
     }
   }
 
   // The name of the method.
-  type.matcher.StringMatcher name = 1;
+  type.matcher.v3alpha.StringMatcher name = 1;
 
   // Method parameter definition.
   // The key is the parameter index, starting from 0.

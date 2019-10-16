@@ -275,7 +275,7 @@ class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersi
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()) {
     dispatcher_ = api_->allocateDispatcher();
-    upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+    upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
     client_connection_ = client_connection.get();
@@ -285,18 +285,11 @@ public:
     client_ = std::make_unique<CodecClientForTest>(std::move(client_connection), codec_, nullptr,
                                                    host_, *dispatcher_);
 
-    EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket());
-          listener_callbacks_.onNewConnection(std::move(new_connection));
-        }));
-
     int expected_callbacks = 2;
-
-    EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
-        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-          upstream_connection_ = std::move(conn);
+    EXPECT_CALL(listener_callbacks_, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          upstream_connection_ = dispatcher_->createServerConnection(
+              std::move(socket), Network::Test::createRawBufferSocket());
           upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
 
           expected_callbacks--;

@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 cc_library(
     name = "all_external",
     srcs = [":empty.cc"],
+    defines = ["OPENTRACING_STATIC"],
     deps = [
         "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
         "@com_google_googletest//:gtest",

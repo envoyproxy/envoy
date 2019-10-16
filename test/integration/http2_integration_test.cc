@@ -64,6 +64,8 @@ TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
 
+TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
+
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
 config: {}

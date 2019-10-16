@@ -804,6 +804,10 @@ public:
 
   bool usesVhds() const override { return uses_vhds_; }
 
+  bool mostSpecificHeaderMutationsWins() const override {
+    return most_specific_header_mutations_wins_;
+  }
+
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -812,6 +816,7 @@ private:
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
   const bool uses_vhds_;
+  const bool most_specific_header_mutations_wins_;
 };
 
 /**
@@ -828,6 +833,7 @@ public:
 
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
+  bool mostSpecificHeaderMutationsWins() const override { return false; }
 
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;

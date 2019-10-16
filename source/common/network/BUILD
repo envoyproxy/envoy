@@ -4,7 +4,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
@@ -53,6 +52,15 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_balancer_lib",
+    srcs = ["connection_balancer_impl.cc"],
+    hdrs = ["connection_balancer_impl.h"],
+    deps = [
+        "//include/envoy/network:connection_balancer_interface",
     ],
 )
 
@@ -281,7 +289,10 @@ envoy_cc_library(
     srcs = ["transport_socket_options_impl.cc"],
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
+        ":application_protocol_lib",
+        ":upstream_server_name_lib",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
     ],

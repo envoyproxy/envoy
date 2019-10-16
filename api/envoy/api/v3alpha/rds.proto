@@ -44,24 +44,25 @@ service RouteDiscoveryService {
 // Virtual Host Discovery Service (VHDS) is used to dynamically update the list of virtual hosts for
 // a given RouteConfiguration. If VHDS is configured a virtual host list update will be triggered
 // during the processing of an HTTP request if a route for the request cannot be resolved. The
-// :ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>`
-// field contains a list of virtual host names or aliases to track. The contents of an alias would
-// be the contents of a *host* or *authority* header used to make an http request. An xDS server
-// will match an alias to a virtual host based on the content of :ref:`domains'
-// <envoy_api_msg_route.VirtualHost.domains>` field. The *resource_names_unsubscribe* field contains
-// a list of virtual host names that have been :ref:`unsubscribed <xds_protocol_unsubscribe>`
-// from the routing table associated with the RouteConfiguration.
+// :ref:`resource_names_subscribe
+// <envoy_api_field_api.v3alpha.DeltaDiscoveryRequest.resource_names_subscribe>` field contains a
+// list of virtual host names or aliases to track. The contents of an alias would be the contents of
+// a *host* or *authority* header used to make an http request. An xDS server will match an alias to
+// a virtual host based on the content of :ref:`domains'
+// <envoy_api_field_api.v3alpha.route.VirtualHost.domains>` field. The *resource_names_unsubscribe*
+// field contains a list of virtual host names that have been :ref:`unsubscribed
+// <xds_protocol_unsubscribe>` from the routing table associated with the RouteConfiguration.
 service VirtualHostDiscoveryService {
   rpc DeltaVirtualHosts(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 }
 
-// [#comment:next free field: 10]
+// [#comment:next free field: 11]
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.Rds.route_config_name>`
-  // in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v3alpha.Rds`.
+  // in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.Rds`.
   string name = 1;
 
   // An array of virtual hosts that make up the route table.
@@ -107,6 +108,18 @@ message RouteConfiguration {
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
   repeated string request_headers_to_remove = 8;
+
+  // By default, headers that should be added/removed are evaluated from most to least specific:
+  //
+  // * route level
+  // * virtual host level
+  // * connection manager level
+  //
+  // To allow setting overrides at the route or virtual host level, this order can be reversed
+  // by setting this option to true. Defaults to false.
+  //
+  // [#next-major-version: In the v3 API, this will default to true.]
+  bool most_specific_header_mutations_wins = 10;
 
   // An optional boolean that specifies whether the clusters that the route
   // table refers to will be validated by the cluster manager. If set to true
