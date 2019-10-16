@@ -222,9 +222,9 @@ RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing
     overall_sampling_ = tracing.overall_sampling();
   }
   for (const auto& tag : tracing.custom_tags()) {
-    Tracing::CustomTagPtr ptr = Tracing::HttpTracerUtility::createCustomTag(tag);
+    Tracing::CustomTagConstSharedPtr ptr = Tracing::HttpTracerUtility::createCustomTag(tag);
     if (ptr) {
-      custom_tags_.push_back(ptr);
+      custom_tags_.emplace(ptr->tag(), ptr);
     }
   }
 }
@@ -240,9 +240,7 @@ const envoy::type::FractionalPercent& RouteTracingImpl::getRandomSampling() cons
 const envoy::type::FractionalPercent& RouteTracingImpl::getOverallSampling() const {
   return overall_sampling_;
 }
-const std::vector<Tracing::CustomTagPtr>& RouteTracingImpl::getCustomTags() const {
-  return custom_tags_;
-}
+const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,

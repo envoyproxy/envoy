@@ -775,7 +775,7 @@ public:
    * This method returns the route level tracing custom tags.
    * @return the tracing custom tags.
    */
-  virtual const std::vector<Tracing::CustomTagPtr>& getCustomTags() const PURE;
+  virtual const Tracing::CustomTagMap& getCustomTags() const PURE;
 };
 
 using RouteTracingConstPtr = std::unique_ptr<const RouteTracing>;

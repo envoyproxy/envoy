@@ -285,14 +285,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
-    std::vector<Tracing::CustomTagPtr> custom_tags;
+    Tracing::CustomTagMap custom_tags;
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
-      custom_tags.push_back(std::make_shared<Tracing::RequestHeaderCustomTag>(header, header));
+      envoy::type::tracing::v2::CustomTag::Header headerTag;
+      headerTag.set_name(header);
+      Tracing::CustomTagConstSharedPtr ptr =
+          std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
+      custom_tags.emplace(ptr->tag(), ptr);
     }
     for (const auto& tag : tracing_config.custom_tags()) {
-      Tracing::CustomTagPtr ptr = Tracing::HttpTracerUtility::createCustomTag(tag);
+      Tracing::CustomTagConstSharedPtr ptr = Tracing::HttpTracerUtility::createCustomTag(tag);
       if (ptr) {
-        custom_tags.push_back(ptr);
+        custom_tags.emplace(ptr->tag(), ptr);
       }
     }
 

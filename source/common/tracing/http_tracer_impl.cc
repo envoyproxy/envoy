@@ -7,7 +7,6 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
-#include "common/config/metadata.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -167,8 +166,8 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span, const Http::HeaderMap
     }
   }
   CustomTagContext ctx{request_headers, stream_info};
-  for (const CustomTagPtr& custom_tag : tracing_config.customTags()) {
-    custom_tag->apply(span, ctx);
+  for (const auto& it : tracing_config.customTags()) {
+    it.second->apply(span, ctx);
   }
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
@@ -222,19 +221,20 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::HeaderMap* respons
   }
 }
 
-CustomTagPtr HttpTracerUtility::createCustomTag(const envoy::type::TracingCustomTag& tag) {
+CustomTagConstSharedPtr
+HttpTracerUtility::createCustomTag(const envoy::type::tracing::v2::CustomTag& tag) {
   switch (tag.type_case()) {
-  case envoy::type::TracingCustomTag::kLiteral:
+  case envoy::type::tracing::v2::CustomTag::kLiteral:
     return std::make_shared<Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
-  case envoy::type::TracingCustomTag::kEnvironment:
+  case envoy::type::tracing::v2::CustomTag::kEnvironment:
     return std::make_shared<Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
-  case envoy::type::TracingCustomTag::kRequestHeader:
+  case envoy::type::tracing::v2::CustomTag::kRequestHeader:
     return std::make_shared<Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
-  case envoy::type::TracingCustomTag::kRequestMetadata:
+  case envoy::type::tracing::v2::CustomTag::kRequestMetadata:
     return std::make_shared<Tracing::RequestMetadataCustomTag>(tag.tag(), tag.request_metadata());
-  case envoy::type::TracingCustomTag::kRouteMetadata:
+  case envoy::type::tracing::v2::CustomTag::kRouteMetadata:
     return std::make_shared<Tracing::RouteMetadataCustomTag>(tag.tag(), tag.route_metadata());
-  case envoy::type::TracingCustomTag::TYPE_NOT_SET:
+  case envoy::type::tracing::v2::CustomTag::TYPE_NOT_SET:
     return nullptr;
   }
   return nullptr;
@@ -273,37 +273,17 @@ void GeneralCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
 }
 
 EnvironmentCustomTag::EnvironmentCustomTag(
-    const std::string& tag, const envoy::type::TracingCustomTag::Environment& environment)
+    const std::string& tag, const envoy::type::tracing::v2::CustomTag::Environment& environment)
     : GeneralCustomTag(tag), name_(environment.name()),
       default_value_(environment.default_value()) {
   const char* env = std::getenv(name_.data());
   final_value_ = env ? env : default_value_;
 }
 
-EnvironmentCustomTag::EnvironmentCustomTag(const std::string& tag, const std::string& name)
-    : GeneralCustomTag(tag), name_(name) {
-  const char* env = std::getenv(name_.data());
-  final_value_ = env ? env : default_value_;
-}
-
-EnvironmentCustomTag::EnvironmentCustomTag(const std::string& tag, const std::string& name,
-                                           const std::string& default_value)
-    : GeneralCustomTag(tag), name_(name), default_value_(default_value) {
-  const char* env = std::getenv(name_.data());
-  final_value_ = env ? env : default_value_;
-}
-
 RequestHeaderCustomTag::RequestHeaderCustomTag(
-    const std::string& tag, const envoy::type::TracingCustomTag::Header& request_header)
+    const std::string& tag, const envoy::type::tracing::v2::CustomTag::Header& request_header)
     : GeneralCustomTag(tag), name_(Http::LowerCaseString(request_header.name())),
       default_value_(request_header.default_value()) {}
-
-RequestHeaderCustomTag::RequestHeaderCustomTag(const std::string& tag, const std::string& name)
-    : GeneralCustomTag(tag), name_(Http::LowerCaseString(name)) {}
-
-RequestHeaderCustomTag::RequestHeaderCustomTag(const std::string& tag, const std::string& name,
-                                               const std::string& default_value)
-    : GeneralCustomTag(tag), name_(Http::LowerCaseString(name)), default_value_(default_value) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
   if (!ctx.request_headers) {
@@ -313,26 +293,10 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   return entry ? entry->value().getStringView() : default_value_;
 }
 
-const std::string MetadataCustomTag::DefaultSeparator = ".";
-
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
-                                     const envoy::type::TracingCustomTag::Metadata& metadata)
-    : GeneralCustomTag(tag), filter_namespace_(metadata.filter_namespace()),
-      raw_path_(metadata.path()),
-      separator_(metadata.path_separator().empty() ? DefaultSeparator : metadata.path_separator()),
-      default_value_(metadata.default_value()), path_(absl::StrSplit(raw_path_, separator_)) {}
-
-MetadataCustomTag::MetadataCustomTag(const std::string& tag, const std::string& filter_namespace,
-                                     const std::string& raw_path)
-    : GeneralCustomTag(tag), filter_namespace_(filter_namespace), raw_path_(raw_path),
-      separator_(DefaultSeparator), path_(absl::StrSplit(raw_path_, separator_)) {}
-
-MetadataCustomTag::MetadataCustomTag(const std::string& tag, const std::string& filter_namespace,
-                                     const std::string& raw_path, const std::string& separator,
-                                     const std::string& default_value)
-    : GeneralCustomTag(tag), filter_namespace_(filter_namespace), raw_path_(raw_path),
-      separator_(separator.empty() ? DefaultSeparator : separator), default_value_(default_value),
-      path_(absl::StrSplit(raw_path_, separator_)) {}
+                                     const envoy::type::tracing::v2::CustomTag::Metadata& metadata)
+    : GeneralCustomTag(tag), metadata_key_(metadata.metadata_key()),
+      default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
   const envoy::api::v2::core::Metadata* meta = metadata(ctx);
@@ -342,8 +306,7 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     }
     return;
   }
-  const ProtobufWkt::Value& value =
-      Envoy::Config::Metadata::metadataValue(*meta, filter_namespace_, path_);
+  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(*meta, metadata_key_);
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kBoolValue:
     span.setTag(tag(), value.bool_value() ? "true" : "false");

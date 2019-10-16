@@ -1292,23 +1292,16 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
-  std::map<absl::string_view, Tracing::CustomTagPtr> merged;
-  auto mp = [](const Tracing::CustomTagPtr& ct) { return std::make_pair(ct->tag(), ct); };
   if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
-    const std::vector<Tracing::CustomTagPtr>& route_tags =
+    const Tracing::CustomTagMap& route_tags =
         cached_route_.value()->tracingConfig()->getCustomTags();
-    std::transform(route_tags.begin(), route_tags.end(), std::inserter(merged, merged.end()), mp);
+    tracing_custom_tags_.insert(route_tags.begin(), route_tags.end());
   }
   if (connection_manager_.config_.tracingConfig()) {
-    const std::vector<Tracing::CustomTagPtr>& conn_manager_tags =
+    const Tracing::CustomTagMap& conn_manager_tags =
         connection_manager_.config_.tracingConfig()->custom_tags_;
-    std::transform(conn_manager_tags.begin(), conn_manager_tags.end(),
-                   std::inserter(merged, merged.end()), mp);
+    tracing_custom_tags_.insert(conn_manager_tags.begin(), conn_manager_tags.end());
   }
-  std::transform(merged.begin(), merged.end(), std::back_inserter(tracing_custom_tags_),
-                 [](const std::map<absl::string_view, Tracing::CustomTagPtr>::value_type& p) {
-                   return p.second;
-                 });
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1771,7 +1764,7 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
-const std::vector<Tracing::CustomTagPtr>& ConnectionManagerImpl::ActiveStream::customTags() const {
+const Tracing::CustomTagMap& ConnectionManagerImpl::ActiveStream::customTags() const {
   return tracing_custom_tags_;
 }
 

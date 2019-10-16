@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package test.common.tracing;
+
+import "envoy/type/tracing/v2/custom_tag.proto";
+
+message CustomTagCases {
+  message Case {
+    envoy.type.tracing.v2.CustomTag custom_tag = 1;
+    oneof validate {
+      string value = 2;
+    }
+  }
+
+  repeated Case cases = 1;
+}

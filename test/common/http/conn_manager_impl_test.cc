@@ -95,6 +95,12 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
+  Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header) {
+    envoy::type::tracing::v2::CustomTag::Header headerTag;
+    headerTag.set_name(header);
+    return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
+  }
+
   void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false) {
     use_srds_ = use_srds;
     if (ssl) {
@@ -119,15 +125,16 @@ public:
       envoy::type::FractionalPercent percent2;
       percent2.set_numerator(10000);
       percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-      tracing_config_ =
-          std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-              Tracing::OperationName::Ingress,
-              {std::make_shared<Tracing::RequestHeaderCustomTag>(":method", ":method")},
-              percent1,
-              percent2,
-              percent1,
-              false,
-              256});
+      const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr =
+          requestHeaderCustomTag(":method");
+      tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+          TracingConnectionManagerConfig{Tracing::OperationName::Ingress,
+                                         {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                         percent1,
+                                         percent2,
+                                         percent1,
+                                         false,
+                                         256});
     }
   }
 
@@ -797,36 +804,47 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
 
   struct TracingTagMetaSuite {
-    using Factory = std::function<Tracing::CustomTagPtr(const std::string&, const std::string&)>;
+    using Factory =
+        std::function<Tracing::CustomTagConstSharedPtr(const std::string&, const std::string&)>;
     std::string prefix;
     Factory factory;
   };
   struct TracingTagSuite {
     bool has_conn;
     bool has_route;
-    std::list<Tracing::CustomTagPtr> custom_tags;
+    std::list<Tracing::CustomTagConstSharedPtr> custom_tags;
     std::string tag;
     std::string tag_value;
   };
   std::vector<TracingTagMetaSuite> tracing_tag_meta_cases = {
       {"l-tag",
        [](const std::string& t, const std::string& v) {
-         return std::make_shared<Tracing::LiteralCustomTag>(t, v);
+         envoy::type::tracing::v2::CustomTag::Literal literal;
+         literal.set_value(v);
+         return std::make_shared<Tracing::LiteralCustomTag>(t, literal);
        }},
       {"e-tag",
        [](const std::string& t, const std::string& v) {
-         return std::make_shared<Tracing::EnvironmentCustomTag>(t, v, v);
+         envoy::type::tracing::v2::CustomTag::Environment e;
+         e.set_default_value(v);
+         return std::make_shared<Tracing::EnvironmentCustomTag>(t, e);
        }},
       {"x-tag",
        [](const std::string& t, const std::string& v) {
-         return std::make_shared<Tracing::RequestHeaderCustomTag>(t, v, v);
+         envoy::type::tracing::v2::CustomTag::Header h;
+         h.set_default_value(v);
+         return std::make_shared<Tracing::RequestHeaderCustomTag>(t, h);
        }},
       {"m-req-tag",
        [](const std::string& t, const std::string& v) {
-         return std::make_shared<Tracing::RequestMetadataCustomTag>(t, "", "", "", v);
+         envoy::type::tracing::v2::CustomTag::Metadata m;
+         m.set_default_value(v);
+         return std::make_shared<Tracing::RequestMetadataCustomTag>(t, m);
        }},
       {"m-rot-tag", [](const std::string& t, const std::string& v) {
-         return std::make_shared<Tracing::RouteMetadataCustomTag>(t, "", "", "", v);
+         envoy::type::tracing::v2::CustomTag::Metadata m;
+         m.set_default_value(v);
+         return std::make_shared<Tracing::RouteMetadataCustomTag>(t, m);
        }}};
   std::vector<TracingTagSuite> tracing_tag_cases;
   for (const TracingTagMetaSuite& ms : tracing_tag_meta_cases) {
@@ -843,17 +861,19 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
     const std::string& rv3 = ms.prefix + "-r3";
     tracing_tag_cases.push_back({false, true, {ms.factory(t3, rv3)}, t3, rv3});
   }
-  std::vector<Tracing::CustomTagPtr> conn_tracing_tags = {
-      {std::make_shared<Tracing::RequestHeaderCustomTag>(":method",
-                                                         ":method")}}; // legacy test case
-  std::vector<Tracing::CustomTagPtr> route_tracing_tags;
+  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
+  Tracing::CustomTagMap conn_tracing_tags = {
+      {method_custom_tag_ptr->tag(), method_custom_tag_ptr}}; // legacy test case
+  Tracing::CustomTagMap route_tracing_tags;
   for (TracingTagSuite& s : tracing_tag_cases) {
     if (s.has_conn) {
-      conn_tracing_tags.push_back(s.custom_tags.front());
+      const Tracing::CustomTagConstSharedPtr& ptr = s.custom_tags.front();
+      conn_tracing_tags.emplace(ptr->tag(), ptr);
       s.custom_tags.pop_front();
     }
     if (s.has_route) {
-      route_tracing_tags.push_back(s.custom_tags.front());
+      const Tracing::CustomTagConstSharedPtr& ptr = s.custom_tags.front();
+      route_tracing_tags.emplace(ptr->tag(), ptr);
       s.custom_tags.pop_front();
     }
   }
@@ -1060,14 +1080,15 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   envoy::type::FractionalPercent percent2;
   percent2.set_numerator(10000);
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress,
-      {std::make_shared<Tracing::RequestHeaderCustomTag>(":method", ":method")},
-      percent1,
-      percent2,
-      percent1,
-      false,
-      256});
+  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Egress,
+                                     {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                     percent1,
+                                     percent2,
+                                     percent1,
+                                     false,
+                                     256});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -1139,14 +1160,15 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   envoy::type::FractionalPercent percent2;
   percent2.set_numerator(10000);
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress,
-      {std::make_shared<Tracing::RequestHeaderCustomTag>(":method", ":method")},
-      percent1,
-      percent2,
-      percent1,
-      false,
-      256});
+  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Egress,
+                                     {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                     percent1,
+                                     percent2,
+                                     percent1,
+                                     false,
+                                     256});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -1213,14 +1235,15 @@ TEST_F(HttpConnectionManagerImplTest,
   envoy::type::FractionalPercent percent2;
   percent2.set_numerator(10000);
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
-      Tracing::OperationName::Egress,
-      {std::make_shared<Tracing::RequestHeaderCustomTag>(":method", ":method")},
-      percent1,
-      percent2,
-      percent1,
-      false,
-      256});
+  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Egress,
+                                     {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                     percent1,
+                                     percent2,
+                                     percent1,
+                                     false,
+                                     256});
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
                                                  An<const envoy::type::FractionalPercent&>(), _))

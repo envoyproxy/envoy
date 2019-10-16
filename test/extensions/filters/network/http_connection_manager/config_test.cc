@@ -20,6 +20,7 @@ using testing::_;
 using testing::An;
 using testing::ContainerEq;
 using testing::Return;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -245,13 +246,14 @@ tracing:
       default_value: rvalue
   - tag: req_mtag
     request_metadata:
-      filter_namespace: com.bar.foo
-      path: x.y.z
+      metadata_key:
+        filter: com.bar.foo
+        path: [ { key: xx }, { key: yy } ]
   - tag: rot_mtag
     route_metadata:
-      filter_namespace: com.bar.foo
-      path: x_y_z
-      path_separator: _
+      metadata_key:
+        filter: com.bar.foo
+        path: [ { key: xx }, { key: yy } ]
       default_value: mvalue
   max_path_tag_length: 128
 http_filters:
@@ -264,19 +266,19 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
-  const std::vector<Tracing::CustomTagPtr>& custom_tags = config.tracingConfig()->custom_tags_;
+  const Tracing::CustomTagMap& custom_tags = config.tracingConfig()->custom_tags_;
   std::vector<std::string> custom_tag_views;
-  std::transform(custom_tags.begin(), custom_tags.end(), std::back_inserter(custom_tag_views),
-                 [](const Tracing::CustomTagPtr& ctp) {
-                   return dynamic_cast<Tracing::GeneralCustomTag*>(ctp.get())->toString();
-                 });
-  ASSERT_THAT(
-      custom_tag_views,
-      ContainerEq(std::vector<std::string>(
-          {"REQUEST_HEADER|foo|foo|", "LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG|",
-           "ENVIRONMENT|etag-n|E_TAG_N|evalue", "REQUEST_HEADER|rtag|x-tag|",
-           "REQUEST_HEADER|rtag-n|x-tag-n|rvalue", "REQUEST_METADATA|req_mtag|com.bar.foo|x.y.z|",
-           "ROUTE_METADATA|rot_mtag|com.bar.foo|x_y_z|mvalue"})));
+  for (const auto& it : custom_tags) {
+    custom_tag_views.emplace_back(
+        dynamic_cast<const Tracing::GeneralCustomTag*>(it.second.get())->toString());
+  }
+  ASSERT_THAT(custom_tag_views,
+              UnorderedElementsAre("REQUEST_HEADER|foo|foo|", "LITERAL|ltag|lvalue",
+                                   "ENVIRONMENT|etag|E_TAG|", "ENVIRONMENT|etag-n|E_TAG_N|evalue",
+                                   "REQUEST_HEADER|rtag|x-tag|",
+                                   "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
+                                   "REQUEST_METADATA|req_mtag|com.bar.foo|xx.yy|",
+                                   "ROUTE_METADATA|rot_mtag|com.bar.foo|xx.yy|mvalue"));
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());

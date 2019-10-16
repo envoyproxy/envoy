@@ -5,9 +5,18 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
+
+envoy_proto_library(
+    name = "http_tracer_impl_proto",
+    srcs = ["http_tracer_impl.proto"],
+    deps = [
+        "@envoy_api//envoy/type/tracing/v2:pkg",
+    ],
+)
 
 envoy_cc_test(
     name = "http_tracer_impl_test",
@@ -15,7 +24,7 @@ envoy_cc_test(
         "http_tracer_impl_test.cc",
     ],
     deps = [
-        ":utility_lib",
+        ":http_tracer_impl_proto_cc_proto",
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -32,14 +41,6 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "utility_lib",
-    hdrs = ["utility.h"],
-    deps = [
         "//test/test_common:utility_lib",
     ],
 )

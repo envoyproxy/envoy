@@ -16,12 +16,12 @@ public:
   ~MockConfig() override;
 
   MOCK_CONST_METHOD0(operationName, OperationName());
-  MOCK_CONST_METHOD0(customTags, const std::vector<CustomTagPtr>&());
+  MOCK_CONST_METHOD0(customTags, const CustomTagMap&());
   MOCK_CONST_METHOD0(verbose, bool());
   MOCK_CONST_METHOD0(maxPathTagLength, uint32_t());
 
   OperationName operation_name_{OperationName::Ingress};
-  std::vector<CustomTagPtr> custom_tags_;
+  CustomTagMap custom_tags_;
   bool verbose_{false};
 };
 

@@ -11,6 +11,9 @@
 namespace Envoy {
 namespace Tracing {
 
+class Span;
+using SpanPtr = std::unique_ptr<Span>;
+
 constexpr uint32_t DefaultMaxPathTagLength = 256;
 
 enum class OperationName { Ingress, Egress };
@@ -47,9 +50,6 @@ struct CustomTagContext {
   const StreamInfo::StreamInfo& stream_info;
 };
 
-class Span;
-using SpanPtr = std::unique_ptr<Span>;
-
 /**
  * Tracing custom tag, with tag name and how it would be applied to the span.
  */
@@ -71,7 +71,8 @@ public:
   virtual void apply(Span& span, const CustomTagContext& ctx) const PURE;
 };
 
-using CustomTagPtr = std::shared_ptr<CustomTag>;
+using CustomTagConstSharedPtr = std::shared_ptr<const CustomTag>;
+using CustomTagMap = absl::flat_hash_map<absl::string_view, CustomTagConstSharedPtr>;
 
 /**
  * Tracing configuration, it carries additional data needed to populate the span.
@@ -88,7 +89,7 @@ public:
   /**
    * @return custom tags to be attached to the active span.
    */
-  virtual const std::vector<CustomTagPtr>& customTags() const PURE;
+  virtual const CustomTagMap& customTags() const PURE;
 
   /**
    * @return true if spans should be annotated with more detailed information.

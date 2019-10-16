@@ -37,6 +37,7 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Router {
@@ -5404,13 +5405,14 @@ virtual_hosts:
               default_value: rvalue
           - tag: req_mtag
             request_metadata:
-              filter_namespace: com.bar.foo
-              path: x.y.z
+              metadata_key:
+                filter: com.bar.foo
+                path: [ { key: xx }, { key: yy } ]
           - tag: rot_mtag
             route_metadata:
-              filter_namespace: com.bar.foo
-              path: x_y_z
-              path_separator: _
+              metadata_key:
+                filter: com.bar.foo
+                path: [ { key: xx }, { key: yy } ]
               default_value: mvalue
         route: { cluster: ww2 }
   )EOF";
@@ -5440,19 +5442,19 @@ virtual_hosts:
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
 
-  const std::vector<Tracing::CustomTagPtr>& custom_tags = route3->tracingConfig()->getCustomTags();
+  const Tracing::CustomTagMap& custom_tags = route3->tracingConfig()->getCustomTags();
   std::vector<std::string> custom_tag_views;
-  std::transform(custom_tags.begin(), custom_tags.end(), std::back_inserter(custom_tag_views),
-                 [](const Tracing::CustomTagPtr& ctp) {
-                   return dynamic_cast<Tracing::GeneralCustomTag*>(ctp.get())->toString();
-                 });
-  EXPECT_THAT(
-      custom_tag_views,
-      ContainerEq(std::vector<std::string>(
-          {"LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG|", "ENVIRONMENT|etag-n|E_TAG_N|evalue",
-           "REQUEST_HEADER|rtag|x-tag|", "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
-           "REQUEST_METADATA|req_mtag|com.bar.foo|x.y.z|",
-           "ROUTE_METADATA|rot_mtag|com.bar.foo|x_y_z|mvalue"})));
+  for (const auto& it : custom_tags) {
+    custom_tag_views.emplace_back(
+        dynamic_cast<const Tracing::GeneralCustomTag*>(it.second.get())->toString());
+  }
+  EXPECT_THAT(custom_tag_views,
+              UnorderedElementsAre("LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG|",
+                                   "ENVIRONMENT|etag-n|E_TAG_N|evalue",
+                                   "REQUEST_HEADER|rtag|x-tag|",
+                                   "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
+                                   "REQUEST_METADATA|req_mtag|com.bar.foo|xx.yy|",
+                                   "ROUTE_METADATA|rot_mtag|com.bar.foo|xx.yy|mvalue"));
 }
 
 // Test to check Prefix Rewrite for redirects

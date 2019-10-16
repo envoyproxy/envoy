@@ -477,7 +477,7 @@ private:
 
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    const std::vector<Tracing::CustomTagPtr>& customTags() const override;
+    const Tracing::CustomTagMap& customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
 
@@ -634,7 +634,7 @@ private:
     // response.
     bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
-    std::vector<Tracing::CustomTagPtr> tracing_custom_tags_;
+    Tracing::CustomTagMap tracing_custom_tags_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
