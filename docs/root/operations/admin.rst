@@ -372,7 +372,7 @@ modify different aspects of the server:
   but in response to user requests on high core-count machines, this
   can cause performance issues due to mutex contention.
 
-  This option requires Envoy to be started with `use-fake-symbol-table 0`.
+  This admin endpoint requires Envoy to be started with :option:`use-fake-symbol-table 0`.
 
   See :repo:`source/docs/stats.md` for more details.
 
@@ -396,10 +396,9 @@ modify different aspects of the server:
 
   .. http:post:: /stats/recentlookups/clear
 
-  Clears all outstanding lookups and counts. If called when recent lookup
-  collection is enabled, this clears all the, but collection
-  continues. If called when recent lookup collection is disabled,
-  there is no effect, as disabling collection clears the data.
+  Clears all outstanding lookups and counts. This clears all recent
+  lookups data as well as the count, but collection continues if
+  it is enabled.
 
   See :repo:`source/docs/stats.md` for more details.
 
