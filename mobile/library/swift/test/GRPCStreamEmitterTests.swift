@@ -5,10 +5,14 @@ import XCTest
 private let kMessageData = Data([1, 2, 3, 4])
 
 private final class MockEmitter: StreamEmitter {
-  private let onSendData: (Data) -> Void
+  private let onSendData: (_ data: Data) -> Void
+  private let onClose: ((_ trailers: [String: [String]]?) -> Void)?
 
-  init(onSendData: @escaping (Data) -> Void) {
+  init(onSendData: @escaping (_ data: Data) -> Void,
+       onClose: ((_ trailers: [String: [String]]?) -> Void)? = nil)
+  {
     self.onSendData = onSendData
+    self.onClose = onClose
   }
 
   func sendData(_ data: Data) -> StreamEmitter {
@@ -20,7 +24,10 @@ private final class MockEmitter: StreamEmitter {
     return self
   }
 
-  func close(trailers: [String: [String]]?) {}
+  func close(trailers: [String: [String]]?) {
+    self.onClose?(trailers)
+  }
+
   func cancel() {}
 }
 
@@ -58,5 +65,13 @@ final class GRPCStreamEmitterTests: XCTestCase {
     let grpcEmitter = GRPCStreamEmitter(emitter: mockEmitter)
     grpcEmitter.sendMessage(kMessageData)
     XCTAssertEqual(kMessageData, sentData.subdata(in: 5..<sentData.count))
+  }
+
+  func testCloseIsCalledWithNilTrailersInOrderToCloseWithEmptyDataFrame() {
+    var sentTrailers: [String: [String]]? = ["x": ["invalid"]]
+    let mockEmitter = MockEmitter(onSendData: { _ in }, onClose: { sentTrailers = $0 })
+    let grpcEmitter = GRPCStreamEmitter(emitter: mockEmitter)
+    grpcEmitter.close()
+    XCTAssertNil(sentTrailers)
   }
 }
