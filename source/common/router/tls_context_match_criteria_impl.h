@@ -6,9 +6,6 @@
 namespace Envoy {
 namespace Router {
 
-class TlsContextMatchCriteriaImpl;
-using TlsContextMatchCriteriaImplConstPtr = std::unique_ptr<const TlsContextMatchCriteriaImpl>;
-
 class TlsContextMatchCriteriaImpl : public TlsContextMatchCriteria {
 public:
   TlsContextMatchCriteriaImpl(

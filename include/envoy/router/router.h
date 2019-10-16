@@ -691,7 +691,8 @@ public:
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
-   * @return TlsContextMatchCriteria* the tls context match criterion for this route.
+   * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
+   * tls context match criteria, nullptr is returned.
    */
   virtual const TlsContextMatchCriteria* tlsContextMatchCriteria() const PURE;
 

@@ -5,7 +5,6 @@ namespace Router {
 
 TlsContextMatchCriteriaImpl::TlsContextMatchCriteriaImpl(
     const ::envoy::api::v2::route::RouteMatch_TlsContextMatchOptions& options) {
-
   if (options.has_presented()) {
     presented_ = options.presented().value();
   }
