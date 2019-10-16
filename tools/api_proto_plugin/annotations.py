@@ -5,7 +5,7 @@ from collections import namedtuple
 import re
 
 # Key-value annotation regex.
-ANNOTATION_REGEX = re.compile('\[#([\w-]+?):(.*?)\](\s?)', re.DOTALL)
+ANNOTATION_REGEX = re.compile('\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
 
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'
@@ -89,12 +89,12 @@ def XformAnnotation(s, annotation_xforms):
     annotation_xform = annotation_xforms.get(annotation)
     if annotation_xform:
       value = annotation_xform(annotation)
-      return "[#%s:%s]%s" % (annotation, value, trailing) if value is not None else ""
+      return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
     else:
       return match.group(0)
 
   def append(s, annotation, content):
-    return "%s [#%s:%s]\n" % (s, annotation, content)
+    return '%s [#%s: %s]\n' % (s, annotation, content)
 
   xformed = re.sub(ANNOTATION_REGEX, xform, s)
   for annotation, xform in sorted(annotation_xforms.items()):

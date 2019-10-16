@@ -91,7 +91,7 @@ class SourceCodeInfo(object):
     location = self.LocationPathLookup(path)
     if location is not None:
       return Comment(location.leading_comments, self.file_level_annotations)
-    return Comment('', None)
+    return Comment('')
 
   def LeadingDetachedCommentsPathLookup(self, path):
     """Lookup leading detached comments by path in SourceCodeInfo.
