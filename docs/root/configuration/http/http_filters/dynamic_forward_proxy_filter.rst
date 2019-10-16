@@ -21,12 +21,6 @@ HTTP dynamic forward proxy.
 
 .. note::
 
-  The HTTP connection manager :ref:`allow_absolute_url
-  <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` parameter has been set to true
-  to allow Envoy to proxy absolute HTTP URLs.
-
-.. note::
-
   Configuring a :ref:`tls_context <envoy_api_field_Cluster.tls_Context>` on the cluster with
   *trusted_ca* certificates instructs Envoy to use TLS when connecting to upstream hosts and verify
   the certificate chain. Additionally, Envoy will automatically perform SAN verification for the
@@ -55,8 +49,6 @@ HTTP dynamic forward proxy.
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
-            http_protocol_options:
-              allow_absolute_url: true
             route_config:
               name: local_route
               virtual_hosts:
