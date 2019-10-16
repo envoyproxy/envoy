@@ -531,7 +531,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
-  EXPECT_EQ(std::chrono::seconds(1), config.idleTimeout().value());
+  EXPECT_EQ(std::chrono::hours(1), config.idleTimeout().value());
 }
 
 // Validate that idle_timeouts can be turned off
@@ -549,7 +549,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
-  EXPECT_FALSE(std::chrono::seconds(1), config.idleTimeout().has_value());
+  EXPECT_FALSE(config.idleTimeout().has_value());
 }
 
 // Check that the default max request header count is 100.
