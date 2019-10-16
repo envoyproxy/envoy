@@ -82,8 +82,6 @@ public:
 
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
-  AsyncClientImplTracingTest() : AsyncClientImplTest() {}
-
   Tracing::MockSpan parent_span_;
 };
 
