@@ -203,6 +203,15 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
   runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
 }
 
+void EnvoyQuicServerStream::OnClose() {
+  quic::QuicSpdyServerStreamBase::OnClose();
+  if (BufferedDataBytes() > 0) {
+    // If the stream is closed without sending out all bufferred data, regard
+    // them as sent now and adjust connection buffer book keeping.
+    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(0 - BufferedDataBytes());
+  }
+}
+
 void EnvoyQuicServerStream::OnCanWrite() {
   uint64_t buffered_data_old = BufferedDataBytes();
   quic::QuicSpdyServerStreamBase::OnCanWrite();

@@ -48,6 +48,9 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL);
   ActivateStream(absl::WrapUnique(stream));
   setUpRequestDecoder(*stream);
+  if (aboveHighWatermark()) {
+    stream->runHighWatermarkCallbacks();
+  }
   return stream;
 }
 

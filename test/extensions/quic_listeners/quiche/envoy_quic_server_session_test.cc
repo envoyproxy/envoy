@@ -548,6 +548,32 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
   stream2->encodeData(buffer2, false);
 
+  // Receive another request, the new stream should be notified about connection
+  // high watermark reached upon creation.
+  Http::MockStreamDecoder request_decoder3;
+  Http::MockStreamCallbacks stream_callbacks3;
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
+      .WillOnce(Invoke([&request_decoder3, &stream_callbacks3](Http::StreamEncoder& encoder,
+                                                               bool) -> Http::StreamDecoder& {
+        encoder.getStream().addCallbacks(stream_callbacks3);
+        return request_decoder3;
+      }));
+  EXPECT_CALL(stream_callbacks3, onAboveWriteBufferHighWatermark());
+  auto stream3 =
+      dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id + 8));
+  EXPECT_CALL(request_decoder3, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
+        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+                  decoded_headers->Method()->value().getStringView());
+      }));
+  EXPECT_CALL(request_decoder3, decodeData(_, true))
+      .Times(testing::AtMost(1))
+      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) { EXPECT_EQ(0, buffer.length()); }));
+  stream3->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
+                              request_headers);
+
   // Update flow control window for stream1.
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, stream1->id(),
                                              32 * 1024);
@@ -575,12 +601,29 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   // come down below low watermark.
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark)
       .WillOnce(Invoke([this]() {
-        // This call shouldn't be propagate to streams because they both wrote to end
-        // of stream.
+        // This call shouldn't be propagate to stream1 and stream2 because they both wrote to the
+        // end of stream.
         http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
       }));
+  EXPECT_CALL(stream_callbacks3, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([=]() {
+    std::string super_large_response(40 * 1024, 'a');
+    Buffer::OwnedImpl buffer(super_large_response);
+    // This call will buffer 24k on stream3, raise the buffered bytes above
+    // high watermarks of the stream and connection.
+    // But callback will not propogate to stream_callback3 as the steam is
+    // ended locally.
+    stream3->encodeData(buffer, true);
+  }));
+  EXPECT_CALL(network_connection_callbacks_, onAboveWriteBufferHighWatermark());
   envoy_quic_session_.OnCanWrite();
   EXPECT_TRUE(stream2->flow_controller()->IsBlocked());
+
+  // Resetting stream3 should lower the bufferred bytes, but callbacks will not
+  // be triggered because reset callback has been already triggerred.
+  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, ""));
+  // Connection buffered data book keeping should also be updated.
+  EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark());
+  stream3->resetStream(Http::StreamResetReason::LocalReset);
 
   // Update flow control window for stream1.
   quic::QuicWindowUpdateFrame window_update3(quic::kInvalidControlFrameId, stream1->id(),

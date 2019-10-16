@@ -35,6 +35,7 @@ public:
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
+  void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicServerSessionBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
