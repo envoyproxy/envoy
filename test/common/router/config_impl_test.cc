@@ -5644,6 +5644,58 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, TlsContextMatching) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/peer-cert-test"
+          tls_context:
+            presented: true
+        route:
+          cluster: server_peer-cert-presented
+      - match:
+          prefix: "/peer-cert-test"
+          tls_context:
+            presented: false
+        route:
+          cluster: server_peer-cert-not-presented
+      - match:
+          prefix: "/peer-cert-no-tls-context-match"
+        route:
+          cluster: server_peer-cert-no-tls-context-match
+      - match:
+          prefix: "/"
+        route:
+          cluster: local_service_without_headers
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
+    EXPECT_EQ("server_peer-cert-presented", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
+    EXPECT_EQ("server_peer-cert-not-presented", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+}
+
 TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
 
   // Setup regex route entry. the regex is trivial, that's ok as we only want to test that
