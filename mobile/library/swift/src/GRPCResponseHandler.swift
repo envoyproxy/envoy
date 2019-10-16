@@ -28,6 +28,8 @@ public final class GRPCResponseHandler: NSObject {
   ///
   /// - parameter closure: Closure which will receive the headers, gRPC status,
   ///                      and flag indicating if the stream is headers-only.
+  ///
+  /// - returns: This handler, which may be used for chaining syntax.
   @discardableResult
   public func onHeaders(_ closure:
     @escaping (_ headers: [String: [String]], _ grpcStatus: Int, _ endStream: Bool) -> Void)
@@ -44,6 +46,8 @@ public final class GRPCResponseHandler: NSObject {
   /// Specify a callback for when a new message has been received by the stream.
   ///
   /// - parameter closure: Closure which will receive messages on the stream.
+  ///
+  /// - returns: This handler, which may be used for chaining syntax.
   @discardableResult
   public func onMessage(_ closure:
     @escaping (_ message: Data) -> Void)
@@ -65,6 +69,8 @@ public final class GRPCResponseHandler: NSObject {
   /// If the closure is called, the stream is complete.
   ///
   /// - parameter closure: Closure which will receive the trailers.
+  ///
+  /// - returns: This handler, which may be used for chaining syntax.
   @discardableResult
   public func onTrailers(_ closure:
     @escaping (_ trailers: [String: [String]]) -> Void)
@@ -78,6 +84,8 @@ public final class GRPCResponseHandler: NSObject {
   /// If the closure is called, the stream is complete.
   ///
   /// - parameter closure: Closure which will be called when an error occurs.
+  ///
+  /// - returns: This handler, which may be used for chaining syntax.
   @discardableResult
   public func onError(_ closure:
     @escaping (_ error: EnvoyError) -> Void)
