@@ -97,6 +97,8 @@ public:
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
+  // Update the book keeping of the aggregated buffered bytes cross all the
+  // streams, and run watermark check.
   void adjustBytesToSend(int64_t delta);
 
 protected:

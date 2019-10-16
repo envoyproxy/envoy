@@ -31,15 +31,23 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSp
                                              quic::StreamType type)
     : quic::QuicSpdyServerStreamBase(id, session, type),
       EnvoyQuicStream(
-          2 * GetQuicFlag(FLAGS_quic_buffered_data_threshold),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+          // This should be larger than 8k to fully utilize congestion control
+          // window. And no larger than the max stream flow control window for
+          // the stream to buffer all the data.
+          // Ideally this limit should also corelate to peer's receive window
+          // but not fully depends on that.
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }) {}
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
                                              quic::QuicSpdySession* session, quic::StreamType type)
     : quic::QuicSpdyServerStreamBase(pending, session, type),
       EnvoyQuicStream(
-          session->config()->ReceivedInitialStreamFlowControlWindowBytes(),
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+          // This should be larger than 8k to fully utilize congestion control
+          // window. And no larger than the max stream flow control window for
+          // the stream to buffer all the data.
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }) {}
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
@@ -64,13 +72,8 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
 
   uint64_t bytes_to_send_new = BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  if (bytes_to_send_new > bytes_to_send_old) {
-    // If buffered bytes changed, update stream and session's watermark book
-    // keeping.
-    sendBufferSimulation().checkHighWatermark(bytes_to_send_new);
-    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(bytes_to_send_new -
-                                                                        bytes_to_send_old);
-  }
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new,
+                      dynamic_cast<EnvoyQuicServerSession&>(*session()));
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
@@ -207,11 +210,8 @@ void EnvoyQuicServerStream::OnCanWrite() {
   // As long as OnCanWriteNewData() is no-op, data to sent in buffer shouldn't
   // increase.
   ASSERT(buffered_data_new <= buffered_data_old);
-  if (buffered_data_new < buffered_data_old) {
-    sendBufferSimulation().checkLowWatermark(buffered_data_new);
-    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(buffered_data_new -
-                                                                        buffered_data_old);
-  }
+  maybeCheckWatermark(buffered_data_old, buffered_data_new,
+                      dynamic_cast<EnvoyQuicServerSession&>(*session()));
 }
 
 uint32_t EnvoyQuicServerStream::streamId() { return id(); }

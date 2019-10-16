@@ -43,10 +43,9 @@ void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
 }
 
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
-  // TODO(danzh): add interface to quic for connection level buffer throttling.
-  // Currently read buffer is capped by connection level flow control. And
-  // write buffer limit is set during construction. Change buffer limit during
-  // the life time of connection is not supported.
+  // Currently read buffer is capped by connection level flow control. And write buffer limit is set
+  // during construction. Changing the buffer limit during the life time of the connection is not
+  // supported.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 

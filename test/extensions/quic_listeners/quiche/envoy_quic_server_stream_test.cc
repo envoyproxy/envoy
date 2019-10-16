@@ -94,7 +94,6 @@ public:
         stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
-    quic::SetVerbosityLogThreshold(2);
     quic_stream_->setDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
@@ -305,8 +304,11 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
 
 TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   std::string large_request(1024, 'a');
+  // Sending such large request will cause read to be disabled.
   size_t payload_offset = sendRequest(large_request, false, 512);
   EXPECT_FALSE(quic_stream_->HasBytesToRead());
+  // Disable reading one more time.
+  quic_stream_->readDisable(true);
   std::string second_part_request("bbb");
   if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
     std::unique_ptr<char[]> data_buffer;
@@ -321,6 +323,9 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   quic::QuicStreamFrame frame(stream_id_, false, payload_offset, second_part_request);
   EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
   quic_stream_->OnStreamFrame(frame);
+
+  // Re-enable reading just once shouldn't unblock stream.
+  quic_stream_->readDisable(false);
 
   // This data frame should also be buffered.
   std::string last_part_request("ccc");

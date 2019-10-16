@@ -28,7 +28,7 @@ public:
 
   void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_above_high_watermark_ && bytes_buffered > high_watermark_) {
-      // Just exceeds high watermark.
+      // Just exceeded the high watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross high watermark {}",
                           bytes_buffered, high_watermark_);
       is_above_high_watermark_ = true;
@@ -39,7 +39,7 @@ public:
 
   void checkLowWatermark(uint32_t bytes_buffered) {
     if (low_watermark_ > 0 && !is_below_low_watermark_ && bytes_buffered < low_watermark_) {
-      // Just cross low watermark.
+      // Just crossed the low watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross low watermark {}",
                           bytes_buffered, low_watermark_);
       is_below_low_watermark_ = true;

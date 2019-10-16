@@ -25,6 +25,13 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
   // Network::UdpListenerCallbacks which should be called at the beginning
   // of HandleReadEvent(). And this callback should call quic::Dispatcher::ProcessBufferedChlos().
   SetQuicFlag(FLAGS_quic_allow_chlo_buffering, false);
+  // Set send buffer twice of max flow control window to ensure that stream send
+  // buffer always takes all the data.
+  // The max amount of data buffered is the per-stream high watermark + the max
+  // flow control window of upstream. The per-stream high watermark should be
+  // smaller than max flow control window to make sure upper stream can be flow
+  // control blocked early enough not to send more than the threshold allows.
+  SetQuicFlag(FLAGS_quic_buffered_data_threshold, 2 * 16 * 1024 * 1024); // 32MB
 }
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,

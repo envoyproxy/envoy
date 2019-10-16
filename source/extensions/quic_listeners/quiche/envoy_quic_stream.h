@@ -6,6 +6,7 @@
 #include "common/http/codec_helper.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
+#include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -29,7 +30,6 @@ public:
     bool status_changed{false};
     if (disable) {
       ++read_disable_counter_;
-      ASSERT(read_disable_counter_ == 1);
       if (read_disable_counter_ == 1) {
         status_changed = true;
       }
@@ -57,6 +57,21 @@ public:
   // any headers and data.
   void setDecoder(Http::StreamDecoder& decoder) { decoder_ = &decoder; }
 
+  void maybeCheckWatermark(uint64_t buffered_data_old, uint64_t buffered_data_new,
+                           QuicFilterManagerConnectionImpl& connection) {
+    if (buffered_data_new == buffered_data_old) {
+      return;
+    }
+    // If buffered bytes changed, update stream and session's watermark book
+    // keeping.
+    if (buffered_data_new > buffered_data_old) {
+      send_buffer_simulation_.checkHighWatermark(buffered_data_new);
+    } else {
+      send_buffer_simulation_.checkLowWatermark(buffered_data_new);
+    }
+    connection.adjustBytesToSend(buffered_data_new - buffered_data_old);
+  }
+
 protected:
   virtual void switchStreamBlockState(bool should_block) PURE;
 
@@ -69,7 +84,6 @@ protected:
     return decoder_;
   }
 
-  EnvoyQuicSimulatedWatermarkBuffer& sendBufferSimulation() { return send_buffer_simulation_; }
   // True once end of stream is propergated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
