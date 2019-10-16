@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Config {
 
 /**
- * MetadataKey present the path key to retrieve value from metadata.
+ * MetadataKey presents the filter and path to retrieve value from metadata.
  */
 struct MetadataKey {
   std::string filter_;
@@ -50,10 +50,9 @@ public:
                                                  const std::string& filter,
                                                  const std::vector<std::string>& path);
   /**
-   * Lookup value by a multi-key path for a given filter in Metadata. If path is empty
-   * will return the empty struct.
+   * Lookup the value by a metadata key from a Metadata.
    * @param metadata reference.
-   * @param metadata_key describes the path key.
+   * @param metadata_key for the key of filter and path.
    * @return const ProtobufWkt::Value& value if found, empty if not found.
    */
   static const ProtobufWkt::Value& metadataValue(const envoy::api::v2::core::Metadata& metadata,
