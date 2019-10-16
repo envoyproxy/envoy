@@ -21,42 +21,6 @@ public:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  // IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
-  //   initialize();
-  //   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-  //   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  //   auto encoder_decoder =
-  //       codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
-  //                                                           {":path", "/test/long/url"},
-  //                                                           {":scheme", "http"},
-  //                                                           {":authority", "host"}});
-  //   request_encoder_ = &encoder_decoder.first;
-  //   auto response = std::move(encoder_decoder.second);
-  //   AssertionResult result =
-  //       fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-  //   RELEASE_ASSERT(result, result.message());
-  //   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
-  //   RELEASE_ASSERT(result, result.message());
-  //   result = upstream_request_->waitForHeadersComplete();
-  //   RELEASE_ASSERT(result, result.message());
-  //   return response;
-  // }
-
-  // void sleep() { test_time_.timeSystem().sleep(std::chrono::milliseconds(IdleTimeoutMs / 2)); }
-
-  // void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
-  //                     absl::string_view stat_prefix = "http.config_test") {
-  //   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-  //     codec_client_->waitForDisconnect();
-  //   } else {
-  //     response.waitForReset();
-  //     codec_client_->close();
-  //   }
-  //   if (!stat_name.empty()) {
-  //     EXPECT_EQ(1, test_server_->counter(fmt::format("{}.{}", stat_prefix, stat_name))->value());
-  //   }
-  // }
-
   // TODO(htuch): This might require scaling for TSAN/ASAN/Valgrind/etc. Bump if
   // this is the cause of flakes.
   static constexpr uint64_t MaxConnectionDurationMs = 400;
@@ -69,8 +33,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, ConnectionDurationIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Tests idle timeout behaviour with single request and validates that idle timer kicks in
-// after given timeout.
+// Test connection is closed after single request processed.
 TEST_P(ConnectionDurationIntegrationTest, TimeoutBasic) {
   enable_connection_duration_timeout_ = true;
   initialize();
@@ -92,6 +55,7 @@ TEST_P(ConnectionDurationIntegrationTest, TimeoutBasic) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
+// Test inflight request is processed correctly when timeout fires during request processing.
 TEST_P(ConnectionDurationIntegrationTest, InflightRequest) {
   enable_connection_duration_timeout_ = true;
   initialize();
@@ -100,8 +64,10 @@ TEST_P(ConnectionDurationIntegrationTest, InflightRequest) {
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest();
 
+  // block and wait for counter to increase
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 
+  // ensure request processed correctly
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
   response->waitForEndStream();
@@ -113,7 +79,7 @@ TEST_P(ConnectionDurationIntegrationTest, InflightRequest) {
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
-
+// Test connection is closed if no http requests were processed
 TEST_P(ConnectionDurationIntegrationTest, TimeoutNoHttpRequest) {
   enable_connection_duration_timeout_ = true;
   initialize();
