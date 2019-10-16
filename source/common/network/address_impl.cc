@@ -43,9 +43,9 @@ void validateIpv6Supported(const std::string& address) {
   }
 }
 
-// Returns the abstract path with embedded nulls replaces with '@'.
-std::string friendlyNameFromAbstractPath(const char* path, size_t num) {
-  std::string friendly_name(path, num);
+// Construsts a readable string with the embedded nulls in the abstract path replaced with '@'.
+std::string friendlyNameFromAbstractPath(absl::string_view path) {
+  std::string friendly_name(path.data(), path.size());
   std::replace(friendly_name.begin(), friendly_name.end(), '\0', '@');
   return friendly_name;
 }
@@ -350,7 +350,8 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
   address_ = *address;
   if (abstract_namespace_) {
     // Replace all null characters with '@' in friendly_name_.
-    friendly_name_ = friendlyNameFromAbstractPath(address_.sun_path, address_length_);
+    friendly_name_ =
+        friendlyNameFromAbstractPath(absl::string_view(address_.sun_path, address_length_));
   } else {
     friendly_name_ = address->sun_path;
   }
@@ -378,7 +379,8 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
     memcpy(&address_.sun_path[0], pipe_path.data(), pipe_path.size());
     address_.sun_path[0] = '\0';
     address_.sun_path[pipe_path.size()] = '\0';
-    friendly_name_ = friendlyNameFromAbstractPath(address_.sun_path, address_length_);
+    friendly_name_ =
+        friendlyNameFromAbstractPath(absl::string_view(address_.sun_path, address_length_));
   } else {
     // Throw an error if the pipe path has an embedded null character.
     if (pipe_path.size() != strlen(pipe_path.c_str())) {
