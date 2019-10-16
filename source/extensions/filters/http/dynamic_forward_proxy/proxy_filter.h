@@ -37,7 +37,7 @@ public:
   const std::string& hostRewrite() const { return host_rewrite_; }
 
 private:
-  std::string host_rewrite_;
+  const std::string host_rewrite_;
 };
 
 class ProxyFilter
