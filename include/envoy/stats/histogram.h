@@ -81,6 +81,8 @@ public:
    * integer.
    */
   enum class Unit {
+    Null,        // The histogram has been rejected, i.e. it's a null histogram and is not recording
+                 // anything.
     Unspecified, // Measured quantity does not require a unit, e.g. "items".
     Bytes,
     Microseconds,
@@ -88,15 +90,6 @@ public:
   };
 
   ~Histogram() override = default;
-
-  /**
-   * Indicates whether the histogram is recording.
-   *
-   * @return true if the histogram is recording values (or can be recording values, but has not been
-   * used yet), false if the histogram has been rejected by the stat matching and is essentially a
-   * NOP histogram (aka NullHistogram).
-   */
-  virtual bool active() const PURE;
 
   /**
    * @return the unit of measurement for values recorded by the histogram.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -15,9 +16,9 @@ public:
   virtual ~CompletableTimespan() = default;
 
   /**
-   * Time elapsed since the creation of the timespan, in milliseconds.
+   * Time elapsed since the creation of the timespan.
    */
-  virtual uint64_t elapsedMs() PURE;
+  virtual std::chrono::milliseconds elapsed() const PURE;
 
   /**
    * Complete the timespan.

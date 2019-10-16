@@ -81,7 +81,6 @@ public:
   }
 
   // Stats::Histogram
-  bool active() const override { return true; }
   Unit unit() const override { return unit_; };
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
@@ -108,8 +107,7 @@ public:
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
-  bool active() const override { return false; }
-  Unit unit() const override { return Unit::Unspecified; };
+  Unit unit() const override { return Unit::Null; };
   void recordValue(uint64_t) override {}
 
 private:

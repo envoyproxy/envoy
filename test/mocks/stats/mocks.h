@@ -214,9 +214,6 @@ public:
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
-  // Histogram
-  bool active() const override { return true; }
-
   Unit unit_{Histogram::Unit::Unspecified};
   Store* store_;
 
@@ -243,9 +240,6 @@ public:
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
-
-  // Histogram
-  bool active() const override { return true; }
 
   bool used_;
   Unit unit_{Histogram::Unit::Unspecified};

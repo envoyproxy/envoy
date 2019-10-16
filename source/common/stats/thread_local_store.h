@@ -48,7 +48,6 @@ public:
   }
 
   // Stats::Histogram
-  bool active() const override { return true; }
   Histogram::Unit unit() const override {
     // If at some point ThreadLocalHistogramImpl will hold a pointer to its parent we can just
     // return parent's unit here and not store it separately.
@@ -86,7 +85,6 @@ public:
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
 
   // Stats::Histogram
-  bool active() const override { return true; }
   Histogram::Unit unit() const override;
   void recordValue(uint64_t value) override;
 

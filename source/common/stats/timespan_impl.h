@@ -1,7 +1,5 @@
 #pragma once
 
-#include <chrono>
-
 #include "envoy/common/time.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
@@ -21,14 +19,15 @@ public:
   HistogramCompletableTimespanImpl(Histogram& histogram, TimeSource& time_source);
 
   // Stats::CompletableTimespan
-  uint64_t elapsedMs() override;
+  std::chrono::milliseconds elapsed() const override;
   void complete() override;
 
 private:
-  template <typename TimeUnit> TimeUnit elapsed() {
+  void ensureTimeHistogram(const Histogram& histogram) const;
+  template <typename TimeUnit> TimeUnit elapsedDuration() const {
     return std::chrono::duration_cast<TimeUnit>(time_source_.monotonicTime() - start_);
   }
-  uint64_t tickCount();
+  uint64_t tickCount() const;
 
   TimeSource& time_source_;
   Histogram& histogram_;
