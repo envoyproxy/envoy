@@ -18,7 +18,6 @@
 
 using testing::_;
 using testing::An;
-using testing::ContainerEq;
 using testing::Return;
 using testing::UnorderedElementsAre;
 
