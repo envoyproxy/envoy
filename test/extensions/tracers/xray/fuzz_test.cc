@@ -7,6 +7,8 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
+// TODO(@marcomagdy): @htuch suggests to compare results with re2 (after replacing * with .* and ?
+// with '.' and doing proper regex escaping)
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   absl::string_view pattern, input;
   if (len > 1) {
