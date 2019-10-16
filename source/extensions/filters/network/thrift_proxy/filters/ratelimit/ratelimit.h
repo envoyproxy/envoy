@@ -130,7 +130,8 @@ public:
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
-                Http::HeaderMapPtr&& headers) override;
+                Http::HeaderMapPtr&& response_headers_to_add,
+                Http::HeaderMapPtr&& request_headers_to_add) override;
 
 private:
   void initiateCall(const ThriftProxy::MessageMetadata& metadata);
