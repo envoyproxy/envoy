@@ -8,10 +8,13 @@ import shlex
 import subprocess
 from pathlib import Path
 
+
 def runBazelBuildForCompilationDatabase(bazel_options, bazel_targets):
-  query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(' union '.join(bazel_targets))
+  query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(
+      ' union '.join(bazel_targets))
   build_targets = subprocess.check_output(["bazel", "query", query]).decode().splitlines()
   subprocess.check_call(["bazel", "build"] + bazel_options + build_targets)
+
 
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
 def generateCompilationDatabase(args):
@@ -19,7 +22,8 @@ def generateCompilationDatabase(args):
   # binaries so just always strip and use dynamic link to minimize download size.
   bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
       "-c", "fastbuild", "--build_tag_filters=-manual",
-      "--experimental_remote_download_outputs=all", "--strip=always"]
+      "--experimental_remote_download_outputs=all", "--strip=always"
+  ]
   if args.run_bazel_build:
     runBazelBuildForCompilationDatabase(bazel_options, args.bazel_targets)
 
