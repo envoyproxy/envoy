@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -270,6 +271,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
@@ -405,6 +407,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
+        "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],

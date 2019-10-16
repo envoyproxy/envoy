@@ -9,7 +9,7 @@ option java_generic_services = true;
 
 import "envoy/api/v3alpha/discovery.proto";
 import "envoy/api/v3alpha/endpoint/endpoint.proto";
-import "envoy/type/percent.proto";
+import "envoy/type/v3alpha/percent.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -54,7 +54,7 @@ message ClusterLoadAssignment {
       string category = 1 [(validate.rules).string = {min_bytes: 1}];
 
       // Percentage of traffic that should be dropped for the category.
-      type.FractionalPercent drop_percentage = 2;
+      type.v3alpha.FractionalPercent drop_percentage = 2;
     }
 
     reserved 1;
@@ -115,9 +115,9 @@ message ClusterLoadAssignment {
   }
 
   // Name of the cluster. This will be the :ref:`service_name
-  // <envoy_api_field_Cluster.EdsClusterConfig.service_name>` value if specified
+  // <envoy_api_field_api.v3alpha.Cluster.EdsClusterConfig.service_name>` value if specified
   // in the cluster :ref:`EdsClusterConfig
-  // <envoy_api_msg_Cluster.EdsClusterConfig>`.
+  // <envoy_api_msg_api.v3alpha.Cluster.EdsClusterConfig>`.
   string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // List of endpoints to load balance to.

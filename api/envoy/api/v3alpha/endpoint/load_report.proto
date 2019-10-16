@@ -16,7 +16,7 @@ import "validate/validate.proto";
 
 // These are stats Envoy reports to GLB every so often. Report frequency is
 // defined by
-// :ref:`LoadStatsResponse.load_reporting_interval<envoy_api_field_load_stats.LoadStatsResponse.load_reporting_interval>`.
+// :ref:`LoadStatsResponse.load_reporting_interval<envoy_api_field_service.load_stats.v3alpha.LoadStatsResponse.load_reporting_interval>`.
 // Stats per upstream region/zone and optionally per subzone.
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message UpstreamLocalityStats {
@@ -45,7 +45,7 @@ message UpstreamLocalityStats {
 
   // Endpoint granularity stats information for this locality. This information
   // is populated if the Server requests it by setting
-  // :ref:`LoadStatsResponse.report_endpoint_granularity<envoy_api_field_load_stats.LoadStatsResponse.report_endpoint_granularity>`.
+  // :ref:`LoadStatsResponse.report_endpoint_granularity<envoy_api_field_service.load_stats.v3alpha.LoadStatsResponse.report_endpoint_granularity>`.
   repeated UpstreamEndpointStats upstream_endpoint_stats = 7;
 
   // [#not-implemented-hide:] The priority of the endpoint group these metrics
@@ -106,7 +106,7 @@ message EndpointLoadMetricStats {
 }
 
 // Per cluster load stats. Envoy reports these stats a management server in a
-// :ref:`LoadStatsRequest<envoy_api_msg_load_stats.LoadStatsRequest>`
+// :ref:`LoadStatsRequest<envoy_api_msg_service.load_stats.v3alpha.LoadStatsRequest>`
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // Next ID: 7
 message ClusterStats {

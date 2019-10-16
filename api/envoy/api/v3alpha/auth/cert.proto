@@ -124,12 +124,12 @@ message TlsCertificate {
   core.DataSource private_key = 2;
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
-  // <envoy_api_field_auth.TlsCertificate.private_key>` field. This can't be
+  // <envoy_api_field_api.v3alpha.auth.TlsCertificate.private_key>` field. This can't be
   // marked as ``oneof`` due to API compatibility reasons. Setting both :ref:`private_key
-  // <envoy_api_field_auth.TlsCertificate.private_key>` and
+  // <envoy_api_field_api.v3alpha.auth.TlsCertificate.private_key>` and
   // :ref:`private_key_provider
-  // <envoy_api_field_auth.TlsCertificate.private_key_provider>` fields will result in an
-  // error.
+  // <envoy_api_field_api.v3alpha.auth.TlsCertificate.private_key_provider>` fields will result in
+  // an error.
   PrivateKeyProvider private_key_provider = 6;
 
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
@@ -149,10 +149,11 @@ message TlsSessionTicketKeys {
   // All keys are candidates for decrypting received tickets. This allows for easy rotation of keys
   // by, for example, putting the new key first, and the previous key second.
   //
-  // If :ref:`session_ticket_keys <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys>`
-  // is not specified, the TLS library will still support resuming sessions via tickets, but it will
-  // use an internally-generated and managed key, so sessions cannot be resumed across hot restarts
-  // or on different hosts.
+  // If :ref:`session_ticket_keys
+  // <envoy_api_field_api.v3alpha.auth.DownstreamTlsContext.session_ticket_keys>` is not specified,
+  // the TLS library will still support resuming sessions via tickets, but it will use an
+  // internally-generated and managed key, so sessions cannot be resumed across hot restarts or on
+  // different hosts.
   //
   // Each key must contain exactly 80 bytes of cryptographically-secure random data. For
   // example, the output of ``openssl rand 80``.
@@ -176,14 +177,14 @@ message CertificateValidationContext {
   // for listeners). If not specified and a peer certificate is presented it will not be
   // verified. By default, a client certificate is optional, unless one of the additional
   // options (:ref:`require_client_certificate
-  // <envoy_api_field_auth.DownstreamTlsContext.require_client_certificate>`,
+  // <envoy_api_field_api.v3alpha.auth.DownstreamTlsContext.require_client_certificate>`,
   // :ref:`verify_certificate_spki
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`,
+  // <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`, or
+  // <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_certificate_hash>`, or
   // :ref:`verify_subject_alt_name
-  // <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`) is also
-  // specified.
+  // <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_subject_alt_name>`) is
+  // also specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify
   // that the presented peer certificate has not been revoked by one of the included CRLs.
@@ -211,15 +212,16 @@ message CertificateValidationContext {
   //
   // When both:
   // :ref:`verify_certificate_hash
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
+  // <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_certificate_hash>` and
   // :ref:`verify_certificate_spki
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
-  // a hash matching value from either of the lists will result in the certificate being accepted.
+  // <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_certificate_spki>` are
+  // specified, a hash matching value from either of the lists will result in the certificate being
+  // accepted.
   //
   // .. attention::
   //
   //   This option is preferred over :ref:`verify_certificate_hash
-  //   <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`,
+  //   <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_certificate_hash>`,
   //   because SPKI is tied to a private key, so it doesn't change when the certificate
   //   is renewed using the same private key.
   repeated string verify_certificate_spki = 3
@@ -247,10 +249,11 @@ message CertificateValidationContext {
   //
   // When both:
   // :ref:`verify_certificate_hash
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
+  // <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_certificate_hash>` and
   // :ref:`verify_certificate_spki
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
-  // a hash matching value from either of the lists will result in the certificate being accepted.
+  // <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.verify_certificate_spki>` are
+  // specified, a hash matching value from either of the lists will result in the certificate being
+  // accepted.
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
 
@@ -261,7 +264,7 @@ message CertificateValidationContext {
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
-  //   <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+  //   <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.trusted_ca>`.
   repeated string verify_subject_alt_name = 4;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.

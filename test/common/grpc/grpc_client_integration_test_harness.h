@@ -468,7 +468,6 @@ public:
     fake_upstream_.reset();
     async_client_transport_socket_.reset();
     client_connection_.reset();
-    mock_cluster_info_->transport_socket_factory_.reset();
   }
 
   envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
@@ -493,13 +492,11 @@ public:
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
         tls_context, factory_context_);
 
-    mock_cluster_info_->transport_socket_factory_ =
+    mock_host_description_->socket_factory_ =
         std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
             std::move(cfg), context_manager_, *stats_store_);
-    ON_CALL(*mock_cluster_info_, transportSocketFactory())
-        .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
-        mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
+        mock_host_description_->socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
                                                     FakeHttpConnection::Type::HTTP2, ipVersion(),
                                                     test_time_.timeSystem());
