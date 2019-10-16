@@ -1,0 +1,27 @@
+name: artifacts
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'library/**'
+      - 'envoy/**'
+
+jobs:
+  master_aar_dist:
+    name: master_aar_dist
+    runs-on: macOS-10.14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
+      - name: 'Build envoy_master.aar distributable'
+        run: ./bazelw build --config=release --config=fat //:android_dist
+      - uses: actions/upload-artifact@v1
+        with:
+          name: envoy_master.aar
+          path: dist/envoy.aar
