@@ -2,11 +2,14 @@
 
 set -e
 
-# Quick syntax check of .clang-tidy using PyYAML.
-if ! python3 -c 'import yaml, sys; yaml.safe_load(sys.stdin)' < .clang-tidy > /dev/null; then
-  echo ".clang-tidy has a syntax error"
+# Quick syntax check of .clang-tidy.
+clang-tidy -dump-config > /dev/null 2> clang-tidy-config-errors.txt
+if [[ -s clang-tidy-config-errors.txt ]]; then
+  cat clang-tidy-config-errors.txt
+  rm clang-tidy-config-errors.txt
   exit 1
 fi
+rm clang-tidy-config-errors.txt
 
 echo "Generating compilation database..."
 
