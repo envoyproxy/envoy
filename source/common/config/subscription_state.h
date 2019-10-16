@@ -23,6 +23,7 @@ namespace Config {
 // This is the abstract parent class for both the delta and state-of-the-world xDS variants.
 class SubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
+  // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
                     std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher);
   virtual ~SubscriptionState() = default;
@@ -60,7 +61,7 @@ protected:
 
 private:
   const std::string type_url_;
-  // callbacks_ is expected to be a WatchMap.
+  // callbacks_ is expected (outside of tests) to be a WatchMap.
   SubscriptionCallbacks& callbacks_;
   Event::TimerPtr init_fetch_timeout_timer_;
 };
@@ -68,6 +69,7 @@ private:
 class SubscriptionStateFactory {
 public:
   virtual ~SubscriptionStateFactory() = default;
+  // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   virtual std::unique_ptr<SubscriptionState>
   makeSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
                         std::chrono::milliseconds init_fetch_timeout) PURE;
