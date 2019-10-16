@@ -153,6 +153,6 @@ build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 build:asan-fuzzer --config=asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-build:asan-fuzzer --copt=-fsanitize-coverage=trace-pc-guard
+build:asan-fuzzer --copt=-fsanitize=fuzzer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
