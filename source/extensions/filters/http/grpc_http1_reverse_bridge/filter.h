@@ -44,7 +44,8 @@ private:
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(
-      const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig& config)
+      const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute&
+          config)
       : disabled_(config.disabled()) {}
   bool disabled() const { return disabled_; }
 

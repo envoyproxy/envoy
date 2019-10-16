@@ -11,8 +11,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
-class Config : public Common::FactoryBase<
-                   envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig> {
+class Config
+    : public Common::FactoryBase<
+          envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig,
+          envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute> {
 public:
   Config() : FactoryBase(HttpFilterNames::get().GrpcHttp1ReverseBridge) {}
 
@@ -23,7 +25,7 @@ public:
 
 private:
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig&
+      const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute&
           proto_config,
       Server::Configuration::FactoryContext& context) override;
 };

@@ -23,11 +23,15 @@ message FilterConfig {
   // hide the gRPC semantics from the upstream, allowing it to receive and respond with a
   // simple binary encoded protobuf.
   bool withhold_grpc_frames = 2;
+}
 
-  // If true, It disables filter at route level
+// gRPC reverse bridge filter configuration per virtualhost/route/weighted-cluster level.
+message FilterConfigPerRoute {
+  // It disables gRPC reverse bridge filter for this particular vhost or route.
+  // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
   // The order is:
   // - the routeEntry() (for config that's applied on weighted clusters)
   // - the route
   // - and finally from the virtual host object (routeEntry()->virtualhost()).
-  bool disabled = 3;
+  bool disabled = 1 [(validate.rules).bool = {const: true}];
 }
