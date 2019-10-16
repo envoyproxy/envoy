@@ -68,12 +68,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   }
 
   // Check for per route filter config.
-  const std::string& name = HttpFilterNames::get().DynamicForwardProxy;
-  const ProxyPerRouteConfig* route_config =
-      route_entry->perFilterConfigTyped<ProxyPerRouteConfig>(name);
-  const ProxyPerRouteConfig* config =
-      route_config ? route_config
-                   : route_entry->virtualHost().perFilterConfigTyped<ProxyPerRouteConfig>(name);
+  const auto* config = route_entry->mostSpecificPerFilterConfigTyped<ProxyPerRouteConfig>(
+      HttpFilterNames::get().DynamicForwardProxy);
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();
     if (!host_rewrite.empty()) {
