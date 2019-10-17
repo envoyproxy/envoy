@@ -420,17 +420,19 @@ void StatNameStorage::free(SymbolTable& table) {
 StatNameManagedStorage::StatNameManagedStorage(absl::string_view name, SymbolTable& symbol_table) {
   absl::optional<StatName> opt_stat_name = symbol_table.getBuiltin(name);
   if (opt_stat_name) {
+    symbol_table_ = nullptr;
     stat_name_ = opt_stat_name.value();
   } else {
-    storage_and_table_ =
-        std::make_unique<StorageAndTable>(StatNameStorage(name, symbol_table), symbol_table);
-    stat_name_ = storage_and_table_->first.statName();
+    symbol_table_ = &symbol_table;
+    SymbolTable::StoragePtr storage = symbol_table.encode(name);
+    stat_name_ = StatName(storage.release());
   }
 }
 
 StatNameManagedStorage::~StatNameManagedStorage() {
-  if (storage_and_table_.get() != nullptr) {
-    storage_and_table_->first.free(storage_and_table_->second);
+  if (symbol_table_ != nullptr) {
+    symbol_table_->free(stat_name_);
+    delete[] stat_name_.sizeAndData();
   }
 }
 

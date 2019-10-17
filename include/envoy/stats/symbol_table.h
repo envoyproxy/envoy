@@ -187,6 +187,7 @@ public:
 
 private:
   friend struct HeapStatData;
+  friend class StatNameManagedStorage;
   friend class StatNameStorage;
   friend class StatNameList;
   friend class StatNameSet;

@@ -472,6 +472,9 @@ public:
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
+  friend class StatNameManagedStorage;
+  uint8_t* sizeAndData() { return const_cast<uint8_t*>(size_and_data_); }
+
   const uint8_t* size_and_data_{nullptr};
 };
 
@@ -507,10 +510,8 @@ public:
   StatName statName() const { return stat_name_; }
 
 private:
-  using StorageAndTable = std::pair<StatNameStorage, SymbolTable&>;
-
   StatName stat_name_;
-  std::unique_ptr<StorageAndTable> storage_and_table_;
+  Stats::SymbolTable* symbol_table_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
