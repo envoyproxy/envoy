@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["proxy_filter_test.cc"],
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
     deps = [
+        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",

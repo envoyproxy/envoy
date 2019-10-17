@@ -41,9 +41,7 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::api::v2::RouteConfiguration& config,
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
-    :
-
-      config_(new ConfigImpl(config, factory_context.getServerFactoryContext(),
+    : config_(new ConfigImpl(config, factory_context.getServerFactoryContext(),
                              factory_context.messageValidationVisitor(), true)),
 
       route_config_proto_{config}, last_updated_(factory_context.timeSource().systemTime()),

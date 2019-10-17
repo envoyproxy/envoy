@@ -315,6 +315,7 @@ getaddrinfo
 sendto
 ssize
 upcasts
+vectorize
 vip
 xDSes
 XFCC

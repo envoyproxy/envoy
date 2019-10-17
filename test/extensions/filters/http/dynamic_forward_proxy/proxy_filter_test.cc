@@ -1,4 +1,5 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -168,6 +169,30 @@ TEST_F(ProxyFilterTest, NoCluster) {
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_)).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+TEST_F(ProxyFilterTest, HostRewrite) {
+  InSequence s;
+
+  envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig proto_config;
+  proto_config.set_host_rewrite("bar");
+  ProxyPerRouteConfig config(proto_config);
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(callbacks_.route_->route_entry_,
+              perFilterConfig(HttpFilterNames::get().DynamicForwardProxy))
+      .WillOnce(Return(&config));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 80, _))
+      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
 }
 
 } // namespace
