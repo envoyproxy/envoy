@@ -42,7 +42,7 @@ build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 # TODO(lizan): vptr and function requires C++ UBSAN runtime which we're not currently linking to.
-# Enable them when bazel has better support for that.
+# Enable them when bazel has better support for that or with explicit linker options.
 build:asan --copt -fno-sanitize=vptr,function
 build:asan --linkopt -fno-sanitize=vptr,function
 build:asan --copt -DADDRESS_SANITIZER=1
