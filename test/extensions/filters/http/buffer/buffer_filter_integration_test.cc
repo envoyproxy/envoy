@@ -75,7 +75,8 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
   codec_client_->sendData(*request_encoder_, "0123", false);
   codec_client_->sendData(*request_encoder_, "456", false);
   codec_client_->sendData(*request_encoder_, "789", false);
-  codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{});
+  Http::TestHeaderMapImpl request_trailers{{"request", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
