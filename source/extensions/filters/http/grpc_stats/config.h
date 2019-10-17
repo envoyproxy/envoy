@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GrpcStreaming {
+namespace GrpcStats {
 
 // Filter state exposing the gRPC message counts.
 struct GrpcMessageCounterObject : public StreamInfo::FilterState::Object {
@@ -17,16 +17,15 @@ struct GrpcMessageCounterObject : public StreamInfo::FilterState::Object {
   uint64_t response_message_count = 0;
 };
 
-class GrpcStreamingFilterConfig : public Common::EmptyHttpFilterConfig {
+class GrpcStatsFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
-  GrpcStreamingFilterConfig()
-      : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcStreaming) {}
+  GrpcStatsFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcStats) {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override;
 };
 
-} // namespace GrpcStreaming
+} // namespace GrpcStats
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

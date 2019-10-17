@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-# L7 HTTP filter that implements gRPC streaming message counting telemetry
+# L7 HTTP filter that implements gRPC telemetry
 
 load(
     "//bazel:envoy_build_system.bzl",

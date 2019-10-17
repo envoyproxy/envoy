@@ -39,6 +39,9 @@ Version 1.12.0 (pending)
   has been deprecated in favor of the `traffic_direction` field in
   :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
   specified.
+* The use of :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>` for
+  gRPC stats has been deprecated in favor of the dedicated :ref:`gRPC stats
+  filter <config_http_filters_grpc_stats>`
 
 1.11.2 (October 8, 2019)
 ========================

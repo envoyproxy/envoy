@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GrpcStreaming {
+namespace GrpcStats {
 
 // The struct to store gRPC message counter state.
 struct GrpcMessageCounter {
@@ -35,7 +35,7 @@ struct GrpcMessageCounter {
 // increment.
 uint64_t IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* counter);
 
-} // namespace GrpcStreaming
+} // namespace GrpcStats
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

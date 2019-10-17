@@ -1,9 +1,9 @@
-#include "extensions/filters/http/grpc_streaming/message_counter.h"
+#include "extensions/filters/http/grpc_stats/message_counter.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace GrpcStreaming {
+namespace GrpcStats {
 
 uint64_t IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* counter) {
   uint64_t pos = 0;
@@ -44,7 +44,7 @@ uint64_t IncrementMessageCounter(Buffer::Instance& data, GrpcMessageCounter* cou
   return delta;
 }
 
-} // namespace GrpcStreaming
+} // namespace GrpcStats
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
