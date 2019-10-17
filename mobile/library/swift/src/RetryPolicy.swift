@@ -31,18 +31,34 @@ public enum RetryRule: Int, CaseIterable {
 /// https://www.envoyproxy.io/learn/automatic-retries
 @objcMembers
 public final class RetryPolicy: NSObject {
-  /// Maximum number of retries that a request may be performed.
   public let maxRetryCount: UInt
-  /// Whitelist of rules used for retrying.
   public let retryOn: [RetryRule]
-  /// Timeout (in milliseconds) to apply to each retry.
   public let perRetryTimeoutMS: UInt?
+  public let totalUpstreamTimeoutMS: UInt
 
-  /// Public initializer.
-  public init(maxRetryCount: UInt, retryOn: [RetryRule], perRetryTimeoutMS: UInt? = nil) {
+  /// Designated initializer.
+  ///
+  /// - parameter maxRetryCount:          Maximum number of retries that a request may be
+  ///                                     performed.
+  /// - parameter retryOn:                Whitelist of rules used for retrying.
+  /// - parameter perRetryTimeoutMS:      Timeout (in milliseconds) to apply to each retry. Must
+  ///                                     be <= `totalUpstreamTimeoutMS` or it will be ignored.
+  /// - parameter totalUpstreamTimeoutMS: Total timeout (in milliseconds) that includes all
+  ///                                     retries. Spans the point at which the entire downstream
+  ///                                     request has been processed and when the upstream
+  ///                                     response has been completely processed.
+  public init(maxRetryCount: UInt, retryOn: [RetryRule], perRetryTimeoutMS: UInt? = nil,
+              totalUpstreamTimeoutMS: UInt = 15_000)
+  {
+    if let perRetryTimeoutMS = perRetryTimeoutMS {
+      assert(perRetryTimeoutMS <= totalUpstreamTimeoutMS,
+             "Per-retry timeout must be <= total timeout")
+    }
+
     self.maxRetryCount = maxRetryCount
     self.retryOn = retryOn
     self.perRetryTimeoutMS = perRetryTimeoutMS
+    self.totalUpstreamTimeoutMS = totalUpstreamTimeoutMS
   }
 }
 
