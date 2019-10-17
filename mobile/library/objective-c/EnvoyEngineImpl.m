@@ -32,7 +32,7 @@
   // Envoy exceptions will only be caught here when compiled for 64-bit arches.
   // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Exceptions/Articles/Exceptions64Bit.html
   @try {
-    return (int)run_engine(configYAML.UTF8String, logLevel.UTF8String);
+    return (int)run_engine(_engineHandle, configYAML.UTF8String, logLevel.UTF8String);
   } @catch (...) {
     NSLog(@"Envoy exception caught.");
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyException" object:self];
