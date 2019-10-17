@@ -24,6 +24,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -77,7 +78,8 @@ public:
   /**
    * @return host specific counters.
    */
-  virtual std::vector<Stats::CounterSharedPtr> counters() const PURE;
+  virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
+  counters() const PURE;
 
   /**
    * Create a connection for this host.
@@ -105,7 +107,8 @@ public:
   /**
    * @return host specific gauges.
    */
-  virtual std::vector<Stats::GaugeSharedPtr> gauges() const PURE;
+  virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
+  gauges() const PURE;
 
   /**
    * Atomically clear a health flag for a host. Flags are specified in HealthFlags.
@@ -765,6 +768,12 @@ public:
   virtual uint64_t maxRequestsPerConnection() const PURE;
 
   /**
+   * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
+   * reset if the number of headers exceeds this value.
+   */
+  virtual uint32_t maxResponseHeadersCount() const PURE;
+
+  /**
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
@@ -776,10 +785,10 @@ public:
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
-   * @return Network::TransportSocketFactory& the factory of transport socket to use when
-   *         communicating with the cluster.
+   * @return TransportSocketMatcher& the transport socket matcher associated
+   * factory.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.
@@ -847,6 +856,12 @@ public:
    * Create network filters on a new upstream connection.
    */
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
+
+  /**
+   * Calculate upstream protocol based on features.
+   */
+  virtual Http::Protocol
+  upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
 protected:
   /**

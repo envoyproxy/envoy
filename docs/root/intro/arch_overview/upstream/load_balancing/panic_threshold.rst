@@ -5,12 +5,23 @@ Panic threshold
 
 During load balancing, Envoy will generally only consider available (healthy or degraded) hosts in
 an upstream cluster. However, if the percentage of available hosts in the cluster becomes too low,
-Envoy will disregard health status and balance amongst all hosts. This is known as the *panic
-threshold*. The default panic threshold is 50%. This is
+Envoy will disregard health status and balance either amongst all hosts or no hosts. This is known
+as the *panic threshold*. The default panic threshold is 50%. This is
 :ref:`configurable <config_cluster_manager_cluster_runtime>` via runtime as well as in the
 :ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>`.
 The panic threshold is used to avoid a situation in which host failures cascade throughout the
 cluster as load increases.
+
+There are two modes Envoy can choose from when in a panic state: traffic will either be sent to all
+hosts, or will be sent to no hosts (and therefore will always fail). This is configured in the
+:ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>`.
+Choosing to fail traffic during panic scenarios can help avoid overwhelming potentially failing
+upstream services, as it will reduce the load on the upstream service before all hosts have been
+determined to be unhealthy. However, it eliminates the possibility of _some_ requests succeeding
+even when many or all hosts in a cluster are unhealthy. This may be a good tradeoff to make if a
+given service is observed to fail in an all-or-nothing pattern, as it will more quickly cut off
+requests to the cluster. Conversely, if a cluster typically continues to successfully service _some_
+requests even when degraded, enabling this option is probably unhelpful.
 
 Panic thresholds work in conjunction with priorities. If the number of available hosts in a given
 priority goes down, Envoy will try to shift some traffic to lower priorities. If it succeeds in
@@ -20,8 +31,8 @@ disregards panic thresholds and continues to distribute traffic load across prio
 the algorithm described :ref:`here <arch_overview_load_balancing_priority_levels>`.
 However, when normalized total availability drops below 100%, Envoy assumes that there are not enough
 available hosts across all priority levels. It continues to distribute traffic load across priorities,
-but if a given priority level's availability is below the panic threshold, traffic will go to all hosts
-in that priority level regardless of their availability.
+but if a given priority level's availability is below the panic threshold, traffic will go to all
+(or no) hosts in that priority level regardless of their availability.
 
 The following examples explain the relationship between normalized total availability and panic threshold.
 It is assumed that the default value of 50% is used for the panic threshold.

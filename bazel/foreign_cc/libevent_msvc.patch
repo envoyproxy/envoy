@@ -1,0 +1,10 @@
+--- CMakeLists.txt	2019-10-02 20:20:58.449181400 -0400
++++ CMakeLists.txt	2019-10-02 20:21:19.390279100 -0400
+@@ -236,7 +236,6 @@
+ 
+     if (EVENT__MSVC_STATIC_RUNTIME)
+         foreach (flag_var
+-                 CMAKE_C_FLAGS
+                  CMAKE_C_FLAGS_DEBUG
+                  CMAKE_C_FLAGS_RELEASE
+                  CMAKE_C_FLAGS_MINSIZEREL

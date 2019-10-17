@@ -13,7 +13,6 @@ namespace {
 
 using ::Envoy::Http::TestHeaderMapImpl;
 using ::testing::NiceMock;
-using ::testing::Return;
 
 class FooFragment : public ScopeKeyFragmentBase {
 public:

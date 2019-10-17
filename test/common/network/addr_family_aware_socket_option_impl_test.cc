@@ -17,6 +17,7 @@ protected:
         .WillRepeatedly(Invoke([](int domain, int type, int protocol) {
           return Api::SysCallIntResult{::socket(domain, type, protocol), 0};
         }));
+    EXPECT_CALL(os_sys_calls_, close(_)).Times(testing::AnyNumber());
   }
 };
 

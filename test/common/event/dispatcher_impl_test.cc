@@ -18,8 +18,6 @@
 using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
-using testing::Return;
-using testing::StartsWith;
 
 namespace Envoy {
 namespace Event {

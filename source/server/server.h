@@ -49,9 +49,9 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
-  COUNTER(static_unknown_fields)                                                                   \
-  COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(debug_assertion_failures)                                                                \
+  COUNTER(dynamic_unknown_fields)                                                                  \
+  COUNTER(static_unknown_fields)                                                                   \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
@@ -60,6 +60,7 @@ namespace Server {
   GAUGE(memory_heap_size, Accumulate)                                                              \
   GAUGE(parent_connections, Accumulate)                                                            \
   GAUGE(state, NeverImport)                                                                        \
+  GAUGE(stats_recent_lookups, NeverImport)                                                         \
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)                                                                      \
@@ -144,14 +145,14 @@ private:
 /**
  * This is the actual full standalone server which stitches together various common components.
  */
-class InstanceImpl : Logger::Loggable<Logger::Id::main>,
-                     public Instance,
-                     public ServerLifecycleNotifier {
+class InstanceImpl final : Logger::Loggable<Logger::Id::main>,
+                           public Instance,
+                           public ServerLifecycleNotifier {
 public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(const Options& options, Event::TimeSystem& time_system,
+  InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -194,7 +195,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  ProcessContext& processContext() override { return *process_context_; }
+  OptProcessContextRef processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
@@ -227,7 +228,7 @@ private:
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime. This init manager is populated with LdsApi targets.
-  Init::ManagerImpl init_manager_{"Server"};
+  Init::Manager& init_manager_;
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:
   // - There may be active filter chains referencing it in listener_manager_.

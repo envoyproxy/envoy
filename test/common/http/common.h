@@ -39,8 +39,8 @@ public:
  * Mock callbacks used for conn pool testing.
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
-  void onPoolReady(Http::StreamEncoder& encoder,
-                   Upstream::HostDescriptionConstSharedPtr host) override {
+  void onPoolReady(Http::StreamEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
+                   const StreamInfo::StreamInfo&) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();

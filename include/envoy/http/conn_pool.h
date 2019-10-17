@@ -58,9 +58,11 @@ public:
    * @param encoder supplies the request encoder to use.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
+   * @param info supplies the stream info object associated with the upstream connection.
    */
   virtual void onPoolReady(Http::StreamEncoder& encoder,
-                           Upstream::HostDescriptionConstSharedPtr host) PURE;
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           const StreamInfo::StreamInfo& info) PURE;
 };
 
 /**

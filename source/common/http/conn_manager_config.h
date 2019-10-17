@@ -108,6 +108,7 @@ struct TracingConnectionManagerConfig {
   envoy::type::FractionalPercent random_sampling_;
   envoy::type::FractionalPercent overall_sampling_;
   bool verbose_;
+  uint32_t max_path_tag_length_;
 };
 
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
@@ -231,6 +232,11 @@ public:
    * @return maximum request headers size the connection manager will accept.
    */
   virtual uint32_t maxRequestHeadersKb() const PURE;
+
+  /**
+   * @return maximum number of request headers the codecs will accept.
+   */
+  virtual uint32_t maxRequestHeadersCount() const PURE;
 
   /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a

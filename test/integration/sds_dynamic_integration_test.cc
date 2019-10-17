@@ -28,9 +28,6 @@
 #include "integration.h"
 #include "utility.h"
 
-using testing::NiceMock;
-using testing::Return;
-
 namespace Envoy {
 namespace Ssl {
 
@@ -72,9 +69,9 @@ protected:
     secret.set_name(server_cert_);
     auto* tls_certificate = secret.mutable_tls_certificate();
     tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
     return secret;
   }
 
@@ -102,9 +99,9 @@ protected:
     secret.set_name(client_cert_);
     auto* tls_certificate = secret.mutable_tls_certificate();
     tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("/test/config/integration/certs/clientcert.pem"));
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("/test/config/integration/certs/clientkey.pem"));
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     return secret;
   }
 
@@ -252,9 +249,9 @@ public:
 
       auto* tls_certificate = common_tls_context->add_tls_certificates();
       tls_certificate->mutable_certificate_chain()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
       tls_certificate->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
 
       if (use_combined_validation_context_) {
         // Modify the listener context validation type to use combined certificate validation

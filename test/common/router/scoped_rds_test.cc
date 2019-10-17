@@ -6,6 +6,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/grpc_mux_impl.h"
 #include "common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"
@@ -20,15 +21,12 @@
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
-using testing::ByMove;
-using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsNull;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRefOfCopy;
 
 namespace Envoy {
 namespace Router {
@@ -97,25 +95,27 @@ protected:
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup() {
-    InSequence s;
+    ON_CALL(factory_context_.cluster_manager_, adsMux())
+        .WillByDefault(Return(std::make_shared<::Envoy::Config::NullGrpcMuxImpl>()));
 
+    InSequence s;
     // Since factory_context_.cluster_manager_.subscription_factory_.callbacks_ is taken by the SRDS
     // subscription. We need to return a different MockSubscription here for each RDS subscription.
     // To build the map from RDS route_config_name to the RDS subscription, we need to get the
     // route_config_name by mocking start() on the Config::Subscription.
     EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
-                subscriptionFromConfigSource(_, _, _, _))
+                subscriptionFromConfigSource(_, _, _, _, _))
         .Times(AnyNumber());
     EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
                 subscriptionFromConfigSource(
                     _,
                     Eq(Grpc::Common::typeUrl(
                         envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name())),
-                    _, _))
+                    _, _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](const envoy::api::v2::core::ConfigSource&, absl::string_view,
                                       Stats::Scope&,
-                                      Envoy::Config::SubscriptionCallbacks& callbacks) {
+                                      Envoy::Config::SubscriptionCallbacks& callbacks, bool) {
           auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
           rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
           EXPECT_CALL(*ret, start(_))
@@ -247,7 +247,7 @@ key:
 }
 
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
-TEST_F(ScopedRdsTest, MultipleResourcesStow) {
+TEST_F(ScopedRdsTest, MultipleResourcesSotw) {
   setup();
 
   const std::string config_yaml = R"EOF(

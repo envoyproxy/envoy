@@ -194,6 +194,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
   // whether the connection is in the ready list (connected) or the pending list (failed to
   // connect).
   if (event == Network::ConnectionEvent::Connected) {
+    conn.conn_->streamInfo().setDownstreamSslConnection(conn.conn_->ssl());
     conn_connect_ms_->complete();
     processIdleConnection(conn, true, false);
   }

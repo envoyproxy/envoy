@@ -38,8 +38,7 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
 
 } // namespace
 
-// TODO(alyssawilk) update.
-TEST(DubboRouteMatcherTest, DEPRECATED_FEATURE_TEST(RouteByServiceNameWithAnyMethod)) {
+TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
   {
     const std::string yaml = R"EOF(
 name: local_route
@@ -48,7 +47,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -95,7 +96,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -129,7 +132,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -168,7 +173,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -292,8 +299,7 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-// TODO(alyssawilk) update.
-TEST(DubboRouteMatcherTest, DEPRECATED_FEATURE_TEST(RouteByMethodWithRegexMatch)) {
+TEST(DubboRouteMatcherTest, RouteByMethodWithRegexMatch) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
@@ -301,7 +307,9 @@ routes:
   - match:
       method:
         name:
-          regex: "\\d{3}test"
+          safe_regex:
+            google_re2: {}
+            regex: "\\d{3}test"
     route:
         cluster: user_service_dubbo_server
 )EOF";

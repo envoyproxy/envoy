@@ -14,18 +14,18 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-using testing::AssertionFailure;
 using testing::AssertionResult;
-using testing::AssertionSuccess;
-using testing::IsSubstring;
 
 namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest()
-    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), AdsIntegrationConfig()) {
+    : HttpIntegrationTest(
+          Http::CodecClient::Type::HTTP2, ipVersion(),
+          AdsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
+  sotw_or_delta_ = sotwOrDelta();
 }
 
 void AdsIntegrationTest::TearDown() {

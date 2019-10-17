@@ -24,11 +24,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
-using testing::_;
-using testing::ContainerEq;
-using testing::Invoke;
 using testing::NiceMock;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {

@@ -193,7 +193,8 @@ public:
   ~MockGuardDog() override;
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadId));
+  MOCK_METHOD2(createWatchDog,
+               WatchDogSharedPtr(Thread::ThreadId thread_id, const std::string& thread_name));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
@@ -233,11 +234,13 @@ public:
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return LdsApiPtr{createLdsApi_(lds_config)};
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
+                         bool is_delta) override {
+    return LdsApiPtr{createLdsApi_(lds_config, is_delta)};
   }
 
-  MOCK_METHOD1(createLdsApi_, LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config));
+  MOCK_METHOD2(createLdsApi_,
+               LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
   MOCK_METHOD2(createNetworkFilterFactoryList,
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -268,7 +271,8 @@ public:
 
   MOCK_METHOD3(addOrUpdateListener, bool(const envoy::api::v2::Listener& config,
                                          const std::string& version_info, bool modifiable));
-  MOCK_METHOD1(createLdsApi, void(const envoy::api::v2::core::ConfigSource& lds_config));
+  MOCK_METHOD2(createLdsApi,
+               void(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
@@ -293,7 +297,9 @@ public:
   ~MockWorkerFactory() override;
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&) override { return WorkerPtr{createWorker_()}; }
+  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
+    return WorkerPtr{createWorker_()};
+  }
 
   MOCK_METHOD0(createWorker_, Worker*());
 };
@@ -382,7 +388,7 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD0(grpcContext, Grpc::Context&());
   MOCK_METHOD0(httpContext, Http::Context&());
-  MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(processContext, absl::optional<std::reference_wrapper<ProcessContext>>());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
@@ -470,7 +476,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(processContext, OptProcessContextRef());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
@@ -529,10 +535,10 @@ public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext() override;
 
-  const Network::ListenerConfig& listenerConfig() const override { return _listenerConfig_; }
+  const Network::ListenerConfig& listenerConfig() const override { return listener_config_; }
   MOCK_CONST_METHOD0(listenerConfig_, const Network::ListenerConfig&());
 
-  Network::MockListenerConfig _listenerConfig_;
+  Network::MockListenerConfig listener_config_;
 };
 
 class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {
@@ -546,6 +552,7 @@ public:
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(eventLogger_, Upstream::HealthCheckEventLogger*());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+  MOCK_METHOD0(api, Api::Api&());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }
@@ -555,6 +562,7 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
+  testing::NiceMock<Envoy::Api::MockApi> api_{};
 };
 
 } // namespace Configuration

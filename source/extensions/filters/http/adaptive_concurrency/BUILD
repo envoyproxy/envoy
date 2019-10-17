@@ -21,6 +21,20 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:adaptive_concurrency_cc",
+        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//source/common/config:filter_json_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
+        "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
     ],
 )

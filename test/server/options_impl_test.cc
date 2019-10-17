@@ -26,8 +26,6 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 namespace {
 

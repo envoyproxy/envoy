@@ -40,6 +40,30 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "recent_lookups_test",
+    srcs = ["recent_lookups_test.cc"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/stats:recent_lookups_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "recent_lookups_speed_test",
+    srcs = ["recent_lookups_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_lib",
+        "//source/common/stats:recent_lookups_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stat_merger_test",
     srcs = ["stat_merger_test.cc"],
     deps = [
@@ -84,6 +108,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "symbol_table_impl_test",
     srcs = ["symbol_table_impl_test.cc"],
+    external_deps = ["abseil_hash_testing"],
     deps = [
         ":stat_test_utility_lib",
         "//source/common/common:mutex_tracer_lib",
@@ -147,7 +172,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 

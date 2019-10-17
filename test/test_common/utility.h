@@ -27,15 +27,16 @@
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
+using testing::_; // NOLINT(misc-unused-using-decls)
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
-using testing::Invoke;
+using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
 
@@ -491,6 +492,8 @@ public:
    * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
    */
   static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
+  static bool gaugesZeroed(
+      const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message) {
@@ -637,8 +640,8 @@ public:
   using HeaderMapImpl::remove;
   void addCopy(const std::string& key, const std::string& value);
   void remove(const std::string& key);
-  std::string get_(const std::string& key);
-  std::string get_(const LowerCaseString& key);
+  std::string get_(const std::string& key) const;
+  std::string get_(const LowerCaseString& key) const;
   bool has(const std::string& key);
   bool has(const LowerCaseString& key);
 };

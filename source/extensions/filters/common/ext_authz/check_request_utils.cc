@@ -39,7 +39,7 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
 
   // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
   // cert.
-  Ssl::ConnectionInfo* ssl = const_cast<Ssl::ConnectionInfo*>(connection.ssl());
+  auto ssl = connection.ssl();
   if (ssl != nullptr) {
     if (local) {
       const auto uri_sans = ssl->uriSanLocalCertificate();

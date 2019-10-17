@@ -25,9 +25,7 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnNew;
 using testing::ReturnRef;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -58,7 +56,8 @@ class ClientSslAuthFilterTest : public testing::Test {
 protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
-        api_(Api::createApiForTest(stats_store_)) {}
+        api_(Api::createApiForTest(stats_store_)),
+        ssl_(std::make_shared<Ssl::MockConnectionInfo>()) {}
   ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
 
   void setup() {
@@ -112,10 +111,10 @@ ip_white_list:
   std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Ssl::MockConnectionInfo ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Api::ApiPtr api_;
+  std::shared_ptr<Ssl::MockConnectionInfo> ssl_;
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
@@ -156,11 +155,11 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Create a new filter for an SSL connection, with no backing auth data yet.
   createAuthFilter();
-  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(&ssl_));
+  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_));
   filter_callbacks_.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
   std::string expected_sha_1("digest");
-  EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
+  EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -184,7 +183,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   filter_callbacks_.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
   std::string expected_sha_2("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314");
-  EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
+  EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);

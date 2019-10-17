@@ -76,12 +76,15 @@ public:
   }
   void metadata(const envoy::api::v2::core::Metadata&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
+  Network::TransportSocketFactory& transportSocketFactory() const override {
+    return logical_host_->transportSocketFactory();
+  }
   const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
   HealthCheckHostMonitor& healthChecker() const override { return logical_host_->healthChecker(); }
   Outlier::DetectorHostMonitor& outlierDetector() const override {
     return logical_host_->outlierDetector();
   }
-  const HostStats& stats() const override { return logical_host_->stats(); }
+  HostStats& stats() const override { return logical_host_->stats(); }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const envoy::api::v2::core::Locality& locality() const override {

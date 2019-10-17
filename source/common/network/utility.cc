@@ -28,8 +28,10 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/network/io_socket_error_impl.h"
 
 #include "common/common/fmt.h"
 
@@ -504,6 +506,68 @@ Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_ad
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
+
+Api::IoCallUint64Result Utility::writeToSocket(Network::Socket& socket, Buffer::RawSlice* slices,
+                                               uint64_t num_slices, const Address::Ip* local_ip,
+                                               const Address::Instance& peer_address) {
+  Api::IoCallUint64Result send_result(
+      /*rc=*/0, /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
+  do {
+    send_result = socket.ioHandle().sendmsg(slices, num_slices, 0, local_ip, peer_address);
+  } while (!send_result.ok() &&
+           // Send again if interrupted.
+           send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
+
+  if (send_result.ok()) {
+    ENVOY_LOG_MISC(trace, "sendmsg sent:{} bytes", send_result.rc_);
+  } else {
+    ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
+                   static_cast<int>(send_result.err_->getErrorCode()),
+                   send_result.err_->getErrorDetails());
+  }
+  return send_result;
+}
+
+Api::IoCallUint64Result Utility::readFromSocket(Network::Socket& socket,
+                                                UdpPacketProcessor& udp_packet_processor,
+                                                MonotonicTime receive_time,
+                                                uint32_t* packets_dropped) {
+  Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+  Buffer::RawSlice slice;
+  const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
+  ASSERT(num_slices == 1);
+
+  IoHandle::RecvMsgOutput output(packets_dropped);
+  Api::IoCallUint64Result result =
+      socket.ioHandle().recvmsg(&slice, num_slices, socket.localAddress()->ip()->port(), output);
+
+  if (!result.ok()) {
+    return result;
+  }
+
+  RELEASE_ASSERT(output.local_address_ != nullptr, "fail to get local address from IP header");
+
+  // Adjust used memory length.
+  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+  buffer->commit(&slice, 1);
+
+  ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
+
+  RELEASE_ASSERT(output.peer_address_ != nullptr,
+                 fmt::format("Unable to get remote address for fd: {}, local address: {} ",
+                             socket.ioHandle().fd(), socket.localAddress()->asString()));
+
+  // Unix domain sockets are not supported
+  RELEASE_ASSERT(output.peer_address_->type() == Address::Type::Ip,
+                 fmt::format("Unsupported remote address: {} local address: {}, receive size: "
+                             "{}",
+                             output.peer_address_->asString(), socket.localAddress()->asString(),
+                             result.rc_));
+  udp_packet_processor.processPacket(std::move(output.local_address_),
+                                     std::move(output.peer_address_), std::move(buffer),
+                                     receive_time);
+  return result;
 }
 
 } // namespace Network

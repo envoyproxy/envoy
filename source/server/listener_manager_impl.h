@@ -59,10 +59,12 @@ public:
       Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
+                         bool is_delta) override {
     return std::make_unique<LdsApiImpl>(
         lds_config, server_.clusterManager(), server_.initManager(), server_.stats(),
-        server_.listenerManager(), server_.messageValidationContext().dynamicValidationVisitor());
+        server_.listenerManager(), server_.messageValidationContext().dynamicValidationVisitor(),
+        is_delta);
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -127,9 +129,9 @@ public:
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::api::v2::Listener& config, const std::string& version_info,
                            bool added_via_api) override;
-  void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+  void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta) override {
     ASSERT(lds_api_ == nullptr);
-    lds_api_ = factory_.createLdsApi(lds_config);
+    lds_api_ = factory_.createLdsApi(lds_config, is_delta);
   }
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
@@ -282,6 +284,7 @@ public:
   const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
+  Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -324,7 +327,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override {
     return parent_.server_.lifecycleNotifier();
   }
-  ProcessContext& processContext() override { return parent_.server_.processContext(); }
+  OptProcessContextRef processContext() override { return parent_.server_.processContext(); }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -383,6 +386,8 @@ private:
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+  Network::ConnectionBalancerPtr connection_balancer_;
+
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };

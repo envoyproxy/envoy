@@ -13,6 +13,9 @@ namespace Zipkin {
 
 class ZipkinCoreConstantValues {
 public:
+  const std::string KIND_CLIENT = "CLIENT";
+  const std::string KIND_SERVER = "SERVER";
+
   const std::string CLIENT_SEND = "cs";
   const std::string CLIENT_RECV = "cr";
   const std::string SERVER_SEND = "ss";

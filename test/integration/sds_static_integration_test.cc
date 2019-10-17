@@ -26,9 +26,6 @@
 #include "integration.h"
 #include "utility.h"
 
-using testing::NiceMock;
-using testing::Return;
-
 namespace Envoy {
 namespace Ssl {
 
@@ -63,9 +60,9 @@ public:
       secret->set_name("server_cert");
       auto* tls_certificate = secret->mutable_tls_certificate();
       tls_certificate->mutable_certificate_chain()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
       tls_certificate->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
     });
 
     HttpIntegrationTest::initialize();
@@ -124,9 +121,9 @@ public:
       secret->set_name("client_cert");
       auto* tls_certificate = secret->mutable_tls_certificate();
       tls_certificate->mutable_certificate_chain()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/clientcert.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
       tls_certificate->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/clientkey.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     });
 
     HttpIntegrationTest::initialize();

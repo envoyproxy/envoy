@@ -2,6 +2,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 
 /**
@@ -25,5 +27,7 @@ public:
    */
   virtual ProcessObject& get() const PURE;
 };
+
+using OptProcessContextRef = absl::optional<std::reference_wrapper<ProcessContext>>;
 
 } // namespace Envoy

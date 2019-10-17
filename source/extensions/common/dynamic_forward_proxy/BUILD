@@ -15,7 +15,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "@envoy_api//envoy/config/common/dynamic_forward_proxy/v2alpha:dns_cache_cc",
+        "@envoy_api//envoy/config/common/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )
 

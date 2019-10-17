@@ -13,8 +13,11 @@ envoy_cc_test(
     srcs = [
         "utility_test.cc",
     ],
-    external_deps = ["ssl"],
+    external_deps = [
+        "ssl",
+    ],
     deps = [
+        "//bazel:crypto_utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",

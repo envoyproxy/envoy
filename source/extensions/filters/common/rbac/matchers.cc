@@ -133,7 +133,7 @@ bool PortMatcher::matches(const Network::Connection& connection, const Envoy::Ht
 bool AuthenticatedMatcher::matches(const Network::Connection& connection,
                                    const Envoy::Http::HeaderMap&,
                                    const StreamInfo::StreamInfo&) const {
-  const auto* ssl = connection.ssl();
+  const auto& ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
     return false;
   } else if (!matcher_.has_value()) { // matcher allows any subject

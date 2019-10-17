@@ -23,7 +23,7 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    RouteConfigProviderManager& route_config_provider_manager) {
+    RouteConfigProviderManager& route_config_provider_manager, bool is_delta) {
   switch (config.route_specifier_case()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
@@ -31,7 +31,7 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
                                                                          factory_context);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
     return route_config_provider_manager.createRdsRouteConfigProvider(
-        config.rds(), factory_context, stat_prefix, factory_context.initManager());
+        config.rds(), factory_context, stat_prefix, factory_context.initManager(), is_delta);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -56,7 +56,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     const std::string& stat_prefix,
-    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
+    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager, bool is_delta)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}); }),
@@ -69,7 +69,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(),
           Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-          *scope_, *this);
+          *scope_, *this, is_delta);
 
   config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
       factory_context.timeSource(), factory_context.messageValidationVisitor());
@@ -148,8 +148,9 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   }
 }
 
-void RdsRouteConfigSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
-                                                      const EnvoyException*) {
+void RdsRouteConfigSubscription::onConfigUpdateFailed(
+    Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
@@ -199,8 +200,12 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(
       new ConfigImpl(config_update_info_->routeConfiguration(), factory_context_, false));
-  tls_->runOnAllThreads(
-      [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+  tls_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
+    prev_config->config_ = new_config;
+    return previous;
+  });
 }
 
 void RdsRouteConfigProviderImpl::validateConfig(
@@ -220,7 +225,7 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
 Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    Init::Manager& init_manager) {
+    Init::Manager& init_manager, bool is_delta) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
 
@@ -232,7 +237,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
     subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
-                                                      stat_prefix, *this));
+                                                      stat_prefix, *this, is_delta));
     init_manager.add(subscription->init_target_);
     route_config_subscriptions_.insert({manager_identifier, subscription});
   } else {

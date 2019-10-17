@@ -27,7 +27,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;

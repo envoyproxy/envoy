@@ -9,13 +9,16 @@ ALPN
 ALS
 AMZ
 API
+ABI
 ASAN
 ASCII
 ASSERTs
 AWS
 BSON
+CAS
 CB
 CBs
+CEL
 CDS
 CHACHA
 CHLO
@@ -121,6 +124,7 @@ HV
 IAM
 IANA
 IDL
+IETF
 INADDR
 INET
 IO
@@ -150,6 +154,7 @@ LDS
 LEV
 LHS
 LF
+LRS
 MB
 MD
 MGET
@@ -200,8 +205,10 @@ POSTs
 PREBIND
 PRNG
 PROT
+ProcessBufferedChlos
 PSS
 QPS
+QoS
 QUIC
 RAII
 RANLUX
@@ -294,6 +301,9 @@ VC
 VH
 VHDS
 VLOG
+VM
+WASM
+WAVM
 WKT
 WRR
 WS
@@ -305,6 +315,7 @@ getaddrinfo
 sendto
 ssize
 upcasts
+vectorize
 vip
 xDSes
 XFCC
@@ -320,9 +331,11 @@ abcd
 absl
 accessor
 accessors
+acks
 acls
 addr
 agg
+alice
 alignas
 alignof
 alloc
@@ -414,14 +427,17 @@ decompressor
 decrement
 decrypt
 decrypting
+decls
 dedup
 dedupe
 deduplicate
+deduplicates
 deflateInit
 deletable
 deleter
 delim
 deque
+deprecations
 dereference
 dereferences
 dereferencing
@@ -451,6 +467,7 @@ dynamodb
 eg
 emplace
 emplaced
+emscripten
 enablement
 encodings
 endian
@@ -630,6 +647,7 @@ paren
 parentid
 parsers
 passthroughs
+pausable
 pcall
 pcap
 pclose
@@ -671,6 +689,7 @@ rc
 readded
 readv
 realloc
+rebalanced
 rebalancing
 rebuffer
 recurse
@@ -804,6 +823,7 @@ unordered
 unowned
 unparented
 unpause
+unpaused
 unpopulated
 unprotect
 unref

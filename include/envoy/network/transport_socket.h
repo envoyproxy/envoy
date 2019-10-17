@@ -144,7 +144,7 @@ public:
   /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::ConnectionInfo* ssl() const PURE;
+  virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
@@ -170,6 +170,11 @@ public:
    *         verification.
    */
   virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
+
+  /**
+   * @return the optional overridden application protocols.
+   */
+  virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used

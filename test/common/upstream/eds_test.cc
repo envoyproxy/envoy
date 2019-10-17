@@ -22,9 +22,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -78,8 +75,8 @@ protected:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(
-        new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
+    cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope),
+                                      false, false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
@@ -207,14 +204,6 @@ TEST_F(EdsTest, ValidateFail) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(resource);
   EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), ProtoValidationException);
-  EXPECT_FALSE(initialized_);
-}
-
-// Validate onConfigUpdate() on stream disconnection.
-TEST_F(EdsTest, StreamDisconnection) {
-  initialize();
-  eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                       nullptr);
   EXPECT_FALSE(initialized_);
 }
 

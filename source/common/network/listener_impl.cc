@@ -29,6 +29,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   const Address::InstanceConstSharedPtr& local_address =
       listener->local_address_ ? listener->local_address_
                                : listener->getLocalAddress(io_handle->fd());
+
   // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
   // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
   // sockaddr_un associated with the client socket when starting from the server socket.
@@ -43,8 +44,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
                                          remote_addr_len,
                                          local_address->ip()->version() == Address::IpVersion::v6);
   listener->cb_.onAccept(
-      std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address),
-      listener->hand_off_restored_destination_connections_);
+      std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
 }
 
 void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
@@ -66,10 +66,8 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
 }
 
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                           bool bind_to_port, bool hand_off_restored_destination_connections)
-    : BaseListenerImpl(dispatcher, socket), cb_(cb),
-      hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-      listener_(nullptr) {
+                           bool bind_to_port)
+    : BaseListenerImpl(dispatcher, socket), cb_(cb), listener_(nullptr) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, socket);
   }

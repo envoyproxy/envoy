@@ -216,19 +216,8 @@ protected:
    *
    * @param update_fn the callback to run on each thread, it takes the previous version Config and
    * returns a updated/new version Config.
-   * @param complete_cb the callback to run when the update propagation is done.
    */
-  void applyConfigUpdate(
-      const ConfigUpdateCb& update_fn, const Event::PostCb& complete_cb = []() {}) {
-    tls_->runOnAllThreads(
-        [this, update_fn]() {
-          // NOTE: there is a known race condition between *this* subscription being teared down in
-          // main thread and the posted callback being executed before the destruction. See more
-          // details in https://github.com/envoyproxy/envoy/issues/7902
-          tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(getConfig());
-        },
-        complete_cb);
-  }
+  void applyConfigUpdate(const ConfigUpdateCb& update_fn);
 
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
 

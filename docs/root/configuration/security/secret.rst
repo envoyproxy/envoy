@@ -15,7 +15,10 @@ Upstream clusters are handled in a similar way, if a cluster client certificate 
 
 If a static cluster is using SDS, and it needs to define a SDS cluster (unless Google gRPC is used which doesn't need a cluster), the SDS cluster has to be defined before the static clusters using it.
 
-The connection between Envoy proxy and SDS server has to be secure. One option is to run the SDS server on the same host and use Unix Domain Socket for the connection. Otherwise it requires mTLS between the proxy and SDS server. In this case, the client certificates for the SDS connection must be statically configured.
+The connection between Envoy proxy and SDS server has to be secure. One option is to run the SDS server on the same host and use Unix Domain Socket for the connection. Otherwise the connection requires TLS with authentication between the proxy and SDS server. Credential types in use today for authentication are:
+
+* mTLS -- In this case, the client certificates for the SDS connection must be statically configured.
+* AWS IAM SigV4
 
 SDS server
 ----------
