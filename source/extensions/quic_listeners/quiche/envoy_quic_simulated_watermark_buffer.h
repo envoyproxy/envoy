@@ -28,7 +28,8 @@ public:
 
   void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_above_high_watermark_ && bytes_buffered > high_watermark_) {
-      // Just exceeded the high watermark.
+      // This is the first time for the buffer to cross the high watermark
+      // since it was once below low watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross high watermark {}",
                           bytes_buffered, high_watermark_);
       is_above_high_watermark_ = true;
@@ -39,7 +40,8 @@ public:
 
   void checkLowWatermark(uint32_t bytes_buffered) {
     if (low_watermark_ > 0 && !is_below_low_watermark_ && bytes_buffered < low_watermark_) {
-      // Just crossed the low watermark.
+      // This is the first time for the buffer to cross the low watermark
+      // since it was once above high watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross low watermark {}",
                           bytes_buffered, low_watermark_);
       is_below_low_watermark_ = true;
@@ -48,8 +50,14 @@ public:
     }
   }
 
+  // True after the buffer goes above high watermark and hasn't come down below low
+  // watermark yet, even though the buffered data might be between high and low
+  // watermarks.
   bool isAboveHighWatermark() const { return is_above_high_watermark_; }
 
+  // True after the buffer goes below low watermark and hasn't come up above high
+  // watermark yet, even though the buffered data might be between high and low
+  // watermarks.
   bool isBelowLowWatermark() const { return is_below_low_watermark_; }
 
 private:

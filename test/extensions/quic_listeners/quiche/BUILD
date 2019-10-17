@@ -183,3 +183,12 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "envoy_quic_simulated_watermark_buffer_test",
+    srcs = ["envoy_quic_simulated_watermark_buffer_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche:envoy_quic_simulated_watermark_buffer_lib",
+    ],
+)
