@@ -65,7 +65,7 @@ public:
                                                   PoolCallbacks& callbacks) override;
   /**
    * Makes a redis request based on IP address and TCP port of the upstream host (e.g.,
-   moved/ask cluster redirection).  This is now only kept mostly for testing.
+   moved/ask cluster redirection). This is now only kept mostly for testing.
    * @param host_address supplies the IP address and TCP port of the upstream host to receive
    the
    * request.

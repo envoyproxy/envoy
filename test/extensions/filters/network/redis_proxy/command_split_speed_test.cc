@@ -107,7 +107,7 @@ static void BM_Split_Move(benchmark::State& state) {
   for (auto _ : state) {
     context.move(request);
   }
-//  state.counters["use_count"] = request.use_count();
+  //  state.counters["use_count"] = request.use_count();
 }
 BENCHMARK(BM_Split_Move)->Ranges({{1, 100}, {64, 8 << 14}});
 
@@ -118,7 +118,7 @@ static void BM_Split_Move_Local_Variant(benchmark::State& state) {
   for (auto _ : state) {
     context.moveLocalVariant(request);
   }
-//  state.counters["use_count"] = request.use_count();
+  //  state.counters["use_count"] = request.use_count();
 }
 BENCHMARK(BM_Split_Move_Local_Variant)->Ranges({{1, 100}, {64, 8 << 14}});
 
@@ -130,7 +130,7 @@ static void BM_Split_Copy(benchmark::State& state) {
     context.copy(request);
   }
 
-//  state.counters["use_count"] = request.use_count();
+  //  state.counters["use_count"] = request.use_count();
 }
 BENCHMARK(BM_Split_Copy)->Ranges({{1, 100}, {64, 8 << 14}});
 
