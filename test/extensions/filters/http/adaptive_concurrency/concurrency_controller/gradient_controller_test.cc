@@ -109,6 +109,38 @@ min_rtt_calc_params:
   EXPECT_EQ(config.jitterPercent(), .132);
 }
 
+TEST_F(GradientControllerConfigTest, Clamping) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 42.5
+concurrency_limit_params:
+  max_gradient: 2.1
+  max_concurrency_limit: 1337
+  concurrency_update_interval:
+    nanos: 123000000
+min_rtt_calc_params:
+  jitter:
+    value: 13.2
+  interval:
+    seconds: 31
+  request_count: 52
+)EOF";
+
+  auto config = makeConfig(yaml, runtime_);
+
+  // Should be clamped in the range [0,1].
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 42.5)).WillOnce(Return(150.0));
+  EXPECT_EQ(config.sampleAggregatePercentile(), 1.0);
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 42.5)).WillOnce(Return(-50.5));
+  EXPECT_EQ(config.sampleAggregatePercentile(), 0.0);
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 13.2)).WillOnce(Return(150.0));
+  EXPECT_EQ(config.jitterPercent(), 1.0);
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 13.2)).WillOnce(Return(-50.5));
+  EXPECT_EQ(config.jitterPercent(), 0.0);
+}
+
 TEST_F(GradientControllerConfigTest, BasicTestOverrides) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
