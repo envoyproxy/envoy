@@ -45,9 +45,8 @@ InstanceImpl::InstanceImpl(
   });
 }
 
-Common::Redis::Client::PoolRequest* InstanceImpl::makeRequest(const std::string& key,
-                                                              const RespVariant&& request,
-                                                              PoolCallbacks& callbacks) {
+Common::Redis::Client::PoolRequest*
+InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks);
 }
 
@@ -215,7 +214,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
 }
 
 Common::Redis::Client::PoolRequest*
-InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, const RespVariant&& request,
+InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&& request,
                                            PoolCallbacks& callbacks) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
@@ -348,7 +347,7 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
 }
 
 InstanceImpl::PendingRequest::PendingRequest(InstanceImpl::ThreadLocalPool& parent,
-                                             const RespVariant&& incoming_request,
+                                             RespVariant&& incoming_request,
                                              PoolCallbacks& pool_callbacks)
     : parent_(parent), incoming_request_(std::move(incoming_request)),
       pool_callbacks_(pool_callbacks) {}

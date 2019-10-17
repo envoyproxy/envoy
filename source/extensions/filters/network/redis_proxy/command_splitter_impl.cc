@@ -278,9 +278,8 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     if (route) {
       Common::Redis::RespValue single_set(base_request,
                                           Common::Redis::Utility::SetRequest::instance(), i, i + 1);
-      pending_request.handle_ =
-          makeFragmentedRequest(route, "set", base_request->asArray()[i].asString(),
-                                std::move(single_set), pending_request);
+      pending_request.handle_ = makeFragmentedRequest(
+          route, "set", base_request->asArray()[i].asString(), single_set, pending_request);
     }
 
     if (!pending_request.handle_) {

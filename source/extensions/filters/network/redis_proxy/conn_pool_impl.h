@@ -60,8 +60,7 @@ public:
       Api::Api& api, Stats::ScopePtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats);
   // RedisProxy::ConnPool::Instance
-  Common::Redis::Client::PoolRequest* makeRequest(const std::string& key,
-                                                  const RespVariant&& request,
+  Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
                                                   PoolCallbacks& callbacks) override;
   /**
    * Makes a redis request based on IP address and TCP port of the upstream host (e.g.,
@@ -102,7 +101,7 @@ private:
 
   struct PendingRequest : public Common::Redis::Client::ClientCallbacks,
                           public Common::Redis::Client::PoolRequest {
-    PendingRequest(ThreadLocalPool& parent, const RespVariant&& incoming_request,
+    PendingRequest(ThreadLocalPool& parent, RespVariant&& incoming_request,
                    PoolCallbacks& pool_callbacks);
     ~PendingRequest() override;
 
@@ -125,8 +124,8 @@ private:
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
-    Common::Redis::Client::PoolRequest*
-    makeRequest(const std::string& key, const RespVariant&& request, PoolCallbacks& callbacks);
+    Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
+                                                    PoolCallbacks& callbacks);
     Common::Redis::Client::PoolRequest*
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);

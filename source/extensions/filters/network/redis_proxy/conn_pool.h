@@ -59,9 +59,8 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
-                                                          const RespVariant&& request,
-                                                          PoolCallbacks& callbacks) PURE;
+  virtual Common::Redis::Client::PoolRequest*
+  makeRequest(const std::string& hash_key, RespVariant&& request, PoolCallbacks& callbacks) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;
