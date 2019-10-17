@@ -356,6 +356,8 @@ TEST_P(IntegrationAdminTest, Admin) {
               "\n"
               "total: 12\n",
               response->body());
+  case Http::CodecClient::Type::HTTP3:
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   response = request("/certs", "GET");
