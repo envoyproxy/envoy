@@ -5,7 +5,7 @@ package io.envoyproxy.envoymobile
  *
  * @param maxRetryCount Maximum number of retries that a request may be performed.
  * @param retryOn Whitelist of rules used for retrying.
- * @param perRetryTimeoutMs Timeout (in milliseconds) to apply to each retry.
+ * @param perRetryTimeoutMS Timeout (in milliseconds) to apply to each retry.
  * Must be <= `totalUpstreamTimeoutMS`.
  * @param totalUpstreamTimeoutMS Total timeout (in milliseconds) that includes all retries.
  * Spans the point at which the entire downstream request has been processed and when the
@@ -14,11 +14,11 @@ package io.envoyproxy.envoymobile
 data class RetryPolicy(
   val maxRetryCount: Int,
   val retryOn: List<RetryRule>,
-  val perRetryTimeoutMs: Long? = null,
+  val perRetryTimeoutMS: Long? = null,
   val totalUpstreamTimeoutMS: Long = 15000
 ) {
   init {
-    if (perRetryTimeoutMs != null && perRetryTimeoutMs > totalUpstreamTimeoutMS) {
+    if (perRetryTimeoutMS != null && perRetryTimeoutMS > totalUpstreamTimeoutMS) {
       throw IllegalArgumentException("Per-retry timeout must be <= total timeout")
     }
   }

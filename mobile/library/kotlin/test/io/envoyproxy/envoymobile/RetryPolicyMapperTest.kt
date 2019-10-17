@@ -15,7 +15,7 @@ class RetryPolicyMapperTest {
             RetryRule.CONNECT_FAILURE,
             RetryRule.RETRIABLE_4XX,
             RetryRule.REFUSED_UPSTREAM),
-        perRetryTimeoutMs = 15000,
+        perRetryTimeoutMS = 15000,
         totalUpstreamTimeoutMS = 60000)
 
     assertThat(retryPolicy.outboundHeaders()).isEqualTo(mapOf(
@@ -27,7 +27,7 @@ class RetryPolicyMapperTest {
   }
 
   @Test
-  fun `retry policy without perRetryTimeoutMs should exclude per try time ms header key`() {
+  fun `retry policy without perRetryTimeoutMS should exclude per try time ms header key`() {
     val retryPolicy = RetryPolicy(
         maxRetryCount = 123,
         retryOn = listOf(
@@ -45,7 +45,7 @@ class RetryPolicyMapperTest {
     val retryPolicy = RetryPolicy(
         maxRetryCount = 3,
         retryOn = listOf(RetryRule.STATUS_5XX),
-        perRetryTimeoutMs = 2,
+        perRetryTimeoutMS = 2,
         totalUpstreamTimeoutMS = 1)
   }
 }

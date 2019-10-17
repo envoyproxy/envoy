@@ -8,7 +8,7 @@ class RequestBuilderTest {
   @Test
   fun `adding retry policy should have policy present in request`() {
 
-    val retryPolicy = RetryPolicy(maxRetryCount = 23, retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), perRetryTimeoutMs = 1234)
+    val retryPolicy = RetryPolicy(maxRetryCount = 23, retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), perRetryTimeoutMS = 1234)
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addRetryPolicy(retryPolicy)
         .build()

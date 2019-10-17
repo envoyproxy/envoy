@@ -13,8 +13,8 @@ internal fun RetryPolicy.outboundHeaders(): Map<String, List<String>> {
       "x-envoy-upstream-rq-timeout-ms" to listOf("$totalUpstreamTimeoutMS")
   )
 
-  if (perRetryTimeoutMs != null) {
-    headers["x-envoy-upstream-rq-per-try-timeout-ms"] = listOf("$perRetryTimeoutMs")
+  if (perRetryTimeoutMS != null) {
+    headers["x-envoy-upstream-rq-per-try-timeout-ms"] = listOf("$perRetryTimeoutMS")
   }
   return headers
 }

@@ -99,7 +99,7 @@ class RequestMapperTest {
             RetryRule.CONNECT_FAILURE,
             RetryRule.RETRIABLE_4XX,
             RetryRule.REFUSED_UPSTREAM),
-        perRetryTimeoutMs = 9001)
+        perRetryTimeoutMS = 9001)
     val retryPolicyHeaders = retryPolicy.outboundHeaders()
 
     val requestHeaders = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "/foo")
@@ -120,7 +120,7 @@ class RequestMapperTest {
             RetryRule.CONNECT_FAILURE,
             RetryRule.RETRIABLE_4XX,
             RetryRule.REFUSED_UPSTREAM),
-        perRetryTimeoutMs = 9001)
+        perRetryTimeoutMS = 9001)
     val retryPolicyHeaders = retryPolicy.outboundHeaders()
 
     val requestHeaders = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "/foo")
