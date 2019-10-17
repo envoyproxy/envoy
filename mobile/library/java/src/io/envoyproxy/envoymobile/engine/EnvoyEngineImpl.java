@@ -32,7 +32,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   @Override
   public int runWithConfig(String configurationYAML, String logLevel) {
     try {
-      return JniLibrary.runEngine(configurationYAML, logLevel);
+      return JniLibrary.runEngine(this.engineHandle, configurationYAML, logLevel);
     } catch (Throwable throwable) {
       // TODO: Need to have a way to log the exception somewhere
       return 1;
@@ -43,7 +43,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * Run the Envoy engine with the provided envoyConfiguration and log level.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
-   * @param logLevel The log level to use when starting Envoy.
+   * @param logLevel           The log level to use when starting Envoy.
    * @return int A status indicating if the action was successful.
    */
   @Override
