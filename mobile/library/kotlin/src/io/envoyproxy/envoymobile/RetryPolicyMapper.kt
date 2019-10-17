@@ -9,7 +9,8 @@ internal fun RetryPolicy.outboundHeaders(): Map<String, List<String>> {
 
   val headers = mutableMapOf(
       "x-envoy-max-retries" to listOf("$maxRetryCount"),
-      "x-envoy-retry-on" to retryOn.map { elm -> elm.stringValue() }
+      "x-envoy-retry-on" to retryOn.map { elm -> elm.stringValue() },
+      "x-envoy-upstream-rq-timeout-ms" to listOf("$totalUpstreamTimeoutMS")
   )
 
   if (perRetryTimeoutMs != null) {

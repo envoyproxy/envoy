@@ -8,19 +8,21 @@ class RetryPolicyMapperTest {
   @Test
   fun `all retry policy properties should all be encoded`() {
     val retryPolicy = RetryPolicy(
-        maxRetryCount = 123,
+        maxRetryCount = 3,
         retryOn = listOf(
             RetryRule.STATUS_5XX,
             RetryRule.GATEWAY_ERROR,
             RetryRule.CONNECT_FAILURE,
             RetryRule.RETRIABLE_4XX,
             RetryRule.REFUSED_UPSTREAM),
-        perRetryTimeoutMs = 9001)
+        perRetryTimeoutMs = 15000,
+        totalUpstreamTimeoutMS = 60000)
 
     assertThat(retryPolicy.outboundHeaders()).isEqualTo(mapOf(
-        "x-envoy-max-retries" to listOf("123"),
+        "x-envoy-max-retries" to listOf("3"),
         "x-envoy-retry-on" to listOf("5xx", "gateway-error", "connect-failure", "retriable-4xx", "refused-upstream"),
-        "x-envoy-upstream-rq-per-try-timeout-ms" to listOf("9001")
+        "x-envoy-upstream-rq-per-try-timeout-ms" to listOf("15000"),
+        "x-envoy-upstream-rq-timeout-ms" to listOf("60000")
     ))
   }
 
@@ -36,5 +38,14 @@ class RetryPolicyMapperTest {
             RetryRule.REFUSED_UPSTREAM))
 
     assertThat(retryPolicy.outboundHeaders()).doesNotContainKey("x-envoy-upstream-rq-per-try-timeout-ms")
+  }
+
+  @Test(expected=IllegalArgumentException::class)
+  fun `throws error when per-retry timeout is larger than total timeout`() {
+    val retryPolicy = RetryPolicy(
+        maxRetryCount = 3,
+        retryOn = listOf(RetryRule.STATUS_5XX),
+        perRetryTimeoutMs = 2,
+        totalUpstreamTimeoutMS = 1)
   }
 }
