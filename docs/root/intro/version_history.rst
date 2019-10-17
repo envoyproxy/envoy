@@ -41,6 +41,7 @@ Version history
 * http: :ref:`AUTO <envoy_api_enum_value_config.filter.network.http_connection_manager.v2.HttpConnectionManager.CodecType.AUTO>` codec protocol inference now requires the H2 magic bytes to be the first bytes transmitted by a downstream client.
 * http: remove h2c upgrade headers for HTTP/1 as h2c upgrades are currently not supported.
 * http: absolute URL support is now on by default. The prior behavior can be reinstated by setting :ref:`allow_absolute_url <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` to false.
+* http: support :ref:`host rewrite <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig>` in the dynamic forward proxy.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * listeners: added :ref:`connection balancer <envoy_api_field_Listener.connection_balance_config>`
