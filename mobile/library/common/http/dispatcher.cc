@@ -148,7 +148,14 @@ envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
         std::make_unique<DirectStreamCallbacks>(new_stream_handle, bridge_callbacks, *this);
 
     AsyncClient& async_client = getClient();
-    AsyncClient::Stream* underlying_stream = async_client.start(*callbacks, {});
+    // Note: currently all streams are set to buffer body data for retries.
+    // This is done as an assumption that almost all client calls are retriable,
+    // and the penalty for those that are not is minimal.
+    // The stream options could be exposed
+    // (like in: https://github.com/lyft/envoy-mobile/pull/456/) in the future,
+    // if the library needs the added configuration flexiblity.
+    AsyncClient::Stream* underlying_stream =
+        async_client.start(*callbacks, AsyncClient::StreamOptions().setBufferBodyForRetry(true));
 
     if (!underlying_stream) {
       // TODO: this callback might fire before the startStream function returns.
