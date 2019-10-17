@@ -128,10 +128,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clust
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
-  ListenerManager::StopListenerSelector listener_selector;
-  listener_selector.listener_direction_ =
-      ListenerManager::StopListenerSelector::ListenerDirection::All;
-  listener_manager_->stopListeners(listener_selector);
+  listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
   drain_manager_->startDrainSequence(nullptr);
 }
 

@@ -1143,10 +1143,7 @@ filter_chains:
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  ListenerManager::StopListenerSelector listener_selector;
-  listener_selector.listener_direction_ =
-      ListenerManager::StopListenerSelector::ListenerDirection::InboundOnly;
-  manager_->stopListeners(listener_selector);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
 
   // Validate that adding a listener in stopped listener's traffic direction is not allowed.
   const std::string listener_bar_yaml = R"EOF(
@@ -1193,10 +1190,7 @@ filter_chains:
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  ListenerManager::StopListenerSelector listener_selector;
-  listener_selector.listener_direction_ =
-      ListenerManager::StopListenerSelector::ListenerDirection::All;
-  manager_->stopListeners(listener_selector);
+  manager_->stopListeners(ListenerManager::StopListenersType::All);
 
   // Validate that adding a listener is not allowed after all listeners are stopped.
   const std::string listener_bar_yaml = R"EOF(
@@ -1265,10 +1259,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  ListenerManager::StopListenerSelector listener_selector;
-  listener_selector.listener_direction_ =
-      ListenerManager::StopListenerSelector::ListenerDirection::InboundOnly;
-  manager_->stopListeners(listener_selector);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {

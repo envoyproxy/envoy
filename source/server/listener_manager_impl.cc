@@ -840,13 +840,12 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   }
 }
 
-bool ListenerManagerImpl::stopListeners(const StopListenerSelector& listener_selector) {
+bool ListenerManagerImpl::stopListeners(StopListenersType listeners_type) {
   bool listeners_stopped = false;
-  listener_stop_state_.listener_direction_ = listener_selector.listener_direction_;
+  listeners_type_ = listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     for (const auto& worker : workers_) {
-      if (listener_selector.listener_direction_ !=
-              StopListenerSelector::ListenerDirection::InboundOnly ||
+      if (listeners_type != StopListenersType::InboundOnly ||
           listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
         listeners_stopped = true;
         ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
