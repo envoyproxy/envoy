@@ -600,6 +600,7 @@ matcher
 matchers
 mcontext
 mem
+memcmp
 memcpy
 midp
 milli
