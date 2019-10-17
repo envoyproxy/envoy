@@ -1,5 +1,7 @@
 #include "common/stats/timespan_impl.h"
 
+#include "common/common/fmt.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -23,7 +25,12 @@ void HistogramCompletableTimespanImpl::ensureTimeHistogram(const Histogram& hist
     return;
   case Histogram::Unit::Unspecified:
   case Histogram::Unit::Bytes:
-    ASSERT(0);
+    RELEASE_ASSERT(
+        false,
+        fmt::format("Cannot create a timespan flushing the duration to histogram '{}' because "
+                    "it does not measure time. This is a programming error, either pass a "
+                    "histogram measuring time or fix the unit of the passed histogram.",
+                    histogram.name()));
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
