@@ -15,10 +15,9 @@ public:
   ~MockRedirectionManager() override = default;
 
   MOCK_METHOD1(onRedirection, bool(const std::string& cluster_name));
-  MOCK_METHOD4(registerCluster,
-               HandlePtr(const std::string& cluster_name,
-                         const std::chrono::milliseconds min_time_between_triggering,
-                         const uint32_t redirects_threshold, const RedirectCB cb));
+  MOCK_METHOD4(registerCluster, HandlePtr(const std::string& cluster_name,
+                                          std::chrono::milliseconds min_time_between_triggering,
+                                          uint32_t redirects_threshold, const RedirectCB& cb));
 };
 
 } // namespace Redis

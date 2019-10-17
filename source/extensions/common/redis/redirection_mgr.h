@@ -51,8 +51,8 @@ public:
    * destruction.
    */
   virtual HandlePtr registerCluster(const std::string& cluster_name,
-                                    const std::chrono::milliseconds min_time_between_triggering,
-                                    const uint32_t redirects_threshold, const RedirectCB cb) PURE;
+                                    std::chrono::milliseconds min_time_between_triggering,
+                                    uint32_t redirects_threshold, const RedirectCB& cb) PURE;
 };
 
 using RedirectionManagerSharedPtr = std::shared_ptr<RedirectionManager>;

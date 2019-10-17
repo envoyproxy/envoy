@@ -48,17 +48,11 @@ public:
     HandleImpl(RedirectionManagerImpl* mgr, ClusterInfoSharedPtr& cluster_info)
         : manager_(mgr->shared_from_this()), cluster_info_(cluster_info) {}
 
-    ~HandleImpl() override {
-      std::shared_ptr<RedirectionManagerImpl> strong_manager = manager_.lock();
-      ClusterInfoSharedPtr strong_cluster_info = cluster_info_.lock();
-      if (strong_manager && strong_cluster_info) {
-        strong_manager->unregisterCluster(strong_cluster_info);
-      }
-    }
+    ~HandleImpl() override { manager_->unregisterCluster(cluster_info_); }
 
   private:
-    std::weak_ptr<RedirectionManagerImpl> manager_;
-    std::weak_ptr<ClusterInfo> cluster_info_;
+    const std::shared_ptr<RedirectionManagerImpl> manager_;
+    const std::shared_ptr<ClusterInfo> cluster_info_;
   };
 
   RedirectionManagerImpl(Event::Dispatcher& main_thread_dispatcher, Upstream::ClusterManager& cm,
@@ -68,16 +62,16 @@ public:
   bool onRedirection(const std::string& cluster_name) override;
 
   HandlePtr registerCluster(const std::string& cluster_name,
-                            const std::chrono::milliseconds min_time_between_triggering,
-                            const uint32_t redirects_threshold, const RedirectCB cb) override;
+                            std::chrono::milliseconds min_time_between_triggering,
+                            uint32_t redirects_threshold, const RedirectCB& cb) override;
 
 private:
-  void unregisterCluster(ClusterInfoSharedPtr& cluster_info);
+  void unregisterCluster(const ClusterInfoSharedPtr& cluster_info);
 
   Event::Dispatcher& main_thread_dispatcher_;
   Upstream::ClusterManager& cm_;
   TimeSource& time_source_;
-  std::map<std::string, ClusterInfoSharedPtr> info_map_;
+  std::map<std::string, ClusterInfoSharedPtr> info_map_ GUARDED_BY(map_mutex_);
   Thread::MutexBasicLockable map_mutex_;
 };
 

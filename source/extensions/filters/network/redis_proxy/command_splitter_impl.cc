@@ -308,10 +308,10 @@ bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value
     return false;
   }
 
-  this->pending_requests_[index].handle_ =
-      conn_pool->makeRequestToHost(host_address, request, this->pending_requests_[index]);
+  pending_requests_[index].handle_ =
+      conn_pool->makeRequestToHost(host_address, request, pending_requests_[index]);
 
-  if (this->pending_requests_[index].handle_ != nullptr) {
+  if (pending_requests_[index].handle_ != nullptr) {
     conn_pool->onRedirection();
     return true;
   }

@@ -267,9 +267,9 @@ private:
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
 
-  Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
-  Common::Redis::RedirectionManager::HandlePtr registration_handle_;
   const std::string auth_password_;
+  const Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
+  const Common::Redis::RedirectionManager::HandlePtr registration_handle_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

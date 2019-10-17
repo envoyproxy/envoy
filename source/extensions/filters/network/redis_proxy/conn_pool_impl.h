@@ -138,7 +138,7 @@ private:
   Stats::ScopePtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   RedisClusterStats redis_cluster_stats_;
-  Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
+  const Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
 };
 
 } // namespace ConnPool
