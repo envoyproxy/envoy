@@ -12,7 +12,7 @@ repos:
     - id: detect-private-key
     - id: mixed-line-ending
 - repo: https://github.com/codespell-project/codespell
-  rev: v1.15.0
+  rev: v1.16.0
   hooks:
     - id: codespell
       args: [-L uint]

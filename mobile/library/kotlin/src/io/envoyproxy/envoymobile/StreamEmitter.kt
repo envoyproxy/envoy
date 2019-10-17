@@ -18,7 +18,6 @@ interface CancelableStream {
  * Interface allowing for sending/emitting data on an Envoy stream.
  */
 interface StreamEmitter : CancelableStream {
-
   /**
    * For sending data to an associated stream.
    *

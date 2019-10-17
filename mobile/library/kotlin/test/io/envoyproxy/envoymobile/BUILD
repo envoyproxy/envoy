@@ -71,3 +71,33 @@ envoy_mobile_kt_test(
         "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
+
+envoy_mobile_kt_test(
+    name = "grpc_request_builder_test",
+    srcs = [
+        "GRPCRequestBuilderTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_kt_test(
+    name = "grpc_response_handler_test",
+    srcs = [
+        "GRPCResponseHandlerTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_kt_test(
+    name = "grpc_stream_emitter_test",
+    srcs = [
+        "GRPCStreamEmitterTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)

@@ -7,7 +7,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit
 
 class ResponseHandlerTest {
-  @Test(timeout = 100L)
+  @Test(timeout = 200L)
   fun `parsing status code from headers returns first status code`() {
     val countDownLatch = CountDownLatch(1)
     val headers = mapOf(":status" to listOf("204", "200"), "other" to listOf("1"))
@@ -21,7 +21,7 @@ class ResponseHandlerTest {
     countDownLatch.await(1L, TimeUnit.SECONDS)
   }
 
-  @Test(timeout = 100L)
+  @Test(timeout = 200L)
   fun `parsing invalid status code from headers returns 0`() {
     val countDownLatch = CountDownLatch(1)
     val headers = mapOf(":status" to listOf("invalid"), "other" to listOf("1"))
@@ -35,7 +35,7 @@ class ResponseHandlerTest {
     countDownLatch.await(1L, TimeUnit.SECONDS)
   }
 
-  @Test(timeout = 100L)
+  @Test(timeout = 200L)
   fun `parsing missing status code from headers returns 0`() {
     val countDownLatch = CountDownLatch(1)
     val headers = mapOf("other" to listOf("1"))
