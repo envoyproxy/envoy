@@ -344,7 +344,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type` HttpHealthCheckerImpl::codecClientType(
+Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(
     const envoy::type::CodecClientType& type) {
   switch (type) {
   case envoy::type::HTTP3:
