@@ -155,8 +155,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
-    response_headers_to_add_->insertEnvoyRateLimited().value(
-        Http::Headers::get().EnvoyRateLimitedValues.True);
+    if (response_headers_to_add_) {
+      response_headers_to_add_->insertEnvoyRateLimited().value(
+          Http::Headers::get().EnvoyRateLimitedValues.True);
+    }
     break;
   }
 
