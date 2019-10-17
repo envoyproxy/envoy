@@ -13,20 +13,28 @@ envoy_package()
 envoy_cc_library(
     name = "xray_lib",
     srcs = [
+        "localized_sampling.cc",
+        "tracer.cc",
         "util.cc",
         "xray_tracer_impl.cc",
     ],
     hdrs = [
+        "localized_sampling.h",
+        "reservoir.h",
         "sampling_strategy.h",
         "tracer.h",
         "util.h",
         "xray_configuration.h",
         "xray_tracer_impl.h",
     ],
+    external_deps = [
+        "rapidjson",
+    ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/common:hex_lib",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
