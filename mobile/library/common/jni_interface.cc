@@ -172,7 +172,18 @@ static void jvm_on_metadata(envoy_headers metadata, void* context) {
 
 static void jvm_on_trailers(envoy_headers trailers, void* context) {
   __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_trailers");
-  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", std::to_string(trailers.length).c_str());
+
+  JNIEnv* env = get_env();
+  jobject j_context = static_cast<jobject>(context);
+
+  jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onTrailers = env->GetMethodID(jcls_JvmCallbackContext, "onTrailers", "(J)V");
+  // Note: be careful of JVM types
+  // FIXME: make this cast safer
+  env->CallVoidMethod(j_context, jmid_onTrailers, (jlong)trailers.length);
+
+  env->DeleteLocalRef(jcls_JvmCallbackContext);
+  pass_headers(env, trailers, j_context);
 }
 
 static void jvm_on_error(envoy_error error, void* context) {

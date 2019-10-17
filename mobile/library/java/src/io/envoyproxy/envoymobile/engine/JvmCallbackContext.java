@@ -43,6 +43,14 @@ class JvmCallbackContext {
   }
 
   /**
+   * Initializes state for accumulating trailer pairs via passHeaders, ultimately
+   * to be dispatched via the callback.
+   *
+   * @param length, the total number of trailers included in this header block.
+   */
+  public void onTrailers(long length) { startAccumulation(FrameType.TRAILERS, length, true); }
+
+  /**
    * Allows pairs of strings to be passed across the JVM, reducing overall calls
    * (at the expense of some complexity).
    *
