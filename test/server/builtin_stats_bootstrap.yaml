@@ -1,7 +1,5 @@
 stats_config:
   builtin_stat_names:
     - name: builtin.stat1
-  builtin_stat_names:  
     - name: builtin.stat1
-  builtin_stat_names:
     - name: builtin.stat2

@@ -313,10 +313,6 @@ private:
     absl::optional<std::reference_wrapper<const StatType>>
     findStatLockHeld(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map) const;
 
-    void extractTagsAndTruncate(StatName& name,
-                                std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
-                                std::vector<Tag>& tags, std::string& tag_extracted_name);
-
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;

@@ -494,23 +494,23 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * In the stat structures, we generally use StatNameStorage to avoid the
  * per-stat overhead.
  */
-class StatNameManagedStorage : public StatNameStorage {
+class StatNameManagedStorage {
 public:
   // Basic constructor for when you have a name as a string, and need to
   // generate symbols for it.
-  StatNameManagedStorage(absl::string_view name, SymbolTable& table)
-      : StatNameStorage(name, table), symbol_table_(table) {}
+  StatNameManagedStorage(absl::string_view name, SymbolTable& table);
+  ~StatNameManagedStorage();
 
-  // Obtains new backing storage for an already existing StatName.
-  StatNameManagedStorage(StatName src, SymbolTable& table)
-      : StatNameStorage(src, table), symbol_table_(table) {}
-
-  ~StatNameManagedStorage() { free(symbol_table_); }
+  StatName statName() const { return stat_name_; }
 
   SymbolTable& symbolTable() { return symbol_table_; }
   const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
 private:
+  //using StorageAndTable = std::pair<StatNameStorage, SymbolTable&>;
+
+  StatName stat_name_;
+  std::unique_ptr<StatNameStorage> storage_;
   SymbolTable& symbol_table_;
 };
 

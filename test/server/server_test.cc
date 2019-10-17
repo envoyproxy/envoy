@@ -488,12 +488,13 @@ TEST_P(ServerStatsTest, FlushStats) {
 TEST_P(ServerStatsTest, BootstrapBuiltins) {
   initialize("test/server/builtin_stats_bootstrap.yaml");
   Stats::SymbolTable& symbol_table = stats_store_.symbolTable();
-  auto numLookups = [&symbol_table]() -> uint64_t {
-                      return symbol_table.getRecentLookups([](absl::string_view, uint64_t){});
-                    };
-  const uint64_t lookups_at_init = numLookups();
   stats_store_.counter("builtin.stat1");
-  EXPECT_EQ(lookups_at_init, numLookups());
+  auto num_lookups = [&symbol_table]() -> uint64_t {
+                       return symbol_table.getRecentLookups([](absl::string_view, uint64_t){});
+                     };
+  const uint64_t lookups_at_init = num_lookups();
+  stats_store_.counter("builtin.stat1");
+  EXPECT_EQ(lookups_at_init, num_lookups());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,
