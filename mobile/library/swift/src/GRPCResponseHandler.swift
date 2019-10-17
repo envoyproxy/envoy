@@ -124,6 +124,7 @@ public final class GRPCResponseHandler: NSObject {
       }
 
       guard compressionFlag == 0 else {
+        // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501
         assertionFailure("gRPC decompression is not supported")
         buffer.removeAll()
         state = .expectingCompressionFlag
