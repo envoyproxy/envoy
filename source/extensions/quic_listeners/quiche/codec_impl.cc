@@ -23,7 +23,6 @@ void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWat
 }
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  std::cerr << "========== onUnderlyingConnectionBelowWriteBufferLowWatermark\n";
   for (const auto& it : quic_server_session_.stream_map()) {
     if (!it.second->is_static()) {
       ENVOY_LOG(debug, "runLowWatermarkCallbacks on stream {}", it.first);
