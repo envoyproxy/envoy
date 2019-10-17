@@ -8,6 +8,7 @@ extension RetryPolicy {
       "x-envoy-retry-on": self.retryOn
         .lazy
         .map { $0.stringValue },
+      "x-envoy-upstream-rq-timeout-ms": ["\(self.totalUpstreamTimeoutMS)"],
     ]
 
     if let perRetryTimeoutMS = self.perRetryTimeoutMS {
