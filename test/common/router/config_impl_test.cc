@@ -5787,6 +5787,8 @@ virtual_hosts:
   }
 }
 
+// Test Route Matching based on connection Tls Context.
+// Validate configured and default settings are routed to the correct cluster.
 TEST_F(RouteMatcherTest, TlsContextMatching) {
   const std::string yaml = R"EOF(
 name: foo
