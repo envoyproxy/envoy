@@ -284,6 +284,7 @@ envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
+        ":builtin_stats_bootstrap.yaml",
         ":cluster_dupe_bootstrap.yaml",
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",

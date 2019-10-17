@@ -485,6 +485,17 @@ TEST_P(ServerStatsTest, FlushStats) {
   EXPECT_EQ(2, recent_lookups.value() - strobed_recent_lookups);
 }
 
+TEST_P(ServerStatsTest, BootstrapBuiltins) {
+  initialize("test/server/builtin_stats_bootstrap.yaml");
+  Stats::SymbolTable& symbol_table = stats_store_.symbolTable();
+  auto numLookups = [&symbol_table]() -> uint64_t {
+                      return symbol_table.getRecentLookups([](absl::string_view, uint64_t){});
+                    };
+  const uint64_t lookups_at_init = numLookups();
+  stats_store_.counter("builtin.stat1");
+  EXPECT_EQ(lookups_at_init, numLookups());
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

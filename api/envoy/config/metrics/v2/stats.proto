@@ -40,6 +40,10 @@ message StatsSink {
   }
 }
 
+message StatsBuiltin {
+  string name = 1;
+}
+
 // Statistics configuration such as tagging.
 message StatsConfig {
   // Each stat name is iteratively processed through these tag specifiers.
@@ -68,6 +72,12 @@ message StatsConfig {
   // as normal. Preventing the instantiation of certain families of stats can improve memory
   // performance for Envoys running especially large configs.
   StatsMatcher stats_matcher = 3;
+
+  // Looking up statistics by name is expensive because it entails taking
+  // a global lock in the hot path. Names specified in the builtin list
+  // are pre-allocated at process startup, and held in a map that is accessed
+  // without a lock.
+  repeated StatsBuiltin builtin_stat_names = 4;
 }
 
 // Configuration for disabling stat instantiation.

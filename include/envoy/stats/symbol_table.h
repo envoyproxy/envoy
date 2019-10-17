@@ -8,6 +8,8 @@
 
 #include "absl/strings/string_view.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -179,6 +181,10 @@ public:
    * @return the set.
    */
   virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
+
+  virtual void rememberBuiltin(absl::string_view name) PURE;
+  virtual bool hasBuiltin(absl::string_view str) const PURE;
+  virtual absl::optional<StatName> getBuiltin(absl::string_view str) const PURE;
 
 private:
   friend struct HeapStatData;

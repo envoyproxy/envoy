@@ -98,9 +98,11 @@ uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_ar
 
 SymbolTableImpl::SymbolTableImpl()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
-    : next_symbol_(0), monotonic_counter_(0) {}
+    : next_symbol_(0), monotonic_counter_(0), builtins_(*this) {}
 
 SymbolTableImpl::~SymbolTableImpl() {
+  builtins_.clear();
+
   // To avoid leaks into the symbol table, we expect all StatNames to be freed.
   // Note: this could potentially be short-circuited if we decide a fast exit
   // is needed in production. But it would be good to ensure clean up during
@@ -282,6 +284,10 @@ uint64_t SymbolTableImpl::recentLookupCapacity() const {
   return recent_lookups_.capacity();
 }
 
+absl::optional<StatName> SymbolTableImpl::getBuiltin(absl::string_view str) const {
+  return builtins_.lookup(str);
+}
+
 StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
   const uint64_t capacity = recentLookupCapacity();
   // make_unique does not work with private ctor, even though SymbolTableImpl is a friend.
@@ -425,6 +431,30 @@ uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
 
 StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
 
+bool StatNameMappedPool::contains(absl::string_view str) const {
+  return map_.find(str) != map_.end();
+}
+
+void StatNameMappedPool::add(absl::string_view name) {
+  if (!contains(name)) {
+    map_[name] = pool_.add(name);
+  }
+}
+
+absl::optional<StatName> StatNameMappedPool::lookup(absl::string_view str) const {
+  absl::optional<StatName> ret;
+  auto p = map_.find(str);
+  if (p != map_.end()) {
+    ret = p->second;
+  }
+  return ret;
+}
+
+void StatNameMappedPool::clear() {
+  map_.clear();
+  pool_.clear();
+}
+
 StatNameStorageSet::~StatNameStorageSet() {
   // free() must be called before destructing StatNameStorageSet to decrement
   // references to all symbols.
@@ -531,6 +561,10 @@ StatNameSet::StatNameSet(SymbolTable& symbol_table, absl::string_view name)
 StatNameSet::~StatNameSet() { symbol_table_.forgetSet(*this); }
 
 void StatNameSet::rememberBuiltin(absl::string_view str) {
+  if (symbol_table_.hasBuiltin(str)) {
+    return;
+  }
+
   StatName stat_name;
   {
     absl::MutexLock lock(&mutex_);
@@ -540,6 +574,11 @@ void StatNameSet::rememberBuiltin(absl::string_view str) {
 }
 
 StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
+  absl::optional<StatName> opt_stat_name = symbol_table_.getBuiltin(token);
+  if (opt_stat_name) {
+    return opt_stat_name.value();
+  }
+
   // If token was recorded as a built-in during initialization, we can
   // service this request lock-free.
   const auto iter = builtin_stat_names_.find(token);

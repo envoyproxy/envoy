@@ -90,6 +90,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
 
   initializeTracers(bootstrap.tracing(), server);
   initializeStatsSinks(bootstrap, server);
+  initializeStatsBuiltins(bootstrap, server);
 }
 
 void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& configuration,
@@ -123,6 +124,16 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
     stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
+  }
+}
+
+void MainImpl::initializeStatsBuiltins(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                                       Instance& server) {
+  ENVOY_LOG(info, "loading stats builtin configuration");
+
+  Stats::SymbolTable& symbol_table = server.stats().symbolTable();
+  for (const auto& stats_builtin : bootstrap.stats_config().builtin_stat_names()) {
+    symbol_table.rememberBuiltin(stats_builtin.name());
   }
 }
 

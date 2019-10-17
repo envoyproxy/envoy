@@ -128,6 +128,8 @@ private:
 
   void initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                             Instance& server);
+  void initializeStatsBuiltins(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                               Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;

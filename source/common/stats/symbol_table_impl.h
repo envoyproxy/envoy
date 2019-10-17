@@ -39,6 +39,129 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
 
+using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
+
+/**
+ * Holds backing storage for a StatName. Usage of this is not required, as some
+ * applications may want to hold multiple StatName objects in one contiguous
+ * uint8_t array, or embed the characters directly in another structure.
+ *
+ * This is intended for embedding in other data structures that have access
+ * to a SymbolTable. StatNameStorage::free(symbol_table) must be called prior
+ * to allowing the StatNameStorage object to be destructed, otherwise an assert
+ * will fire to guard against symbol-table leaks.
+ *
+ * Thus this class is inconvenient to directly use as temp storage for building
+ * a StatName from a string. Instead it should be used via StatNameManagedStorage.
+ */
+class StatNameStorage {
+public:
+  // Basic constructor for when you have a name as a string, and need to
+  // generate symbols for it.
+  StatNameStorage(absl::string_view name, SymbolTable& table);
+
+  // Move constructor; needed for using StatNameStorage as an
+  // absl::flat_hash_map value.
+  StatNameStorage(StatNameStorage&& src) noexcept : bytes_(std::move(src.bytes_)) {}
+
+  // Obtains new backing storage for an already existing StatName. Used to
+  // record a computed StatName held in a temp into a more persistent data
+  // structure.
+  StatNameStorage(StatName src, SymbolTable& table);
+
+  /**
+   * Before allowing a StatNameStorage to be destroyed, you must call free()
+   * on it, to drop the references to the symbols, allowing the SymbolTable
+   * to shrink.
+   */
+  ~StatNameStorage();
+
+  /**
+   * Decrements the reference counts in the SymbolTable.
+   *
+   * @param table the symbol table.
+   */
+  void free(SymbolTable& table);
+
+  /**
+   * @return StatName a reference to the owned storage.
+   */
+  inline StatName statName() const;
+
+  uint8_t* bytes() { return bytes_.get(); }
+
+private:
+  SymbolTable::StoragePtr bytes_;
+};
+
+/**
+ * Maintains storage for a collection of StatName objects. Like
+ * StatNameManagedStorage, this has an RAII usage model, taking
+ * care of decrementing ref-counts in the SymbolTable for all
+ * contained StatNames on destruction or on clear();
+ *
+ * Example usage:
+ *   StatNamePool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ *   uint8_t* storage = pool.addReturningStorage("name3");
+ *   StatName name3(storage);
+ */
+class StatNamePool {
+public:
+  explicit StatNamePool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNamePool() { clear(); }
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear();
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+  /**
+   * Does essentially the same thing as add(), but returns the storage as a
+   * pointer which can later be used to create a StatName. This can be used
+   * to accumulate a vector of uint8_t* which can later be used to create
+   * StatName objects on demand.
+   *
+   * The use-case for this is in source/common/http/codes.cc, where we have a
+   * fixed sized array of atomic pointers, indexed by HTTP code. This API
+   * enables storing the allocated stat-name in that array of atomics, which
+   * enables content-avoidance when finding StatNames for frequently used HTTP
+   * codes.
+   *
+   * @param name the name to add the container.
+   * @return a pointer to the bytes held in the container for this name, suitable for
+   *         using to construct a StatName.
+   */
+  uint8_t* addReturningStorage(absl::string_view name);
+
+private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
+  SymbolTable& symbol_table_;
+  std::vector<StatNameStorage> storage_vector_;
+};
+
+class StatNameMappedPool {
+ public:
+  explicit StatNameMappedPool(SymbolTable& symbol_table) : pool_(symbol_table) {}
+  bool contains(absl::string_view str) const;
+  void add(absl::string_view name);
+  absl::optional<StatName> lookup(absl::string_view str) const;
+  void clear();
+
+ private:
+  StringStatNameMap map_;
+  StatNamePool pool_;
+};
+
 /**
  * SymbolTableImpl manages a namespace optimized for stats, which are typically
  * composed of arrays of "."-separated tokens, with a significant overlap
@@ -160,6 +283,10 @@ public:
     return bytes;
   }
 
+  void rememberBuiltin(absl::string_view name) override { builtins_.add(name); }
+  bool hasBuiltin(absl::string_view name) const override { return builtins_.contains(name); }
+  absl::optional<StatName> getBuiltin(absl::string_view name) const override;
+
   StatNameSetPtr makeSet(absl::string_view name) override;
   void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) const override;
@@ -252,59 +379,7 @@ private:
   RecentLookups recent_lookups_ GUARDED_BY(lock_);
 
   absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
-};
-
-/**
- * Holds backing storage for a StatName. Usage of this is not required, as some
- * applications may want to hold multiple StatName objects in one contiguous
- * uint8_t array, or embed the characters directly in another structure.
- *
- * This is intended for embedding in other data structures that have access
- * to a SymbolTable. StatNameStorage::free(symbol_table) must be called prior
- * to allowing the StatNameStorage object to be destructed, otherwise an assert
- * will fire to guard against symbol-table leaks.
- *
- * Thus this class is inconvenient to directly use as temp storage for building
- * a StatName from a string. Instead it should be used via StatNameManagedStorage.
- */
-class StatNameStorage {
-public:
-  // Basic constructor for when you have a name as a string, and need to
-  // generate symbols for it.
-  StatNameStorage(absl::string_view name, SymbolTable& table);
-
-  // Move constructor; needed for using StatNameStorage as an
-  // absl::flat_hash_map value.
-  StatNameStorage(StatNameStorage&& src) noexcept : bytes_(std::move(src.bytes_)) {}
-
-  // Obtains new backing storage for an already existing StatName. Used to
-  // record a computed StatName held in a temp into a more persistent data
-  // structure.
-  StatNameStorage(StatName src, SymbolTable& table);
-
-  /**
-   * Before allowing a StatNameStorage to be destroyed, you must call free()
-   * on it, to drop the references to the symbols, allowing the SymbolTable
-   * to shrink.
-   */
-  ~StatNameStorage();
-
-  /**
-   * Decrements the reference counts in the SymbolTable.
-   *
-   * @param table the symbol table.
-   */
-  void free(SymbolTable& table);
-
-  /**
-   * @return StatName a reference to the owned storage.
-   */
-  inline StatName statName() const;
-
-  uint8_t* bytes() { return bytes_.get(); }
-
-private:
-  SymbolTable::StoragePtr bytes_;
+  StatNameMappedPool builtins_;
 };
 
 /**
@@ -437,61 +512,6 @@ public:
 
 private:
   SymbolTable& symbol_table_;
-};
-
-/**
- * Maintains storage for a collection of StatName objects. Like
- * StatNameManagedStorage, this has an RAII usage model, taking
- * care of decrementing ref-counts in the SymbolTable for all
- * contained StatNames on destruction or on clear();
- *
- * Example usage:
- *   StatNamePool pool(symbol_table);
- *   StatName name1 = pool.add("name1");
- *   StatName name2 = pool.add("name2");
- *   uint8_t* storage = pool.addReturningStorage("name3");
- *   StatName name3(storage);
- */
-class StatNamePool {
-public:
-  explicit StatNamePool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-  ~StatNamePool() { clear(); }
-
-  /**
-   * Removes all StatNames from the pool.
-   */
-  void clear();
-
-  /**
-   * @param name the name to add the container.
-   * @return the StatName held in the container for this name.
-   */
-  StatName add(absl::string_view name);
-
-  /**
-   * Does essentially the same thing as add(), but returns the storage as a
-   * pointer which can later be used to create a StatName. This can be used
-   * to accumulate a vector of uint8_t* which can later be used to create
-   * StatName objects on demand.
-   *
-   * The use-case for this is in source/common/http/codes.cc, where we have a
-   * fixed sized array of atomic pointers, indexed by HTTP code. This API
-   * enables storing the allocated stat-name in that array of atomics, which
-   * enables content-avoidance when finding StatNames for frequently used HTTP
-   * codes.
-   *
-   * @param name the name to add the container.
-   * @return a pointer to the bytes held in the container for this name, suitable for
-   *         using to construct a StatName.
-   */
-  uint8_t* addReturningStorage(absl::string_view name);
-
-private:
-  // We keep the stat names in a vector of StatNameStorage, storing the
-  // SymbolTable reference separately. This saves 8 bytes per StatName,
-  // at the cost of having a destructor that calls clear().
-  SymbolTable& symbol_table_;
-  std::vector<StatNameStorage> storage_vector_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
@@ -742,7 +762,6 @@ private:
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_ GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
-  using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
   StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
   RecentLookups recent_lookups_ GUARDED_BY(mutex_);

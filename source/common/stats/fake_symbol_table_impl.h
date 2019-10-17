@@ -49,6 +49,8 @@ namespace Stats {
  */
 class FakeSymbolTableImpl : public SymbolTable {
 public:
+  FakeSymbolTableImpl() : builtins_(*this) {}
+
   // SymbolTable
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override {
@@ -125,6 +127,11 @@ public:
     fn(toStringView(stat_name));
   }
 
+  void rememberBuiltin(absl::string_view name) override { builtins_.add(name); }
+  bool hasBuiltin(absl::string_view name) const override { return builtins_.contains(name); }
+  absl::optional<StatName> getBuiltin(absl::string_view name) const override {
+    return builtins_.lookup(name);
+  }
   StatNameSetPtr makeSet(absl::string_view name) override {
     // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
     return StatNameSetPtr(new StatNameSet(*this, name));
@@ -148,6 +155,8 @@ private:
     memcpy(buffer, name.data(), name.size());
     return bytes;
   }
+
+  StatNameMappedPool builtins_;
 };
 
 } // namespace Stats
