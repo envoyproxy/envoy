@@ -218,7 +218,7 @@ private:
       StopAllBuffer,       // Iteration has stopped for all frame types, and following data should
                            // be buffered.
       StopAllWatermark,    // Iteration has stopped for all frame types, and following data should
-      // be buffered until high watermark is reached.
+                           // be buffered until high watermark is reached.
     };
     ActiveStream& parent_;
     IterationState iteration_state_;
@@ -480,7 +480,7 @@ private:
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
-    virtual bool requestRouteConfigUpdate(const HeaderString& host,
+    bool requestRouteConfigUpdate(const HeaderString& host,
                                           std::function<void()> cb) override;
 
   private:
@@ -490,7 +490,7 @@ private:
   class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
   public:
     NullRouteConfigUpdateRequester() = default;
-    virtual bool requestRouteConfigUpdate(const HeaderString&, std::function<void()>) override {
+    bool requestRouteConfigUpdate(const HeaderString&, std::function<void()>) override {
       return false;
     }
   };

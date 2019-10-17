@@ -77,7 +77,6 @@ private:
   void setResourceWaitingForServer(const std::string& resource_name);
   void setLostInterestInResource(const std::string& resource_name);
   void populateDiscoveryRequest(envoy::api::v2::DeltaDiscoveryRequest& request);
-  void populateDiscoveryRequestWithAliases(envoy::api::v2::DeltaDiscoveryRequest& request);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have

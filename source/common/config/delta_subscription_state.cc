@@ -143,8 +143,6 @@ envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInt
 
   if (!any_request_sent_yet_in_current_stream_) {
     populateDiscoveryRequest(request);
-  } else if (!aliases_added_.empty()) {
-    populateDiscoveryRequestWithAliases(request);
   } else {
     populateDiscoveryRequest(request);
   }
@@ -152,14 +150,6 @@ envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInt
   request.set_type_url(type_url_);
   request.mutable_node()->MergeFrom(local_info_.node());
   return request;
-}
-
-//
-void DeltaSubscriptionState::populateDiscoveryRequestWithAliases(
-    envoy::api::v2::DeltaDiscoveryRequest& request) {
-  std::copy(aliases_added_.begin(), aliases_added_.end(),
-            Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
-  aliases_added_.clear();
 }
 
 void DeltaSubscriptionState::populateDiscoveryRequest(
@@ -189,6 +179,7 @@ void DeltaSubscriptionState::populateDiscoveryRequest(
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names_unsubscribe()));
   names_added_.clear();
   names_removed_.clear();
+  aliases_added_.clear();
 
   return request;
 }
