@@ -7,11 +7,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
-import java.util.concurrent.TimeUnit
 
 class GRPCResponseHandlerTest {
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `headers and grpc status is passed to on headers`() {
     val countDownLatch = CountDownLatch(1)
 
@@ -26,10 +25,10 @@ class GRPCResponseHandlerTest {
         mapOf("grpc-status" to listOf("1"), "other" to listOf("foo", "bar")),
         true)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `trailers are passed on trailers`() {
     val countDownLatch = CountDownLatch(1)
 
@@ -42,10 +41,10 @@ class GRPCResponseHandlerTest {
     handler.underlyingHandler.underlyingCallbacks.onTrailers(
         mapOf("foo" to listOf("bar"), "baz" to listOf("1", "2")))
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `messages are passed when it fits in the same chunk`() {
     val countDownLatch = CountDownLatch(1)
 
@@ -69,10 +68,10 @@ class GRPCResponseHandlerTest {
 
     handler.underlyingHandler.underlyingCallbacks.onData(byteBuffer, true)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `messages are buffered and passed until all chunks are received`() {
     val countDownLatch = CountDownLatch(1)
 
@@ -101,10 +100,10 @@ class GRPCResponseHandlerTest {
     handler.underlyingHandler.underlyingCallbacks.onData(ByteBuffer.wrap(part2), false)
     handler.underlyingHandler.underlyingCallbacks.onData(ByteBuffer.wrap(part3), true)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `multiple messages in the same chunk will be passed down`() {
     val countDownLatch = CountDownLatch(2)
 
@@ -138,12 +137,12 @@ class GRPCResponseHandlerTest {
 
     handler.underlyingHandler.underlyingCallbacks.onData(part1AndPart2, false)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
     assertThat(messages[0].array().toString(Charsets.UTF_8)).isEqualTo("part1")
     assertThat(messages[1].array().toString(Charsets.UTF_8)).isEqualTo("part2")
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `multiple messages in different chunks will be passed down`() {
     val countDownLatch = CountDownLatch(2)
 
@@ -178,12 +177,12 @@ class GRPCResponseHandlerTest {
     handler.underlyingHandler.underlyingCallbacks.onData(part1AndPart2a, false)
     handler.underlyingHandler.underlyingCallbacks.onData(ByteBuffer.wrap(part2b), false)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
     assertThat(messages[0].array().toString(Charsets.UTF_8)).isEqualTo("part1")
     assertThat(messages[1].array().toString(Charsets.UTF_8)).isEqualTo("part2a_part2b")
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `empty messages in same will send empty message down`() {
     val countDownLatch = CountDownLatch(2)
 
@@ -214,13 +213,13 @@ class GRPCResponseHandlerTest {
 
     handler.underlyingHandler.underlyingCallbacks.onData(resultMessages, false)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
     assertThat(messages[0].array()).isEmpty()
     assertThat(messages[1].array().toString(Charsets.UTF_8)).isEqualTo("part2")
   }
 
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `zero length messages are passed as empty byte buffers`() {
     val countDownLatch = CountDownLatch(1)
     val prefix = ByteBuffer.allocate(5)
@@ -241,12 +240,12 @@ class GRPCResponseHandlerTest {
 
     handler.underlyingHandler.underlyingCallbacks.onData(data, false)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
     assertThat(messages[0].array()).isEmpty()
 
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `first grpc status is passed on headers`() {
     val countDownLatch = CountDownLatch(1)
 
@@ -258,11 +257,11 @@ class GRPCResponseHandlerTest {
 
     handler.underlyingHandler.underlyingCallbacks.onHeaders(mapOf("grpc-status" to listOf("1", "2")), true)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
 
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `missing grpc status will default status to 0`() {
     val countDownLatch = CountDownLatch(1)
 
@@ -274,10 +273,10 @@ class GRPCResponseHandlerTest {
 
     handler.underlyingHandler.underlyingCallbacks.onHeaders(mapOf(), true)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
   }
 
-  @Test(timeout = 200L)
+  @Test(timeout = 1000L)
   fun `invalid grpc status will default status to 0`() {
     val countDownLatch = CountDownLatch(1)
 
@@ -289,6 +288,6 @@ class GRPCResponseHandlerTest {
 
     handler.underlyingHandler.underlyingCallbacks.onHeaders(mapOf("grpc-status" to listOf("invalid")), true)
 
-    countDownLatch.await(1L, TimeUnit.SECONDS)
+    countDownLatch.await()
   }
 }
