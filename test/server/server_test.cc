@@ -490,8 +490,8 @@ TEST_P(ServerStatsTest, BootstrapBuiltins) {
   Stats::SymbolTable& symbol_table = stats_store_.symbolTable();
   stats_store_.counter("builtin.stat1");
   auto num_lookups = [&symbol_table]() -> uint64_t {
-                       return symbol_table.getRecentLookups([](absl::string_view, uint64_t){});
-                     };
+    return symbol_table.getRecentLookups([](absl::string_view, uint64_t) {});
+  };
   const uint64_t lookups_at_init = num_lookups();
   stats_store_.counter("builtin.stat1");
   EXPECT_EQ(lookups_at_init, num_lookups());

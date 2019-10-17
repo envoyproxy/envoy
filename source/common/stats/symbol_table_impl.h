@@ -150,14 +150,14 @@ private:
 };
 
 class StatNameMappedPool {
- public:
+public:
   explicit StatNameMappedPool(SymbolTable& symbol_table) : pool_(symbol_table) {}
   bool contains(absl::string_view str) const;
   void add(absl::string_view name);
   absl::optional<StatName> lookup(absl::string_view str) const;
   void clear();
 
- private:
+private:
   StringStatNameMap map_;
   StatNamePool pool_;
 };
