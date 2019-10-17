@@ -289,7 +289,9 @@ bool RespValue::operator==(const RespValue& other) const {
   return result;
 }
 
-uint64_t RespValue::CompositeArray::size() const { return end_ - start_ + 2; }
+uint64_t RespValue::CompositeArray::size() const {
+  return (command_ && base_array_) ? end_ - start_ + 2 : 0;
+}
 
 bool RespValue::CompositeArray::operator==(const RespValue::CompositeArray& other) const {
   return base_array_ == other.base_array_ && command_ == other.command_ && start_ == other.start_ &&

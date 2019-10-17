@@ -9,6 +9,8 @@
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -35,6 +37,13 @@ public:
 };
 
 /**
+ * A variant that either holds a shared pointer to a single server request or a composite array
+ * resp value. This is for performance reason to avoid creating RespValueSharedPtr for each
+ * composite arrays.
+ */
+using RespVariant = absl::variant<Common::Redis::RespValue, Common::Redis::RespValueSharedPtr>;
+
+/**
  * A redis connection pool. Wraps M connections to N upstream hosts, consistent hashing,
  * pipelining, failure handling, etc.
  */
@@ -51,22 +60,8 @@ public:
    *         for some reason.
    */
   virtual Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
-                                                          Common::Redis::RespValueSharedPtr request,
+                                                          const RespVariant&& request,
                                                           PoolCallbacks& callbacks) PURE;
-
-  /**
-   * Makes a redis request based on IP address and TCP port of the upstream host (e.g., moved/ask
-   * cluster redirection).
-   * @param host_address supplies the IP address and TCP port of the upstream host to receive the
-   * request.
-   * @param request supplies the Redis request to make.
-   * @param callbacks supplies the request completion callbacks.
-   * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
-   *         for some reason.
-   */
-  virtual Common::Redis::Client::PoolRequest*
-  makeRequestToHost(const std::string& host_address, Common::Redis::RespValueSharedPtr request,
-                    PoolCallbacks& callbacks) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

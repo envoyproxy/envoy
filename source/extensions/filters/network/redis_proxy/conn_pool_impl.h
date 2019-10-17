@@ -61,11 +61,23 @@ public:
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest* makeRequest(const std::string& key,
-                                                  Common::Redis::RespValueSharedPtr request,
+                                                  const RespVariant&& request,
                                                   PoolCallbacks& callbacks) override;
-  Common::Redis::Client::PoolRequest* makeRequestToHost(const std::string& host_address,
-                                                        Common::Redis::RespValueSharedPtr request,
-                                                        PoolCallbacks& callbacks) override;
+  /**
+   * Makes a redis request based on IP address and TCP port of the upstream host (e.g.,
+   moved/ask cluster redirection).  This is now only kept mostly for testing.
+   * @param host_address supplies the IP address and TCP port of the upstream host to receive
+   the
+   * request.
+   * @param request supplies the Redis request to make.
+   * @param callbacks supplies the request completion callbacks.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be
+   made
+   *         for some reason.
+   */
+  Common::Redis::Client::PoolRequest*
+  makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
+                    Common::Redis::Client::ClientCallbacks& callbacks);
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;
@@ -90,7 +102,7 @@ private:
 
   struct PendingRequest : public Common::Redis::Client::ClientCallbacks,
                           public Common::Redis::Client::PoolRequest {
-    PendingRequest(ThreadLocalPool& parent, Common::Redis::RespValueSharedPtr incoming_request,
+    PendingRequest(ThreadLocalPool& parent, const RespVariant&& incoming_request,
                    PoolCallbacks& pool_callbacks);
     ~PendingRequest() override;
 
@@ -103,7 +115,7 @@ private:
     void cancel() override;
 
     ThreadLocalPool& parent_;
-    Common::Redis::RespValueSharedPtr incoming_request_;
+    const RespVariant incoming_request_;
     Common::Redis::Client::PoolRequest* request_handler_;
     PoolCallbacks& pool_callbacks_;
   };
@@ -113,22 +125,12 @@ private:
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
-    Common::Redis::Client::PoolRequest* makeRequest(const std::string& key,
-                                                    Common::Redis::RespValueSharedPtr request,
-                                                    PoolCallbacks& callbacks);
-    Common::Redis::Client::PoolRequest* makeRequestToHost(const std::string& host_address,
-                                                          Common::Redis::RespValueSharedPtr request,
-                                                          PoolCallbacks& callbacks);
-    Common::Redis::Client::PoolRequest* makeRequestToHostInternal(const std::string& host_address,
-                                                                  PendingRequest& pending_request);
     Common::Redis::Client::PoolRequest*
-    makeRequestInternal(const Upstream::HostConstSharedPtr& host,
-                        Common::Redis::RespValueSharedPtr request, PoolCallbacks& callbacks);
+    makeRequest(const std::string& key, const RespVariant&& request, PoolCallbacks& callbacks);
     Common::Redis::Client::PoolRequest*
-    makeRequestToHostInternal(const std::string& host_address,
-                              const Common::Redis::RespValue& request,
-                              Common::Redis::Client::ClientCallbacks& callbacks);
-    Upstream::HostConstSharedPtr getHost(const std::string& host_address);
+    makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
+                      Common::Redis::Client::ClientCallbacks& callbacks);
+
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);

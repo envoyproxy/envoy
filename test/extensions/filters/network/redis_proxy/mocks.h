@@ -59,16 +59,16 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  MOCK_METHOD3(makeRequest,
-               Common::Redis::Client::PoolRequest*(const std::string& hash_key,
-                                                   Common::Redis::RespValueSharedPtr request,
-                                                   PoolCallbacks& callbacks));
-  MOCK_METHOD3(makeRequestToHost,
-               Common::Redis::Client::PoolRequest*(const std::string& host_address,
-                                                   Common::Redis::RespValueSharedPtr request,
-                                                   PoolCallbacks& callbacks));
-};
+  Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
+                                                  const RespVariant&& request,
+                                                  PoolCallbacks& callbacks) override {
+    return makeRequest_(hash_key, request, callbacks);
+  }
 
+  MOCK_METHOD3(makeRequest_, Common::Redis::Client::PoolRequest*(const std::string& hash_key,
+                                                                 const RespVariant& request,
+                                                                 PoolCallbacks& callbacks));
+};
 } // namespace ConnPool
 
 namespace CommandSplitter {

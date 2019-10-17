@@ -246,6 +246,19 @@ public:
               conn_pool_->tls_->getTyped<InstanceImpl::ThreadLocalPool>().pending_requests_.size());
   }
 
+  void verifyInvalidMoveResponse(Common::Redis::Client::MockClient* client,
+                                 const std::string& move_response, bool create_client) {
+    Common::Redis::RespValueSharedPtr request_value = std::make_shared<Common::Redis::RespValue>();
+    Common::Redis::Client::MockPoolRequest active_request;
+    MockPoolCallbacks callbacks;
+    makeRequest(client, request_value, callbacks, active_request, create_client);
+    Common::Redis::RespValuePtr moved_response{new Common::Redis::RespValue()};
+    moved_response->type(Common::Redis::RespType::Error);
+    moved_response->asString() = move_response;
+    EXPECT_CALL(callbacks, onResponse_(Ref(moved_response)));
+    EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response)));
+  }
+
   MOCK_METHOD1(create_, Common::Redis::Client::Client*(Upstream::HostConstSharedPtr host));
 
   const std::string cluster_name_{"fake_cluster"};
@@ -545,11 +558,11 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
 
   setup(false);
 
-  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolRequest active_request1;
   Common::Redis::Client::MockPoolRequest active_request2;
-  MockPoolCallbacks callbacks1;
-  MockPoolCallbacks callbacks2;
+  Common::Redis::Client::MockClientCallbacks callbacks1;
+  Common::Redis::Client::MockClientCallbacks callbacks2;
   Common::Redis::Client::MockClient* client1 = new NiceMock<Common::Redis::Client::MockClient>();
   Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
   Upstream::HostConstSharedPtr host1;
@@ -561,27 +574,23 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
-  EXPECT_CALL(*client1, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request1));
+  EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
+      .WillOnce(Return(&active_request1));
   Common::Redis::Client::PoolRequest* request1 =
       conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
-  EXPECT_NE(nullptr, request1);
+  EXPECT_EQ(&active_request1, request1);
   EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
-
-  EXPECT_CALL(callbacks1, onResponse_(_));
-  client1->client_callbacks_.back()->onResponse(std::make_unique<Common::Redis::RespValue>());
 
   // IPv6 address returned from Redis server will not have square brackets
   // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
   // the address.
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
-  EXPECT_CALL(*client2, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request2));
+  EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
+      .WillOnce(Return(&active_request2));
   Common::Redis::Client::PoolRequest* request2 =
       conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
-  EXPECT_NE(nullptr, request2);
+  EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
-
-  EXPECT_CALL(callbacks2, onResponse_(_));
-  client2->client_callbacks_.back()->onResponse(std::make_unique<Common::Redis::RespValue>());
 
   // Test with a badly specified host address (no colon, no address, no port).
   EXPECT_EQ(conn_pool_->makeRequestToHost("bad", value, callbacks1), nullptr);
@@ -610,8 +619,8 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHostWithZeroMaxUnknownUpstreamConnect
   // Create a ConnPool with a max_upstream_unknown_connections setting of 0.
   setup(true, true, 0);
 
-  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
-  MockPoolCallbacks callbacks1;
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockClientCallbacks callbacks1;
 
   // The max_unknown_upstream_connections is set to 0. Request should fail.
   EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
@@ -626,31 +635,33 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHostWithZeroMaxUnknownUpstreamConnect
 TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   setup();
 
-  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolRequest auth_request1, active_request1;
   Common::Redis::Client::MockPoolRequest auth_request2, active_request2;
-  MockPoolCallbacks callbacks1;
-  MockPoolCallbacks callbacks2;
+  Common::Redis::Client::MockClientCallbacks callbacks1;
+  Common::Redis::Client::MockClientCallbacks callbacks2;
   Common::Redis::Client::MockClient* client1 = new NiceMock<Common::Redis::Client::MockClient>();
   Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
   Upstream::HostConstSharedPtr host1;
   Upstream::HostConstSharedPtr host2;
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
-  EXPECT_CALL(*client1, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request1));
+  EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
+      .WillOnce(Return(&active_request1));
   Common::Redis::Client::PoolRequest* request1 =
       conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
-  EXPECT_NE(nullptr, request1);
+  EXPECT_EQ(&active_request1, request1);
   EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
 
   // IPv6 address returned from Redis server will not have square brackets
   // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
   // the address.
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
-  EXPECT_CALL(*client2, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request2));
+  EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
+      .WillOnce(Return(&active_request2));
   Common::Redis::Client::PoolRequest* request2 =
       conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
-  EXPECT_NE(nullptr, request2);
+  EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
   std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
@@ -713,11 +724,6 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(drainTimer()->enabled(), false);
   EXPECT_EQ(upstreamCxDrained().value(), 1);
 
-  EXPECT_CALL(active_request1, cancel());
-  EXPECT_CALL(active_request2, cancel());
-  EXPECT_CALL(callbacks1, onFailure_());
-  EXPECT_CALL(callbacks2, onFailure_());
-
   tls_.shutdownThread();
 }
 
@@ -728,38 +734,34 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
 TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   setup();
 
-  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolRequest auth_request1, active_request1;
   Common::Redis::Client::MockPoolRequest auth_request2, active_request2;
-  MockPoolCallbacks callbacks1;
-  MockPoolCallbacks callbacks2;
+  Common::Redis::Client::MockClientCallbacks callbacks1;
+  Common::Redis::Client::MockClientCallbacks callbacks2;
   Common::Redis::Client::MockClient* client1 = new NiceMock<Common::Redis::Client::MockClient>();
   Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
   Upstream::HostConstSharedPtr host1;
   Upstream::HostConstSharedPtr host2;
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
-  EXPECT_CALL(*client1, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request1));
+  EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
+      .WillOnce(Return(&active_request1));
   Common::Redis::Client::PoolRequest* request1 =
       conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
-  EXPECT_NE(nullptr, request1);
+  EXPECT_EQ(&active_request1, request1);
   EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
-
-  EXPECT_CALL(callbacks1, onFailure_());
-  client1->client_callbacks_.back()->onFailure();
 
   // IPv6 address returned from Redis server will not have square brackets
   // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
   // the address.
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
-  EXPECT_CALL(*client2, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request2));
+  EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
+      .WillOnce(Return(&active_request2));
   Common::Redis::Client::PoolRequest* request2 =
       conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
-  EXPECT_NE(nullptr, request2);
+  EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
-
-  EXPECT_CALL(callbacks2, onFailure_());
-  client2->client_callbacks_.back()->onFailure();
 
   std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
@@ -810,42 +812,34 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
 TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   setup();
 
-  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolRequest auth_request1, active_request1;
   Common::Redis::Client::MockPoolRequest auth_request2, active_request2;
-  MockPoolCallbacks callbacks1;
-  MockPoolCallbacks callbacks2;
+  Common::Redis::Client::MockClientCallbacks callbacks1;
+  Common::Redis::Client::MockClientCallbacks callbacks2;
   Common::Redis::Client::MockClient* client1 = new NiceMock<Common::Redis::Client::MockClient>();
   Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
   Upstream::HostConstSharedPtr host1;
   Upstream::HostConstSharedPtr host2;
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
-  EXPECT_CALL(*client1, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request1));
+  EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
+      .WillOnce(Return(&active_request1));
   Common::Redis::Client::PoolRequest* request1 =
       conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
-  Common::Redis::Client::ClientCallbacks* client_callbacks1 = client1->client_callbacks_.back();
-  EXPECT_NE(nullptr, request1);
-  EXPECT_NE(nullptr, client_callbacks1);
+  EXPECT_EQ(&active_request1, request1);
   EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
-
-  EXPECT_CALL(callbacks1, onFailure_());
-  client_callbacks1->onFailure();
 
   // IPv6 address returned from Redis server will not have square brackets
   // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
   // the address.
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
-  EXPECT_CALL(*client2, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request2));
+  EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
+      .WillOnce(Return(&active_request2));
   Common::Redis::Client::PoolRequest* request2 =
       conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
-  Common::Redis::Client::ClientCallbacks* client_callbacks2 = client2->client_callbacks_.back();
-  EXPECT_NE(nullptr, request2);
-  EXPECT_NE(nullptr, client_callbacks2);
+  EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
-
-  EXPECT_CALL(callbacks2, onFailure_());
-  client_callbacks2->onFailure();
 
   std::unordered_map<std::string, Upstream::HostConstSharedPtr>& host_address_map =
       hostAddressMap();
@@ -969,25 +963,40 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailure) {
 
   setup();
 
-  // Test a truncated MOVED error response that cannot be parsed properly.
-  Common::Redis::RespValueSharedPtr request_value = std::make_shared<Common::Redis::RespValue>();
-  Common::Redis::Client::MockPoolRequest active_request;
-  MockPoolCallbacks callbacks;
   Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
-  makeRequest(client, request_value, callbacks, active_request);
-  Common::Redis::RespValuePtr moved_response{new Common::Redis::RespValue()};
-  moved_response->type(Common::Redis::RespType::Error);
-  moved_response->asString() = "MOVED 1111";
-  EXPECT_CALL(callbacks, onResponse_(Ref(moved_response)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response)));
 
+  // Test a truncated MOVED error response that cannot be parsed properly.
+  verifyInvalidMoveResponse(client, "MOVED 1111", true);
+
+  // Test with a badly specified host address (no colon, no address, no port).
+  verifyInvalidMoveResponse(client, "MOVED 1111 bad", false);
+
+  // Test with a badly specified IPv4 address.
+  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.bad:3000", false);
+
+  // Test with a badly specified TCP port.
+  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.bad:3000", false);
+
+  // Test with a TCP port outside of the acceptable range for a 32-bit integer.
+  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.0.1:4294967297", false); // 2^32 + 1
+
+  // Test with a TCP port outside of the acceptable range for a TCP port (0 .. 65535).
+  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.0.1:65536", false);
+
+  // Test with a badly specified IPv6-like address.
+  verifyInvalidMoveResponse(client, "MOVED 1111 bad:ipv6:3000", false);
+
+  // Test with a valid IPv6 address and a badly specified TCP port (out of range).
+  verifyInvalidMoveResponse(client, "MOVED 1111 2001:470:813b:::70000", false);
+
+  // Test a wrong response
+  MockPoolCallbacks callbacks;
   Common::Redis::RespValueSharedPtr request2 = std::make_shared<Common::Redis::RespValue>();
   Common::Redis::Client::MockPoolRequest active_request2;
   makeRequest(client, request2, callbacks, active_request2, false);
   Common::Redis::RespValuePtr moved_response2{new Common::Redis::RespValue()};
   moved_response2->type(Common::Redis::RespType::Integer);
   moved_response2->asInteger() = 1;
-
   EXPECT_CALL(callbacks, onResponse_(Ref(moved_response2)));
   EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response2)));
 

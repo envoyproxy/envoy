@@ -23,15 +23,44 @@ ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
  * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
  *         for some reason.
  */
-Common::Redis::Client::PoolRequest* makeRequest(const RouteSharedPtr& route,
-                                                const std::string& command, const std::string& key,
-                                                Common::Redis::RespValueSharedPtr incoming_request,
-                                                ConnPool::PoolCallbacks& callbacks) {
-  auto handler = route->upstream()->makeRequest(key, incoming_request, callbacks);
+Common::Redis::Client::PoolRequest*
+makeSingleServerRequest(const RouteSharedPtr& route, const std::string& command,
+                        const std::string& key, Common::Redis::RespValueSharedPtr incoming_request,
+                        ConnPool::PoolCallbacks& callbacks) {
+  auto handler =
+      route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request), callbacks);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
       if (mirror_policy->shouldMirror(command)) {
-        mirror_policy->upstream()->makeRequest(key, incoming_request, null_pool_callbacks);
+        mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
+                                               null_pool_callbacks);
+      }
+    }
+  }
+  return handler;
+}
+
+/**
+ * Make request and maybe mirror the request based on the mirror policies of the route.
+ * @param route supplies the route matched with the request.
+ * @param command supplies the command of the request.
+ * @param key supplies the key of the request.
+ * @param incoming_request supplies the request.
+ * @param callbacks supplies the request completion callbacks.
+ * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+ *         for some reason.
+ */
+Common::Redis::Client::PoolRequest*
+makeFragmentedRequest(const RouteSharedPtr& route, const std::string& command,
+                      const std::string& key, const Common::Redis::RespValue& incoming_request,
+                      ConnPool::PoolCallbacks& callbacks) {
+  auto handler =
+      route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request), callbacks);
+  if (handler) {
+    for (auto& mirror_policy : route->mirrorPolicies()) {
+      if (mirror_policy->shouldMirror(command)) {
+        mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
+                                               null_pool_callbacks);
       }
     }
   }
@@ -84,8 +113,8 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
     request_ptr->handle_ =
-        makeRequest(route, base_request->asArray()[0].asString(),
-                    base_request->asArray()[1].asString(), base_request, *request_ptr);
+        makeSingleServerRequest(route, base_request->asArray()[0].asString(),
+                                base_request->asArray()[1].asString(), base_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -114,8 +143,8 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
     request_ptr->handle_ =
-        makeRequest(route, base_request->asArray()[0].asString(),
-                    base_request->asArray()[3].asString(), base_request, *request_ptr);
+        makeSingleServerRequest(route, base_request->asArray()[0].asString(),
+                                base_request->asArray()[3].asString(), base_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -169,10 +198,10 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
-      auto single_get = std::make_shared<Common::Redis::RespValue>(
-          base_request, Common::Redis::Utility::GetRequest::instance(), i, i);
-      pending_request.handle_ = makeRequest(route, "get", base_request->asArray()[i].asString(),
-                                            single_get, pending_request);
+      Common::Redis::RespValue single_get(base_request,
+                                          Common::Redis::Utility::GetRequest::instance(), i, i);
+      pending_request.handle_ = makeFragmentedRequest(
+          route, "get", base_request->asArray()[i].asString(), single_get, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -247,10 +276,11 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     // ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set->toString());
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
-      auto single_set = std::make_shared<Common::Redis::RespValue>(
-          base_request, Common::Redis::Utility::SetRequest::instance(), i, i + 1);
-      pending_request.handle_ = makeRequest(route, "set", base_request->asArray()[i].asString(),
-                                            std::move(single_set), pending_request);
+      Common::Redis::RespValue single_set(base_request,
+                                          Common::Redis::Utility::SetRequest::instance(), i, i + 1);
+      pending_request.handle_ =
+          makeFragmentedRequest(route, "set", base_request->asArray()[i].asString(),
+                                std::move(single_set), pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -313,15 +343,14 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    auto single_fragment =
-        std::make_shared<Common::Redis::RespValue>(base_request, base_request->asArray()[0], i, i);
+    Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", base_request->asArray()[0].asString(),
-              single_fragment->toString());
+              single_fragment.toString());
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
-      pending_request.handle_ =
-          makeRequest(route, base_request->asArray()[0].asString(),
-                      base_request->asArray()[i].asString(), single_fragment, pending_request);
+      pending_request.handle_ = makeFragmentedRequest(route, base_request->asArray()[0].asString(),
+                                                      base_request->asArray()[i].asString(),
+                                                      single_fragment, pending_request);
     }
 
     if (!pending_request.handle_) {

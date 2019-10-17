@@ -151,12 +151,19 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
 }
 
+MATCHER_P(RespVariantEq, rhs, "RespVariant should be equal") {
+  const ConnPool::RespVariant& obj = arg;
+  EXPECT_EQ(obj.index(), 1);
+  EXPECT_EQ(*(absl::get<Common::Redis::RespValueSharedPtr>(obj)), rhs);
+  return true;
+}
+
 class RedisSingleServerRequestTest : public RedisCommandSplitterImplTest,
                                      public testing::WithParamInterface<std::string> {
 public:
   void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request) {
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-    EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Pointee(Ref(*request)), _))
+    EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   }
@@ -269,7 +276,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
-  EXPECT_CALL(*conn_pool_, makeRequest("hello", Pointee(Ref(*request)), _))
+  EXPECT_CALL(*conn_pool_, makeRequest_("hello", RespVariantEq(*request), _))
       .WillOnce(Return(nullptr));
 
   Common::Redis::RespValue response;
@@ -377,7 +384,8 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"eval", "return {ARGV[1]}", "1", "key", "arg"});
-  EXPECT_CALL(*conn_pool_, makeRequest("key", Pointee(Ref(*request)), _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*conn_pool_, makeRequest_("key", RespVariantEq(*request), _))
+      .WillOnce(Return(nullptr));
 
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
@@ -391,11 +399,12 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
 };
 
 MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
-  const Common::Redis::RespValueSharedPtr& obj = arg;
-  EXPECT_TRUE(obj->type() == Common::Redis::RespType::CompositeArray);
-  EXPECT_EQ(obj->asCompositeArray().size(), rhs.size());
+  const ConnPool::RespVariant& obj = arg;
+  const Common::Redis::RespValue& lhs = absl::get<Common::Redis::RespValue>(obj);
+  EXPECT_TRUE(lhs.type() == Common::Redis::RespType::CompositeArray);
+  EXPECT_EQ(lhs.asCompositeArray().size(), rhs.size());
   std::vector<std::string> array;
-  for (auto const& entry : obj->asCompositeArray()) {
+  for (auto const& entry : lhs.asCompositeArray()) {
     array.emplace_back(entry.asString());
   }
   EXPECT_EQ(array, rhs);
@@ -428,7 +437,7 @@ public:
         request_to_use = &pool_requests_[i];
       }
       EXPECT_CALL(*conn_pool_,
-                  makeRequest(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
+                  makeRequest_(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
@@ -634,7 +643,7 @@ public:
         request_to_use = &pool_requests_[i];
       }
       EXPECT_CALL(*conn_pool_,
-                  makeRequest(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
+                  makeRequest_(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
@@ -761,7 +770,7 @@ public:
         request_to_use = &pool_requests_[i];
       }
       EXPECT_CALL(*conn_pool_,
-                  makeRequest(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
+                  makeRequest_(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
@@ -850,7 +859,7 @@ class RedisSingleServerRequestWithLatencyMicrosTest : public RedisSingleServerRe
 public:
   void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request) {
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-    EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Pointee(Ref(*request)), _))
+    EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   }

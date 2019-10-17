@@ -176,7 +176,7 @@ TEST_F(RedisRespValueTest, SwapTest) {
   EXPECT_TRUE(value1 == value3);
 }
 
-TEST_F(RedisRespValueTest, IteratorTest) {
+TEST_F(RedisRespValueTest, CompositeArrayTest) {
   InSequence s;
 
   RespValueSharedPtr base = std::make_shared<RespValue>();
@@ -193,6 +193,13 @@ TEST_F(RedisRespValueTest, IteratorTest) {
   validateIterator(value1, {"get", "foo"});
   validateIterator(value2, {"get", "bar"});
   validateIterator(value3, {"get", "now"});
+
+  EXPECT_EQ(value1.asCompositeArray().command(), &command);
+  EXPECT_EQ(value1.asCompositeArray().baseArray(), base);
+
+  RespValue empty;
+  empty.type(RespType::CompositeArray);
+  validateIterator(empty, {});
 }
 
 class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {
@@ -317,6 +324,35 @@ TEST_F(RedisEncoderDecoderImplTest, Array) {
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, CompositeArray) {
+  std::vector<RespValue> values(2);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "bar";
+  values[1].type(RespType::BulkString);
+  values[1].asString() = "foo";
+
+  auto base = std::make_shared<RespValue>();
+  base->type(RespType::Array);
+  base->asArray().swap(values);
+
+  RespValue command;
+  command.type(RespType::SimpleString);
+  command.asString() = "get";
+
+  RespValue value1{base, command, 0, 0};
+  RespValue value2{base, command, 1, 1};
+
+  EXPECT_EQ("[\"get\", \"bar\"]", value1.toString());
+  encoder_.encode(value1, buffer_);
+  EXPECT_EQ("*2\r\n+get\r\n$3\r\nbar\r\n", buffer_.toString());
+
+  EXPECT_EQ("[\"get\", \"foo\"]", value2.toString());
+  encoder_.encode(value2, buffer_);
+  EXPECT_EQ("*2\r\n+get\r\n$3\r\nbar\r\n*2\r\n+get\r\n$3\r\nfoo\r\n", buffer_.toString());
+
+  // There is no decoder for composite array
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NestedArray) {

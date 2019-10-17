@@ -15,6 +15,7 @@
 
 #include "test/test_common/simulated_time_system.h"
 
+#include "absl/types/variant.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -61,16 +62,20 @@ public:
 
     return request;
   }
+  using ValueOrPointer = absl::variant<Common::Redis::RespValue, Common::Redis::RespValueSharedPtr>;
 
   void move(Common::Redis::RespValueSharedPtr request) {
     for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
-      //      auto single_set = std::make_shared<Common::Redis::RespValue>();
-      //      single_set->type(Common::Redis::RespType::CompositeArray);
-      //      single_set->asCompositeArray().initialize(request,
-      //      Common::Redis::Utility::SetRequest::instance(), i, i + 2);
-
       auto single_set = std::make_shared<Common::Redis::RespValue>(
           request, Common::Redis::Utility::SetRequest::instance(), i, i + 2);
+    }
+  }
+
+  void moveLocalVariant(Common::Redis::RespValueSharedPtr request) {
+    for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
+      Common::Redis::RespValue single_set(request, Common::Redis::Utility::SetRequest::instance(),
+                                          i, i + 1);
+      ValueOrPointer variant(single_set);
     }
   }
 
@@ -102,8 +107,20 @@ static void BM_Split_Move(benchmark::State& state) {
   for (auto _ : state) {
     context.move(request);
   }
+//  state.counters["use_count"] = request.use_count();
 }
-BENCHMARK(BM_Split_Move)->Ranges({{1, 100}, {512, 8 << 14}});
+BENCHMARK(BM_Split_Move)->Ranges({{1, 100}, {64, 8 << 14}});
+
+static void BM_Split_Move_Local_Variant(benchmark::State& state) {
+  Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
+  Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
+      context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
+  for (auto _ : state) {
+    context.moveLocalVariant(request);
+  }
+//  state.counters["use_count"] = request.use_count();
+}
+BENCHMARK(BM_Split_Move_Local_Variant)->Ranges({{1, 100}, {64, 8 << 14}});
 
 static void BM_Split_Copy(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
@@ -112,8 +129,10 @@ static void BM_Split_Copy(benchmark::State& state) {
   for (auto _ : state) {
     context.copy(request);
   }
+
+//  state.counters["use_count"] = request.use_count();
 }
-BENCHMARK(BM_Split_Copy)->Ranges({{1, 100}, {512, 8 << 14}});
+BENCHMARK(BM_Split_Copy)->Ranges({{1, 100}, {64, 8 << 14}});
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
