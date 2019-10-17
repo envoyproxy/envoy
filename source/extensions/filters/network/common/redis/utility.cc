@@ -1,4 +1,5 @@
 #include "extensions/filters/network/common/redis/utility.h"
+
 #include "common/common/utility.h"
 
 namespace Envoy {
