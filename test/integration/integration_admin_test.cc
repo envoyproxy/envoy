@@ -10,6 +10,7 @@
 #include "common/profiler/profiler.h"
 #include "common/stats/stats_matcher_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
 #include "test/test_common/utility.h"
 
@@ -122,101 +123,117 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
+  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
   initialize();
 
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/notfound", "", downstreamProtocol(), version_);
+  auto request = [this](absl::string_view request,
+                        absl::string_view method) -> BufferingStreamDecoderPtr {
+    return IntegrationUtil::makeSingleRequest(lookupPort("admin"), std::string(method),
+                                              std::string(request), "", downstreamProtocol(),
+                                              version_);
+  };
+
+  BufferingStreamDecoderPtr response = request("/notfound", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_NE(std::string::npos, response->body().find("invalid path. admin commands are:"))
       << response->body();
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/help", "",
-                                                downstreamProtocol(), version_);
+  response = request("/help", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_NE(std::string::npos, response->body().find("admin commands are:")) << response->body();
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/", "",
-                                                downstreamProtocol(), version_);
+  response = request("/", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/html; charset=UTF-8", ContentType(response));
   EXPECT_NE(std::string::npos, response->body().find("<title>Envoy Admin</title>"))
       << response->body();
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/server_info", "",
-                                                downstreamProtocol(), version_);
+  response = request("/server_info", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/ready", "",
-                                                downstreamProtocol(), version_);
+  response = request("/ready", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
-                                                downstreamProtocol(), version_);
+  response = request("/stats", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly", "",
-                                                downstreamProtocol(), version_);
+  // Our first attempt to get recent lookups will get the error message as they
+  // are off by default.
+  response = request("/stats/recentlookups", "GET");
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+
+  // Now enable recent-lookups tracking and check that we get a count.
+  request("/stats/recentlookups/enable", "POST");
+  response = request("/stats/recentlookups", "GET");
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_TRUE(absl::StartsWith(response->body(), "   Count Lookup\n")) << response->body();
+  EXPECT_LT(30, response->body().size());
+
+  // Now disable recent-lookups tracking and check that we get the error again.
+  request("/stats/recentlookups/disable", "POST");
+  response = request("/stats/recentlookups", "GET");
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+
+  response = request("/stats?usedonly", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   // Testing a filter with no matches
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=foo", "",
-                                                downstreamProtocol(), version_);
+  response = request("/stats?filter=foo", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   // Testing a filter with matches
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=server",
-                                                "", downstreamProtocol(), version_);
+  response = request("/stats?filter=server", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
-                                                "/stats?filter=server&usedonly", "",
-                                                downstreamProtocol(), version_);
+  response = request("/stats?filter=server&usedonly", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json&usedonly",
-                                         "", downstreamProtocol(), version_);
+  response = request("/stats?format=json&usedonly", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=blah",
-                                                "", downstreamProtocol(), version_);
+  response = request("/stats?format=blah", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json",
-                                                "", downstreamProtocol(), version_);
+  response = request("/stats?format=json", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json", ContentType(response));
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   validateStatsJson(response->body(), 1);
 
   // Filtering stats by a regex with one match should return just that match.
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
-                                                "/stats?format=json&filter=^server\\.version$", "",
-                                                downstreamProtocol(), version_);
+  response = request("/stats?format=json&filter=^server\\.version$", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json", ContentType(response));
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
@@ -225,9 +242,7 @@ TEST_P(IntegrationAdminTest, Admin) {
               testing::Eq("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}"));
 
   // Filtering stats by a non-full-string regex should also return just that match.
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
-                                                "/stats?format=json&filter=server\\.version", "",
-                                                downstreamProtocol(), version_);
+  response = request("/stats?format=json&filter=server\\.version", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json", ContentType(response));
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
@@ -237,17 +252,14 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // Filtering stats by a regex with no matches (".*not_intended_to_appear.*") should return a
   // valid, empty, stats array.
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
-                                                "/stats?format=json&filter=not_intended_to_appear",
-                                                "", downstreamProtocol(), version_);
+  response = request("/stats?format=json&filter=not_intended_to_appear", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("application/json", ContentType(response));
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   validateStatsJson(response->body(), 0);
   EXPECT_THAT(response->body(), testing::Eq("{\"stats\":[]}"));
 
-  response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
+  response = request("/stats?format=prometheus", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_THAT(response->body(),
@@ -265,8 +277,7 @@ TEST_P(IntegrationAdminTest, Admin) {
       response->body(),
       testing::HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats/prometheus", "",
-                                                downstreamProtocol(), version_);
+  response = request("/stats/prometheus", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_THAT(response->body(),
@@ -284,58 +295,84 @@ TEST_P(IntegrationAdminTest, Admin) {
       response->body(),
       testing::HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters", "",
-                                                downstreamProtocol(), version_);
+  response = request("/clusters", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters?format=json",
-                                                "", downstreamProtocol(), version_);
+  response = request("/clusters?format=json", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
   EXPECT_NO_THROW(Json::Factory::loadFromString(response->body()));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/cpuprofiler", "",
-                                                downstreamProtocol(), version_);
+  response = request("/cpuprofiler", "POST");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/hot_restart_version",
-                                                "", downstreamProtocol(), version_);
+  response = request("/hot_restart_version", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/reset_counters", "",
-                                                downstreamProtocol(), version_);
+  response = request("/reset_counters", "POST");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/certs", "",
-                                                downstreamProtocol(), version_);
+  request("/stats/recentlookups/enable", "POST");
+  request("/stats/recentlookups/clear", "POST");
+  response = request("/stats/recentlookups", "GET");
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+
+  // TODO(#8324): "http1.metadata_not_supported_error" should not still be in
+  // the 'recent lookups' output after reset_counters.
+  switch (GetParam().downstream_protocol) {
+  case Http::CodecClient::Type::HTTP1:
+    EXPECT_EQ("   Count Lookup\n"
+              "       1 http1.metadata_not_supported_error\n"
+              "\n"
+              "total: 1\n",
+              response->body());
+    break;
+  case Http::CodecClient::Type::HTTP2:
+    EXPECT_EQ("   Count Lookup\n"
+              "       1 http2.header_overflow\n"
+              "       1 http2.headers_cb_no_stream\n"
+              "       1 http2.inbound_empty_frames_flood\n"
+              "       1 http2.inbound_priority_frames_flood\n"
+              "       1 http2.inbound_window_update_frames_flood\n"
+              "       1 http2.outbound_control_flood\n"
+              "       1 http2.outbound_flood\n"
+              "       1 http2.rx_messaging_error\n"
+              "       1 http2.rx_reset\n"
+              "       1 http2.too_many_header_frames\n"
+              "       1 http2.trailers\n"
+              "       1 http2.tx_reset\n"
+              "\n"
+              "total: 12\n",
+              response->body());
+  }
+
+  response = request("/certs", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime", "",
-                                                downstreamProtocol(), version_);
+  response = request("/runtime", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/runtime_modify", "foo=bar&foo1=bar1", downstreamProtocol(),
-      version_, "host", Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+  response = request("/runtime_modify?foo=bar&foo1=bar1", "POST");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime?format=json",
-                                                "", downstreamProtocol(), version_);
+  response = request("/runtime?format=json", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
@@ -347,8 +384,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   auto foo1_obj = entries->getObject("foo1");
   EXPECT_EQ("bar1", foo1_obj->getString("final_value"));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/listeners", "",
-                                                downstreamProtocol(), version_);
+  response = request("/listeners", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
@@ -360,8 +396,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                       listener_it->get().socket().localAddress()->asString())));
   }
 
-  response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/listeners?format=json", "", downstreamProtocol(), version_);
+  response = request("/listeners?format=json", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
@@ -381,8 +416,7 @@ TEST_P(IntegrationAdminTest, Admin) {
               socket_address->getInteger("port_value"));
   }
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/config_dump", "",
-                                                downstreamProtocol(), version_);
+  response = request("/config_dump", "GET");
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
