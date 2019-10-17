@@ -479,10 +479,15 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
 
 /**
  * Contains the backing store for a StatName and enough context so it can
- * self-delete through RAII. This works by augmenting StatNameStorage with a
- * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
- * is intended to be used in cases where simplicity of implementation is more
- * important than byte-savings, for example:
+ * self-delete through RAII, if needed. First, the builtins map in the
+ * SymbolTable is checked -- end-users can add to this table via bootstrap
+ * config. If that fails, then we need to do the locked symbol table lookup
+ * via StatNameStorage.
+ *
+ * In that case we need to augment StatNameStorage with a reference to the
+ * SymbolTable&, so it has an extra 8 bytes of footprint. It is intended to be
+ * used in cases where simplicity of implementation is more important than
+ * byte-savings, for example:
  *   - outside the stats system
  *   - in tests
  *   - as a scoped temp in a function
@@ -492,26 +497,20 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * for the entire map.
  *
  * In the stat structures, we generally use StatNameStorage to avoid the
- * per-stat overhead.
+ * per-stat overhead. Consider also use of StatNamePool or StatNameSet.
  */
 class StatNameManagedStorage {
 public:
-  // Basic constructor for when you have a name as a string, and need to
-  // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table);
   ~StatNameManagedStorage();
 
   StatName statName() const { return stat_name_; }
 
-  SymbolTable& symbolTable() { return symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return symbol_table_; }
-
 private:
-  //using StorageAndTable = std::pair<StatNameStorage, SymbolTable&>;
+  using StorageAndTable = std::pair<StatNameStorage, SymbolTable&>;
 
   StatName stat_name_;
-  std::unique_ptr<StatNameStorage> storage_;
-  SymbolTable& symbol_table_;
+  std::unique_ptr<StorageAndTable> storage_and_table_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
