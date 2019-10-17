@@ -610,7 +610,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
     Buffer::OwnedImpl buffer(super_large_response);
     // This call will buffer 24k on stream3, raise the buffered bytes above
     // high watermarks of the stream and connection.
-    // But callback will not propogate to stream_callback3 as the steam is
+    // But callback will not propagate to stream_callback3 as the steam is
     // ended locally.
     stream3->encodeData(buffer, true);
   }));
