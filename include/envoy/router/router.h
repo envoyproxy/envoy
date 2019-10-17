@@ -508,15 +508,14 @@ public:
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
 
-class TlsContextMatchCriteria;
-using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
-
 class TlsContextMatchCriteria {
 public:
   virtual ~TlsContextMatchCriteria() = default;
 
   virtual const absl::optional<bool>& presented() const PURE;
 };
+
+using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
 
 /**
  * Type of path matching that a route entry uses.
