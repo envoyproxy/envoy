@@ -191,6 +191,11 @@ typedef void (*envoy_on_error_f)(envoy_error error, void* context);
  */
 typedef void (*envoy_on_complete_f)(void* context);
 
+/**
+ * Called when the envoy engine is exiting.
+ */
+typedef void (*envoy_on_exit_f)();
+
 #ifdef __cplusplus
 } // function pointers
 #endif
@@ -207,3 +212,14 @@ typedef struct {
   envoy_on_complete_f on_complete;
   void* context; // Will be passed through to callbacks to provide dispatch and execution state.
 } envoy_http_callbacks;
+
+/**
+ * Interface that can handle Engine callbacks.
+ * Note: currently this set of callbacks doesn't
+ * have a context because users of the library do not interact with the
+ * callbacks. However, these set of callbacks can be easily extended
+ * following the envoy_http_callbacks pattern to do so.
+ */
+typedef struct {
+  envoy_on_exit_f on_exit;
+} envoy_engine_callbacks;

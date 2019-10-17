@@ -21,7 +21,7 @@ namespace Envoy {
 
 class Engine {
 public:
-  Engine(const char* config, const char* log_level,
+  Engine(envoy_engine_callbacks callbacks, const char* config, const char* log_level,
          std::atomic<envoy_network_t>& preferred_network);
 
   ~Engine();
@@ -31,6 +31,7 @@ public:
   Http::Dispatcher& httpDispatcher();
 
 private:
+  envoy_engine_callbacks callbacks_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
   std::thread main_thread_;
