@@ -96,6 +96,7 @@ public:
   }
 
   RedirectionManagerImpl::ClusterInfoSharedPtr clusterInfo(const std::string& cluster_name) {
+    Thread::LockGuard lock(redirection_manager_->map_mutex_);
     return redirection_manager_->info_map_[cluster_name];
   }
 
