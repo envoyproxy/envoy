@@ -326,6 +326,7 @@ envoy_cc_test(
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/common/stats:stat_test_utility_lib",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],

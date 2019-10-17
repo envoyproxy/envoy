@@ -20,6 +20,8 @@ filegroup(
         "server_xds.cds.yaml",
         "server_xds.eds.with_unknown_field.yaml",
         "server_xds.eds.yaml",
+        "server_xds.lds.typed_struct.yaml",
+        "server_xds.lds.with_unknown_field.typed_struct.yaml",
         "server_xds.lds.with_unknown_field.yaml",
         "server_xds.lds.yaml",
         "server_xds.rds.with_unknown_field.yaml",
