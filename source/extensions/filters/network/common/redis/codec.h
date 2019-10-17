@@ -67,7 +67,7 @@ public:
 
     bool operator==(const CompositeArray& other) const;
 
-    uint32_t size() const;
+    uint64_t size() const;
 
     /**
      * Forward const iterator for CompositeArray.

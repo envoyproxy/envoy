@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "common/common/utility.h"
-
 #include "extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
