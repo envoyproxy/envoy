@@ -187,6 +187,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!idle_timeout_) {
     idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout);
   }
+  if (!idle_timeout_) {
+    idle_timeout_ = std::chrono::hours(1);
+  } else if (idle_timeout_.value().count() == 0) {
+    idle_timeout_ = absl::nullopt;
+  }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.

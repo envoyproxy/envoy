@@ -6,6 +6,7 @@ HTTP filters
 .. toctree::
   :maxdepth: 2
 
+  adaptive_concurrency_filter
   buffer_filter
   cors_filter
   csrf_filter
