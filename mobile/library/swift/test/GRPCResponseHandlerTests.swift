@@ -129,6 +129,47 @@ final class GRPCResponseHandlerTests: XCTestCase {
     XCTAssertTrue(expectedMessages.isEmpty)
   }
 
+  // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501
+  func testCalledWithErrorWhenCompressedMessageReceived() {
+    let expectation = self.expectation(description: "Error closure is called")
+    let firstMessage = Data([
+      0x1, // Compression flag
+      0x0, 0x0, 0x0, 0x5, // Length bytes
+    ] + kMessage1)
+
+    let handler = GRPCResponseHandler()
+      .onMessage { _ in } // Compiler segfaults without this
+      .onError { error in
+        let message = "Unable to read compressed gRPC response message"
+        XCTAssertEqual(message, error.message)
+        expectation.fulfill()
+      }
+
+    handler.underlyingHandler.underlyingCallbacks.onData(firstMessage, false)
+    self.waitForExpectations(timeout: 0.1)
+  }
+
+  // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501
+  func testDoesNotCallOtherCallbacksAfterReceivingCompressedMessageError() {
+    let errorExpectation = self.expectation(description: "Error closure is called")
+    let otherExpectation = self.expectation(description: "Other closures are not called")
+    otherExpectation.isInverted = true
+    let firstMessage = Data([
+      0x1, // Compression flag
+      0x0, 0x0, 0x0, 0x5, // Length bytes
+    ] + kMessage1)
+
+    let handler = GRPCResponseHandler()
+      .onMessage { _ in otherExpectation.fulfill() }
+      .onTrailers { _ in otherExpectation.fulfill() }
+      .onError { _ in errorExpectation.fulfill() }
+
+    handler.underlyingHandler.underlyingCallbacks.onData(firstMessage, false)
+    handler.underlyingHandler.underlyingCallbacks.onData(firstMessage, false)
+    handler.underlyingHandler.underlyingCallbacks.onTrailers([:])
+    self.waitForExpectations(timeout: 0.1)
+  }
+
   // MARK: - gRPC status parsing
 
   func testParsingGRPCStatusFromHeadersReturnsFirstStatus() {
