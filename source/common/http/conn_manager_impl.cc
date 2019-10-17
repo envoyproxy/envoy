@@ -342,6 +342,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
 Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   if (!read_callbacks_->connection().streamInfo().protocol()) {
+    // For Non-QUIC traffic, continue passing data to filters.
     return Network::FilterStatus::Continue;
   }
   // Only QUIC connection's stream_info_ specifies protocol.
@@ -350,6 +351,9 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   ASSERT(codec_->protocol() == Protocol::Http3);
   stats_.named_.downstream_cx_http3_total_.inc();
   stats_.named_.downstream_cx_http3_active_.inc();
+  // Stop iterating through each filters for QUIC. Currently a QUIC connection
+  // only supports one filter, HCM, and bypasses the onData() interface. Because
+  // QUICHE already handles de-multiplexing.
   return Network::FilterStatus::StopIteration;
 }
 
