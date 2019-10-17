@@ -315,7 +315,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     }
   }
 
-  if (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2) {
+  if (response_headers_->ProxyConnection() && protocol_ < Http::Protocol::Http2) {
     const bool close =
         absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
@@ -344,8 +344,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type
-HttpHealthCheckerImpl::codecClientType(const envoy::type::CodecClientType type) {
+Http::CodecClient::Type` HttpHealthCheckerImpl::codecClientType(
+    const envoy::type::CodecClientType& type) {
   switch (type) {
   case envoy::type::HTTP3:
     return Http::CodecClient::Type::HTTP3;
