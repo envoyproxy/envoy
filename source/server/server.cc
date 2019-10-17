@@ -1,6 +1,5 @@
 #include "server/server.h"
 
-#include <atomic>
 #include <csignal>
 #include <cstdint>
 #include <functional>
@@ -135,8 +134,8 @@ void InstanceImpl::drainListeners() {
 }
 
 void InstanceImpl::failHealthcheck(bool fail) {
-  live_ = !fail;
-  server_stats_->live_.set(live_);
+  live_.store(!fail);
+  server_stats_->live_.set(live_.load());
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
@@ -213,7 +212,7 @@ void InstanceImpl::flushStatsInternal() {
   }
 }
 
-bool InstanceImpl::healthCheckFailed() { return !live_; }
+bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
