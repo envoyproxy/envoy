@@ -27,8 +27,8 @@ class GRPCResponseHandler(
   }
 
   internal val underlyingHandler: ResponseHandler = ResponseHandler(executor)
-
   private var errorClosure: (error: EnvoyError) -> Unit = { }
+
   /**
    * Specify a callback for when response headers are received by the stream.
    *
@@ -128,6 +128,7 @@ class GRPCResponseHandler(
                   "Unable to read compressed gRPC response message"))
 
           // no op the current onData and clean up
+          errorClosure = { }
           underlyingHandler.onHeaders { _, _, _ -> }
           underlyingHandler.onData { _, _ -> }
           underlyingHandler.onTrailers { }
