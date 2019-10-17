@@ -12,45 +12,48 @@ import java.util.concurrent.Executor;
 class ResponseHandler(val executor: Executor) {
 
   class EnvoyHTTPCallbacksAdapter(
-      private val responseHandler: ResponseHandler
+      private val executor: Executor
   ) : EnvoyHTTPCallbacks {
 
-    override fun getExecutor(): Executor = responseHandler.executor
+    internal var onHeadersClosure: (headers: Map<String, List<String>>, statusCode: Int, endStream: Boolean) -> Unit = { _, _, _ -> Unit }
+    internal var onDataClosure: (byteBuffer: ByteBuffer, endStream: Boolean) -> Unit = { _, _ -> Unit }
+    internal var onMetadataClosure: (metadata: Map<String, List<String>>) -> Unit = { Unit }
+    internal var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
+    internal var onErrorClosure: (error: EnvoyError) -> Unit = { Unit }
+    internal var onCancelClosure: () -> Unit = { Unit }
+
+    override fun getExecutor(): Executor {
+      return executor
+    }
 
     override fun onHeaders(headers: Map<String, List<String>>, endStream: Boolean) {
       val statusCode = headers[":status"]?.first()?.toIntOrNull() ?: 0
-      responseHandler.onHeadersClosure(headers, statusCode, endStream)
+      onHeadersClosure(headers, statusCode, endStream)
     }
 
     override fun onData(byteBuffer: ByteBuffer, endStream: Boolean) {
-      responseHandler.onDataClosure(byteBuffer, endStream)
+      onDataClosure(byteBuffer, endStream)
     }
 
     override fun onMetadata(metadata: Map<String, List<String>>) {
-      responseHandler.onMetadataClosure(metadata)
+      onMetadataClosure(metadata)
     }
 
     override fun onTrailers(trailers: Map<String, List<String>>) {
-      responseHandler.onTrailersClosure(trailers)
+      onTrailersClosure(trailers)
     }
 
     override fun onError(error: EnvoyError) {
-      responseHandler.onErrorClosure(error)
+      onErrorClosure(error)
     }
 
     override fun onCancel() {
-      responseHandler.onCancelClosure()
+      onCancelClosure()
     }
   }
 
-  internal val underlyingCallbacks = EnvoyHTTPCallbacksAdapter(this)
+  internal val underlyingCallbacks = EnvoyHTTPCallbacksAdapter(executor)
 
-  private var onHeadersClosure: (headers: Map<String, List<String>>, statusCode: Int, endStream: Boolean) -> Unit = { _, _, _ -> Unit }
-  private var onDataClosure: (byteBuffer: ByteBuffer, endStream: Boolean) -> Unit = { _, _ -> Unit }
-  private var onMetadataClosure: (metadata: Map<String, List<String>>) -> Unit = { Unit }
-  private var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
-  private var onErrorClosure: (error: EnvoyError) -> Unit = { Unit }
-  private var onCancelClosure: () -> Unit = { Unit }
 
   /**
    * Specify a callback for when response headers are received by the stream.
@@ -61,7 +64,7 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onHeaders(closure: (headers: Map<String, List<String>>, statusCode: Int, endStream: Boolean) -> Unit): ResponseHandler {
-    this.onHeadersClosure = closure
+    underlyingCallbacks.onHeadersClosure = closure
     return this
   }
 
@@ -74,7 +77,7 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onData(closure: (byteBuffer: ByteBuffer, endStream: Boolean) -> Unit): ResponseHandler {
-    this.onDataClosure = closure
+    underlyingCallbacks.onDataClosure = closure
     return this
   }
 
@@ -86,7 +89,7 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onMetadata(closure: (metadata: Map<String, List<String>>) -> Unit): ResponseHandler {
-    this.onMetadataClosure = closure
+    underlyingCallbacks.onMetadataClosure = closure
     return this
   }
 
@@ -98,7 +101,7 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onTrailers(closure: (trailers: Map<String, List<String>>) -> Unit): ResponseHandler {
-    this.onTrailersClosure = closure
+    underlyingCallbacks.onTrailersClosure = closure
     return this
   }
 
@@ -110,7 +113,7 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onError(closure: (error: EnvoyError) -> Unit): ResponseHandler {
-    this.onErrorClosure = closure
+    underlyingCallbacks.onErrorClosure = closure
     return this
   }
 
@@ -122,7 +125,7 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onCanceled(closure: () -> Unit): ResponseHandler {
-    this.onCancelClosure = closure
+    underlyingCallbacks.onCancelClosure = closure
     return this
   }
 }
