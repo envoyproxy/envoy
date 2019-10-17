@@ -702,8 +702,12 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
 Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderMap&,
                                             Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  const bool inbound_only = params.find("inboundonly") != params.end();
-  if (server_.listenerManager().shutdownListeners(inbound_only)) {
+  ListenerManager::StopListenerSelector listener_selector;
+  listener_selector.listener_direction_ =
+      params.find("inboundonly") != params.end()
+          ? ListenerManager::StopListenerSelector::ListenerDirection::InboundOnly
+          : ListenerManager::StopListenerSelector::ListenerDirection::All;
+  if (server_.listenerManager().stopListeners(listener_selector)) {
     response.add("OK\n");
   } else {
     response.add("No listeners matched\n");

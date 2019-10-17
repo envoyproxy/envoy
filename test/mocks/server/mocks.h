@@ -276,9 +276,8 @@ public:
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
-  MOCK_METHOD1(shutdownListeners, bool(bool inbound_only));
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
-  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD1(stopListeners, bool(const StopListenerSelector& listener_selector));
   MOCK_METHOD0(stopWorkers, void());
 };
 

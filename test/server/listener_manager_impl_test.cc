@@ -1111,8 +1111,8 @@ filter_chains:
   checkStats(2, 1, 2, 0, 0, 0);
 }
 
-// Validates that ShutdownListener functionality works correctly for inbound listeners.
-TEST_F(ListenerManagerImplTest, ShutdownListenerInbound) {
+// Validates that StopListener functionality works correctly for inbound listeners.
+TEST_F(ListenerManagerImplTest, StopInboundListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1143,7 +1143,10 @@ filter_chains:
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->shutdownListeners(true);
+  ListenerManager::StopListenerSelector listener_selector;
+  listener_selector.listener_direction_ =
+      ListenerManager::StopListenerSelector::ListenerDirection::InboundOnly;
+  manager_->stopListeners(listener_selector);
 
   // Validate that adding a listener in stopped listener's traffic direction is not allowed.
   const std::string listener_bar_yaml = R"EOF(
@@ -1159,8 +1162,8 @@ filter_chains:
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true));
 }
 
-// Validates that ShutdownListener functionality works correctly.
-TEST_F(ListenerManagerImplTest, ShutdownListener) {
+// Validates that StopListener functionality works correctly.
+TEST_F(ListenerManagerImplTest, StopListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1190,7 +1193,10 @@ filter_chains:
 
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->shutdownListeners(false);
+  ListenerManager::StopListenerSelector listener_selector;
+  listener_selector.listener_direction_ =
+      ListenerManager::StopListenerSelector::ListenerDirection::All;
+  manager_->stopListeners(listener_selector);
 
   // Validate that adding a listener is not allowed after all listeners are stopped.
   const std::string listener_bar_yaml = R"EOF(
@@ -1206,7 +1212,7 @@ filter_chains:
 }
 
 // Validate that stopping a warming listener, removes directly from warming listener list.
-TEST_F(ListenerManagerImplTest, ShutdownWarmingListener) {
+TEST_F(ListenerManagerImplTest, StopWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1259,7 +1265,10 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
-  manager_->shutdownListeners(true);
+  ListenerManager::StopListenerSelector listener_selector;
+  listener_selector.listener_direction_ =
+      ListenerManager::StopListenerSelector::ListenerDirection::InboundOnly;
+  manager_->stopListeners(listener_selector);
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {

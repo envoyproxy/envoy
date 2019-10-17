@@ -788,33 +788,6 @@ uint64_t ListenerManagerImpl::numConnections() {
   return num_connections;
 }
 
-bool ListenerManagerImpl::shutdownListeners(bool inbound_only) {
-  bool listeners_stopped = false;
-  if (inbound_only) {
-    inbound_listeners_stopped_ = true;
-  } else {
-    all_listeners_stopped_ = true;
-  }
-  for (Network::ListenerConfig& listener : listeners()) {
-    for (const auto& worker : workers_) {
-      if (!inbound_only ||
-          listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
-        listeners_stopped = true;
-        ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
-
-        auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
-        // Destroy a warming listener directly.
-        if (existing_warming_listener != warming_listeners_.end()) {
-          (*existing_warming_listener)->debugLog("removing warming listener");
-          warming_listeners_.erase(existing_warming_listener);
-        }
-        worker->stopListener(listener);
-      }
-    }
-  }
-  return listeners_stopped;
-}
-
 bool ListenerManagerImpl::removeListener(const std::string& name) {
   ENVOY_LOG(debug, "begin remove listener: name={}", name);
 
@@ -867,10 +840,28 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   }
 }
 
-void ListenerManagerImpl::stopListeners() {
-  for (const auto& worker : workers_) {
-    worker->stopListeners();
+bool ListenerManagerImpl::stopListeners(const StopListenerSelector& listener_selector) {
+  bool listeners_stopped = false;
+  listener_stop_state_.listener_direction_ = listener_selector.listener_direction_;
+  for (Network::ListenerConfig& listener : listeners()) {
+    for (const auto& worker : workers_) {
+      if (listener_selector.listener_direction_ !=
+              StopListenerSelector::ListenerDirection::InboundOnly ||
+          listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
+        listeners_stopped = true;
+        ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
+
+        auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+        // Destroy a warming listener directly.
+        if (existing_warming_listener != warming_listeners_.end()) {
+          (*existing_warming_listener)->debugLog("removing warming listener");
+          warming_listeners_.erase(existing_warming_listener);
+        }
+        worker->stopListener(listener);
+      }
+    }
   }
+  return listeners_stopped;
 }
 
 void ListenerManagerImpl::stopWorkers() {

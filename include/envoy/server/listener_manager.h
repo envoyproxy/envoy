@@ -102,6 +102,20 @@ public:
  */
 class ListenerManager {
 public:
+  // Criteria for selecting listeners to stop.
+  struct StopListenerSelector {
+
+    enum class ListenerDirection {
+      // Listeners in the inbound direction are only stopped.
+      InboundOnly,
+      // All listeners are stopped.
+      All,
+      // Listeners are not stopped by direction.
+      None
+    };
+    ListenerDirection listener_direction_{ListenerDirection::None};
+  };
+
   virtual ~ListenerManager() = default;
 
   /**
@@ -153,15 +167,6 @@ public:
    */
   virtual bool removeListener(const std::string& name) PURE;
 
-  /*
-   * Stops listeners from accepting new connections without actually removing them. This is
-   * used by /drain_listeners admin endpoint. This method directly stops the listeners on workers.
-   * Once a listener is stopped, any listener modifications are not allowed.
-   * @param inbound_only if true stops all the inbound listeners and stops all listeners if false.
-   * @return true if any listeners have been stopped.
-   */
-  virtual bool shutdownListeners(bool inbound_only) PURE;
-
   /**
    * Start all workers accepting new connections on all added listeners.
    * @param guard_dog supplies the guard dog to use for thread watching.
@@ -170,9 +175,12 @@ public:
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
-   * is used for server draining.
+   * is used for server draining and /drain_listeners admin endpoint. This method directly stops the
+   * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
+   * @param listener_selector allows to select listeners to stop.
+   * @return true if any listeners have been stopped.
    */
-  virtual void stopListeners() PURE;
+  virtual bool stopListeners(const StopListenerSelector& listener_selector) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will

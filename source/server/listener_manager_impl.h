@@ -136,9 +136,8 @@ public:
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
-  bool shutdownListeners(bool inbound_only) override;
   void startWorkers(GuardDog& guard_dog) override;
-  void stopListeners() override;
+  bool stopListeners(const StopListenerSelector& listener_selector) override;
   void stopWorkers() override;
   Http::Context& httpContext() { return server_.httpContext(); }
 
@@ -156,6 +155,11 @@ private:
     uint64_t workers_pending_removal_;
   };
 
+  struct ListenerStopState {
+    StopListenerSelector::ListenerDirection listener_direction_{
+        StopListenerSelector::ListenerDirection::None};
+  };
+
   void addListenerToWorker(Worker& worker, ListenerImpl& listener);
   ProtobufTypes::MessagePtr dumpListenerConfigs();
   static ListenerManagerStats generateStats(Stats::Scope& scope);
@@ -171,9 +175,12 @@ private:
     // Currently all listeners in a given direction are stopped because of the way admin
     // drain_listener functionality is implemented. This needs to be revisited, if that changes - if
     // we support drain by listener name,for example.
-    return (all_listeners_stopped_ ||
-            (inbound_listeners_stopped_ &&
-             config.traffic_direction() == envoy::api::v2::core::TrafficDirection::INBOUND));
+    return
+
+        (listener_stop_state_.listener_direction_ == StopListenerSelector::ListenerDirection::All ||
+         (listener_stop_state_.listener_direction_ ==
+              StopListenerSelector::ListenerDirection::InboundOnly &&
+          config.traffic_direction() == envoy::api::v2::core::TrafficDirection::INBOUND));
   }
 
   /**
@@ -204,8 +211,7 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
-  bool inbound_listeners_stopped_{};
-  bool all_listeners_stopped_{};
+  ListenerStopState listener_stop_state_;
   Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
