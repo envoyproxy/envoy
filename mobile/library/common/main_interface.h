@@ -94,11 +94,13 @@ envoy_status_t set_preferred_network(envoy_network_t network);
 /**
  * External entry point for library.
  * @param engine, handle to the engine to run.
+ * @param callbacks, the callbacks that will run the engine callbacks.
  * @param config, the configuration blob to run envoy with.
  * @param log_level, the logging level to run envoy with.
  * @return envoy_status_t, the resulting status of the operation.
  */
-envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char* log_level);
+envoy_status_t run_engine(envoy_engine_t engine, envoy_engine_callbacks callbacks,
+                          const char* config, const char* log_level);
 
 #ifdef __cplusplus
 } // functions

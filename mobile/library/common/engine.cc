@@ -21,8 +21,9 @@ static void registerFactories() {
   Envoy::Upstream::forceRegisterLogicalDnsClusterFactory();
 }
 
-Engine::Engine(const char* config, const char* log_level,
-               std::atomic<envoy_network_t>& preferred_network) {
+Engine::Engine(envoy_engine_callbacks callbacks, const char* config, const char* log_level,
+               std::atomic<envoy_network_t>& preferred_network)
+    : callbacks_(callbacks) {
   // Ensure static factory registration occurs on time.
   // TODO: ensure this is only called one time once multiple Engine objects can be allocated.
   registerFactories();
@@ -89,7 +90,10 @@ Engine::~Engine() {
     // Gracefully shutdown the running envoy instance by resetting the main_common_ unique_ptr.
     // Destroying MainCommon's member variables shutsdown things in the correct order and
     // gracefully.
-    event_dispatcher_->post([this]() -> void { TS_UNCHECKED_READ(main_common_).reset(); });
+    event_dispatcher_->post([this]() -> void {
+      callbacks_.on_exit();
+      TS_UNCHECKED_READ(main_common_).reset();
+    });
   } // _mutex
 
   // Now we wait for the main thread to wrap things up.

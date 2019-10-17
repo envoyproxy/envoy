@@ -30,9 +30,19 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   return init_engine();
 }
 
+static void jvm_on_exit() {
+  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_exit");
+  // Note that this is not dispatched because the thread that
+  // needs to be detached is the engine thread.
+  // This function is called from the context of the engine's
+  // thread due to it being posted to the engine's event dispatcher.
+  static_jvm->DetachCurrentThread();
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
     JNIEnv* env, jclass, jlong engine, jstring config, jstring log_level) {
-  return run_engine(engine, env->GetStringUTFChars(config, nullptr),
+  envoy_engine_callbacks native_callbacks = {jvm_on_exit};
+  return run_engine(engine, native_callbacks, env->GetStringUTFChars(config, nullptr),
                     env->GetStringUTFChars(log_level, nullptr));
 }
 
@@ -122,7 +132,7 @@ static JNIEnv* get_env() {
     // Note: the only thread that should need to be attached is Envoy's engine std::thread.
     // TODO: harden this piece of code to make sure that we are only needing to attach Envoy
     // engine's std::thread, and that we detach it successfully.
-    static_jvm->AttachCurrentThread(&env, NULL);
+    static_jvm->AttachCurrentThread(&env, nullptr);
     static_jvm->GetEnv((void**)&env, JNI_VERSION);
   }
   return env;

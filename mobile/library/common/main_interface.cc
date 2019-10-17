@@ -51,9 +51,10 @@ envoy_status_t set_preferred_network(envoy_network_t network) {
 /**
  * External entrypoint for library.
  */
-envoy_status_t run_engine(envoy_engine_t, const char* config, const char* log_level) {
+envoy_status_t run_engine(envoy_engine_t, envoy_engine_callbacks callbacks, const char* config,
+                          const char* log_level) {
   // This will change once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
-  engine_ = std::make_unique<Envoy::Engine>(config, log_level, preferred_network_);
+  engine_ = std::make_unique<Envoy::Engine>(callbacks, config, log_level, preferred_network_);
   return ENVOY_SUCCESS;
 }
