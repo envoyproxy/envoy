@@ -97,8 +97,7 @@ private:
    */
   void endEncode();
 
-void encodeFormattedHeader(absl::string_view key, absl::string_view value,
-                             HeaderKeyFormatter* formatter, StreamEncoderImpl* encoder);
+void encodeFormattedHeader(absl::string_view key, absl::string_view value);
 
   bool chunk_encoding_{true};
   bool processing_100_continue_{false};
