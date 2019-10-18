@@ -146,7 +146,12 @@ bool SingleServerRequest::onRedirection(const Common::Redis::RespValue& value) {
     return false;
   }
   handle_ = conn_pool_->makeRequestToHost(host_address, *incoming_request_, *this);
-  return (handle_ != nullptr);
+
+  if (handle_ != nullptr) {
+    conn_pool_->onRedirection();
+    return true;
+  }
+  return false;
 }
 
 void SingleServerRequest::cancel() {
@@ -301,9 +306,14 @@ bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value
     return false;
   }
 
-  this->pending_requests_[index].handle_ =
-      conn_pool->makeRequestToHost(host_address, request, this->pending_requests_[index]);
-  return (this->pending_requests_[index].handle_ != nullptr);
+  pending_requests_[index].handle_ =
+      conn_pool->makeRequestToHost(host_address, request, pending_requests_[index]);
+
+  if (pending_requests_[index].handle_ != nullptr) {
+    conn_pool->onRedirection();
+    return true;
+  }
+  return false;
 }
 
 void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
