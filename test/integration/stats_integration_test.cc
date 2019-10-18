@@ -256,6 +256,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/09/25  8226     43022       44000   dns: enable dns failure refresh rate configuration
   // 2019/09/30  8354     43310       44000   Implement transport socket match.
   // 2019/10/17  8537     43308       44000   add new enum value HTTP3
+  // 2019/10/17  8484     43340       44000   stats: add unit support to histogram
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -265,7 +266,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 43308); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 43340); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 
@@ -295,6 +296,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/09/25  8226     34777       35000   dns: enable dns failure refresh rate configuration
   // 2019/09/30  8354     34969       35000   Implement transport socket match.
   // 2019/10/17  8537     34966       35000   add new enum value HTTP3
+  // 2019/10/17  8484     34998       35000   stats: add unit support to histogram
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -304,7 +306,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 34966); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 34998); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
 

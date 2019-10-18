@@ -8,6 +8,7 @@
 
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/timespan_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
 
@@ -370,7 +371,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
 ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
     ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection, TimeSource& time_source)
     : listener_(listener), connection_(std::move(new_connection)),
-      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_, time_source)) {
+      conn_length_(new Stats::HistogramCompletableTimespanImpl(
+          listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);

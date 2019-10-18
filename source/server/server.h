@@ -64,7 +64,7 @@ namespace Server {
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)                                                                      \
-  HISTOGRAM(initialization_time_ms)
+  HISTOGRAM(initialization_time_ms, Milliseconds)
 
 struct ServerStats {
   ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)

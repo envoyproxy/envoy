@@ -66,8 +66,8 @@ namespace Http {
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_upgrades_active, Accumulate)                                                 \
   GAUGE(downstream_rq_active, Accumulate)                                                          \
-  HISTOGRAM(downstream_cx_length_ms)                                                               \
-  HISTOGRAM(downstream_rq_time)
+  HISTOGRAM(downstream_cx_length_ms, Milliseconds)                                                 \
+  HISTOGRAM(downstream_rq_time, Milliseconds)
 
 /**
  * Wrapper struct for connection manager stats. @see stats_macros.h

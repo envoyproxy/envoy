@@ -36,6 +36,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
+#include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -300,8 +301,8 @@ void InstanceImpl::initialize(const Options& options,
   validation_context_.dynamic_warning_validation_visitor().setCounter(
       server_stats_->dynamic_unknown_fields_);
 
-  initialization_timer_ =
-      std::make_unique<Stats::Timespan>(server_stats_->initialization_time_ms_, timeSource());
+  initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
