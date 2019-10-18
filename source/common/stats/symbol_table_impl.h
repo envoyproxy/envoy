@@ -149,12 +149,35 @@ private:
   std::vector<StatNameStorage> storage_vector_;
 };
 
+// Represents a map from string to StatName, including the pool used to allocate
+// new StatNames.
 class StatNameMappedPool {
 public:
   explicit StatNameMappedPool(SymbolTable& symbol_table) : pool_(symbol_table) {}
-  bool contains(absl::string_view str) const;
+
+  /**
+   * @param name The stat name.
+   * @return Whether the mapped-pool contains name.
+   */
+  bool contains(absl::string_view name) const;
+
+  /**
+   * Adds a new name to the mapped pool. Has no effect if the name is already
+   * in the pool.
+   *
+   * @param name The stat name.
+   */
   void add(absl::string_view name);
+
+  /**
+   * @param name The stat name.
+   * @return Optional StatName corresponding to name, or an empty optional.
+   */
   absl::optional<StatName> lookup(absl::string_view str) const;
+
+  /**
+   * Removes all names from the mapped pool.
+   */
   void clear();
 
 private:

@@ -460,9 +460,9 @@ void StatNameMappedPool::add(absl::string_view name) {
   }
 }
 
-absl::optional<StatName> StatNameMappedPool::lookup(absl::string_view str) const {
+absl::optional<StatName> StatNameMappedPool::lookup(absl::string_view name) const {
   absl::optional<StatName> ret;
-  auto p = map_.find(str);
+  auto p = map_.find(name);
   if (p != map_.end()) {
     ret = p->second;
   }

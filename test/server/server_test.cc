@@ -488,13 +488,30 @@ TEST_P(ServerStatsTest, FlushStats) {
 TEST_P(ServerStatsTest, BootstrapBuiltins) {
   initialize("test/server/builtin_stats_bootstrap.yaml");
   Stats::SymbolTable& symbol_table = stats_store_.symbolTable();
+
+  // Before taking our initial measurement of stat-name lookups, allocate
+  // 3 counters. The first time a counter is allocated, it will make and
+  // extra copy of some of the constituent names due to tag extraction,
+  // but that should not occur after the initial allocation.
   stats_store_.counter("builtin.stat1");
+  stats_store_.counter("builtin.stat2");
+  stats_store_.counter("not-builtin.stat3");
+
   auto num_lookups = [&symbol_table]() -> uint64_t {
     return symbol_table.getRecentLookups([](absl::string_view, uint64_t) {});
   };
   const uint64_t lookups_at_init = num_lookups();
+
+  // Looking up existing counters with names established in the bootstrap file
+  // do not incur additional lookups & global locks.
   stats_store_.counter("builtin.stat1");
+  stats_store_.counter("builtin.stat2");
   EXPECT_EQ(lookups_at_init, num_lookups());
+
+  // Looking up an existing without the name established in the bootstrap file
+  // incurs additional lookups requiring the acquisition of a global lock.
+  stats_store_.counter("not-builtin.stat3");
+  EXPECT_LT(lookups_at_init, num_lookups());
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,

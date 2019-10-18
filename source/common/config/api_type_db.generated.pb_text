@@ -5599,6 +5599,14 @@ types {
   }
 }
 types {
+  key: "envoy.config.metrics.v2.StatsBuiltin"
+  value {
+    qualified_package: "envoy.config.metrics.v2"
+    proto_path: "envoy/config/metrics/v2/stats.proto"
+    next_version_type_name: "envoy.config.metrics.v3alpha.StatsBuiltin"
+  }
+}
+types {
   key: "envoy.config.metrics.v2.StatsConfig"
   value {
     qualified_package: "envoy.config.metrics.v2"
@@ -5657,6 +5665,13 @@ types {
   value {
     qualified_package: "envoy.config.metrics.v3alpha"
     proto_path: "envoy/config/metrics/v3alpha/metrics_service.proto"
+  }
+}
+types {
+  key: "envoy.config.metrics.v3alpha.StatsBuiltin"
+  value {
+    qualified_package: "envoy.config.metrics.v3alpha"
+    proto_path: "envoy/config/metrics/v3alpha/stats.proto"
   }
 }
 types {

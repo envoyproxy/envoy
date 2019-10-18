@@ -181,9 +181,26 @@ public:
    */
   virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
 
+  /**
+   * Remembers a builtin stat name. This can only be called during startup,
+   * e.g. bootstrap processing. The underlying map must never be mutated,
+   * as it is accessed without a lock.
+   *
+   * @param name The name of the stat to pre-allocate on startup.
+   */
   virtual void rememberBuiltin(absl::string_view name) PURE;
+
+  /**
+   * @param name the stat name.
+   * @return Whether the the name has been pre-allocated as a builtin.
+   */
   virtual bool hasBuiltin(absl::string_view str) const PURE;
-  virtual absl::optional<StatName> getBuiltin(absl::string_view str) const PURE;
+
+  /**
+   * @param name the stat name.
+   * @return Optionalized StatName for the specified name.
+   */
+  virtual absl::optional<StatName> getBuiltin(absl::string_view name) const PURE;
 
 private:
   friend struct HeapStatData;
