@@ -524,7 +524,7 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * In the stat structures, we generally use StatNameStorage to avoid the
  * per-stat overhead. Consider also use of StatNamePool or StatNameSet.
  */
-class StatNameManagedStorage {
+class StatNameManagedStorage : public NonCopyable {
 public:
   StatNameManagedStorage(absl::string_view name, SymbolTable& table);
   ~StatNameManagedStorage();
