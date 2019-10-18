@@ -234,7 +234,8 @@ struct Http1Settings {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
     // internals normalize everything to lowercase.)
     Default,
-    // Performs proper casing of header keys: the first and all alpha characters following a non-alphanumeric
+    // Performs proper casing of header keys: the first and all alpha characters following a
+    // non-alphanumeric
     // character is capitalized.
     ProperCase,
   };
