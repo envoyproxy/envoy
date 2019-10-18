@@ -197,7 +197,8 @@ static void ios_on_error(envoy_error error, void *context) {
   // start_stream could result in a reset that would release the native ref.
   // TODO: To be truly safe we probably need stronger guarantees of operation ordering on this ref
   _strongSelf = self;
-  envoy_status_t result = start_stream(_streamHandle, native_callbacks);
+  envoy_stream_options stream_options;
+  envoy_status_t result = start_stream(_streamHandle, native_callbacks, stream_options);
   if (result != ENVOY_SUCCESS) {
     _strongSelf = nil;
     return nil;

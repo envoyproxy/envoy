@@ -32,7 +32,8 @@ envoy_stream_t init_stream(envoy_engine_t);
  * @param callbacks, the callbacks that will run the stream callbacks.
  * @return envoy_stream, with a stream handle and a success status, or a failure status.
  */
-envoy_status_t start_stream(envoy_stream_t, envoy_http_callbacks callbacks);
+envoy_status_t start_stream(envoy_stream_t, envoy_http_callbacks callbacks,
+                            envoy_stream_options stream_options);
 
 /**
  * Send headers over an open HTTP stream. This method can be invoked once and needs to be called

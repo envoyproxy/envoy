@@ -33,9 +33,11 @@ public:
    * there is no guarantee it will ever functionally represent an open stream.
    * @param stream, the stream to start.
    * @param bridge_callbacks, wrapper for callbacks for events on this stream.
+   * @param stream_options, the config options to start the stream with.
    * @return envoy_stream_t handle to the stream being created.
    */
-  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks);
+  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
+                             envoy_stream_options stream_options);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -120,6 +122,8 @@ private:
   public:
     DirectStream(envoy_stream_t stream_handle, AsyncClient::Stream& underlying_stream,
                  DirectStreamCallbacksPtr&& callbacks);
+
+    static AsyncClient::StreamOptions toNativeStreamOptions(envoy_stream_options stream_options);
 
     const envoy_stream_t stream_handle_;
     // Used to issue outgoing HTTP stream operations.
