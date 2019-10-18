@@ -33,6 +33,7 @@ import "google/protobuf/timestamp.proto";
 // - field mask to send
 // - which return values from request_context are copied back
 // - which return values are copied into request_headers]
+// [#next-free-field: 12]
 message AttributeContext {
   // This message defines attributes for a node that handles a network request.
   // The node can be either a service or an application that sends, forwards,
@@ -78,6 +79,7 @@ message AttributeContext {
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
+  // [#next-free-field: 12]
   message HttpRequest {
     // The unique ID for a request, which can be propagated to downstream
     // systems. The ID should have low probability of collision

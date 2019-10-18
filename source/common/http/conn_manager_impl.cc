@@ -1302,7 +1302,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_id_);
+      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;

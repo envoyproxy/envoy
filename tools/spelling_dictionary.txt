@@ -668,6 +668,7 @@ matchers
 maxbuffer
 megamiss
 mem
+memcmp
 memcpy
 mergeable
 messagename

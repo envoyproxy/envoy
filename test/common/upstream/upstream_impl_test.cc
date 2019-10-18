@@ -2186,7 +2186,8 @@ public:
   }
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&,
-                                  Server::Configuration::FactoryContext&) override {
+                                  Server::Configuration::ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 

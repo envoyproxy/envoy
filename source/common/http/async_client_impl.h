@@ -160,7 +160,8 @@ private:
   };
 
   struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
+                                      uint64_t) const override {
       return nullptr;
     }
 
@@ -239,6 +240,9 @@ private:
       return absl::nullopt;
     }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+      return nullptr;
+    }
+    const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
       return nullptr;
     }
     const std::multimap<std::string, std::string>& opaqueConfig() const override {

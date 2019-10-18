@@ -54,6 +54,7 @@ message Http1ProtocolOptions {
 }
 
 // [#comment:next free field: 13]
+// [#next-free-field: 13]
 message Http2ProtocolOptions {
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values

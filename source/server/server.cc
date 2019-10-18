@@ -75,7 +75,8 @@ InstanceImpl::InstanceImpl(
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()) {
+      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
+      server_context_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -326,8 +327,8 @@ void InstanceImpl::initialize(const Options& options,
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), std::move(local_address), options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
+      options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
