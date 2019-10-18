@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "common/http/http1/header_formatter.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -41,6 +42,26 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
+
+  encode_header_cb_ = [this](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+    absl::string_view key_to_use = header.key().getStringView();
+    uint32_t key_size_to_use = header.key().size();
+    // Translate :authority -> host so that upper layers do not need to deal with this.
+    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+      key_to_use = absl::string_view(Headers::get().HostLegacy.get());
+      key_size_to_use = Headers::get().HostLegacy.get().size();
+    }
+
+    // Skip all headers starting with ':' that make it here.
+    if (key_to_use[0] == ':') {
+      return HeaderMap::Iterate::Continue;
+    }
+
+    encodeFormattedHeader(key_to_use, header.value().getStringView(), header_key_formatter_,
+                          static_cast<StreamEncoderImpl*>(context));
+
+    return HeaderMap::Iterate::Continue;
+  };
 }
 
 void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
@@ -60,6 +81,16 @@ void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view va
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
 }
 
+void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::string_view value,
+                                              HeaderKeyFormatter* formatter,
+                                              StreamEncoderImpl* encoder) {
+  if (formatter != nullptr) {
+    encoder->encodeHeader(formatter->format(key), value);
+  } else {
+    encoder->encodeHeader(key, value);
+  }
+}
+
 void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   processing_100_continue_ = true;
@@ -69,31 +100,7 @@ void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
-  headers.iterate(
-      [this](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        absl::string_view key_to_use = header.key().getStringView();
-        uint32_t key_size_to_use = header.key().size();
-        // Translate :authority -> host so that upper layers do not need to deal with this.
-        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
-          key_size_to_use = Headers::get().HostLegacy.get().size();
-        }
-
-        // Skip all headers starting with ':' that make it here.
-        if (key_to_use[0] == ':') {
-          return HeaderMap::Iterate::Continue;
-        }
-
-        if (header_key_formatter_ != nullptr) {
-          static_cast<StreamEncoderImpl*>(context)->encodeHeader(
-              header_key_formatter_->format(key_to_use), header.value().getStringView());
-        } else {
-          static_cast<StreamEncoderImpl*>(context)->encodeHeader(key_to_use,
-                                                                 header.value().getStringView());
-        }
-        return HeaderMap::Iterate::Continue;
-      },
-      this);
+  headers.iterate(encode_header_cb_, this);
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -124,32 +131,16 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
       if (is_content_length_allowed_) {
-        if (header_key_formatter_ != nullptr) {
-          const auto formatted_header =
-              header_key_formatter_->format(Headers::get().ContentLength.get().c_str());
-          encodeHeader(formatted_header.c_str(), formatted_header.size(), "0", 1);
-        } else {
-          encodeHeader(Headers::get().ContentLength.get().c_str(),
-                       Headers::get().ContentLength.get().size(), "0", 1);
-        }
+        encodeFormattedHeader(Headers::get().ContentLength.get().c_str(), "0",
+                              header_key_formatter_, this);
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else {
-      if (header_key_formatter_ != nullptr) {
-        const auto formatted_header =
-            header_key_formatter_->format(Headers::get().TransferEncoding.get().c_str());
-        encodeHeader(formatted_header.c_str(), formatted_header.size(),
-                     Headers::get().TransferEncodingValues.Chunked.c_str(),
-                     Headers::get().TransferEncodingValues.Chunked.size());
-      } else {
-        encodeHeader(Headers::get().TransferEncoding.get().c_str(),
-                     Headers::get().TransferEncoding.get().size(),
-                     Headers::get().TransferEncodingValues.Chunked.c_str(),
-                     Headers::get().TransferEncodingValues.Chunked.size());
-      }
-
+      encodeFormattedHeader(Headers::get().TransferEncoding.get().c_str(),
+                            Headers::get().TransferEncodingValues.Chunked.c_str(),
+                            header_key_formatter_, this);
       // We do not apply chunk encoding for HTTP upgrades.
       // If there is a body in a WebSocket Upgrade response, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
