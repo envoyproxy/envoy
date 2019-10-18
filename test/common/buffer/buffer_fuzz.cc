@@ -10,12 +10,10 @@
 #include "common/memory/stats.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "test/fuzz/utility.h"
+
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
-
-// Strong assertion that applies across all compilation modes and doesn't rely
-// on gtest, which only provides soft fails that don't trip oss-fuzz failures.
-#define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
 
 namespace Envoy {
 
