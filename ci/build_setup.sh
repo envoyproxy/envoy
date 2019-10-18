@@ -23,11 +23,10 @@ function setup_gcc_toolchain() {
 
 function setup_clang_toolchain() {
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export PATH=/usr/lib/llvm-8/bin:$PATH
     export CC=clang
     export CXX=clang++
     export BAZEL_COMPILER=clang
-    export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
+    export ASAN_SYMBOLIZER_PATH=/opt/llvm/bin/llvm-symbolizer
     echo "$CC/$CXX toolchain configured"
   else
     export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang ${BAZEL_BUILD_OPTIONS}"
@@ -36,11 +35,10 @@ function setup_clang_toolchain() {
 
 function setup_clang_libcxx_toolchain() {
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export PATH=/usr/lib/llvm-8/bin:$PATH
     export CC=clang
     export CXX=clang++
     export BAZEL_COMPILER=clang
-    export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
+    export ASAN_SYMBOLIZER_PATH=/opt/llvm/bin/llvm-symbolizer
     export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
     echo "$CC/$CXX toolchain with libc++ configured"
   else
@@ -68,12 +66,13 @@ export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 export USER=bazel
 export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
+export PATH=/opt/llvm/bin:$PATH
+export CLANG_FORMAT=clang-format
 
-if [[ -f "/etc/redhat-release" ]]
-then
-  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
+if [[ -f "/etc/redhat-release" ]]; then
+  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 ${BAZEL_BUILD_EXTRA_OPTIONS}"
 else
-  export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-8/bin --linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+  export BAZEL_BUILD_EXTRA_OPTIONS="--linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
 fi
 
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
