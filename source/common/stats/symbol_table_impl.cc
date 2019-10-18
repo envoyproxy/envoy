@@ -439,7 +439,7 @@ StatNameManagedStorage::~StatNameManagedStorage() {
   if (symbol_table_ != nullptr) {
     // For managed storage, we had to release the storage from its unique_ptr
     // to store in the union as bytes. So now we restore the unique_pointer so
-    // it can be disposed of symmmetrically.
+    // it can be disposed of symmetrically.
     symbol_table_->free(statName());
     SymbolTable::StoragePtr storage(storage_.managed_);
   }

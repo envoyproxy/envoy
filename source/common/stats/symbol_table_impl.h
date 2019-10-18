@@ -540,8 +540,8 @@ public:
 
 private:
   union {
-    uint8_t* managed_;        // Used if symbol_table_ is non-null.
-    const uint8_t* builtin_;  // Used if symbol_table_ is null.
+    uint8_t* managed_;       // Used if symbol_table_ is non-null.
+    const uint8_t* builtin_; // Used if symbol_table_ is null.
   } storage_;
   Stats::SymbolTable* symbol_table_; // null if we name was found as a builtin on construction.
 };
