@@ -705,11 +705,8 @@ Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderM
   ListenerManager::StopListenersType listeners_type =
       params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
                                                  : ListenerManager::StopListenersType::All;
-  if (server_.listenerManager().stopListeners(listeners_type)) {
-    response.add("OK\n");
-  } else {
-    response.add("No listeners matched\n");
-  }
+  server_.listenerManager().stopListeners(listeners_type);
+  response.add("OK\n");
   return Http::Code::OK;
 }
 

@@ -133,7 +133,7 @@ public:
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
-  bool stopListeners(StopListenersType listeners_type) override;
+  void stopListeners(StopListenersType listeners_type) override;
   void stopWorkers() override;
   Http::Context& httpContext() { return server_.httpContext(); }
 
@@ -199,7 +199,7 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
-  StopListenersType listeners_type_{StopListenersType::None};
+  absl::optional<StopListenersType> listeners_type_;
   Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;

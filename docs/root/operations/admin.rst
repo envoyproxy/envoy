@@ -211,13 +211,15 @@ modify different aspects of the server:
 
    .. http:post:: /drain_listeners?inboundonly
 
-   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in :ref:`Listener <envoy_api_msg_Listener>` 
-   is used to determine whether a listener is inbound or outbound.
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
+   :ref:`Listener <envoy_api_msg_Listener>` is used to determine whether a listener 
+   is inbound or outbound.
 
 .. attention::
 
-   This operation directly stops the matched listeners on workers. Once listeners in a given traffic direction are stopped, listener additions
-   and modifications in that direction are not allowed.
+   This operation directly stops the matched listeners on workers. Once listeners in a given
+   traffic direction are stopped, listener additions and modifications in that direction
+   are not allowed.
 
 .. http:get:: /server_info
 

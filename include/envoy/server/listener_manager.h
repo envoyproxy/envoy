@@ -108,8 +108,6 @@ public:
     InboundOnly,
     // All listeners are stopped.
     All,
-    // Listeners are not stopped by direction.
-    None
   };
 
   virtual ~ListenerManager() = default;
@@ -174,9 +172,8 @@ public:
    * is used for server draining and /drain_listeners admin endpoint. This method directly stops the
    * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
    * @param listeners_type indicates listeners to stop.
-   * @return true if any listeners have been stopped.
    */
-  virtual bool stopListeners(StopListenersType listeners_type) PURE;
+  virtual void stopListeners(StopListenersType listeners_type) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will

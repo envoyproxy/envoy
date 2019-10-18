@@ -561,14 +561,13 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   }
 }
 
-bool ListenerManagerImpl::stopListeners(StopListenersType listeners_type) {
-  bool listeners_stopped = false;
+void ListenerManagerImpl::stopListeners(StopListenersType listeners_type) {
   listeners_type_ = listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     for (const auto& worker : workers_) {
-      if (listeners_type != StopListenersType::InboundOnly ||
-          listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
-        listeners_stopped = true;
+      if (listeners_type_.has_value() &&
+          (listeners_type != StopListenersType::InboundOnly ||
+           listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND)) {
         ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
 
         auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
@@ -581,7 +580,6 @@ bool ListenerManagerImpl::stopListeners(StopListenersType listeners_type) {
       }
     }
   }
-  return listeners_stopped;
 }
 
 void ListenerManagerImpl::stopWorkers() {

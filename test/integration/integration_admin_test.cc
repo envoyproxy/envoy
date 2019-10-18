@@ -454,16 +454,16 @@ TEST_P(IntegrationAdminTest, Admin) {
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
-  // Validate that the inboundonly does not drain the outbound listeners.
+  // Validate that the inboundonly is processed correctly.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_EQ("No listeners matched\n", response->body());
+  EXPECT_EQ("OK\n", response->body());
 
-  // Validate that the outbound listener is drained on drain listeners.
+  // Validate that the drain_listeners is processed correctly.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
