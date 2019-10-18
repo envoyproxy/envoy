@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "common/http/http1/header_formatter.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -17,6 +16,7 @@
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/http/http1/header_formatter.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -57,7 +57,8 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
       return HeaderMap::Iterate::Continue;
     }
 
-    static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(key_to_use, header.value().getStringView());
+    static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(key_to_use,
+                                                                    header.value().getStringView());
 
     return HeaderMap::Iterate::Continue;
   };
