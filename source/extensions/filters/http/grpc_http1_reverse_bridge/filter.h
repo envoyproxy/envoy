@@ -41,6 +41,7 @@ private:
   // buffer we instead maintain our own.
   Buffer::OwnedImpl buffer_{};
 };
+
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(
@@ -52,6 +53,7 @@ public:
 private:
   bool disabled_;
 };
+
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions
