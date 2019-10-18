@@ -1312,7 +1312,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
 }
 
 // Test connection is closed after single request processed.
-TEST_P(ProtocolIntegrationTest, TimeoutBasic) {
+TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
         hcm.mutable_max_connection_duration()->set_nanos(500 * 1000 * 1000);
@@ -1335,10 +1335,10 @@ TEST_P(ProtocolIntegrationTest, TimeoutBasic) {
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
-} // namespace Envoy
+}
 
 // Test inflight request is processed correctly when timeout fires during request processing.
-TEST_P(ProtocolIntegrationTest, InflightRequest) {
+TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
         hcm.mutable_max_connection_duration()->set_nanos(500 * 1000 * 1000);
@@ -1366,7 +1366,7 @@ TEST_P(ProtocolIntegrationTest, InflightRequest) {
 }
 
 // Test connection is closed if no http requests were processed
-TEST_P(ProtocolIntegrationTest, TimeoutNoHttpRequest) {
+TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
         hcm.mutable_max_connection_duration()->set_nanos(500 * 1000 * 1000);
