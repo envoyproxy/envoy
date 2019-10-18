@@ -49,7 +49,8 @@ message CustomTag {
   //
   // * `boolean`: populate with ``true`` or ``false`` string;
   // * `number`: populate with number string;
-  // * `string`: populate with the string itself, an empty tag value will be populated if it is empty;
+  // * `string`: populate with the string itself, an empty tag value
+  //   will be populated if it is empty;
   // * `list`/`struct`: populate with the corresponding JSON string
   //   converted from the protobuf message;
   // * otherwise means that no valid metadata is found.
