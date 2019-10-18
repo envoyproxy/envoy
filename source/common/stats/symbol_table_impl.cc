@@ -426,9 +426,10 @@ StatNameManagedStorage::StatNameManagedStorage(absl::string_view name, SymbolTab
     storage_.builtin_ = opt_stat_name.value().storage();
   } else {
     // We must allocate and manage the storage for the StatName. To save space
-    // in this object, we release the unique_ptr's and hold the only pointer in
-    // StatName. Thus on destruction we must delete the StatName's underlying
-    // storage.
+    // in this object, we release the unique_ptr and hold the non-const pointer
+    // directly, in a union against the non-const pointer we store when we find
+    // a builtin. On destruction we invert this to allow std::unique_ptr to free
+    // memory.
     symbol_table_ = &symbol_table;
     SymbolTable::StoragePtr storage(symbol_table.encode(name));
     storage_.managed_ = storage.release();
@@ -438,8 +439,8 @@ StatNameManagedStorage::StatNameManagedStorage(absl::string_view name, SymbolTab
 StatNameManagedStorage::~StatNameManagedStorage() {
   if (symbol_table_ != nullptr) {
     // For managed storage, we had to release the storage from its unique_ptr
-    // to store in the union as bytes. So now we restore the unique_pointer so
-    // it can be disposed of symmetrically.
+    // and hold the non-const pointer in the union. Now we restore the
+    // unique_ptr so it can be disposed of symmetrically.
     symbol_table_->free(statName());
     SymbolTable::StoragePtr storage(storage_.managed_);
   }

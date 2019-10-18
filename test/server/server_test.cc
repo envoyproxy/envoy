@@ -508,8 +508,8 @@ TEST_P(ServerStatsTest, BootstrapBuiltins) {
   stats_store_.counter("builtin.stat2");
   EXPECT_EQ(lookups_at_init, num_lookups());
 
-  // Looking up an existing without the name established in the bootstrap file
-  // incurs additional lookups requiring the acquisition of a global lock.
+  // Looking up an existing counter with a name that's not builtin incurs
+  // additional lookups, requiring the acquisition of a global lock.
   stats_store_.counter("not-builtin.stat3");
   EXPECT_LT(lookups_at_init, num_lookups());
 }
