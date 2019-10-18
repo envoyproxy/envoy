@@ -47,7 +47,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message CommandLineOptions {
   enum IpVersion {
     v4 = 0;
@@ -99,6 +99,9 @@ message CommandLineOptions {
 
   // See :option:`--log-format` for details.
   string log_format = 10;
+
+  // See :option:`--log-format-escape-newlines` for details.
+  bool log_format_escape_newlines = 27;
 
   // See :option:`--log-path` for details.
   string log_path = 11;

@@ -267,6 +267,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),
                                       spdlog::level::to_string_view(logLevel()).size());
   command_line_options->set_log_format(logFormat());
+  command_line_options->set_log_format_escape_newlines(logFormatEscapeNewlines());
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
   command_line_options->set_service_node(serviceNodeName());
