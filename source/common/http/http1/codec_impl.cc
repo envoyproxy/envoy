@@ -32,7 +32,8 @@ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Sett
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
-const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
+// Last chunk as defined here https://tools.ietf.org/html/rfc7230#section-4.1
+const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {
   if (connection_.connection().aboveHighWatermark()) {
@@ -171,7 +172,30 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void StreamEncoderImpl::encodeTrailers(const HeaderMap&) { endEncode(); }
+void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
+  if (chunk_encoding_) {
+    // Finalize the body
+    connection_.buffer().add(LAST_CHUNK);
+
+    // Trailers only matter if it is a chunk transfer encoding
+    // https://tools.ietf.org/html/rfc7230#section-4.4
+    trailers.iterate(
+        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+          Buffer::WatermarkBuffer* buffer = static_cast<Buffer::WatermarkBuffer*>(context);
+          buffer->add(header.key().getStringView());
+          buffer->add(":");
+          buffer->add(header.value().getStringView());
+          buffer->add(CRLF);
+          return HeaderMap::Iterate::Continue;
+        },
+        &connection_.buffer());
+
+    connection_.buffer().add(CRLF);
+  }
+
+  connection_.flushOutput();
+  connection_.onEncodeComplete();
+}
 
 void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
   connection_.stats().metadata_not_supported_error_.inc();
@@ -180,6 +204,7 @@ void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
     connection_.buffer().add(LAST_CHUNK);
+    connection_.buffer().add(CRLF);
   }
 
   connection_.flushOutput();

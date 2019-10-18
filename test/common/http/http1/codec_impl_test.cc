@@ -652,8 +652,13 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   response_encoder->encodeHeaders(headers, false);
 
   Buffer::OwnedImpl data("Hello World");
-  response_encoder->encodeData(data, true);
-  EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n",
+  response_encoder->encodeData(data, false);
+
+  TestHeaderMapImpl trailers{{"foo", "bar"}, {"foo", "baz"}};
+  response_encoder->encodeTrailers(trailers);
+
+  EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
+            "World\r\n0\r\nfoo:bar\r\nfoo:baz\r\n\r\n",
             output);
 }
 
