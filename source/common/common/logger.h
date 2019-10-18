@@ -151,6 +151,21 @@ private:
 };
 
 /**
+ * SinkDelegate that writes log messages to stderr and escapes new line characters.
+ * That way, each call to the logger will only output one line.
+ */
+class StderrEscapeNewlineSinkDelegate : public StderrSinkDelegate {
+public:
+  explicit StderrEscapeNewlineSinkDelegate(DelegatingLogSinkPtr log_sink);
+
+  // SinkDelegate
+  void log(absl::string_view msg) override;
+
+private:
+  Thread::BasicLockable* lock_{};
+};
+
+/**
  * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
  * the previous state when the DelegatingSink is destructed.
  */
@@ -172,13 +187,19 @@ public:
    */
   bool hasLock() const { return stderr_sink_->hasLock(); }
 
-  // Constructs a new DelegatingLogSink, sets up the default sink to stderr,
-  // and returns a shared_ptr to it. A shared_ptr is required for sinks used
-  // in spdlog::logger; it would not otherwise be required in Envoy. This method
-  // must own the construction process because StderrSinkDelegate needs access to
-  // the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
-  // available after construction.
-  static DelegatingLogSinkPtr init();
+  /**
+   * Constructs a new DelegatingLogSink, sets up the default sink to stderr,
+   * and returns a shared_ptr to it.
+   *
+   * A shared_ptr is required for sinks used
+   * in spdlog::logger; it would not otherwise be required in Envoy. This method
+   * must own the construction process because StderrSinkDelegate needs access to
+   * the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
+   * available after construction.
+   *
+   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback stderr logger
+   */
+  static DelegatingLogSinkPtr init(bool should_escape_newlines);
 
 private:
   friend class SinkDelegate;
@@ -209,6 +230,8 @@ class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
           Thread::BasicLockable& lock);
+  Context(spdlog::level::level_enum log_level, const std::string& log_format,
+          Thread::BasicLockable& lock, bool should_escape_newlines);
   ~Context();
 
 private:
@@ -217,6 +240,7 @@ private:
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
+  bool should_escape_newlines_;
   Context* const save_context_;
 };
 
@@ -233,11 +257,19 @@ public:
   static spdlog::logger& getLog(Id id);
 
   /**
+   * Init the singleton sink to use for all loggers.
+   *
+   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback stderr logger
+   */
+  static void initSink(bool should_escape_newlines) {
+    sink_ = DelegatingLogSink::init(should_escape_newlines);
+  }
+
+  /**
    * @return the singleton sink to use for all loggers.
    */
   static DelegatingLogSinkPtr getSink() {
-    static DelegatingLogSinkPtr sink = DelegatingLogSink::init();
-    return sink;
+    return sink_;
   }
 
   /**
@@ -268,6 +300,8 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
+
+  static DelegatingLogSinkPtr sink_;
 };
 
 /**

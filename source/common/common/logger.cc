@@ -17,6 +17,10 @@ namespace Logger {
 
 const char* Logger::DEFAULT_LOG_FORMAT = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
 
+// Ensure linker knows where to allocate the static sink
+// https://stackoverflow.com/a/9110546/4402434
+DelegatingLogSinkPtr Registry::sink_;
+
 Logger::Logger(const std::string& name) {
   logger_ = std::make_shared<spdlog::logger>(name, Registry::getSink());
   logger_->set_pattern(DEFAULT_LOG_FORMAT);
@@ -48,6 +52,20 @@ void StderrSinkDelegate::flush() {
   std::cerr << std::flush;
 }
 
+StderrEscapeNewlineSinkDelegate::StderrEscapeNewlineSinkDelegate(DelegatingLogSinkPtr log_sink) : StderrSinkDelegate(log_sink) {}
+
+void StderrEscapeNewlineSinkDelegate::log(absl::string_view msg) {
+  Thread::OptionalLockGuard guard(lock_);
+  for (size_t i = 0; i < msg.size() - 1; i++) {
+    if (msg[i] == '\n') {
+      std::cerr << "\\n ";
+    } else {
+      std::cerr << msg[i];
+    }
+  }
+  std::cerr << msg[msg.size() - 1];
+}
+
 void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatter) {
   absl::MutexLock lock(&format_mutex_);
   formatter_ = std::move(formatter);
@@ -67,9 +85,17 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   sink_->log(absl::string_view(formatted.data(), formatted.size()));
 }
 
-DelegatingLogSinkPtr DelegatingLogSink::init() {
+DelegatingLogSinkPtr DelegatingLogSink::init(bool should_escape_newlines) {
   DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
-  delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
+
+  if (should_escape_newlines) {
+    delegating_sink->stderr_sink_ =
+        std::make_unique<StderrEscapeNewlineSinkDelegate>(delegating_sink);
+  } else {
+    delegating_sink->stderr_sink_ =
+        std::make_unique<StderrSinkDelegate>(delegating_sink);
+  }
+
   return delegating_sink;
 }
 
@@ -77,7 +103,11 @@ static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock)
-    : log_level_(log_level), log_format_(log_format), lock_(lock), save_context_(current_context) {
+    : Context(log_level, log_format, lock, false) {}
+
+Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
+                 Thread::BasicLockable& lock, bool should_escape_newlines)
+    : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_newlines_(should_escape_newlines), save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -92,6 +122,7 @@ Context::~Context() {
 }
 
 void Context::activate() {
+  Registry::initSink(should_escape_newlines_);
   Registry::getSink()->setLock(lock_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
