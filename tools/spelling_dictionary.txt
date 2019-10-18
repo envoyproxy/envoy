@@ -929,6 +929,7 @@ str
 streambuf
 strerr
 strerror
+stringbuf
 stringified
 stringstream
 strtoull
