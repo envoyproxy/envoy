@@ -550,7 +550,7 @@ public:
 
 private:
   StatName stat_name_;
-  Stats::SymbolTable* symbol_table_; // null if stat_name_ was froma builtin.
+  Stats::SymbolTable* symbol_table_; // null if stat_name_ was from a builtin.
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName

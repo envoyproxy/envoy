@@ -312,6 +312,7 @@ Werror
 XDS
 decRefCount
 getaddrinfo
+recentlookups
 sendto
 ssize
 upcasts

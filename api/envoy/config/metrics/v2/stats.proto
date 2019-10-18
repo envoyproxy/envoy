@@ -43,12 +43,12 @@ message StatsSink {
 // Configuration for stat names that are not predictable within the source code.
 // There are several scenarios where Envoy records stats based on names that
 // are not known at compile time. For example:
-//   - Exotic SSL cyphers
+//   - Exotic SSL ciphers
 //   - Dynamo tables
 //   - gRPC method names
 // In these cases, stat-names are discovered in the request path, and we want
 // to avoid taking a global symbol table lock. These names are discoverable
-// using admin endpoint /stats/recentlookups. If an adminstrator discovers
+// using admin endpoint `/stats/recentlookups`. If an administrator discovers
 // these names are being looked up frequently, the bootstrap file can be
 // updated to pre-allocate those, and then access them lock-free.
 message StatsBuiltin {
