@@ -32,7 +32,6 @@ envoy_cc_test_library(
     name = "fuzz_runner_lib",
     srcs = ["fuzz_runner.cc"],
     hdrs = ["fuzz_runner.h"],
-    external_deps = ["libprotobuf_mutator"],
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
@@ -41,6 +40,8 @@ envoy_cc_test_library(
         "//source/common/http/http2:codec_lib",
         "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
+        "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
+        "@org_llvm_releases_compiler_rt//:fuzzed_data_provider",
     ],
 )
 
