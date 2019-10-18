@@ -77,10 +77,12 @@ public:
   void setupTest(const std::string& yaml) {
     envoy::api::v2::RouteConfiguration route_config;
     TestUtility::loadFromYaml(yaml, route_config);
-    config_ = std::make_unique<ConfigImpl>(route_config, factory_context_, true);
+    config_ =
+        std::make_unique<ConfigImpl>(route_config, factory_context_, any_validation_visitor_, true);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  ProtobufMessage::NullValidationVisitorImpl any_validation_visitor_;
   std::unique_ptr<ConfigImpl> config_;
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;

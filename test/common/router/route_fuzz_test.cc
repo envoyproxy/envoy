@@ -78,10 +78,11 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
   static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  static NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   try {
     TestUtility::validate(input.config());
-    ConfigImpl config(cleanRouteConfig(input.config()), factory_context, true);
+    ConfigImpl config(cleanRouteConfig(input.config()), factory_context,
+                      ProtobufMessage::getNullValidationVisitor(), true);
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(input.headers());
     // It's a precondition of routing that {:authority, :path, x-forwarded-proto} headers exists,
     // HCM enforces this.

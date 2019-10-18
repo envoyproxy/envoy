@@ -74,8 +74,10 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
 
-  auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
-  auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
+  auto factory_context =
+      std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
+  auto config = std::make_unique<Router::ConfigImpl>(
+      route_config, *factory_context, ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     MessageUtil::checkForUnexpectedFields(route_config,
                                           ProtobufMessage::getStrictValidationVisitor(),
@@ -96,7 +98,7 @@ void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration&
 }
 
 RouterCheckTool::RouterCheckTool(
-    std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
+    std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
