@@ -229,6 +229,8 @@ struct Http1Settings {
   bool accept_http_10_{false};
   // Set a default host if no Host: header is present for HTTP/1.0 requests.`
   std::string default_host_for_http_10_;
+  // Encode trailers in Http1
+  bool enable_trailers_{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
