@@ -48,6 +48,7 @@ service ClusterDiscoveryService {
 
 // Configuration for a single upstream cluster.
 // [#comment:next free field: 45]
+// [#next-free-field: 45]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -192,6 +193,7 @@ message Cluster {
 
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
+  // [#next-free-field: 8]
   message LbSubsetConfig {
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
@@ -351,6 +353,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
+  // [#next-free-field: 7]
   message CommonLbConfig {
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.

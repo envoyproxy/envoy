@@ -24,6 +24,7 @@ import "validate/validate.proto";
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
 // [#comment:next free field: 36]
+// [#next-free-field: 36]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -83,6 +84,7 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
+  // [#next-free-field: 8]
   message Tracing {
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
@@ -142,6 +144,7 @@ message HttpConnectionManager {
   }
 
   // [#comment:next free field: 7]
+  // [#next-free-field: 7]
   message SetCurrentClientCertDetails {
     reserved 2;
 
@@ -472,6 +475,7 @@ message ScopedRouteConfigurationsList {
       [(validate.rules).repeated = {min_items: 1}];
 }
 
+// [#next-free-field: 6]
 message ScopedRoutes {
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
   // keys are matched against a set of

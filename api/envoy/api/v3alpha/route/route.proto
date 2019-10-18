@@ -29,6 +29,7 @@ import "validate/validate.proto";
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
 // [#comment:next free field: 18]
+// [#next-free-field: 18]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -155,6 +156,7 @@ message VirtualHost {
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
 // [#comment:next free field: 15]
+// [#next-free-field: 16]
 message Route {
   reserved 6;
 
@@ -240,6 +242,7 @@ message Route {
 // weights.
 // [#comment:next free field: 11]
 message WeightedCluster {
+  // [#next-free-field: 11]
   message ClusterWeight {
     reserved 7;
 
@@ -322,6 +325,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
+// [#next-free-field: 11]
 message RouteMatch {
   message GrpcRouteMatchOptions {
   }
@@ -399,6 +403,7 @@ message RouteMatch {
 }
 
 // [#comment:next free field: 11]
+// [#next-free-field: 12]
 message CorsPolicy {
   reserved 1, 8, 7;
 
@@ -450,6 +455,7 @@ message CorsPolicy {
 }
 
 // [#comment:next free field: 30]
+// [#next-free-field: 30]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -798,6 +804,7 @@ message RouteAction {
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
 // [#comment:next free field: 10]
+// [#next-free-field: 11]
 message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -919,6 +926,7 @@ message HedgePolicy {
   bool hedge_on_per_try_timeout = 3;
 }
 
+// [#next-free-field: 9]
 message RedirectAction {
   enum RedirectResponseCode {
     // Moved Permanently HTTP Status Code - 301.
@@ -1070,6 +1078,7 @@ message VirtualCluster {
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 message RateLimit {
+  // [#next-free-field: 7]
   message Action {
     // The following descriptor entry is appended to the descriptor:
     //
@@ -1228,6 +1237,7 @@ message RateLimit {
 //   regardless of the header's value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
+// [#next-free-field: 12]
 message HeaderMatcher {
   reserved 2, 3, 5;
 
@@ -1291,6 +1301,7 @@ message HeaderMatcher {
 
 // Query parameter matching treats the query string of a request's :path header
 // as an ampersand-separated list of keys and/or key=value elements.
+// [#next-free-field: 7]
 message QueryParameterMatcher {
   reserved 3, 4;
 

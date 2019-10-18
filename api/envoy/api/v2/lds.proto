@@ -43,6 +43,7 @@ service ListenerDiscoveryService {
 }
 
 // [#comment:next free field: 21]
+// [#next-free-field: 21]
 message Listener {
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
