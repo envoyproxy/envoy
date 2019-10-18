@@ -56,7 +56,8 @@ private:
                      Stats::StatName rq_code, Stats::StatName category) const;
   void incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) const;
   void incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const;
-  void recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names, uint64_t count) const;
+  void recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names,
+                       Stats::Histogram::Unit unit, uint64_t count) const;
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);
   Stats::StatName upstreamRqGroup(Code response_code) const;
@@ -78,7 +79,6 @@ private:
   const Stats::StatName upstream_rq_5xx_;
   const Stats::StatName upstream_rq_unknown_;
   const Stats::StatName upstream_rq_completed_;
-  const Stats::StatName upstream_rq_time;
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName vcluster_;
   const Stats::StatName vhost_;

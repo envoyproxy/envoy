@@ -58,11 +58,13 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& headers) {
+                      Http::HeaderMapPtr&& response_headers_to_add,
+                      Http::HeaderMapPtr&& request_headers_to_add) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
-  UNREFERENCED_PARAMETER(headers);
+  UNREFERENCED_PARAMETER(response_headers_to_add);
+  UNREFERENCED_PARAMETER(request_headers_to_add);
 
   state_ = State::Complete;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();

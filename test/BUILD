@@ -19,6 +19,7 @@ envoy_cc_test_library(
     srcs = [
         "main.cc",
         "test_listener.cc",
+        "test_runner.cc",
         "test_runner.h",
     ],
     hdrs = ["test_listener.h"],

@@ -146,6 +146,32 @@ public:
   virtual void callWithStringView(StatName stat_name,
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 
+  using RecentLookupsFn = std::function<void(absl::string_view, uint64_t)>;
+
+  /**
+   * Calls the provided function with the name of the most recently looked-up
+   * symbols, including lookups on any StatNameSets, and with a count of
+   * the recent lookups on that symbol.
+   *
+   * @param iter the function to call for every recent item.
+   */
+  virtual uint64_t getRecentLookups(const RecentLookupsFn& iter) const PURE;
+
+  /**
+   * Clears the recent-lookups structures.
+   */
+  virtual void clearRecentLookups() PURE;
+
+  /**
+   * Sets the recent-lookup capacity.
+   */
+  virtual void setRecentLookupCapacity(uint64_t capacity) PURE;
+
+  /**
+   * @return The configured recent-lookup tracking capacity.
+   */
+  virtual uint64_t recentLookupCapacity() const PURE;
+
   /**
    * Creates a StatNameSet.
    *

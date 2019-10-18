@@ -5,7 +5,6 @@ package envoy.service.discovery.v2;
 option java_outer_classname = "HdsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.discovery.v2";
-
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
@@ -80,17 +79,20 @@ message Capability {
     TCP = 1;
     REDIS = 2;
   }
+
   repeated Protocol health_check_protocols = 1;
 }
 
 message HealthCheckRequest {
-  envoy.api.v2.core.Node node = 1;
+  api.v2.core.Node node = 1;
+
   Capability capability = 2;
 }
 
 message EndpointHealth {
-  envoy.api.v2.endpoint.Endpoint endpoint = 1;
-  envoy.api.v2.core.HealthStatus health_status = 2;
+  api.v2.endpoint.Endpoint endpoint = 1;
+
+  api.v2.core.HealthStatus health_status = 2;
 }
 
 message EndpointHealthResponse {
@@ -100,13 +102,15 @@ message EndpointHealthResponse {
 message HealthCheckRequestOrEndpointHealthResponse {
   oneof request_type {
     HealthCheckRequest health_check_request = 1;
+
     EndpointHealthResponse endpoint_health_response = 2;
   }
 }
 
 message LocalityEndpoints {
-  envoy.api.v2.core.Locality locality = 1;
-  repeated envoy.api.v2.endpoint.Endpoint endpoints = 2;
+  api.v2.core.Locality locality = 1;
+
+  repeated api.v2.endpoint.Endpoint endpoints = 2;
 }
 
 // The cluster name and locality is provided to Envoy for the endpoints that it
@@ -115,12 +119,15 @@ message LocalityEndpoints {
 // same cluster structure as that provided by EDS.
 message ClusterHealthCheck {
   string cluster_name = 1;
-  repeated envoy.api.v2.core.HealthCheck health_checks = 2;
+
+  repeated api.v2.core.HealthCheck health_checks = 2;
+
   repeated LocalityEndpoints locality_endpoints = 3;
 }
 
 message HealthCheckSpecifier {
   repeated ClusterHealthCheck cluster_health_checks = 1;
+
   // The default is 1 second.
   google.protobuf.Duration interval = 2;
 }
