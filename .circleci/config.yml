@@ -56,6 +56,17 @@ jobs:
            path: /build/envoy/generated
            destination: /
 
+   go_control_plane_mirror:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.api
+       - add_ssh_keys:
+           fingerprints:
+             - "9d:3b:fe:7c:09:3b:ce:a9:6a:de:de:41:fb:6b:52:62"
+       - run: ci/go_mirror.sh
+
    filter_example_mirror:
      executor: ubuntu-build
      steps:

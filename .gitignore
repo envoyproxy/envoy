@@ -11,6 +11,7 @@ BROWSE
 compile_commands.json
 cscope.*
 .deps
+.devcontainer.json
 /docs/landing_source/.bundle
 /generated
 .idea/

@@ -23,7 +23,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
-        "//include/envoy/stats:timespan",
+        "//include/envoy/stats:timespan_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/upstream:cluster_manager_interface",

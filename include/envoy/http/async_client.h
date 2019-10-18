@@ -6,6 +6,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -215,9 +216,19 @@ public:
       StreamOptions::setHashPolicy(v);
       return *this;
     }
+    RequestOptions& setParentSpan(Tracing::Span& parent_span) {
+      parent_span_ = &parent_span;
+      return *this;
+    }
 
     // For gmock test
-    bool operator==(const RequestOptions& src) const { return StreamOptions::operator==(src); }
+    bool operator==(const RequestOptions& src) const {
+      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_;
+    }
+
+    // The parent span that child spans are created under to trace egress requests/responses.
+    // If not set, requests will not be traced.
+    Tracing::Span* parent_span_{nullptr};
   };
 
   /**
