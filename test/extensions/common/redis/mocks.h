@@ -11,8 +11,8 @@ namespace Redis {
 
 class MockRedirectionManager : public RedirectionManager {
 public:
-  MockRedirectionManager() = default;
-  ~MockRedirectionManager() override = default;
+  MockRedirectionManager();
+  ~MockRedirectionManager() override;
 
   MOCK_METHOD1(onRedirection, bool(const std::string& cluster_name));
   MOCK_METHOD4(registerCluster, HandlePtr(const std::string& cluster_name,

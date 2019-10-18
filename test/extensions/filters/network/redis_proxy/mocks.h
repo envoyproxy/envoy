@@ -22,8 +22,8 @@ namespace RedisProxy {
 
 class MockRouter : public Router {
 public:
-  MockRouter() = default;
-  ~MockRouter() override = default;
+  MockRouter();
+  ~MockRouter() override;
 
   MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
 };
@@ -31,7 +31,8 @@ public:
 class MockRoute : public Route {
 public:
   MockRoute(ConnPool::InstanceSharedPtr);
-  ~MockRoute() override = default;
+  ~MockRoute() override;
+
   MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
   MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
   ConnPool::InstanceSharedPtr conn_pool_;
@@ -42,8 +43,8 @@ namespace ConnPool {
 
 class MockInstance : public Instance {
 public:
-  MockInstance() = default;
-  ~MockInstance() override = default;
+  MockInstance();
+  ~MockInstance() override;
 
   MOCK_METHOD3(makeRequest,
                Common::Redis::Client::PoolRequest*(
@@ -62,16 +63,16 @@ namespace CommandSplitter {
 
 class MockSplitRequest : public SplitRequest {
 public:
-  MockSplitRequest() = default;
-  ~MockSplitRequest() override = default;
+  MockSplitRequest();
+  ~MockSplitRequest() override;
 
   MOCK_METHOD0(cancel, void());
 };
 
 class MockSplitCallbacks : public SplitCallbacks {
 public:
-  MockSplitCallbacks() = default;
-  ~MockSplitCallbacks() override = default;
+  MockSplitCallbacks();
+  ~MockSplitCallbacks() override;
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
@@ -82,8 +83,8 @@ public:
 
 class MockInstance : public Instance {
 public:
-  MockInstance() = default;
-  ~MockInstance() override = default;
+  MockInstance();
+  ~MockInstance() override;
 
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                               SplitCallbacks& callbacks) override {
