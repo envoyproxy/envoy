@@ -60,9 +60,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     ENVOY_LOG_MISC(debug, "Processing {} bytes", next_data.size());
     full_input.add(next_data);
     Buffer::OwnedImpl buffer{next_data.data(), next_data.size()};
+    provider_empty = provider.remaining_bytes() == 0;
     compressor.compress(buffer, provider_empty ? State::Finish : State::Flush);
     decompressor.decompress(buffer, full_output);
-    provider_empty = provider.remaining_bytes() == 0;
   }
   RELEASE_ASSERT(full_input.toString() == full_output.toString(), "");
   RELEASE_ASSERT(compressor.checksum() == decompressor.checksum(), "");
