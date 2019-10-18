@@ -77,6 +77,7 @@ Version history
 * router check tool: add support for outputting missing tests in the detailed coverage report.
 * runtime: allow for the ability to parse boolean values.
 * runtime: allow for the ability to parse integers as double values and vice-versa.
+* sds: added :ref:`session_ticket_keys_sds_secret_config <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys_sds_secret_config>` for loading TLS Session Ticket Encryption Keys using SDS API.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
 * server: added :ref:`per-handler listener stats <config_listener_stats_per_handler>` and
   :ref:`per-worker watchdog stats <operations_performance_watchdog>` to help diagnosing event

@@ -380,7 +380,7 @@ message DownstreamTlsContext {
     // TLS session ticket key settings.
     TlsSessionTicketKeys session_ticket_keys = 4;
 
-    // [#not-implemented-hide:]
+    // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
   }
 }
