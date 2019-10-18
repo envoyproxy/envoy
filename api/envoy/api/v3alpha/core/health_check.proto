@@ -64,7 +64,7 @@ message HealthCheck {
   }
 
   // [#comment:next free field: 10]
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message HttpHealthCheck {
     reserved 7;
 

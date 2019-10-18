@@ -1922,6 +1922,14 @@ types {
   }
 }
 types {
+  key: "envoy.api.v2.route.RouteMatch.TlsContextMatchOptions"
+  value {
+    qualified_package: "envoy.api.v2.route"
+    proto_path: "envoy/api/v2/route/route.proto"
+    next_version_type_name: "envoy.api.v3alpha.route.RouteMatch.TlsContextMatchOptions"
+  }
+}
+types {
   key: "envoy.api.v2.route.Tracing"
   value {
     qualified_package: "envoy.api.v2.route"
@@ -3199,6 +3207,13 @@ types {
   }
 }
 types {
+  key: "envoy.api.v3alpha.route.RouteMatch.TlsContextMatchOptions"
+  value {
+    qualified_package: "envoy.api.v3alpha.route"
+    proto_path: "envoy/api/v3alpha/route/route.proto"
+  }
+}
+types {
   key: "envoy.api.v3alpha.route.Tracing"
   value {
     qualified_package: "envoy.api.v3alpha.route"
@@ -4040,7 +4055,22 @@ types {
   }
 }
 types {
+  key: "envoy.config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig"
+  value {
+    qualified_package: "envoy.config.filter.http.dynamic_forward_proxy.v2alpha"
+    proto_path: "envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.proto"
+    next_version_type_name: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha.PerRouteConfig"
+  }
+}
+types {
   key: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha.FilterConfig"
+  value {
+    qualified_package: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha"
+    proto_path: "envoy/config/filter/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha.PerRouteConfig"
   value {
     qualified_package: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha"
     proto_path: "envoy/config/filter/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.proto"
@@ -7518,6 +7548,14 @@ types {
   }
 }
 types {
+  key: "envoy.type.CodecClientType"
+  value {
+    qualified_package: "envoy.type"
+    proto_path: "envoy/type/http.proto"
+    next_version_type_name: "envoy.type.v3alpha.CodecClientType"
+  }
+}
+types {
   key: "envoy.type.DoubleRange"
   value {
     qualified_package: "envoy.type"
@@ -7721,6 +7759,13 @@ types {
   value {
     qualified_package: "envoy.type.matcher.v3alpha"
     proto_path: "envoy/type/matcher/v3alpha/value.proto"
+  }
+}
+types {
+  key: "envoy.type.v3alpha.CodecClientType"
+  value {
+    qualified_package: "envoy.type.v3alpha"
+    proto_path: "envoy/type/v3alpha/http.proto"
   }
 }
 types {
@@ -8379,6 +8424,10 @@ next_version_proto_paths {
 next_version_proto_paths {
   key: "envoy/service/trace/v2/trace_service.proto"
   value: "envoy/service/trace/v3alpha/trace_service.proto"
+}
+next_version_proto_paths {
+  key: "envoy/type/http.proto"
+  value: "envoy/type/v3alpha/http.proto"
 }
 next_version_proto_paths {
   key: "envoy/type/http_status.proto"
