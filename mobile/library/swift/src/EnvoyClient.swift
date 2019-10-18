@@ -69,7 +69,8 @@ public final class EnvoyClient: NSObject {
 
 extension EnvoyClient: HTTPClient {
   public func send(_ request: Request, handler: ResponseHandler) -> StreamEmitter {
-    let httpStream = self.engine.startStream(with: handler.underlyingCallbacks)
+    let httpStream = self.engine.startStream(
+      with: handler.underlyingCallbacks, bufferForRetry: request.retryPolicy != nil)
     httpStream.sendHeaders(request.outboundHeaders(), close: false)
     return EnvoyStreamEmitter(stream: httpStream)
   }
