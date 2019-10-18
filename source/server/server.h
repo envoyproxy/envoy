@@ -155,10 +155,6 @@ public:
   Stats::Scope& scope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
-  // TODO(lambdai): remove messageValidationVisitor from ServerFactoryContext
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
