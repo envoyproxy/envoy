@@ -6,7 +6,7 @@ package io.envoyproxy.envoymobile
  * @param maxRetryCount Maximum number of retries that a request may be performed.
  * @param retryOn Whitelist of rules used for retrying.
  * @param perRetryTimeoutMS Timeout (in milliseconds) to apply to each retry.
- * Must be <= `totalUpstreamTimeoutMS`.
+ *                          Must be <= `totalUpstreamTimeoutMS`.
  * @param totalUpstreamTimeoutMS Total timeout (in milliseconds) that includes all retries.
  * Spans the point at which the entire downstream request has been processed and when the
  * upstream response has been completely processed.
