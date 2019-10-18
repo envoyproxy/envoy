@@ -62,9 +62,9 @@ envoy_status_t Engine::run(std::string config, std::string log_level) {
     // When we improve synchronous failure handling and/or move to dynamic forwarding, we only need
     // to wait until the dispatcher is running (and can drain by enqueueing a drain callback on it,
     // as we did previously).
-    auto server = main_common_->server();
     postinit_callback_handler_ = main_common_->server()->lifecycleNotifier().registerCallback(
-        Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this, server]() -> void {
+        Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
+          Server::Instance* server = TS_UNCHECKED_READ(main_common_)->server();
           http_dispatcher_->ready(server->dispatcher(), server->clusterManager());
         });
   } // mutex_
