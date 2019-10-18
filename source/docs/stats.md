@@ -196,7 +196,7 @@ to the table in the test indicating the memory impact of each PR.
 Developers trying to can iterate through changes in these tests locally with:
 
 ```bash
-  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true
+  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true \
       test/integration:stats_integration_test
 ```
 
