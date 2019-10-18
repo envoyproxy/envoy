@@ -111,9 +111,7 @@ class SpellChecker:
       f.writelines(words)
 
     # Start an aspell process.
-    aspell_args = [
-        "aspell", "pipe", "--lang=en_US", "--encoding=utf-8", "--personal=" + pws
-    ]
+    aspell_args = ["aspell", "pipe", "--lang=en_US", "--encoding=utf-8", "--personal=" + pws]
     self.aspell = subprocess.Popen(aspell_args,
                                    bufsize=4096,
                                    stdin=subprocess.PIPE,
@@ -253,7 +251,7 @@ def check_camel_case(checker, err):
     split_err = checker.check(part)
     if split_err:
       debug("    -> not found in dictionary")
-      split_errs += [(part, word_offset+part_offset, split_err[0][2])]
+      split_errs += [(part, word_offset + part_offset, split_err[0][2])]
     part_offset += len(part)
 
   return split_errs
