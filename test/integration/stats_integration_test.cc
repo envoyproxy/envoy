@@ -265,6 +265,19 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
+  //
+  // If you have a test failure on the lines below, you PR has changed the
+  // per-cluster stats overhead. If the number is lower, then please lock in
+  // your improvement by updating the expected values. If the new per-cluster
+  // memory consumption is higher, then we must decide whether the value from
+  // the added stats justifies the overhead for all Envoy users. Note that some
+  // deployments may have 10s of thousands of clusters. If you believe this
+  // increase makes sense, you must update the number below, and add a new log
+  // line above.
+  //
+  // You can iterate locally on an update to this by testing with
+  //  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true
+  //      test/integration:stats_integration_test
   EXPECT_MEMORY_EQ(m_per_cluster, 43308); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
@@ -304,6 +317,19 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
+  //
+  // If you have a test failure on the lines below, you PR has changed the
+  // per-cluster stats overhead. If the number is lower, then please lock in
+  // your improvement by updating the expected values. If the new per-cluster
+  // memory consumption is higher, then we must decide whether the value from
+  // the added stats justifies the overhead for all Envoy users. Note that some
+  // deployments may have 10s of thousands of clusters. If you believe this
+  // increase makes sense, you must update the number below, and add a new log
+  // line above.
+  //
+  // You can iterate locally on an update to this by testing with
+  //  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true
+  //      test/integration:stats_integration_test
   EXPECT_MEMORY_EQ(m_per_cluster, 34966); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
@@ -335,6 +361,20 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 'release' builds, where we control the platform and tool-chain. So you
   // will need to find the correct value only after failing CI and looking
   // at the logs.
+  //
+  //
+  // If you have a test failure on the lines below, you PR has changed the
+  // per-host stats overhead. If the number is lower, then please lock in your
+  // improvement by updating the expected values. If the new per-host memory
+  // consumption is higher, then we must decide whether the value from the added
+  // stats justifies the overhead for all Envoy users. Note that some
+  // deployments may have 10s of thousands of hosts. If you believe this
+  // increase makes sense, you must update the number below, and add a new log
+  // line above.
+  //
+  // You can iterate locally on an update to this by testing with
+  //  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true
+  //      test/integration:stats_integration_test
   EXPECT_MEMORY_EQ(m_per_host, 1283);
   EXPECT_MEMORY_LE(m_per_host, 1315);
 }
