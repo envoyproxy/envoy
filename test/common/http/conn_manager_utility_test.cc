@@ -128,7 +128,7 @@ public:
                                                        random_, local_info_)
             ->asString();
     ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
-    ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
+    ret.internal_ = HeaderUtility::isEnvoyInternalRequestheaders(headers);
     return ret;
   }
 
