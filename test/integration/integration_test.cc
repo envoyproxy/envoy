@@ -947,6 +947,18 @@ TEST_P(IntegrationTest, ProcessObjectUnealthy) {
   EXPECT_THAT(response->headers(), HttpStatusIs("500"));
 }
 
+TEST_P(IntegrationTest, TrailersDroppedDuringEncoding) { testTrailers(10, 10, false, false); }
+
+TEST_P(IntegrationTest, TrailersDroppedUpstream) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  testTrailers(10, 10, false, false);
+}
+
+TEST_P(IntegrationTest, TrailersDroppedDownstream) {
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  testTrailers(10, 10, false, false);
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

@@ -4,6 +4,32 @@ Version history
 1.12.1 (November 8, 2019)
 =========================
 * listener: fixed CVE-2019-18836 by clearing accept filters before connection creation.
+1.13.0 (pending)
+================
+* access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
+* api: remove all support for v1
+* buffer: remove old implementation
+* build: official released binary is now built against libc++.
+* ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
+* health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
+* http: support :ref:`auto_host_rewrite_header<envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig.auto_host_rewrite_header>` in the dynamic forward proxy.
+* jwt_authn: added :ref:`bypass_cors_preflight<envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtAuthentication.bypass_cors_preflight>` to allow bypassing the CORS preflight request.
+* lb_subset_config: new fallback policy for selectors: :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+* logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
+* redis: performance improvement for larger split commands by avoiding string copies.
+* router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
+* server: fixed a bug in config validation for configs with runtime layers
+* tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
+* tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
+* thrift_proxy: added support for cluster header based routing.
+* tls: remove TLS 1.0 and 1.1 from client defaults
+* http: add support for http1 trailers, to enable use :ref:`enable_trailers <envoy_api_field_core.Http1ProtocolOptions.enable_trailers>`.
+* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
+* config: Add configuration flag to disable encoding of http1 trailers
+* http: add support for encoding http1 trailers. To disable use :ref:`config <envoy_api_field.core.Http1ProtocolOptions.disable_trailers>`.
+* http: add support for encoding http1 trailers. To disable use :ref:`disable_trailers <envoy_api_field.core.Http1ProtocolOptions.disable_trailers>`.
+* http: add support for encoding http1 trailers, to disable use :ref:`disable_trailers <envoy_api_field_core.Http1ProtocolOptions.disable_trailers>`.
+* http: add support for encoding http1 trailers, to enable use :ref:`enable_trailers <envoy_api_field_core.Http1ProtocolOptions.enable_trailers>`.
 
 1.12.0 (October 31, 2019)
 =========================

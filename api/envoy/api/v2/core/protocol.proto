@@ -46,6 +46,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
 }
 
+// [#next-free-field: 6]
 message Http1ProtocolOptions {
   message HeaderKeyFormat {
     message ProperCaseWords {
@@ -83,6 +84,9 @@ message Http1ProtocolOptions {
   // Describes how the keys for response headers should be formatted. By default, all header keys
   // are lower cased.
   HeaderKeyFormat header_key_format = 4;
+
+  // Enables trailers for HTTP1.
+  bool enable_trailers = 5;
 }
 
 // [#next-free-field: 13]

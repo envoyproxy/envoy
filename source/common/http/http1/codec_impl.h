@@ -192,10 +192,12 @@ public:
 
   CodecStats& stats() { return stats_; }
 
+  const bool enable_trailers_;
+
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter);
+                 HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -204,6 +206,7 @@ protected:
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
+  bool processing_trailers_{};
   bool handling_upgrade_{};
   const HeaderKeyFormatterPtr header_key_formatter_;
 
@@ -269,7 +272,7 @@ private:
    * Called when the request/response is complete.
    */
   void onMessageCompleteBase();
-  virtual void onMessageComplete() PURE;
+  virtual void onMessageComplete(HeaderMapImplPtr&& trailers) PURE;
 
   /**
    * @see onResetStreamBase().
@@ -353,7 +356,7 @@ private:
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
+  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override;
   void onAboveHighWatermark() override;
@@ -393,7 +396,7 @@ private:
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
+  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override {}
   void onAboveHighWatermark() override;
