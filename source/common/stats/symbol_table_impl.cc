@@ -423,23 +423,25 @@ StatNameManagedStorage::StatNameManagedStorage(absl::string_view name, SymbolTab
     // SymbolTable builtins owns the stat_name, and we represent that by
     // storing nullptr into symbol_table_.
     symbol_table_ = nullptr;
-    stat_name_ = opt_stat_name.value();
+    storage_.builtin_ = opt_stat_name.value().storage();
   } else {
     // We must allocate and manage the storage for the StatName. To save space
     // in this object, we release the unique_ptr's and hold the only pointer in
     // StatName. Thus on destruction we must delete the StatName's underlying
     // storage.
     symbol_table_ = &symbol_table;
-    SymbolTable::StoragePtr storage = symbol_table.encode(name);
-    stat_name_ = StatName(storage.release());
+    SymbolTable::StoragePtr storage(symbol_table.encode(name));
+    storage_.managed_ = storage.release();
   }
 }
 
 StatNameManagedStorage::~StatNameManagedStorage() {
   if (symbol_table_ != nullptr) {
-    // If we had to allocate the storage, then here we must delete it.
-    symbol_table_->free(stat_name_);
-    stat_name_.deleteUnderlyingStorage();
+    // For managed storage, we had to release the storage from its unique_ptr
+    // to store in the union as bytes. So now we restore the unique_pointer so
+    // it can be disposed of symmmetrically.
+    symbol_table_->free(statName());
+    SymbolTable::StoragePtr storage(storage_.managed_);
   }
 }
 

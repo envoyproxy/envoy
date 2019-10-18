@@ -480,6 +480,8 @@ public:
 
   void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
 
+  const uint8_t* storage() { return size_and_data_; }
+
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif
@@ -495,25 +497,6 @@ public:
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
-  friend class StatNameManagedStorage;
-
-  /**
-   * In most cases, StatName is analogous to a string_view -- it provides
-   * an interface to backingstore owned elsewhere. However, in
-   * StatNameManagedStorage, there are two ownership models, determined
-   * dynamically at runtime:
-   *  1. StatName is owned by a SymbolTable builtin, added at boostrap time,
-   *     in which case no cleanup is appropriate on StatName destruction.
-   *  2. StatName is allocated by SymbolTableManagedStorage, which must dispose
-   *     of it on destruction. To save storage, the owned StatName contains
-   *     the only pointer to the allocated memory, so we must destroy it
-   *     explicitly.
-   * This is called only by StatNameManagedStorage::~StatNameManagedStorage().
-   */
-  void deleteUnderlyingStorage() {
-    SymbolTable::StoragePtr storage(const_cast<uint8_t*>(size_and_data_));
-  }
-
   const uint8_t* size_and_data_{nullptr};
 };
 
@@ -546,11 +529,21 @@ public:
   StatNameManagedStorage(absl::string_view name, SymbolTable& table);
   ~StatNameManagedStorage();
 
-  StatName statName() const { return stat_name_; }
+  /**
+   * Returns stored StatName.
+   *
+   * Implementation note: We use storage_.builtin_ even if we are managing the
+   * storage in this instance, as it's the same pointer in the union either way,
+   * and the StatName treats its arg as const.
+   */
+  StatName statName() const { return StatName(storage_.builtin_); }
 
 private:
-  StatName stat_name_;
-  Stats::SymbolTable* symbol_table_; // null if stat_name_ was from a builtin.
+  union {
+    uint8_t* managed_;        // Used if symbol_table_ is non-null.
+    const uint8_t* builtin_;  // Used if symbol_table_ is null.
+  } storage_;
+  Stats::SymbolTable* symbol_table_; // null if we name was found as a builtin on construction.
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
