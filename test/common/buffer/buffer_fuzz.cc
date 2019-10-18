@@ -10,6 +10,8 @@
 #include "common/memory/stats.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "test/fuzz/utility.h"
+
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 

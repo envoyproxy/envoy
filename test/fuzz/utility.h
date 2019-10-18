@@ -9,6 +9,10 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
+// Strong assertion that applies across all compilation modes and doesn't rely
+// on gtest, which only provides soft fails that don't trip oss-fuzz failures.
+#define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
+
 namespace Envoy {
 namespace Fuzz {
 
