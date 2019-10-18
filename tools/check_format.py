@@ -51,6 +51,13 @@ SERIALIZE_AS_STRING_WHITELIST = (
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
 
+# Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
+# ones were grandfathered as part of PR #8484 for backwards compatibility.
+HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_length_ms",
+                                      "initialization_time_ms", "loop_duration_us", "poll_delay_us",
+                                      "request_time_ms", "upstream_cx_connect_ms",
+                                      "upstream_cx_length_ms")
+
 # Files in these paths can use std::regex
 STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
                        "./source/common/common/regex.cc",
@@ -260,6 +267,10 @@ def whitelistedForSerializeAsString(file_path):
 
 def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
+
+
+def whitelistedForHistogramSiSuffix(name):
+  return name in HISTOGRAM_WITH_SI_SUFFIX_WHITELIST
 
 
 def whitelistedForStdRegex(file_path):
@@ -519,6 +530,13 @@ def checkSourceLine(line, file_path, reportError):
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
+
+  hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
+  if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
+    reportError(
+        "Don't suffix histogram names with the unit symbol, "
+        "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
+        "other sinks can add the suffix automatically on flush should they prefer to do so.")
 
   if not whitelistedForStdRegex(file_path) and "std::regex" in line:
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")

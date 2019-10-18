@@ -68,10 +68,10 @@ private:
  */
 class HistogramImpl : public HistogramImplHelper {
 public:
-  HistogramImpl(StatName name, Store& parent, const std::string& tag_extracted_name,
+  HistogramImpl(StatName name, Unit unit, Store& parent, const std::string& tag_extracted_name,
                 const std::vector<Tag>& tags)
-      : HistogramImplHelper(name, tag_extracted_name, tags, parent.symbolTable()), parent_(parent) {
-  }
+      : HistogramImplHelper(name, tag_extracted_name, tags, parent.symbolTable()), unit_(unit),
+        parent_(parent) {}
   ~HistogramImpl() override {
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a
@@ -81,12 +81,15 @@ public:
   }
 
   // Stats::Histogram
+  Unit unit() const override { return unit_; };
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
   SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
 private:
+  Unit unit_;
+
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
 };
@@ -104,6 +107,7 @@ public:
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
+  Unit unit() const override { return Unit::Null; };
   void recordValue(uint64_t) override {}
 
 private:
