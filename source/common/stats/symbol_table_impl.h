@@ -496,7 +496,23 @@ public:
 
 private:
   friend class StatNameManagedStorage;
-  uint8_t* sizeAndData() { return const_cast<uint8_t*>(size_and_data_); }
+
+  /**
+   * In most cases, StatName is analogous to a string_view -- it provides
+   * an interface to backingstore owned elsewhere. However, in
+   * StatNameManagedStorage, there are two ownership models, determined
+   * dynamically at runtime:
+   *  1. StatName is owned by a SymbolTable builtin, added at boostrap time,
+   *     in which case no cleanup is appropriate on StatName destruction.
+   *  2. StatName is allocated by SymbolTableManagedStorage, which must dispose
+   *     of it on destruction. To save storage, the owned StatName contains
+   *     the only pointer to the allocated memory, so we must destroy it
+   *     explicitly.
+   * This is called only by StatNameManagedStorage::~StatNameManagedStorage().
+   */
+  void deleteUnderlyingStorage() {
+    SymbolTable::StoragePtr storage(const_cast<uint8_t*>(size_and_data_));
+  }
 
   const uint8_t* size_and_data_{nullptr};
 };
@@ -534,7 +550,7 @@ public:
 
 private:
   StatName stat_name_;
-  Stats::SymbolTable* symbol_table_;
+  Stats::SymbolTable* symbol_table_; // null if stat_name_ was froma builtin.
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName

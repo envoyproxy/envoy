@@ -420,9 +420,15 @@ void StatNameStorage::free(SymbolTable& table) {
 StatNameManagedStorage::StatNameManagedStorage(absl::string_view name, SymbolTable& symbol_table) {
   absl::optional<StatName> opt_stat_name = symbol_table.getBuiltin(name);
   if (opt_stat_name) {
+    // SymbolTable builtins owns the stat_name, and we represent that by
+    // storing nullptr into symbol_table_.
     symbol_table_ = nullptr;
     stat_name_ = opt_stat_name.value();
   } else {
+    // We must allocate and manage the storage for the StatName. To save space
+    // in this object, we release the unique_ptr's and hold the only pointer in
+    // StatName. Thus on destruction we must delete the StatName's underlying
+    // storage.
     symbol_table_ = &symbol_table;
     SymbolTable::StoragePtr storage = symbol_table.encode(name);
     stat_name_ = StatName(storage.release());
@@ -431,8 +437,9 @@ StatNameManagedStorage::StatNameManagedStorage(absl::string_view name, SymbolTab
 
 StatNameManagedStorage::~StatNameManagedStorage() {
   if (symbol_table_ != nullptr) {
+    // If we had to allocate the storage, then here we must delete it.
     symbol_table_->free(stat_name_);
-    delete[] stat_name_.sizeAndData();
+    stat_name_.deleteUnderlyingStorage();
   }
 }
 
