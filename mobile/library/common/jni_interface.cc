@@ -305,7 +305,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
                                            jvm_on_trailers, jvm_on_error, jvm_on_complete,
                                            retained_context};
   envoy_status_t result =
-      start_stream(static_cast<envoy_stream_t>(stream_handle), native_callbacks);
+      start_stream(static_cast<envoy_stream_t>(stream_handle), native_callbacks, {});
   if (result != ENVOY_SUCCESS) {
     env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
   }

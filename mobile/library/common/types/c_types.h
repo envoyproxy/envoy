@@ -140,6 +140,10 @@ typedef struct {
   envoy_data message;
 } envoy_error;
 
+typedef struct {
+  bool buffer_body_for_retry;
+} envoy_stream_options;
+
 #ifdef __cplusplus
 extern "C" { // function pointers
 #endif

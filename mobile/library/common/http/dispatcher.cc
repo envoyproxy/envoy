@@ -109,6 +109,13 @@ Dispatcher::DirectStream::DirectStream(envoy_stream_t stream_handle,
     : stream_handle_(stream_handle), underlying_stream_(underlying_stream),
       callbacks_(std::move(callbacks)) {}
 
+AsyncClient::StreamOptions
+Dispatcher::DirectStream::toNativeStreamOptions(envoy_stream_options stream_options) {
+  AsyncClient::StreamOptions native_stream_options;
+  native_stream_options.setBufferBodyForRetry(stream_options.buffer_body_for_retry);
+  return native_stream_options;
+}
+
 void Dispatcher::ready(Event::Dispatcher& event_dispatcher,
                        Upstream::ClusterManager& cluster_manager) {
   Thread::LockGuard lock(dispatch_lock_);
@@ -142,20 +149,19 @@ Dispatcher::Dispatcher(std::atomic<envoy_network_t>& preferred_network)
     : preferred_network_(preferred_network) {}
 
 envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
-                                       envoy_http_callbacks bridge_callbacks) {
-  post([this, bridge_callbacks, new_stream_handle]() -> void {
+                                       envoy_http_callbacks bridge_callbacks,
+                                       envoy_stream_options stream_options) {
+  post([this, new_stream_handle, bridge_callbacks, stream_options]() -> void {
     DirectStreamCallbacksPtr callbacks =
         std::make_unique<DirectStreamCallbacks>(new_stream_handle, bridge_callbacks, *this);
 
     AsyncClient& async_client = getClient();
-    // Note: currently all streams are set to buffer body data for retries.
-    // This is done as an assumption that almost all client calls are retriable,
-    // and the penalty for those that are not is minimal.
-    // The stream options could be exposed
-    // (like in: https://github.com/lyft/envoy-mobile/pull/456/) in the future,
-    // if the library needs the added configuration flexiblity.
-    AsyncClient::Stream* underlying_stream =
-        async_client.start(*callbacks, AsyncClient::StreamOptions().setBufferBodyForRetry(true));
+    // While this struct is passed by reference to AsyncClient::start, it does not need to be
+    // preserved outside of this stack frame because its values are not used beyond the return of
+    // AsyncClient::start. If this changes, we need to store this struct in the DirectStream.
+    AsyncClient::StreamOptions native_stream_options =
+        Dispatcher::DirectStream::toNativeStreamOptions(stream_options);
+    AsyncClient::Stream* underlying_stream = async_client.start(*callbacks, native_stream_options);
 
     if (!underlying_stream) {
       // TODO: this callback might fire before the startStream function returns.
