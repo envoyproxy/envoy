@@ -1311,6 +1311,73 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   codec_client_->waitForDisconnect();
 }
 
+// Test connection is closed after single request processed.
+TEST_P(ProtocolIntegrationTest, TimeoutBasic) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_max_connection_duration()->set_nanos(500 * 1000 * 1000);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+} // namespace Envoy
+
+// Test inflight request is processed correctly when timeout fires during request processing.
+TEST_P(ProtocolIntegrationTest, InflightRequest) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_max_connection_duration()->set_nanos(500 * 1000 * 1000);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  // block and wait for counter to increase
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+
+  // ensure request processed correctly
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// Test connection is closed if no http requests were processed
+TEST_P(ProtocolIntegrationTest, TimeoutNoHttpRequest) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_max_connection_duration()->set_nanos(500 * 1000 * 1000);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,

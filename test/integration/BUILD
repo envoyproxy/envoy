@@ -396,15 +396,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "connection_duration_ingegration_test",
-    srcs = ["connection_duration_ingegration_test.cc"],
-    deps = [
-        ":http_protocol_integration_lib",
-        "//test/test_common:test_time_lib",
-    ],
-)
-
 envoy_cc_test_library(
     name = "integration_lib",
     srcs = [
