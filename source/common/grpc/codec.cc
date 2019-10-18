@@ -21,10 +21,10 @@ void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& o
   output[4] = static_cast<uint8_t>(length);
 }
 
-Decoder::Decoder() : state_(State::FH_FLAG) {}
+Decoder::Decoder() : state_(State::FhFlag) {}
 
 bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
-  uint64_t count = input.getRawSlices(nullptr, 0);
+  const uint64_t count = input.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, count);
   input.getRawSlices(slices.begin(), count);
   for (const Buffer::RawSlice& slice : slices) {
@@ -32,39 +32,39 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;
       switch (state_) {
-      case State::FH_FLAG:
+      case State::FhFlag:
         if (c & ~GRPC_FH_COMPRESSED) {
           // Unsupported flags.
           return false;
         }
         frame_.flags_ = c;
-        state_ = State::FH_LEN_0;
+        state_ = State::FhLen0;
         mem++;
         j++;
         break;
-      case State::FH_LEN_0:
+      case State::FhLen0:
         frame_.length_ = static_cast<uint32_t>(c) << 24;
-        state_ = State::FH_LEN_1;
+        state_ = State::FhLen1;
         mem++;
         j++;
         break;
-      case State::FH_LEN_1:
+      case State::FhLen1:
         frame_.length_ |= static_cast<uint32_t>(c) << 16;
-        state_ = State::FH_LEN_2;
+        state_ = State::FhLen2;
         mem++;
         j++;
         break;
-      case State::FH_LEN_2:
+      case State::FhLen2:
         frame_.length_ |= static_cast<uint32_t>(c) << 8;
-        state_ = State::FH_LEN_3;
+        state_ = State::FhLen3;
         mem++;
         j++;
         break;
-      case State::FH_LEN_3:
+      case State::FhLen3:
         frame_.length_ |= static_cast<uint32_t>(c);
         if (frame_.length_ == 0) {
           output.push_back(std::move(frame_));
-          state_ = State::FH_FLAG;
+          state_ = State::FhFlag;
         } else {
           frame_.data_ = std::make_unique<Buffer::OwnedImpl>();
           state_ = State::DATA;
@@ -88,7 +88,7 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
           output.push_back(std::move(frame_));
           frame_.flags_ = 0;
           frame_.length_ = 0;
-          state_ = State::FH_FLAG;
+          state_ = State::FhFlag;
         }
         break;
       }
