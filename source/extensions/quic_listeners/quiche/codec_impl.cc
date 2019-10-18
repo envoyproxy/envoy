@@ -8,6 +8,21 @@ namespace Quic {
 
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
 
+void QuicHttpConnectionImplBase::runWatermarkCallbacksForEachStream(
+    quic::QuicSmallMap<quic::QuicStreamId, std::unique_ptr<quic::QuicStream>, 10>& stream_map,
+    bool high_watermark) {
+  for (auto& it : stream_map) {
+    if (!it.second->is_static()) {
+      auto stream = dynamic_cast<EnvoyQuicStream*>(it.second.get());
+      if (high_watermark) {
+        stream->runHighWatermarkCallbacks();
+      } else {
+        stream->runLowWatermarkCallbacks();
+      }
+    }
+  }
+}
+
 QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
     EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks)
     : QuicHttpConnectionImplBase(quic_session), quic_server_session_(quic_session) {
@@ -15,19 +30,11 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
 }
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
-  for (auto& it : quic_server_session_.stream_map()) {
-    if (!it.second->is_static()) {
-      dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runHighWatermarkCallbacks();
-    }
-  }
+  runWatermarkCallbacksForEachStream(quic_server_session_.stream_map(), true);
 }
 
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  for (const auto& it : quic_server_session_.stream_map()) {
-    if (!it.second->is_static()) {
-      dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runLowWatermarkCallbacks();
-    }
-  }
+  runWatermarkCallbacksForEachStream(quic_server_session_.stream_map(), false);
 }
 
 void QuicHttpServerConnectionImpl::goAway() {
@@ -49,19 +56,11 @@ QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
 }
 
 void QuicHttpClientConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
-  for (auto& it : quic_client_session_.stream_map()) {
-    if (!it.second->is_static()) {
-      dynamic_cast<EnvoyQuicClientStream*>(it.second.get())->runHighWatermarkCallbacks();
-    }
-  }
+  runWatermarkCallbacksForEachStream(quic_client_session_.stream_map(), true);
 }
 
 void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  for (const auto& it : quic_client_session_.stream_map()) {
-    if (!it.second->is_static()) {
-      dynamic_cast<EnvoyQuicClientStream*>(it.second.get())->runLowWatermarkCallbacks();
-    }
-  }
+  runWatermarkCallbacksForEachStream(quic_client_session_.stream_map(), false);
 }
 
 } // namespace Quic

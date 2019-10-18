@@ -26,10 +26,10 @@ public:
   // Overridden to un-register all file events.
   ~EnvoyQuicClientConnection() override;
 
+  // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
-
   uint64_t maxPacketSize() const override;
 
   // Register file event and apply socket options.
@@ -51,12 +51,8 @@ private:
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket);
 
-  Network::ConnectionSocketPtr
-  createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
-                         Network::Address::InstanceConstSharedPtr& local_addr,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options);
-
   void onFileEvent(uint32_t events);
+
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
   Event::FileEventPtr file_event_;
