@@ -37,9 +37,9 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 using testing::Values;
 using testing::WithArgs;
-using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -1169,8 +1169,8 @@ TEST_F(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
 }
 
 // Verify that authz denied response headers overrides the existing encoding headers,
-// and that it adds repeated header names using the standard method of comma concatenation of values for predefined
-// inline headers while repeating other headers
+// and that it adds repeated header names using the standard method of comma concatenation of values
+// for predefined inline headers while repeating other headers
 TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
   InSequence s;
 
@@ -1178,12 +1178,13 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
-                                               {Http::LowerCaseString{"bar"}, "foo"},
-                                               {Http::LowerCaseString{"set-cookie"}, "cookie1=value"},
-                                               {Http::LowerCaseString{"set-cookie"}, "cookie2=value"},
-                                               {Http::LowerCaseString{"accept-encoding"}, "gzip"},
-                                               {Http::LowerCaseString{"accept-encoding"}, "deflate"}};
+  response.headers_to_add =
+      Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+                         {Http::LowerCaseString{"bar"}, "foo"},
+                         {Http::LowerCaseString{"set-cookie"}, "cookie1=value"},
+                         {Http::LowerCaseString{"set-cookie"}, "cookie2=value"},
+                         {Http::LowerCaseString{"accept-encoding"}, "gzip"},
+                         {Http::LowerCaseString{"accept-encoding"}, "deflate"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
