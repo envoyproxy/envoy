@@ -171,7 +171,9 @@ static void ios_on_error(envoy_error error, void *context) {
   envoy_stream_t _streamHandle;
 }
 
-- (instancetype)initWithHandle:(envoy_stream_t)handle callbacks:(EnvoyHTTPCallbacks *)callbacks {
+- (instancetype)initWithHandle:(envoy_stream_t)handle
+                     callbacks:(EnvoyHTTPCallbacks *)callbacks
+                bufferForRetry:(BOOL)bufferForRetry {
   self = [super init];
   if (!self) {
     return nil;
@@ -197,7 +199,7 @@ static void ios_on_error(envoy_error error, void *context) {
   // start_stream could result in a reset that would release the native ref.
   // TODO: To be truly safe we probably need stronger guarantees of operation ordering on this ref
   _strongSelf = self;
-  envoy_stream_options stream_options;
+  envoy_stream_options stream_options = {bufferForRetry};
   envoy_status_t result = start_stream(_streamHandle, native_callbacks, stream_options);
   if (result != ENVOY_SUCCESS) {
     _strongSelf = nil;

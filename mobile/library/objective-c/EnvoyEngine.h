@@ -67,8 +67,12 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
  @param handle Underlying handle of the HTTP stream owned by an Envoy engine.
  @param callbacks The callbacks for the stream.
+ @param bufferForRetry Whether this stream should be buffered to support future retries. Must be
+ true for requests that support retrying.
  */
-- (instancetype)initWithHandle:(intptr_t)handle callbacks:(EnvoyHTTPCallbacks *)callbacks;
+- (instancetype)initWithHandle:(intptr_t)handle
+                     callbacks:(EnvoyHTTPCallbacks *)callbacks
+                bufferForRetry:(BOOL)bufferForRetry;
 
 /**
  Send headers over the provided stream.
@@ -177,8 +181,11 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  Opens a new HTTP stream attached to this engine.
 
  @param callbacks Handler for observing stream events.
+ @param bufferForRetry Whether this stream should be buffered to support future retries. Must be
+ true for requests that support retrying.
  */
-- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks;
+- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
+                                 bufferForRetry:(BOOL)bufferForRetry;
 
 @end
 
