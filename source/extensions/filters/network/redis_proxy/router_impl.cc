@@ -21,7 +21,10 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
     return false;
   }
 
-  if (exclude_read_commands_ && Common::Redis::SupportedCommands::isReadCommand(command)) {
+  std::string to_lower_string(command);
+  to_lower_table_.toLowerCase(to_lower_string);
+
+  if (exclude_read_commands_ && Common::Redis::SupportedCommands::isReadCommand(to_lower_string)) {
     return false;
   }
 

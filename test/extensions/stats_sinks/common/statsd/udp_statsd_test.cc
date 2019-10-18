@@ -178,6 +178,47 @@ TEST(UdpStatsdSinkTest, CheckActualStatsWithCustomPrefix) {
   tls_.shutdownThread();
 }
 
+TEST(UdpStatsdSinkTest, SiSuffix) {
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  UdpStatsdSink sink(tls_, writer_ptr, false);
+
+  NiceMock<Stats::MockHistogram> items;
+  items.name_ = "items";
+  items.unit_ = Stats::Histogram::Unit::Unspecified;
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.items:1|ms"));
+  sink.onHistogramComplete(items, 1);
+
+  NiceMock<Stats::MockHistogram> information;
+  information.name_ = "information";
+  information.unit_ = Stats::Histogram::Unit::Bytes;
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.information:2|ms"));
+  sink.onHistogramComplete(information, 2);
+
+  NiceMock<Stats::MockHistogram> duration_micro;
+  duration_micro.name_ = "duration";
+  duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:3|ms"));
+  sink.onHistogramComplete(duration_micro, 3);
+
+  NiceMock<Stats::MockHistogram> duration_milli;
+  duration_milli.name_ = "duration";
+  duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:4|ms"));
+  sink.onHistogramComplete(duration_milli, 4);
+
+  tls_.shutdownThread();
+}
+
 TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
@@ -214,6 +255,53 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_timer:5|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(timer, 5);
+
+  tls_.shutdownThread();
+}
+
+TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  UdpStatsdSink sink(tls_, writer_ptr, true);
+
+  std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+
+  NiceMock<Stats::MockHistogram> items;
+  items.name_ = "items";
+  items.unit_ = Stats::Histogram::Unit::Unspecified;
+  items.setTags(tags);
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.items:1|ms|#key1:value1,key2:value2"));
+  sink.onHistogramComplete(items, 1);
+
+  NiceMock<Stats::MockHistogram> information;
+  information.name_ = "information";
+  information.unit_ = Stats::Histogram::Unit::Bytes;
+  information.setTags(tags);
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.information:2|ms|#key1:value1,key2:value2"));
+  sink.onHistogramComplete(information, 2);
+
+  NiceMock<Stats::MockHistogram> duration_micro;
+  duration_micro.name_ = "duration";
+  duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
+  duration_micro.setTags(tags);
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:3|ms|#key1:value1,key2:value2"));
+  sink.onHistogramComplete(duration_micro, 3);
+
+  NiceMock<Stats::MockHistogram> duration_milli;
+  duration_milli.name_ = "duration";
+  duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
+  duration_milli.setTags(tags);
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:4|ms|#key1:value1,key2:value2"));
+  sink.onHistogramComplete(duration_milli, 4);
 
   tls_.shutdownThread();
 }

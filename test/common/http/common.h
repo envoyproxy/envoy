@@ -17,11 +17,10 @@ namespace Envoy {
 class CodecClientForTest : public Http::CodecClient {
 public:
   using DestroyCb = std::function<void(CodecClient*)>;
-  CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host,
-                     Event::Dispatcher& dispatcher)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host, dispatcher),
-        destroy_cb_(destroy_cb) {
+  CodecClientForTest(CodecClient::Type type, Network::ClientConnectionPtr&& connection,
+                     Http::ClientConnection* codec, DestroyCb destroy_cb,
+                     Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
+      : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
   ~CodecClientForTest() override {

@@ -137,11 +137,13 @@ public:
   // Runs a subset lb test with the given request headers, expecting the x-host-type header to
   // the given type ("a" or "b"). If is_hash_lb_, verifies that a single host is selected over n
   // iterations (e.g. for maglev/hash-ring policies). Otherwise, expected more than one host to be
-  // selected over n iterations.
+  // selected over at least n iterations and at most m.
   void runTest(Http::TestHeaderMapImpl& request_headers, const std::string expected_host_type,
-               const int n = 10) {
+               const int n = 100, const int m = 1000) {
+    ASSERT_LT(n, m);
+
     std::set<std::string> hosts;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < m; i++) {
       Http::TestHeaderMapImpl response_headers{{":status", "200"}};
 
       // Send header only request.
@@ -160,6 +162,12 @@ public:
                         .get(Envoy::Http::LowerCaseString{host_header_})
                         ->value()
                         .getStringView());
+
+      if (i >= n && (is_hash_lb_ || hosts.size() > 1)) {
+        // Once we've completed n iterations, quit for hash lb policies. For others, keep going
+        // until we've seen multiple hosts (as expected) or reached m iterations.
+        break;
+      }
     }
 
     if (is_hash_lb_) {
