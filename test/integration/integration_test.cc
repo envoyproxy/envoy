@@ -107,7 +107,7 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  // Invoke drain listeners endpoint and validate that the listener is actually draining.
+  // Invoke drain listeners endpoint and validate that we can send some data.
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_TRUE(admin_response->complete());

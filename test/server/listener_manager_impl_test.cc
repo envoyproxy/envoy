@@ -1141,9 +1141,50 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(1, 0, 0, 0, 1, 0);
 
-  EXPECT_CALL(*worker_, stopListener(_));
-  EXPECT_CALL(*listener_foo, onDestroy());
+  const std::string listener_foo_outbound_yaml = R"EOF(
+name: foo_outbound
+traffic_direction: OUTBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1239
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_outbound = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo_outbound->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_outbound_yaml), "", true));
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_foo_outbound->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(2UL, manager_->listeners().size());
+
+  // Validate that stop listener is only called once - for inbound listeners.
+  EXPECT_CALL(*worker_, stopListener(_)).Times(1);
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+
+  // Validate that listener creation in outbound direction is allowed.
+  const std::string listener_bar_outbound_yaml = R"EOF(
+name: bar_outbound
+traffic_direction: OUTBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1237
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_bar_outbound = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_outbound_yaml), "", true));
+  EXPECT_EQ(3UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
 
   // Validate that adding a listener in stopped listener's traffic direction is not allowed.
   const std::string listener_bar_yaml = R"EOF(
@@ -1157,6 +1198,9 @@ filter_chains:
 - filters: []
   )EOF";
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_CALL(*listener_foo_outbound, onDestroy());
+  EXPECT_CALL(*listener_bar_outbound, onDestroy());
 }
 
 // Validates that StopListener functionality works correctly.

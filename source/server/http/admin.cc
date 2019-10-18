@@ -702,10 +702,10 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
 Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderMap&,
                                             Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  ListenerManager::StopListenersType listeners_type =
+  ListenerManager::StopListenersType stop_listeners_type =
       params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
                                                  : ListenerManager::StopListenersType::All;
-  server_.listenerManager().stopListeners(listeners_type);
+  server_.listenerManager().stopListeners(stop_listeners_type);
   response.add("OK\n");
   return Http::Code::OK;
 }

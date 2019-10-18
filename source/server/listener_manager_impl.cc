@@ -562,12 +562,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
 }
 
 void ListenerManagerImpl::stopListeners(StopListenersType listeners_type) {
-  listeners_type_ = listeners_type;
+  stop_listeners_type_ = listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     for (const auto& worker : workers_) {
-      if (listeners_type_.has_value() &&
-          (listeners_type != StopListenersType::InboundOnly ||
-           listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND)) {
+      if (listeners_type != StopListenersType::InboundOnly ||
+          listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
         ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
 
         auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
