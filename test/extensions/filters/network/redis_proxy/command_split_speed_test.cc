@@ -64,14 +64,14 @@ public:
   }
   using ValueOrPointer = absl::variant<Common::Redis::RespValue, Common::Redis::RespValueSharedPtr>;
 
-  void move(Common::Redis::RespValueSharedPtr request) {
+  void move(const Common::Redis::RespValueSharedPtr& request) {
     for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
       auto single_set = std::make_shared<Common::Redis::RespValue>(
           request, Common::Redis::Utility::SetRequest::instance(), i, i + 2);
     }
   }
 
-  void moveLocalVariant(Common::Redis::RespValueSharedPtr request) {
+  void moveLocalVariant(Common::Redis::RespValueSharedPtr& request) {
     for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
       Common::Redis::RespValue single_set(request, Common::Redis::Utility::SetRequest::instance(),
                                           i, i + 1);
@@ -79,7 +79,7 @@ public:
     }
   }
 
-  void copy(Common::Redis::RespValueSharedPtr request) {
+  void copy(Common::Redis::RespValueSharedPtr& request) {
     std::vector<Common::Redis::RespValue> values(3);
     values[0].type(Common::Redis::RespType::BulkString);
     values[0].asString() = "set";

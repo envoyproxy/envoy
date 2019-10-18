@@ -21,7 +21,6 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
-using testing::SaveArg;
 using testing::WithArg;
 
 namespace Envoy {
@@ -398,7 +397,7 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
 
 MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
   const ConnPool::RespVariant& obj = arg;
-  const Common::Redis::RespValue& lhs = absl::get<Common::Redis::RespValue>(obj);
+  const auto& lhs = absl::get<Common::Redis::RespValue>(obj);
   EXPECT_TRUE(lhs.type() == Common::Redis::RespType::CompositeArray);
   EXPECT_EQ(lhs.asCompositeArray().size(), rhs.size());
   std::vector<std::string> array;
