@@ -66,7 +66,7 @@ void GrpcAccessLoggerImpl::flush() {
     stream_->stream_ =
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                            "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
-                       *stream_);
+                       *stream_, Http::AsyncClient::StreamOptions());
 
     auto* identifier = message_.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();

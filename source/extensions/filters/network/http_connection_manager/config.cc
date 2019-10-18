@@ -189,6 +189,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!idle_timeout_) {
     idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout);
   }
+  if (!idle_timeout_) {
+    idle_timeout_ = std::chrono::hours(1);
+  } else if (idle_timeout_.value().count() == 0) {
+    idle_timeout_ = absl::nullopt;
+  }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
@@ -428,7 +433,6 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     // better way to aoivd such dependency in case QUICHE breaks this extension.
     return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
-
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,

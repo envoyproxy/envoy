@@ -167,7 +167,7 @@ private:
   std::unique_ptr<Router::ConfigImpl> config_;
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
-  std::string active_runtime;
+  std::string active_runtime_;
   Coverage coverage_;
 };
 

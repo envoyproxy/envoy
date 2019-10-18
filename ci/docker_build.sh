@@ -1,7 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 set -ex
 
-docker build -f ci/Dockerfile-envoy-image -t envoyproxy/envoy-dev:latest .
-docker build -f ci/Dockerfile-envoy-alpine -t envoyproxy/envoy-alpine-dev:latest .
-docker build -f ci/Dockerfile-envoy-alpine-debug -t envoyproxy/envoy-alpine-debug-dev:latest .
+DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
+
+docker build -f ci/Dockerfile-envoy-image -t "${DOCKER_IMAGE_PREFIX}-dev:latest" .
+docker build -f ci/Dockerfile-envoy-alpine -t "${DOCKER_IMAGE_PREFIX}-alpine-dev:latest" .
+docker build -f ci/Dockerfile-envoy-alpine-debug -t "${DOCKER_IMAGE_PREFIX}-alpine-debug-dev:latest" .

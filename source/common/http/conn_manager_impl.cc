@@ -36,6 +36,7 @@
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/stats/timespan_impl.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -102,7 +103,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Server::OverloadManager* overload_manager,
                                              TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
-      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_source)),
+      conn_length_(new Stats::HistogramCompletableTimespanImpl(
+          stats_.named_.downstream_cx_length_ms_, time_source)),
       drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
@@ -148,6 +150,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
   stats_.named_.downstream_cx_destroy_.inc();
+
   stats_.named_.downstream_cx_active_.dec();
   if (read_callbacks_->connection().ssl()) {
     stats_.named_.downstream_cx_ssl_active_.dec();
@@ -341,13 +344,18 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
 Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   if (!read_callbacks_->connection().streamInfo().protocol()) {
+    // For Non-QUIC traffic, continue passing data to filters.
     return Network::FilterStatus::Continue;
   }
   // Only QUIC connection's stream_info_ specifies protocol.
   Buffer::OwnedImpl dummy;
   codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
+  ASSERT(codec_->protocol() == Protocol::Http3);
   stats_.named_.downstream_cx_http3_total_.inc();
   stats_.named_.downstream_cx_http3_active_.inc();
+  // Stop iterating through each filters for QUIC. Currently a QUIC connection
+  // only supports one filter, HCM, and bypasses the onData() interface. Because
+  // QUICHE already handles de-multiplexing.
   return Network::FilterStatus::StopIteration;
 }
 
@@ -451,7 +459,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
       stream_id_(connection_manager.random_generator_.random()),
-      request_response_timespan_(new Stats::Timespan(
+      request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
@@ -2276,6 +2284,9 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
           parent_.is_head_request_);
       parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
+      ENVOY_STREAM_LOG(
+          debug, "Resetting stream. Response data too large and headers have already been sent",
+          *this);
       resetStream();
     }
   }

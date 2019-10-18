@@ -557,6 +557,13 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_EQ("dynamic", table_->toString(dynamic));
   EXPECT_EQ(dynamic.data(), set->getDynamic("dynamic").data());
 
+  // Make sure blanks are always the same.
+  const Stats::StatName blank = set->getDynamic("");
+  EXPECT_EQ("", table_->toString(blank));
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic(absl::string_view()).data());
+
   // There's another corner case for the same "dynamic" name from a
   // different set. Here we will get a different StatName object
   // out of the second set, though it will share the same underlying
@@ -566,6 +573,37 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_EQ("dynamic", table_->toString(dynamic2));
   EXPECT_EQ(dynamic2.data(), set2->getDynamic("dynamic").data());
   EXPECT_NE(dynamic2.data(), dynamic.data());
+}
+
+TEST_P(StatNameTest, RecentLookups) {
+  if (GetParam() == SymbolTableType::Fake) {
+    return;
+  }
+
+  StatNameSetPtr set1(table_->makeSet("set1"));
+  table_->setRecentLookupCapacity(10);
+  StatNameSetPtr set2(table_->makeSet("set2"));
+  set1->getDynamic("dynamic.stat1");
+  set2->getDynamic("dynamic.stat2");
+  encodeDecode("direct.stat");
+
+  std::vector<std::string> accum;
+  uint64_t total = table_->getRecentLookups([&accum](absl::string_view name, uint64_t count) {
+    accum.emplace_back(absl::StrCat(count, ": ", name));
+  });
+  EXPECT_EQ(5, total);
+  std::string recent_lookups_str = StringUtil::join(accum, " ");
+
+  EXPECT_EQ("1: direct.stat "
+            "2: dynamic.stat1 " // Combines entries from set and symbol-table.
+            "2: dynamic.stat2",
+            recent_lookups_str);
+
+  table_->clearRecentLookups();
+  uint32_t num_calls = 0;
+  EXPECT_EQ(0,
+            table_->getRecentLookups([&num_calls](absl::string_view, uint64_t) { ++num_calls; }));
+  EXPECT_EQ(0, num_calls);
 }
 
 TEST_P(StatNameTest, StatNameEmptyEquivalent) {

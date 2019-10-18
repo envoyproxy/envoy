@@ -116,7 +116,7 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
 const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFIG + R"EOF(
     filter_chains:
       transport_socket:
-        name: quic
+        name: envoy.transport_sockets.quic
       filters:
         name: envoy.http_connection_manager
         config:
@@ -457,10 +457,10 @@ void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std:
     RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
   } else if (tls_config.has_value()) {
-    inner_transport_socket.set_name("tls");
+    inner_transport_socket.set_name("envoy.transport_sockets.tls");
     inner_transport_socket.mutable_config()->MergeFrom(tls_config.value());
   } else {
-    inner_transport_socket.set_name("raw_buffer");
+    inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
   // Configure outer tap transport socket.
   transport_socket.set_name("envoy.transport_sockets.tap");
@@ -542,7 +542,7 @@ void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeou
   addConfigModifier(
       [timeout](
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-        hcm.mutable_idle_timeout()->MergeFrom(
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->MergeFrom(
             ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
       });
 }

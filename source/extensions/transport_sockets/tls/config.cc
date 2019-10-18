@@ -29,7 +29,7 @@ ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
 }
 
 REGISTER_FACTORY(UpstreamSslSocketFactory,
-                 Server::Configuration::UpstreamTransportSocketConfigFactory);
+                 Server::Configuration::UpstreamTransportSocketConfigFactory){"tls"};
 
 Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
@@ -47,7 +47,7 @@ ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
 }
 
 REGISTER_FACTORY(DownstreamSslSocketFactory,
-                 Server::Configuration::DownstreamTransportSocketConfigFactory);
+                 Server::Configuration::DownstreamTransportSocketConfigFactory){"tls"};
 
 Ssl::ContextManagerPtr SslContextManagerFactory::createContextManager(TimeSource& time_source) {
   return std::make_unique<ContextManagerImpl>(time_source);

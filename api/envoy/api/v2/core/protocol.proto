@@ -25,6 +25,7 @@ message HttpProtocolOptions {
   // :ref:`drain_timeout
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.drain_timeout>`.
   // Note that request based timeouts mean that HTTP/2 PINGs will not keep the connection alive.
+  // If not specified, this defaults to 1 hour. To disable idle timeouts explicitly set this to 0.
   google.protobuf.Duration idle_timeout = 1;
 
   // The maximum number of headers. If unconfigured, the default

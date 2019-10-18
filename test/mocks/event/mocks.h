@@ -37,7 +37,10 @@ public:
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
-    return Network::ConnectionPtr{createServerConnection_(socket.get(), transport_socket.get())};
+    // The caller expects both the socket and the transport socket to be moved.
+    socket.reset();
+    transport_socket.reset();
+    return Network::ConnectionPtr{createServerConnection_()};
   }
 
   Network::ClientConnectionPtr
@@ -59,10 +62,8 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                                      bool bind_to_port,
-                                      bool hand_off_restored_destination_connections) override {
-    return Network::ListenerPtr{
-        createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
+                                      bool bind_to_port) override {
+    return Network::ListenerPtr{createListener_(socket, cb, bind_to_port)};
   }
 
   Network::UdpListenerPtr createUdpListener(Network::Socket& socket,
@@ -88,9 +89,7 @@ public:
   // Event::Dispatcher
   MOCK_METHOD2(initializeStats, void(Stats::Scope&, const std::string&));
   MOCK_METHOD0(clearDeferredDeleteList, void());
-  MOCK_METHOD2(createServerConnection_,
-               Network::Connection*(Network::ConnectionSocket* socket,
-                                    Network::TransportSocket* transport_socket));
+  MOCK_METHOD0(createServerConnection_, Network::Connection*());
   MOCK_METHOD4(
       createClientConnection_,
       Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,
@@ -103,10 +102,9 @@ public:
   MOCK_METHOD4(createFileEvent_,
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());
-  MOCK_METHOD4(createListener_,
+  MOCK_METHOD3(createListener_,
                Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                                  bool bind_to_port,
-                                  bool hand_off_restored_destination_connections));
+                                  bool bind_to_port));
   MOCK_METHOD2(createUdpListener_,
                Network::UdpListener*(Network::Socket& socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));

@@ -83,7 +83,6 @@ public:
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
-  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
 };
 
@@ -129,7 +128,6 @@ public:
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
-  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
 
   // Network::ClientConnection
@@ -178,7 +176,6 @@ public:
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
-  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
 
   // Network::FilterManagerConnection
