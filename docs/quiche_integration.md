@@ -16,13 +16,13 @@ The HCM will call encoder's encodeHeaders() to write response headers, and then 
 
 ### Flow Control
 
-## Receive buffer
+#### Receive buffer
 
-All the arrived out-of-order data is buffered in QUICHE stream. This buffered is capped by max stream flow control window in QUICHE which is 64MB. Once bytes are put in sequence and ready to be used, OnBodyDataAvailable() is called. The stream implementation overrides this call and calls StreamDecoder::decodeData() in it.Request and response body are buffered in each L7 filter if desired, and the stream itself doesn't buffer any of them unless set as read blocked.
+All arrived out-of-order data is buffered in QUICHE stream. This buffered is capped by max stream flow control window in QUICHE which is 64MB. Once bytes are put in sequence and ready to be used, OnBodyDataAvailable() is called. The stream implementation overrides this call and calls StreamDecoder::decodeData() in it.Request and response body are buffered in each L7 filter if desired, and the stream itself doesn't buffer any of them unless set as read blocked.
 
 When upstream or any L7 filter reaches its buffer limit, it will call Http::Stream::readDisable() with false to set QUIC stream to be read blocked. In this state, even if more request/response body is available to be delivered, OnBodyDataAvailable() will not be called. As a result, downstream flow control will not shift as no data will be consumed. As both filters and upstream buffers can call readDisable(), each stream has a counter of how many times the HCM blocks the stream. When the counter is cleared, the stream will set its state to unblocked and thus deliver any new and existing available data buttered in the QUICHE stream.
 
-## Send buffer
+#### Send buffer
 
 We use the unlimited stream send buffer in QUICHE along with a book keeping data structure `EnvoyQuicSimulatedWatermarkBffer` to serve the function of WatermarkBuffer in Envoy to prevent buffering too much in QUICHE.
 
