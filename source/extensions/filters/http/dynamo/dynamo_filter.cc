@@ -187,11 +187,17 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
   stats_->counter({entity_type_name, entity_name, total_group}).inc();
   stats_->counter({entity_type_name, entity_name, total_name}).inc();
 
-  stats_->histogram({entity_type_name, entity_name, stats_->upstream_rq_time_})
+  stats_
+      ->histogram({entity_type_name, entity_name, stats_->upstream_rq_time_},
+                  Stats::Histogram::Unit::Milliseconds)
       .recordValue(latency.count());
   const Stats::StatName time_group = stats_->upstream_rq_time_groups_[group_index];
-  stats_->histogram({entity_type_name, entity_name, time_group}).recordValue(latency.count());
-  stats_->histogram({entity_type_name, entity_name, time_name}).recordValue(latency.count());
+  stats_
+      ->histogram({entity_type_name, entity_name, time_group}, Stats::Histogram::Unit::Milliseconds)
+      .recordValue(latency.count());
+  stats_
+      ->histogram({entity_type_name, entity_name, time_name}, Stats::Histogram::Unit::Milliseconds)
+      .recordValue(latency.count());
 }
 
 void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {

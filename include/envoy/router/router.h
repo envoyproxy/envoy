@@ -701,6 +701,16 @@ public:
   };
 
   /**
+   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
+   * host's. Or nullptr if none of them exist.
+   */
+  template <class Derived>
+  const Derived* mostSpecificPerFilterConfigTyped(const std::string& name) const {
+    const Derived* config = perFilterConfigTyped<Derived>(name);
+    return config ? config : virtualHost().perFilterConfigTyped<Derived>(name);
+  }
+
+  /**
    * True if the virtual host this RouteEntry belongs to is configured to include the attempt
    * count header.
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.

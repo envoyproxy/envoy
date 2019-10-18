@@ -315,6 +315,7 @@ getaddrinfo
 sendto
 ssize
 upcasts
+vectorize
 vip
 xDSes
 XFCC
@@ -395,6 +396,7 @@ codecs
 codings
 combinatorial
 comparator
+completable
 cond
 condvar
 conf
