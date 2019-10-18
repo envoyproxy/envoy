@@ -12,7 +12,6 @@ import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/api/v3alpha/lds.proto";
-import "envoy/config/bootstrap/v2/bootstrap.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";

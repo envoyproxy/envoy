@@ -11,7 +11,6 @@ import "envoy/api/v3alpha/core/protocol.proto";
 import "envoy/api/v3alpha/rds.proto";
 import "envoy/api/v3alpha/srds.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
-import "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
