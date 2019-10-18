@@ -410,8 +410,8 @@ cases:
     tag: ee-4,
     route_metadata:
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: emp } ] }
-      default_value: e4
-  value: e4
+      default_value: _e
+  value: ''
 - custom_tag:
     tag: ee-5,
     route_metadata:

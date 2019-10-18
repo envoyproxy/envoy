@@ -272,12 +272,12 @@ http_filters:
         dynamic_cast<const Tracing::GeneralCustomTag*>(it.second.get())->toString());
   }
   ASSERT_THAT(custom_tag_views,
-              UnorderedElementsAre("REQUEST_HEADER|foo|foo|", "LITERAL|ltag|lvalue",
-                                   "ENVIRONMENT|etag|E_TAG|", "ENVIRONMENT|etag-n|E_TAG_N|evalue",
-                                   "REQUEST_HEADER|rtag|x-tag|",
-                                   "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
-                                   "REQUEST_METADATA|req_mtag|com.bar.foo|xx.yy|",
-                                   "ROUTE_METADATA|rot_mtag|com.bar.foo|xx.yy|mvalue"));
+              UnorderedElementsAre(
+                  "REQUEST_HEADER|foo|foo|", "LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG||e_val",
+                  "ENVIRONMENT|etag-n|E_TAG_N|evalue|evalue", "REQUEST_HEADER|rtag|x-tag|",
+                  "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
+                  "REQUEST_METADATA|req_mtag|com.bar.foo|xx.yy|",
+                  "ROUTE_METADATA|rot_mtag|com.bar.foo|xx.yy|mvalue"));
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());

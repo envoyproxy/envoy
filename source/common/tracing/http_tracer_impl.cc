@@ -314,19 +314,15 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
   case ProtobufWkt::Value::kNumberValue:
     span.setTag(tag(), fmt::format("{}", value.number_value()));
     return;
+  case ProtobufWkt::Value::kStringValue:
+    span.setTag(tag(), value.string_value());
+    return;
   case ProtobufWkt::Value::kListValue:
     span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.list_value()));
     return;
   case ProtobufWkt::Value::kStructValue:
     span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.struct_value()));
     return;
-  case ProtobufWkt::Value::kStringValue: {
-    if (!value.string_value().empty()) {
-      span.setTag(tag(), value.string_value());
-      return;
-    }
-    break;
-  }
   default:
     break;
   }

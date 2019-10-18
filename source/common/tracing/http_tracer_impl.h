@@ -224,7 +224,7 @@ public:
                        const envoy::type::tracing::v2::CustomTag::Environment& environment);
   absl::string_view value(const CustomTagContext&) const override { return final_value_; }
   std::string toString() const override {
-    return fmt::format("ENVIRONMENT|{}|{}|{}", tag_, name_, default_value_);
+    return fmt::format("ENVIRONMENT|{}|{}|{}|{}", tag_, name_, default_value_, final_value_);
   }
 
 private:
