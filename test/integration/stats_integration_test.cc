@@ -309,7 +309,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
   //
-  //
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
