@@ -53,7 +53,9 @@ public:
                  bool validate_clusters_default)
       : ConfigImpl(config, factory_context, validate_clusters_default), config_(config) {}
 
-  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
+  RouteConstSharedPtr route(const Http::HeaderMap& headers,
+                            const Envoy::StreamInfo::StreamInfo& stream_info,
+                            uint64_t random_value) const override {
     absl::optional<std::string> corpus_path =
         TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
@@ -70,7 +72,11 @@ public:
         corpus_file << corpus;
       }
     }
-    return ConfigImpl::route(headers, random_value);
+    return ConfigImpl::route(headers, stream_info, random_value);
+  }
+
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const {
+    return route(headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), random_value);
   }
 
   const envoy::api::v2::RouteConfiguration config_;
@@ -1900,7 +1906,7 @@ virtual_hosts:
     }
   }
 
-  ConfigImpl& config() {
+  TestConfigImpl& config() {
     if (config_ == nullptr) {
       config_ = std::make_unique<TestConfigImpl>(route_config_, factory_context_, true);
     }
@@ -4393,8 +4399,9 @@ virtual_hosts:
 
 TEST(NullConfigImplTest, All) {
   NullConfigImpl config;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
-  EXPECT_EQ(nullptr, config.route(headers, 0));
+  EXPECT_EQ(nullptr, config.route(headers, stream_info, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
   EXPECT_EQ("", config.name());
 }
@@ -4614,7 +4621,7 @@ virtual_hosts:
   )EOF";
 
   Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
-  std::unique_ptr<ConfigImpl> config_ptr;
+  std::unique_ptr<TestConfigImpl> config_ptr;
 
   config_ptr = std::make_unique<TestConfigImpl>(parseRouteConfigurationFromV2Yaml(yaml),
                                                 factory_context_, true);
@@ -5777,6 +5784,97 @@ virtual_hosts:
     headers.addCopy("test_header_range", "19");
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+// Test Route Matching based on connection Tls Context.
+// Validate configured and default settings are routed to the correct cluster.
+TEST_F(RouteMatcherTest, TlsContextMatching) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/peer-cert-test"
+          tls_context:
+            presented: true
+        route:
+          cluster: server_peer-cert-presented
+      - match:
+          prefix: "/peer-cert-test"
+          tls_context:
+            presented: false
+        route:
+          cluster: server_peer-cert-not-presented
+      - match:
+          prefix: "/peer-cert-no-tls-context-match"
+        route:
+          cluster: server_peer-cert-no-tls-context-match
+      - match:
+          prefix: "/"
+        route:
+          cluster: local_service_without_headers
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
+    EXPECT_EQ("server_peer-cert-presented",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(false));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
+    EXPECT_EQ("server_peer-cert-not-presented",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(false));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    std::shared_ptr<Ssl::MockConnectionInfo> connection_info;
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
 }
 

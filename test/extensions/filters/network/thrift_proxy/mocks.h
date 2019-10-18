@@ -304,6 +304,7 @@ public:
   // ThriftProxy::Router::RouteEntry
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Envoy::Router::MetadataMatchCriteria*());
+  MOCK_CONST_METHOD0(tlsContextMatchCriteria, const Envoy::Router::TlsContextMatchCriteria*());
   MOCK_CONST_METHOD0(rateLimitPolicy, RateLimitPolicy&());
 
   std::string cluster_name_{"fake_cluster"};

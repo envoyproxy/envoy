@@ -330,6 +330,11 @@ message RouteMatch {
   message GrpcRouteMatchOptions {
   }
 
+  message TlsContextMatchOptions {
+    // If specified, the route will match against whether or not a certificate is presented.
+    google.protobuf.BoolValue presented = 1;
+  }
+
   reserved 5, 3;
 
   reserved "regex";
@@ -400,6 +405,12 @@ message RouteMatch {
   // that the content-type header has a application/grpc or one of the various
   // application/grpc+ values.
   GrpcRouteMatchOptions grpc = 8;
+
+  // If specified, the client tls context will be matched against the defined
+  // match options.
+  //
+  // [#next-major-version: unify with RBAC]
+  TlsContextMatchOptions tls_context = 11;
 }
 
 // [#comment:next free field: 11]

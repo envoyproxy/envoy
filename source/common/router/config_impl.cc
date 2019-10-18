@@ -325,6 +325,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy());
   }
 
+  if (route.match().has_tls_context()) {
+    tls_context_match_criteria_ =
+        std::make_unique<TlsContextMatchCriteriaImpl>(route.match().tls_context());
+  }
+
   // Only set include_vh_rate_limits_ to true if the rate limit policy for the route is empty
   // or the route set `include_vh_rate_limits` to true.
   include_vh_rate_limits_ =
@@ -355,7 +360,27 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                        random_value);
 }
 
-bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
+bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const {
+  bool matches = true;
+
+  if (!tlsContextMatchCriteria()) {
+    return matches;
+  }
+
+  const TlsContextMatchCriteria& criteria = *tlsContextMatchCriteria();
+
+  if (criteria.presented().has_value()) {
+    const bool peer_presented = stream_info.downstreamSslConnection() &&
+                                stream_info.downstreamSslConnection()->peerCertificatePresented();
+    matches &= criteria.presented().value() == peer_presented;
+  }
+
+  return matches;
+}
+
+bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random_value) const {
   bool matches = true;
 
   matches &= evaluateRuntimeMatch(random_value);
@@ -374,6 +399,8 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
         Http::Utility::parseQueryString(headers.Path()->value().getStringView());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
+
+  matches &= evaluateTlsContextMatch(stream_info);
 
   return matches;
 }
@@ -737,8 +764,9 @@ void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 }
 
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                  const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, random_value) &&
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       (case_sensitive_
            ? absl::StartsWith(headers.Path()->value().getStringView(), prefix_)
            : absl::StartsWithIgnoreCase(headers.Path()->value().getStringView(), prefix_))) {
@@ -758,8 +786,9 @@ void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 }
 
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, random_value)) {
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     const Http::HeaderString& path = headers.Path()->value();
     absl::string_view query_string = Http::Utility::findQueryStringStart(path);
     size_t compare_length = path.size();
@@ -816,8 +845,9 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 }
 
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
+                                                 const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, random_value)) {
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     if (regex_->match(pathOnly(headers))) {
       return clusterEntry(headers, random_value);
     }
@@ -991,6 +1021,7 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
 }
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
+                                                         const StreamInfo::StreamInfo& stream_info,
                                                          uint64_t random_value) const {
   // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
   // bails early (as it rejects a request), so there is no routing is going to happen anyway.
@@ -1009,7 +1040,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
 
   // Check for a route that matches the request.
   for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    RouteConstSharedPtr route_entry = route->matches(headers, random_value);
+    RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
     if (nullptr != route_entry) {
       return route_entry;
     }
@@ -1053,10 +1084,11 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
 }
 
 RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
+                                        const StreamInfo::StreamInfo& stream_info,
                                         uint64_t random_value) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
-    return virtual_host->getRouteFromEntries(headers, random_value);
+    return virtual_host->getRouteFromEntries(headers, stream_info, random_value);
   } else {
     return nullptr;
   }

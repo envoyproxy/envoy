@@ -761,11 +761,12 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   std::shared_ptr<Router::MockRoute> route = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster_name));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
-      .WillOnce(Invoke([&](const Http::HeaderMap& header_map, uint64_t) {
-        EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
-        return route;
-      }));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
+      .WillOnce(
+          Invoke([&](const Http::HeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t) {
+            EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
+            return route;
+          }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks&) -> void {}));
 
@@ -1548,7 +1549,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
   }));
 
   // This should not be called as we don't have request headers.
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(0);
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _)).Times(0);
 
   EXPECT_CALL(*filter, encodeHeaders(_, _))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -3188,7 +3189,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
       .WillOnce(Return(route1))
       .WillOnce(Return(route2))
       .WillOnce(Return(nullptr));
@@ -4083,7 +4084,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
     decoder->decodeData(fake_data, true);
   }));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
   setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -4165,7 +4166,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
     decoder->decodeTrailers(std::move(trailers));
   }));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
   setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -4259,7 +4260,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
     decoder->decodeData(fake_data2, true);
   }));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
   setupFilterChain(3, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -4645,7 +4646,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
   std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1.get()));
-  EXPECT_CALL(*route_config_, route(_, _)).WillOnce(Return(route1));
+  EXPECT_CALL(*route_config_, route(_, _, _)).WillOnce(Return(route1));
   // First no-scope-found request will be handled by decoder_filters_[0].
   setupFilterChain(1, 0);
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -4679,8 +4680,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       std::make_shared<NiceMock<Router::MockConfig>>();
   std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(*route_config1, route(_, _)).WillRepeatedly(Return(route1));
-  EXPECT_CALL(*route_config2, route(_, _)).WillRepeatedly(Return(route2));
+  EXPECT_CALL(*route_config1, route(_, _, _)).WillRepeatedly(Return(route1));
+  EXPECT_CALL(*route_config2, route(_, _, _)).WillRepeatedly(Return(route2));
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
               getRouteConfig(_))
@@ -4745,7 +4746,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
   EXPECT_CALL(
       *static_cast<const Router::MockConfig*>(
           scopedRouteConfigProvider()->config<Router::MockScopedConfig>()->route_config_.get()),
-      route(_, _))
+      route(_, _, _))
       .WillOnce(Return(route1));
   StreamDecoder* decoder = nullptr;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
