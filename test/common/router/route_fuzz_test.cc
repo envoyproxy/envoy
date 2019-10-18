@@ -51,16 +51,25 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
         // cluster_header from the request header. Because these cluster_headers are destined to be
         // added to a Header Map, we iterate through each route in and remove invalid characters
         // from their cluster headers.
-        std::for_each(virtual_host.mutable_routes()->begin(), virtual_host.mutable_routes()->end(),
-                      [](envoy::api::v2::route::Route& route) {
-                        if (route.has_route()) {
-                          route.mutable_route()->set_cluster_header(
-                              Fuzz::replaceInvalidCharacters(route.route().cluster_header()));
-                          if (route.route().cluster_header().empty()) {
-                            route.mutable_route()->set_cluster_header("not-empty");
-                          }
-                        }
-                      });
+        auto routes = virtual_host.mutable_routes();
+        for (int i = 0; i < routes->size();) {
+          // Erase routes that use a regex matcher. This is deprecated and may cause crashes when
+          // wildcards are matched against very long headers.
+          // See https://github.com/envoyproxy/envoy/issues/7728.
+          if (routes->Get(i).match().path_specifier_case() ==
+              envoy::api::v2::route::RouteMatch::kRegex) {
+            routes->erase(routes->begin() + i);
+          } else {
+            if (routes->Get(i).has_route()) {
+              routes->Mutable(i)->mutable_route()->set_cluster_header(
+                  Fuzz::replaceInvalidCharacters(routes->Mutable(i)->route().cluster_header()));
+              if (routes->Get(i).route().cluster_header().empty()) {
+                routes->Mutable(i)->mutable_route()->set_cluster_header("not-empty");
+              }
+            }
+            ++i;
+          }
+        }
       });
 
   return clean_config;
