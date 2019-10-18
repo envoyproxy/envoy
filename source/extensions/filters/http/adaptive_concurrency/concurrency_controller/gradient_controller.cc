@@ -68,6 +68,7 @@ GradientController::GradientController(GradientControllerConfig config,
     sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   });
 
+  enterMinRTTSamplingWindow();
   sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   stats_.concurrency_limit_.set(concurrency_limit_.load());
 }
@@ -80,6 +81,8 @@ GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
 
 void GradientController::enterMinRTTSamplingWindow() {
   absl::MutexLock ml(&sample_mutation_mtx_);
+
+  stats_.min_rtt_calculation_active_.set(1);
 
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
@@ -102,6 +105,7 @@ void GradientController::updateMinRTT() {
         std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
     updateConcurrencyLimit(deferred_limit_value_.load());
     deferred_limit_value_.store(0);
+    stats_.min_rtt_calculation_active_.set(0);
   }
 
   min_rtt_calc_timer_->enableTimer(

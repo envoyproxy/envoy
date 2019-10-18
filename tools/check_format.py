@@ -51,6 +51,13 @@ SERIALIZE_AS_STRING_WHITELIST = (
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
 
+# Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
+# ones were grandfathered as part of PR #8484 for backwards compatibility.
+HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_length_ms",
+                                      "initialization_time_ms", "loop_duration_us", "poll_delay_us",
+                                      "request_time_ms", "upstream_cx_connect_ms",
+                                      "upstream_cx_length_ms")
+
 # Files in these paths can use std::regex
 STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
                        "./source/common/common/regex.cc",
@@ -64,7 +71,7 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
                                       "envoy_build_fixer.py")
@@ -185,9 +192,9 @@ def checkTools():
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
-        "    export CLANG_FORMAT=clang-format-8.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-8\n"
-        "    export CLANG_FORMAT=/usr/local/opt/llvm@8/bin/clang-format".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=clang-format-9.0.0\n"
+        "    export CLANG_FORMAT=/opt/bin/clang-format-9\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@9/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
@@ -260,6 +267,10 @@ def whitelistedForSerializeAsString(file_path):
 
 def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
+
+
+def whitelistedForHistogramSiSuffix(name):
+  return name in HISTOGRAM_WITH_SI_SUFFIX_WHITELIST
 
 
 def whitelistedForStdRegex(file_path):
@@ -519,6 +530,13 @@ def checkSourceLine(line, file_path, reportError):
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
+
+  hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
+  if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
+    reportError(
+        "Don't suffix histogram names with the unit symbol, "
+        "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
+        "other sinks can add the suffix automatically on flush should they prefer to do so.")
 
   if not whitelistedForStdRegex(file_path) and "std::regex" in line:
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")

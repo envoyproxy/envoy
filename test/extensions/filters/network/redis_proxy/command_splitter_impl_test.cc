@@ -1492,6 +1492,7 @@ public:
   }
 
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
   InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
                          store_, "redis.foo.", time_system_, true};
 };

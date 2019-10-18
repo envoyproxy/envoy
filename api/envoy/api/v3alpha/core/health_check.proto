@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 
 import "envoy/api/v3alpha/core/base.proto";
+import "envoy/type/v3alpha/http.proto";
 import "envoy/type/v3alpha/range.proto";
 
 import "google/protobuf/any.proto";
@@ -63,6 +64,10 @@ message HealthCheck {
 
   // [#comment:next free field: 10]
   message HttpHealthCheck {
+    reserved 7;
+
+    reserved "use_http2";
+
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used.
@@ -94,13 +99,17 @@ message HealthCheck {
     // health checked cluster.
     repeated string request_headers_to_remove = 8;
 
-    // If set, health checks will be made using http/2.
-    bool use_http2 = 7;
-
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
     // semantics of :ref:`Int64Range <envoy_api_msg_type.v3alpha.Int64Range>`.
     repeated type.v3alpha.Int64Range expected_statuses = 9;
+
+    // Use specified application protocol for health checks. This is to replace
+    // :ref:`use_http2
+    // <envoy_api_field_api.v3alpha.core.HealthCheck.HttpHealthCheck.use_http2>` in light of
+    // HTTP3.
+    type.v3alpha.CodecClientType codec_client_type = 10
+        [(validate.rules).enum = {defined_only: true}];
   }
 
   message TcpHealthCheck {

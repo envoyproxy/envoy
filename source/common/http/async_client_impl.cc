@@ -8,6 +8,7 @@
 
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -234,6 +235,14 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
                                    AsyncClient::Callbacks& callbacks,
                                    const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
+
+  if (nullptr != options.parent_span_) {
+    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(),
+                                                   "async " + parent.cluster_->name() + " egress",
+                                                   parent.dispatcher().timeSource().systemTime());
+  } else {
+    child_span_ = std::make_unique<Tracing::NullSpan>();
+  }
 }
 
 void AsyncRequestImpl::initialize() {
@@ -246,9 +255,17 @@ void AsyncRequestImpl::initialize() {
   // TODO(mattklein123): Support request trailers.
 }
 
-void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
+void AsyncRequestImpl::onComplete() {
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
+                                                   response_->trailers(), streamInfo(),
+                                                   Tracing::EgressConfig::get());
+
+  callbacks_.onSuccess(std::move(response_));
+}
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  streamInfo().response_code_ = response_code;
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
@@ -256,6 +273,7 @@ void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
   if (!response_->body()) {
     response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
+  streamInfo().addBytesReceived(data.length());
   response_->body()->move(data);
 }
 
@@ -265,6 +283,17 @@ void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
 
 void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
+    // Add tags about reset.
+    child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    child_span_->setTag(Tracing::Tags::get().ErrorReason, "Reset");
+  }
+
+  // Finalize the span based on whether we received a response or not
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(
+      *child_span_, remoteClosed() ? &response_->headers() : nullptr,
+      remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
+
+  if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.
     callbacks_.onFailure(AsyncClient::FailureReason::Reset);
   }
@@ -272,6 +301,10 @@ void AsyncRequestImpl::onReset() {
 
 void AsyncRequestImpl::cancel() {
   cancelled_ = true;
+
+  // Add tags about the cancellation
+  child_span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
+
   reset();
 }
 

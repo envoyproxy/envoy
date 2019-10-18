@@ -104,6 +104,40 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
+Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfigProvider(
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    const envoy::api::v2::auth::DownstreamTlsContext& config) {
+
+  switch (config.session_ticket_keys_type_case()) {
+  case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeys:
+    return factory_context.secretManager().createInlineTlsSessionTicketKeysProvider(
+        config.session_ticket_keys());
+  case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig: {
+    const auto& sds_secret_config = config.session_ticket_keys_sds_secret_config();
+    if (sds_secret_config.has_sds_config()) {
+      // Fetch dynamic secret.
+      return factory_context.secretManager().findOrCreateTlsSessionTicketKeysContextProvider(
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+    } else {
+      // Load static secret.
+      auto secret_provider =
+          factory_context.secretManager().findStaticTlsSessionTicketKeysContextProvider(
+              sds_secret_config.name());
+      if (!secret_provider) {
+        throw EnvoyException(
+            fmt::format("Unknown tls session ticket keys: {}", sds_secret_config.name()));
+      }
+      return secret_provider;
+    }
+  }
+  case envoy::api::v2::auth::DownstreamTlsContext::SESSION_TICKET_KEYS_TYPE_NOT_SET:
+    return nullptr;
+  default:
+    throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
+                                     config.session_ticket_keys_type_case()));
+  }
+}
+
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
@@ -327,27 +361,22 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
-      session_ticket_keys_([&config, &api = api_] {
-        std::vector<SessionTicketKey> ret;
+      session_ticket_keys_provider_(
+          getTlsSessionTicketKeysConfigProvider(factory_context, config)) {
+  if (session_ticket_keys_provider_ != nullptr) {
+    // Validate tls session ticket keys early to reject bad sds updates.
+    stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(
+        [this](const envoy::api::v2::auth::TlsSessionTicketKeys& keys) {
+          getSessionTicketKeys(keys);
+        });
+  }
 
-        switch (config.session_ticket_keys_type_case()) {
-        case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeys:
-          for (const auto& datasource : config.session_ticket_keys().keys()) {
-            validateAndAppendKey(ret, Config::DataSource::read(datasource, false, api));
-          }
-          break;
-        case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:
-          throw EnvoyException("SDS not supported yet");
-          break;
-        case envoy::api::v2::auth::DownstreamTlsContext::SESSION_TICKET_KEYS_TYPE_NOT_SET:
-          break;
-        default:
-          throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
-                                           config.session_ticket_keys_type_case()));
-        }
+  // Load inline or static secrets.
+  if (session_ticket_keys_provider_ != nullptr &&
+      session_ticket_keys_provider_->secret() != nullptr) {
+    session_ticket_keys_ = getSessionTicketKeys(*session_ticket_keys_provider_->secret());
+  }
 
-        return ret;
-      }()) {
   if ((config.common_tls_context().tls_certificates().size() +
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
     throw EnvoyException("No TLS certificates found for server context");
@@ -357,10 +386,45 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   }
 }
 
-// Append a SessionTicketKey to keys, initializing it with key_data.
+ServerContextConfigImpl::~ServerContextConfigImpl() {
+  if (stk_update_callback_handle_ != nullptr) {
+    stk_update_callback_handle_->remove();
+  }
+  if (stk_validation_callback_handle_ != nullptr) {
+    stk_validation_callback_handle_->remove();
+  }
+}
+
+void ServerContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
+  ContextConfigImpl::setSecretUpdateCallback(callback);
+  if (session_ticket_keys_provider_) {
+    if (stk_update_callback_handle_) {
+      stk_update_callback_handle_->remove();
+    }
+    // Once session_ticket_keys_ receives new secret, this callback updates
+    // ContextConfigImpl::session_ticket_keys_ with new session ticket keys.
+    stk_update_callback_handle_ =
+        session_ticket_keys_provider_->addUpdateCallback([this, callback]() {
+          session_ticket_keys_ = getSessionTicketKeys(*session_ticket_keys_provider_->secret());
+          callback();
+        });
+  }
+}
+
+std::vector<Ssl::ServerContextConfig::SessionTicketKey>
+ServerContextConfigImpl::getSessionTicketKeys(
+    const envoy::api::v2::auth::TlsSessionTicketKeys& keys) {
+  std::vector<Ssl::ServerContextConfig::SessionTicketKey> result;
+  for (const auto& datasource : keys.keys()) {
+    result.emplace_back(getSessionTicketKey(Config::DataSource::read(datasource, false, api_)));
+  }
+  return result;
+}
+
+// Extracts a SessionTicketKey from raw binary data.
 // Throws if key_data is invalid.
-void ServerContextConfigImpl::validateAndAppendKey(
-    std::vector<ServerContextConfig::SessionTicketKey>& keys, const std::string& key_data) {
+Ssl::ServerContextConfig::SessionTicketKey
+ServerContextConfigImpl::getSessionTicketKey(const std::string& key_data) {
   // If this changes, need to figure out how to deal with key files
   // that previously worked. For now, just assert so we'll notice that
   // it changed if it does.
@@ -372,8 +436,7 @@ void ServerContextConfigImpl::validateAndAppendKey(
                                      key_data.size(), sizeof(SessionTicketKey)));
   }
 
-  keys.emplace_back();
-  SessionTicketKey& dst_key = keys.back();
+  SessionTicketKey dst_key;
 
   std::copy_n(key_data.begin(), dst_key.name_.size(), dst_key.name_.begin());
   size_t pos = dst_key.name_.size();
@@ -382,6 +445,8 @@ void ServerContextConfigImpl::validateAndAppendKey(
   std::copy_n(key_data.begin() + pos, dst_key.aes_key_.size(), dst_key.aes_key_.begin());
   pos += dst_key.aes_key_.size();
   ASSERT(key_data.begin() + pos == key_data.end());
+
+  return dst_key;
 }
 
 } // namespace Tls

@@ -89,6 +89,33 @@ jobs:
       artifactName: $(CI_TARGET)
     condition: always()
 
+- job: docker
+  dependsOn: ["bazel"]
+  condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/envoy_binary.tar.gz"
+      downloadType: single
+      targetPath: $(Build.StagingDirectory)
+
+  - bash: |
+      set -e
+      tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+      ci/docker_build.sh
+      ci/docker_push.sh
+      ci/docker_tag.sh
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      AZP_BRANCH: $(Build.SourceBranch)
+      CIRCLE_SHA1: $(Build.SourceVersion)
+      DOCKERHUB_USERNAME: $(DockerUsername)
+      DOCKERHUB_PASSWORD: $(DockerPassword)
+
 - job: fuzzit_fuzzing
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
