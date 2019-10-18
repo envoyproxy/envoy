@@ -197,7 +197,8 @@ public:
    * the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
    * available after construction.
    *
-   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback stderr logger
+   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback
+   * stderr logger
    */
   static DelegatingLogSinkPtr init(bool should_escape_newlines);
 
@@ -259,7 +260,8 @@ public:
   /**
    * Init the singleton sink to use for all loggers.
    *
-   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback stderr logger
+   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback
+   * stderr logger
    */
   static void initSink(bool should_escape_newlines) {
     sink_ = DelegatingLogSink::init(should_escape_newlines);
@@ -268,9 +270,7 @@ public:
   /**
    * @return the singleton sink to use for all loggers.
    */
-  static DelegatingLogSinkPtr getSink() {
-    return sink_;
-  }
+  static DelegatingLogSinkPtr getSink() { return sink_; }
 
   /**
    * Sets the minimum log severity required to print messages.

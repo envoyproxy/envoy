@@ -52,7 +52,8 @@ void StderrSinkDelegate::flush() {
   std::cerr << std::flush;
 }
 
-StderrEscapeNewlineSinkDelegate::StderrEscapeNewlineSinkDelegate(DelegatingLogSinkPtr log_sink) : StderrSinkDelegate(log_sink) {}
+StderrEscapeNewlineSinkDelegate::StderrEscapeNewlineSinkDelegate(DelegatingLogSinkPtr log_sink)
+    : StderrSinkDelegate(log_sink) {}
 
 void StderrEscapeNewlineSinkDelegate::log(absl::string_view msg) {
   Thread::OptionalLockGuard guard(lock_);
@@ -92,8 +93,7 @@ DelegatingLogSinkPtr DelegatingLogSink::init(bool should_escape_newlines) {
     delegating_sink->stderr_sink_ =
         std::make_unique<StderrEscapeNewlineSinkDelegate>(delegating_sink);
   } else {
-    delegating_sink->stderr_sink_ =
-        std::make_unique<StderrSinkDelegate>(delegating_sink);
+    delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
   }
 
   return delegating_sink;
@@ -107,7 +107,8 @@ Context::Context(spdlog::level::level_enum log_level, const std::string& log_for
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock, bool should_escape_newlines)
-    : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_newlines_(should_escape_newlines), save_context_(current_context) {
+    : log_level_(log_level), log_format_(log_format), lock_(lock),
+      should_escape_newlines_(should_escape_newlines), save_context_(current_context) {
   current_context = this;
   activate();
 }
