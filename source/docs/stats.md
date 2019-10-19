@@ -171,3 +171,32 @@ TBD
 ## Disabling statistics by substring or regex
 
 TBD
+
+## Stats Memory Tests
+
+Regardless of the underlying data structures used to implement statistics,
+memory usage will grow with the number of hosts and clusters. When a PR is
+issued that adds new per-host or per-cluster stats, this will have a
+multiplicative effect on consumed memory. This can become significant for
+deployments with O(10k) clusters or hosts.
+
+To improve visibility for this memory growth, there are [memory-usage
+integration
+tests](https://github.com/envoyproxy/envoy/blob/master/test/integration/stats_integration_test.cc).
+
+If a PR fails the tests in that file due to unexpected memory consumption, it
+gives the author and reviewer an opportunity to consider the cost/value of the
+new stats. If the test fails because the new byte-count is lower, then all
+that's needed is to lock in the improvement by updating the expected values. If
+the new per-cluster or per-host memory consumption is higher, then we must
+decide whether the value from the added stats justify the overhead for all Envoy
+deployments. In either case, we must update the golden values and add a comment
+to the table in the test indicating the memory impact of each PR.
+
+Developers trying to can iterate through changes in these tests locally with:
+
+```bash
+  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true \
+      test/integration:stats_integration_test
+```
+
