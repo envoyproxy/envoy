@@ -64,7 +64,7 @@ message HealthCheck {
   }
 
   // [#comment:next free field: 10]
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
