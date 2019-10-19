@@ -404,7 +404,7 @@ bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
   if (!request_handler_) {
     onResponse(std::move(value));
   } else {
-    parent_.onRedirection();
+    parent_.parent_.onRedirection();
   }
   return (request_handler_ != nullptr);
 }
