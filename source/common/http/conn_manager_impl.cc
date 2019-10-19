@@ -1346,8 +1346,6 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     }
     if (snapped_route_config_ != nullptr) {
       route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
-    } else if (route_config_provider_ != nullptr) {
-      route = route_config_provider_->config()->route(*request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -1369,6 +1367,11 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
 
 bool ConnectionManagerImpl::ActiveStream::canRequestRouteConfigUpdate() {
   return route_config_update_requester_->canRequestRouteConfigUpdate();
+}
+
+bool ConnectionManagerImpl::ActiveStream::canResolveRouteAfterConfigUpdate() {
+  return route_config_provider_->config()->route(*request_headers_, stream_info_, stream_id_) !=
+         nullptr;
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -2261,6 +2264,10 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canRequestRouteConfigUpdate() {
   return parent_.canRequestRouteConfigUpdate();
+}
+
+bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canResolveRouteAfterConfigUpdate() {
+  return parent_.canResolveRouteAfterConfigUpdate();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

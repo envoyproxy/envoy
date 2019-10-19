@@ -44,8 +44,9 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 void OnDemandRouteUpdate::onRouteConfigUpdateCompletion() {
   filter_return_ = FilterReturn::ContinueDecoding;
 
-  if (callbacks_->route() != nullptr && // route can be resolved after an on-demand VHDS update
-      !callbacks_->decodingBuffer() &&  // Redirects with body not yet supported.
+  if (callbacks_->canResolveRouteAfterConfigUpdate() && // route can be resolved after an on-demand
+                                                        // VHDS update
+      !callbacks_->decodingBuffer() &&                  // Redirects with body not yet supported.
       callbacks_->recreateStream()) {
     // cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return;

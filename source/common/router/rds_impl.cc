@@ -186,7 +186,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       config_update_info_(subscription_->routeConfigUpdate()),
       factory_context_(factory_context.getServerFactoryContext()),
       validator_(factory_context.messageValidationVisitor()),
-      tls_(factory_context.threadLocal().allocateSlot(),
+      tls_(factory_context.threadLocal().allocateSlot()),
       config_update_callbacks_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {

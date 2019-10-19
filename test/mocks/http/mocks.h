@@ -138,6 +138,7 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD1(requestRouteConfigUpdate, void(std::function<void()>));
   MOCK_METHOD0(canRequestRouteConfigUpdate, bool());
+  MOCK_METHOD0(canResolveRouteAfterConfigUpdate, bool());
   MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());

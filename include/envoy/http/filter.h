@@ -152,20 +152,6 @@ public:
   virtual Router::RouteConstSharedPtr route() PURE;
 
   /**
-   * Schedules a request for a RouteConfiguration update from the management server.
-   * @param route_config_updated_cb callback to be called when the configuration update has been
-   * propagated to the worker thread.
-   */
-  virtual void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb) PURE;
-
-  /**
-   *
-   * @return true if a RouteConfiguration update can be scheduled. Returns false if
-   * RouteConfigProvider doesn't support on-demand updates or VHDS hasn't been configured.
-   */
-  virtual bool canRequestRouteConfigUpdate() PURE;
-
-  /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
    * view of clusterInfo after a route is picked/repicked.
@@ -450,6 +436,26 @@ public:
    * @return The socket options to be applied to the upstream request.
    */
   virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
+
+  /**
+   * Schedules a request for a RouteConfiguration update from the management server.
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to the worker thread.
+   */
+  virtual void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb) PURE;
+
+  /**
+   *
+   * @return true if a RouteConfiguration update can be scheduled. Returns false if
+   * RouteConfigProvider doesn't support on-demand updates or VHDS hasn't been configured.
+   */
+  virtual bool canRequestRouteConfigUpdate() PURE;
+
+  /**
+   *
+   * @return true if a route can be resolved after a VHDS RouteConfig update.
+   */
+  virtual bool canResolveRouteAfterConfigUpdate() PURE;
 };
 
 /**

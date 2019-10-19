@@ -162,12 +162,6 @@ private:
 
     Router::RouteConstSharedPtr route() override;
 
-    void requestRouteConfigUpdate(std::function<void()>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    };
-
-    bool canRequestRouteConfigUpdate() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; };
-
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
 
     void clearRouteCache() override;
@@ -379,6 +373,7 @@ private:
 
     void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb) override;
     bool canRequestRouteConfigUpdate() override;
+    bool canResolveRouteAfterConfigUpdate() override;
 
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
@@ -622,6 +617,7 @@ private:
     void refreshCachedRoute();
     void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb);
     bool canRequestRouteConfigUpdate();
+    bool canResolveRouteAfterConfigUpdate();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
