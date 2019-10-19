@@ -17,21 +17,21 @@ import "validate/validate.proto";
 // Delay specification is used to inject latency into the
 // HTTP/gRPC/Mongo/Redis operation or delay proxying of TCP connections.
 message FaultDelay {
+  enum FaultDelayType {
+    // Unused and deprecated.
+    FIXED = 0;
+  }
+
   // Fault delays are controlled via an HTTP header (if applicable). See the
   // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderDelay {
   }
 
-  enum FaultDelayType {
-    // Unused and deprecated.
-    FIXED = 0;
-  }
+  reserved 2;
 
   // Unused and deprecated. Will be removed in the next release.
   FaultDelayType type = 1 [deprecated = true];
-
-  reserved 2;
 
   oneof fault_delay_secifier {
     option (validate.required) = true;
@@ -42,7 +42,7 @@ message FaultDelay {
     // delay will be injected before a new request/operation. For TCP
     // connections, the proxying of the connection upstream will be delayed
     // for the specified period. This is required if type is FIXED.
-    google.protobuf.Duration fixed_delay = 3 [(validate.rules).duration.gt = {}];
+    google.protobuf.Duration fixed_delay = 3 [(validate.rules).duration = {gt {}}];
 
     // Fault delays are controlled via an HTTP header (if applicable).
     HeaderDelay header_delay = 5;
@@ -57,7 +57,7 @@ message FaultRateLimit {
   // Describes a fixed/constant rate limit.
   message FixedLimit {
     // The limit supplied in KiB/s.
-    uint64 limit_kbps = 1 [(validate.rules).uint64.gte = 1];
+    uint64 limit_kbps = 1 [(validate.rules).uint64 = {gte: 1}];
   }
 
   // Rate limits are controlled via an HTTP header (if applicable). See the

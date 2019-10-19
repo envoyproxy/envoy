@@ -71,7 +71,7 @@ class TlsScope;
  */
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
-  ParentHistogramImpl(StatName name, Store& parent, TlsScope& tlsScope,
+  ParentHistogramImpl(StatName name, Store& parent, TlsScope& tls_scope,
                       absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
   ~ParentHistogramImpl() override;
 
@@ -213,7 +213,7 @@ public:
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
-  void mergeHistograms(PostMergeCb mergeCb) override;
+  void mergeHistograms(PostMergeCb merge_cb) override;
 
 private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
@@ -339,7 +339,7 @@ private:
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, const Event::PostCb& clean_central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
-  void mergeInternal(PostMergeCb mergeCb);
+  void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>

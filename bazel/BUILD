@@ -128,6 +128,13 @@ config_setting(
 )
 
 config_setting(
+    name = "dynamic_link_tests",
+    values = {
+        "define": "dynamic_link_tests=true",
+    },
+)
+
+config_setting(
     name = "disable_tcmalloc",
     values = {"define": "tcmalloc=disabled"},
 )
@@ -349,4 +356,9 @@ alias(
             "//conditions:default": ":darwin_x86_64",
         },
     ),
+)
+
+alias(
+    name = "crypto_utility_lib",
+    actual = "//source/extensions/common/crypto:utility_lib",
 )

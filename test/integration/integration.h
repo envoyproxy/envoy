@@ -220,12 +220,14 @@ public:
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
   // compareDiscoveryRequest() and sendDiscoveryResponse(), but the SotW/delta-specific versions are
   // available if you're writing a SotW/delta-specific test.
+  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
+  // it.
   AssertionResult
   compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
                           const std::vector<std::string>& expected_resource_names,
                           const std::vector<std::string>& expected_resource_names_added,
                           const std::vector<std::string>& expected_resource_names_removed,
-                          bool expect_node = false,
+                          bool expect_node = true,
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "");
   template <class T>
@@ -256,9 +258,12 @@ public:
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
+
+  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
+  // it.
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names, bool expect_node = false,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = true,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
@@ -271,8 +276,11 @@ public:
     for (const auto& message : messages) {
       discovery_response.add_resources()->PackFrom(message);
     }
+    static int next_nonce_counter = 0;
+    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     xds_stream_->sendGrpcMessage(discovery_response);
   }
+
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
@@ -296,7 +304,8 @@ public:
       resource->mutable_resource()->PackFrom(message);
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-    response.set_nonce("noncense");
+    static int next_nonce_counter = 0;
+    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
     stream->sendGrpcMessage(response);
   }
 

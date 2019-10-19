@@ -8,10 +8,11 @@ option java_package = "io.envoyproxy.envoy.service.auth.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/type/http_status.proto";
 import "envoy/service/auth/v2/attribute_context.proto";
+import "envoy/type/http_status.proto";
 
 import "google/rpc/status.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Authorization Service ]
@@ -24,7 +25,8 @@ import "validate/validate.proto";
 service Authorization {
   // Performs authorization check based on the attributes associated with the
   // incoming request, and returns status `OK` or not `OK`.
-  rpc Check(CheckRequest) returns (CheckResponse);
+  rpc Check(CheckRequest) returns (CheckResponse) {
+  }
 }
 
 message CheckRequest {
@@ -36,11 +38,11 @@ message CheckRequest {
 message DeniedHttpResponse {
   // This field allows the authorization service to send a HTTP response status
   // code to the downstream client other than 403 (Forbidden).
-  envoy.type.HttpStatus status = 1 [(validate.rules).message.required = true];
+  type.HttpStatus status = 1 [(validate.rules).message = {required: true}];
 
   // This field allows the authorization service to send HTTP response headers
   // to the downstream client.
-  repeated envoy.api.v2.core.HeaderValueOption headers = 2;
+  repeated api.v2.core.HeaderValueOption headers = 2;
 
   // This field allows the authorization service to send a response body data
   // to the downstream client.
@@ -55,7 +57,7 @@ message OkHttpResponse {
   // the filter will append the correspondent header value to the matched request header. Note that
   // by Leaving `append` as false, the filter will either add a new header, or override an existing
   // one if there is a match.
-  repeated envoy.api.v2.core.HeaderValueOption headers = 2;
+  repeated api.v2.core.HeaderValueOption headers = 2;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.

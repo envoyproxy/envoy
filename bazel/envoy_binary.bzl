@@ -19,7 +19,8 @@ def envoy_cc_binary(
         repository = "",
         stamped = False,
         deps = [],
-        linkopts = []):
+        linkopts = [],
+        tags = []):
     if not linkopts:
         linkopts = _envoy_linkopts()
     if stamped:
@@ -38,6 +39,7 @@ def envoy_cc_binary(
         malloc = tcmalloc_external_dep(repository),
         stamp = 1,
         deps = deps,
+        tags = tags,
     )
 
 # Select the given values if exporting is enabled in the current build.

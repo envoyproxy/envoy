@@ -13,7 +13,7 @@ namespace Envoy {
 namespace {
 
 class ScopedRdsIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::DeltaSotwGrpcClientIntegrationParamTest {
+                                 public Grpc::DeltaSotwIntegrationParamTest {
 protected:
   struct FakeUpstreamInfo {
     FakeHttpConnectionPtr connection_;
@@ -217,6 +217,8 @@ fragments:
         response);
   }
 
+  bool isDelta() { return sotwOrDelta() == Grpc::SotwOrDelta::Delta; }
+
   const std::string srds_config_name_{"foo-scoped-routes"};
   FakeUpstreamInfo scoped_rds_upstream_info_;
   FakeUpstreamInfo rds_upstream_info_;
@@ -266,7 +268,7 @@ key:
                               {":scheme", "http"},
                               {"Addr", "x-foo-key=xyz-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
   // Test "foo-route" and 'bar-route' both gets routed to cluster_0.
@@ -337,7 +339,7 @@ key:
                               {":scheme", "http"},
                               {"Addr", "x-foo-key=foo-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
   // Add a new scope foo_scope4.
   const std::string& scope_route4 =
@@ -398,7 +400,7 @@ key:
                                                                    {":scheme", "http"},
                                                                    {"Addr", "x-foo-key=foo"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
   // SRDS update fixed the problem.

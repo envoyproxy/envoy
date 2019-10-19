@@ -188,6 +188,13 @@ TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
     Buffer::OwnedImpl data("PRI * HTTP/");
     EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data(" PRI * HTTP/2");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
 }
 
 // Verify external request and XFF is set when we are using remote address and the address is

@@ -35,7 +35,7 @@ public:
   // A HeaderData specifies one of exact value or regex or range element
   // to match in a request's header, specified in the header_match_type_ member.
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
-  struct HeaderData {
+  struct HeaderData : public HeaderMatcher {
     HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
     HeaderData(const Json::Object& config);
 
@@ -45,18 +45,35 @@ public:
     Regex::CompiledMatcherPtr regex_;
     envoy::type::Int64Range range_;
     const bool invert_match_;
+
+    // HeaderMatcher
+    bool matchesHeaders(const HeaderMap& headers) const override {
+      return HeaderUtility::matchHeaders(headers, *this);
+    };
   };
 
   using HeaderDataPtr = std::unique_ptr<HeaderData>;
 
   /**
-   * Build a vector of HeaderData given input config.
+   * Build a vector of HeaderDataPtr given input config.
    */
   static std::vector<HeaderUtility::HeaderDataPtr> buildHeaderDataVector(
       const Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher>& header_matchers) {
     std::vector<HeaderUtility::HeaderDataPtr> ret;
-    for (const auto& header_match : header_matchers) {
-      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_match));
+    for (const auto& header_matcher : header_matchers) {
+      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_matcher));
+    }
+    return ret;
+  }
+
+  /**
+   * Build a vector of HeaderMatcherSharedPtr given input config.
+   */
+  static std::vector<Http::HeaderMatcherSharedPtr> buildHeaderMatcherVector(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher>& header_matchers) {
+    std::vector<Http::HeaderMatcherSharedPtr> ret;
+    for (const auto& header_matcher : header_matchers) {
+      ret.emplace_back(std::make_shared<HeaderUtility::HeaderData>(header_matcher));
     }
     return ret;
   }

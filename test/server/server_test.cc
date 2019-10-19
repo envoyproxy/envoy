@@ -316,6 +316,16 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   server_thread->join();
 }
 
+// Validates that the "server.version" is updated with stats_server_version_override from bootstrap.
+TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
+  auto server_thread = startTestServer("test/server/proxy_version_bootstrap.yaml", true);
+
+  EXPECT_EQ(100012001, TestUtility::findGauge(stats_store_, "server.version")->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -853,8 +863,8 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
 
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
 
-  ProcessContext& context = server_->processContext();
-  auto& object_from_context = dynamic_cast<TestObject&>(context.get());
+  auto context = server_->processContext();
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
   EXPECT_EQ(&object_from_context, &object);
   EXPECT_TRUE(object_from_context.boolean_flag_);
 

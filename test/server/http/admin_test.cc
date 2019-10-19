@@ -947,11 +947,11 @@ TEST_P(AdminInstanceTest, Runtime) {
   Runtime::MockLoader loader;
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
-  Runtime::Snapshot::EntryMap entries2{{"string_key", {"override", {}, {}, {}}},
-                                       {"extra_key", {"bar", {}, {}, {}}}};
-  Runtime::Snapshot::EntryMap entries1{{"string_key", {"foo", {}, {}, {}}},
-                                       {"int_key", {"1", 1, {}, {}}},
-                                       {"other_key", {"bar", {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries2{{"string_key", {"override", {}, {}, {}, {}}},
+                                       {"extra_key", {"bar", {}, {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries1{{"string_key", {"foo", {}, {}, {}, {}}},
+                                       {"int_key", {"1", 1, {}, {}, {}}},
+                                       {"other_key", {"bar", {}, {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -1091,14 +1091,27 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));
 
   // Add stats in random order and validate that they come in order.
-  Stats::IsolatedStoreImpl store;
-  store.counter("test_counter").add(10);
-  store.counter("rest_counter").add(10);
-  store.counter("arest_counter").add(5);
-  store.gauge("test_gauge", Stats::Gauge::ImportMode::Accumulate).set(11);
-  store.gauge("atest_gauge", Stats::Gauge::ImportMode::Accumulate).set(10);
-  ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
-  ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
+  Stats::PrimitiveCounter test_counter;
+  test_counter.add(10);
+  Stats::PrimitiveCounter rest_counter;
+  rest_counter.add(10);
+  Stats::PrimitiveCounter arest_counter;
+  arest_counter.add(5);
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters = {
+      {"arest_counter", arest_counter},
+      {"rest_counter", rest_counter},
+      {"test_counter", test_counter},
+  };
+  Stats::PrimitiveGauge test_gauge;
+  test_gauge.set(11);
+  Stats::PrimitiveGauge atest_gauge;
+  atest_gauge.set(10);
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges = {
+      {"atest_gauge", atest_gauge},
+      {"test_gauge", test_gauge},
+  };
+  ON_CALL(*host, counters()).WillByDefault(Invoke([&counters]() { return counters; }));
+  ON_CALL(*host, gauges()).WillByDefault(Invoke([&gauges]() { return gauges; }));
 
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
       .WillByDefault(Return(true));

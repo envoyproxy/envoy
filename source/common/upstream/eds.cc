@@ -10,7 +10,7 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api, bool is_delta)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
       cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
@@ -26,7 +26,7 @@ EdsClusterImpl::EdsClusterImpl(
           eds_config,
           Grpc::Common::typeUrl(
               envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
-          info_->statsScope(), *this);
+          info_->statsScope(), *this, is_delta);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -253,11 +253,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
 
 void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                           const EnvoyException*) {
-  //  We should not call onPreInitComplete if this method is called because of stream disconnection.
-  // This might potentially hang the initialization forever, if init_fetch_timeout is disabled.
-  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
-    return;
-  }
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }
@@ -272,8 +268,9 @@ EdsClusterFactory::createClusterImpl(
   }
 
   return std::make_pair(
-      std::make_shared<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                       std::move(stats_scope), context.addedViaApi()),
+      std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
+                                       std::move(stats_scope), context.addedViaApi(),
+                                       context.clusterManager().xdsIsDelta()),
       nullptr);
 }
 
