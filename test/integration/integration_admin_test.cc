@@ -123,11 +123,6 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    auto* outbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    outbound_listener->set_traffic_direction(envoy::api::v2::core::TrafficDirection::OUTBOUND);
-    outbound_listener->set_name("outbound_0");
-  });
   Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
   initialize();
 
@@ -454,8 +449,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
-  // Validate that the inboundonly does not stop the configured listeners as it has been configured
-  // with OUTBOUND traffic direction.
+  // Validate that the inboundonly does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",
                                                 downstreamProtocol(), version_);
@@ -468,7 +462,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_FALSE(test_server_->gauge("listener_manager.total_listeners_stopped")->used());
   EXPECT_EQ(0, test_server_->gauge("listener_manager.total_listeners_stopped")->value());
 
-  // Now validate that the drain_listeners calls the OUTBOUND listener as well.
+  // Now validate that the drain_listeners stops the listeners.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
