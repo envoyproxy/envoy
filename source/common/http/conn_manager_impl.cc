@@ -63,7 +63,7 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   // match, then we must be processing a new filter for the first time. We omit this check if we're
   // the first filter, since the above check handles that case.
   //
-  // We compare against the previous filter to avoid multiple filter iterations from resetting the
+  // We compare against the previous filter to avoid multiple filter iterations from reseting the
   // pointer: If we just set latest to current, then the first onData filter iteration would
   // correctly iterate over the filters and set latest, but on subsequent onData iterations
   // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
