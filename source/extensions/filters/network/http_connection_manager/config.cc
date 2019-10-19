@@ -187,6 +187,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!idle_timeout_) {
     idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout);
   }
+  if (!idle_timeout_) {
+    idle_timeout_ = std::chrono::hours(1);
+  } else if (idle_timeout_.value().count() == 0) {
+    idle_timeout_ = absl::nullopt;
+  }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
@@ -336,6 +341,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP2:
     codec_type_ = CodecType::HTTP2;
     break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP3:
+    codec_type_ = CodecType::HTTP3;
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -418,6 +426,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
+  case CodecType::HTTP3:
+    // TODO(danzh) create QUIC specific codec.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,

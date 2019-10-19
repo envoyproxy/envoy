@@ -66,6 +66,7 @@ message LightstepConfig {
 }
 
 // Configuration for the Zipkin tracer.
+// [#next-free-field: 6]
 message ZipkinConfig {
   // Available Zipkin collector endpoint versions.
   enum CollectorEndpointVersion {
@@ -134,6 +135,7 @@ message DatadogConfig {
 }
 
 // Configuration for the OpenCensus tracer.
+// [#next-free-field: 13]
 message OpenCensusConfig {
   enum TraceContext {
     // No-op default, no trace context is utilized.

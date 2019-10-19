@@ -44,7 +44,7 @@ for how to update or override dependencies.
     sudo apt-get install \
        libtool \
        cmake \
-       clang-format-8 \
+       clang-format-9 \
        automake \
        autoconf \
        make \
@@ -145,10 +145,10 @@ bazel build --config=libc++ //source/exe:envoy-static
 ```
 Note: this assumes that both: clang compiler and libc++ library are installed in the system,
 and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
-include them in the search path, e.g. `export PATH=/usr/lib/llvm-8/bin:$PATH`.
+include them in the search path, e.g. `export PATH=/usr/lib/llvm-9/bin:$PATH`.
 
 You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
-might look like `sudo apt-get install libc++abi-8-dev libc++-8-dev`.
+might look like `sudo apt-get install libc++abi-9-dev libc++-9-dev`.
 
 Note: this configuration currently doesn't work with Remote Execution or Docker sandbox.
 
@@ -590,14 +590,13 @@ to run clang-format scripts on your workstation directly:
  * Type-ahead doesn't always work when waiting running a command through docker
 
 To run the tools directly, you must install the correct version of clang. This
-may change over time but as of June 2019,
-[clang+llvm-8.0.0](https://releases.llvm.org/download.html) works well. You must
+may change over time, check the version of clang in the docker image. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-8.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 

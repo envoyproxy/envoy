@@ -17,9 +17,9 @@ REPOSITORY_LOCATIONS = dict(
         ],
     ),
     envoy_build_tools = dict(
-        sha256 = "87e0968792b139b462621f5bd56c03126bc06ae4d408f1e956749f12fcc090d9",
-        strip_prefix = "envoy-build-tools-4433e52437af6936d0af95ebc3b16b4b6df38618",
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/4433e52437af6936d0af95ebc3b16b4b6df38618.tar.gz"],
+        sha256 = "92ccfd1fa27ffa74a86258d8c82719cdc0e13fa919eebe3bceaa0496c83d8e2b",
+        strip_prefix = "envoy-build-tools-cbd8d02d9d1521e4c01fc3f58ad4a22cf5636f30",
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/cbd8d02d9d1521e4c01fc3f58ad4a22cf5636f30.tar.gz"],
     ),
     boringssl = dict(
         sha256 = "891352824e0f7977bc0c291b8c65076e3ed23630334841b93f346f12d4484b06",
@@ -170,10 +170,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "38a93926f362a330a2a4489ed799c260df0bc305417e2bb44d6745671d9641d7",
-        strip_prefix = "jwt_verify_lib-7e3191b0dcb72835aa63e308a53b541e7fda5458",
-        # 2019-09-23
-        urls = ["https://github.com/google/jwt_verify_lib/archive/7e3191b0dcb72835aa63e308a53b541e7fda5458.tar.gz"],
+        sha256 = "b42ad9d286e267b265080e97bacb99c27bce39db93a6c34be9575ddd9a3edd7a",
+        strip_prefix = "jwt_verify_lib-945805866007edb9d2760915abaa672ed8b7da86",
+        # 2019-10-07
+        urls = ["https://github.com/google/jwt_verify_lib/archive/945805866007edb9d2760915abaa672ed8b7da86.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -277,5 +277,14 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "38bc0426ee15b5ed67957017fd18201965df0721327be13f60496f2b356e3e01",
         strip_prefix = "re2-2019-08-01",
         urls = ["https://github.com/google/re2/archive/2019-08-01.tar.gz"],
+    ),
+    # Included to access FuzzedDataProvider.h. This is compiler agnostic but
+    # provided as part of the compiler-rt source distribution. We can't use the
+    # Clang variant as we are not a Clang-LLVM only shop today.
+    org_llvm_releases_compiler_rt = dict(
+        sha256 = "56e4cd96dd1d8c346b07b4d6b255f976570c6f2389697347a6c3dcb9e820d10e",
+        # Only allow peeking at fuzzer related files for now.
+        strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
+        urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
     ),
 )

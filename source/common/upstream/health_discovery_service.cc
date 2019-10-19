@@ -246,9 +246,11 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::TransportSocketFactoryPtr socket_factory =
       Upstream::createTransportSocketFactory(params.cluster_, factory_context);
+  auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
+      params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
 
   return std::make_unique<ClusterInfoImpl>(
-      params.cluster_, params.bind_config_, params.runtime_, std::move(socket_factory),
+      params.cluster_, params.bind_config_, params.runtime_, std::move(socket_matcher),
       std::move(scope), params.added_via_api_, params.validation_visitor_, factory_context);
 }
 

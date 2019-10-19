@@ -56,6 +56,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "connection_balancer_lib",
+    srcs = ["connection_balancer_impl.cc"],
+    hdrs = ["connection_balancer_impl.h"],
+    deps = [
+        "//include/envoy/network:connection_balancer_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "connection_lib",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],

@@ -92,9 +92,8 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
 
 } // namespace
 
-void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
-                                      const Upstream::ClusterInfo& cluster) {
-  if (cluster.transportSocketFactory().implementsSecureTransport()) {
+void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport) {
+  if (use_secure_transport) {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);
@@ -534,7 +533,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
-  FilterUtility::setUpstreamScheme(headers, *cluster_);
+  FilterUtility::setUpstreamScheme(
+      headers, conn_pool->host()->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
@@ -906,8 +906,8 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   // TODO: The reset may also come from upstream over the wire. In this case it should be
   // treated as external origin error and distinguished from local origin error.
-  // This matters only when running OutlierDetection with split_external_local_origin_errors config
-  // param set to true.
+  // This matters only when running OutlierDetection with split_external_local_origin_errors
+  // config param set to true.
   updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, upstream_request,
                          absl::nullopt);
 
@@ -1276,15 +1276,16 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
 
-  // If the internal redirect succeeds, callbacks_->recreateStream() will result in the destruction
-  // of this filter before the stream is marked as complete, and onDestroy will reset the stream.
+  // If the internal redirect succeeds, callbacks_->recreateStream() will result in the
+  // destruction of this filter before the stream is marked as complete, and onDestroy will reset
+  // the stream.
   //
-  // Normally when a stream is complete we signal this by resetting the upstream but this cam not be
-  // done in this case because if recreateStream fails, the "failure" path continues to call code
-  // in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy performing
-  // a spurious stream reset in the case recreateStream() succeeds, we explicitly track stream
-  // completion here and check it in onDestroy. This is annoyingly complicated but is better than
-  // needlessly resetting streams.
+  // Normally when a stream is complete we signal this by resetting the upstream but this cam not
+  // be done in this case because if recreateStream fails, the "failure" path continues to call
+  // code in onUpstreamHeaders which requires the upstream *not* be reset. To avoid onDestroy
+  // performing a spurious stream reset in the case recreateStream() succeeds, we explicitly track
+  // stream completion here and check it in onDestroy. This is annoyingly complicated but is
+  // better than needlessly resetting streams.
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
@@ -1355,7 +1356,6 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false) {
-
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
@@ -1409,7 +1409,8 @@ void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& head
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
-  // TODO(rodaine): This is actually measuring after the headers are parsed and not the first byte.
+  // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
+  // byte.
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
@@ -1455,9 +1456,9 @@ void Filter::UpstreamRequest::encodeHeaders(bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
-  // It's possible for a reset to happen inline within the newStream() call. In this case, we might
-  // get deleted inline as well. Only write the returned handle out if it is not nullptr to deal
-  // with this case.
+  // It's possible for a reset to happen inline within the newStream() call. In this case, we
+  // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
+  // deal with this case.
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(*this, *this);
   if (handle) {
     conn_pool_stream_handle_ = handle;
@@ -1575,8 +1576,8 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPerTryTimeout() {
-  // If we've sent anything downstream, ignore the per try timeout and let the response continue up
-  // to the global timeout
+  // If we've sent anything downstream, ignore the per try timeout and let the response continue
+  // up to the global timeout
   if (!parent_.downstream_response_started_) {
     ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
 
@@ -1650,11 +1651,11 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                 end_stream && !delay_headers_end_stream);
   calling_encode_headers_ = false;
 
-  // It is possible to get reset in the middle of an encodeHeaders() call. This happens for example
-  // in the HTTP/2 codec if the frame cannot be encoded for some reason. This should never happen
-  // but it's unclear if we have covered all cases so protect against it and test for it. One
-  // specific example of a case where this happens is if we try to encode a total header size that
-  // is too big in HTTP/2 (64K currently).
+  // It is possible to get reset in the middle of an encodeHeaders() call. This happens for
+  // example in the HTTP/2 codec if the frame cannot be encoded for some reason. This should never
+  // happen but it's unclear if we have covered all cases so protect against it and test for it.
+  // One specific example of a case where this happens is if we try to encode a total header size
+  // that is too big in HTTP/2 (64K currently).
   if (deferred_reset_reason_) {
     onResetStream(deferred_reset_reason_.value(), absl::string_view());
   } else {

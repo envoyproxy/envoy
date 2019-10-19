@@ -1111,5 +1111,12 @@ TEST(HeaderMapImplTest, TestHeaderMapImplyCopy) {
   EXPECT_EQ("bar", baz.get(LowerCaseString("foo"))->value().getStringView());
 }
 
+TEST(HeaderMapImplTest, TestInlineHeaderAdd) {
+  TestHeaderMapImpl foo;
+  foo.addCopy(":path", "GET");
+  EXPECT_EQ(foo.size(), 1);
+  EXPECT_TRUE(foo.Path() != nullptr);
+}
+
 } // namespace Http
 } // namespace Envoy

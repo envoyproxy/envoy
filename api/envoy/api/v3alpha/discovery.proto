@@ -15,6 +15,7 @@ import "google/rpc/status.proto";
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
+// [#next-free-field: 7]
 message DiscoveryRequest {
   // The version_info provided in the request messages will be the version_info
   // received with the most recent successfully processed response or empty on
@@ -57,6 +58,7 @@ message DiscoveryRequest {
   google.rpc.Status error_detail = 6;
 }
 
+// [#next-free-field: 7]
 message DiscoveryResponse {
   // The version of the response data.
   string version_info = 1;
@@ -131,6 +133,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
+// [#next-free-field: 8]
 message DeltaDiscoveryRequest {
   // The node making the request.
   core.Node node = 1;
@@ -187,6 +190,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
+// [#next-free-field: 7]
 message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;

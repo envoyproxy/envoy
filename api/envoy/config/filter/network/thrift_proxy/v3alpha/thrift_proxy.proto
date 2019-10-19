@@ -55,6 +55,7 @@ enum ProtocolType {
 }
 
 // [#comment:next free field: 6]
+// [#next-free-field: 6]
 message ThriftProxy {
   // Supplies the type of transport that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_TRANSPORT<envoy_api_enum_value_config.filter.network.thrift_proxy.v3alpha.TransportType.AUTO_TRANSPORT>`.

@@ -27,6 +27,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
@@ -152,6 +153,7 @@ public:
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
+  Server::Instance& server() { return server_; }
 
 private:
   /**
@@ -287,6 +289,18 @@ private:
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
+  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
+                                       Http::HeaderMap& response_headers,
+                                       Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
+                                            Http::HeaderMap& response_headers,
+                                            Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
+                                              Http::HeaderMap& response_headers,
+                                              Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
+                                             Http::HeaderMap& response_headers,
+                                             Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerReady(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -327,11 +341,13 @@ private:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
+    Network::NopConnectionBalancerImpl connection_balancer_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 

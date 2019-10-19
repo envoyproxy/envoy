@@ -57,6 +57,7 @@ service VirtualHostDiscoveryService {
 }
 
 // [#comment:next free field: 11]
+// [#next-free-field: 11]
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name

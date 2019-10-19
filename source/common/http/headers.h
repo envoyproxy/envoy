@@ -274,6 +274,7 @@ public:
     const std::string Http10String{"HTTP/1.0"};
     const std::string Http11String{"HTTP/1.1"};
     const std::string Http2String{"HTTP/2"};
+    const std::string Http3String{"HTTP/3"};
   } ProtocolStrings;
 
   struct {
