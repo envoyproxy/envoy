@@ -73,7 +73,7 @@ public:
   virtual std::string toString(const StatName& stat_name) const PURE;
 
   /**
-   * Determines whether one StatName lexically precedes another. Note that
+   * Deterines whether one StatName lexically precedes another. Note that
    * the lexical order may not exactly match the lexical order of the
    * elaborated strings. For example, stat-name of "-.-" would lexically
    * sort after "---" but when encoded as a StatName would come lexically

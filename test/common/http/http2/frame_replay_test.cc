@@ -214,7 +214,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
 }
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS frame doesn't crash or
-// trigger ASSERTs. This is a litmus test for the HTTP/2 codec (nghttp2) to demonstrate that it
+// trigger ASSERTs. This is a litmus test for the HTTP/2 codec (nghttp2) to demonsrate that it
 // doesn't suffer from the issue reported for http-parser in CVE-2019-9900. See also
 // https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a non-compressed frame with no
 // Huffman encoding to simplify.
@@ -249,7 +249,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS field name or value
 // yields a CodecProtocolException or stream reset. This is a litmus test for the HTTP/2 codec
-// (nghttp2) to demonstrate that it doesn't suffer from the issue reported for http-parser in
+// (nghttp2) to demonsrate that it doesn't suffer from the issue reported for http-parser in
 // CVE-2019-9900. See also https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a
 // non-compressed frame with no Huffman encoding to simplify.
 TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
@@ -287,7 +287,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS field name or value
 // yields a CodecProtocolException or stream reset. This is a litmus test for the HTTP/2 codec
-// (nghttp2) to demonstrate that it doesn't suffer from the issue reported for http-parser in
+// (nghttp2) to demonsrate that it doesn't suffer from the issue reported for http-parser in
 // CVE-2019-9900. See also https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a
 // non-compressed frame with no Huffman encoding to simplify.
 TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {

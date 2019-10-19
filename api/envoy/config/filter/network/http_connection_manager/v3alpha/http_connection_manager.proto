@@ -340,7 +340,7 @@ message HttpConnectionManager {
   // .. NOTE::
   //    To be useful in avoiding the race condition described above, this timeout must be set
   //    to *at least* <max round trip time expected between clients and Envoy>+<100ms to account for
-  //    a reasonable "worst" case processing time for a full iteration of Envoy's event loop>.
+  //    a reasonsable "worst" case processing time for a full iteration of Envoy's event loop>.
   //
   // .. WARNING::
   //    A value of 0 will completely disable delayed close processing. When disabled, the downstream

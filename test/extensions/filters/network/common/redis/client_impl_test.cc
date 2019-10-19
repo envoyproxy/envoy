@@ -32,7 +32,7 @@ namespace Client {
 
 class RedisClientImplTest : public testing::Test, public Common::Redis::DecoderFactory {
 public:
-  // Common::Redis::DecoderFactory
+  // Commmon::Redis::DecoderFactory
   Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
     callbacks_ = &callbacks;
     return Common::Redis::DecoderPtr{decoder_};
