@@ -91,12 +91,6 @@ public:
   virtual TimeSource& timeSource() PURE;
 
   /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
    * @return Api::Api& a reference to the api object.
    */
   virtual Api::Api& api() PURE;
@@ -199,6 +193,12 @@ public:
    * process context. Will be unset when running in validation mode.
    */
   virtual OptProcessContextRef processContext() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
