@@ -162,7 +162,11 @@ private:
 
     Router::RouteConstSharedPtr route() override;
 
-    bool requestRouteConfigUpdate(std::function<void()> cb) override;
+    void requestRouteConfigUpdate(std::function<void()>) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    };
+
+    bool canRequestRouteConfigUpdate() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; };
 
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
 
@@ -373,6 +377,9 @@ private:
 
     void requestDataDrained();
 
+    void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb) override;
+    bool canRequestRouteConfigUpdate() override;
+
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
   };
@@ -463,8 +470,6 @@ private:
 
     void responseDataDrained();
 
-    bool requestRouteConfigUpdate(std::function<void()>) override { return false; }
-
     StreamEncoderFilterSharedPtr handle_;
   };
 
@@ -473,15 +478,19 @@ private:
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;
-    virtual bool requestRouteConfigUpdate(const HeaderString& host, std::function<void()> cb) PURE;
+    virtual void requestRouteConfigUpdate(const HeaderString&, std::function<void()>) {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    };
+    virtual bool canRequestRouteConfigUpdate() { return false; }
   };
 
   class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
-    bool requestRouteConfigUpdate(const HeaderString& host,
-                                          std::function<void()> cb) override;
+    void requestRouteConfigUpdate(const HeaderString& host,
+                                  std::function<void()> route_config_updated_cb) override;
+    bool canRequestRouteConfigUpdate() override;
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
@@ -490,9 +499,6 @@ private:
   class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
   public:
     NullRouteConfigUpdateRequester() = default;
-    bool requestRouteConfigUpdate(const HeaderString&, std::function<void()>) override {
-      return false;
-    }
   };
 
   /**
@@ -614,7 +620,8 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
-    bool requestRouteConfigUpdate(std::function<void()> cb);
+    void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb);
+    bool canRequestRouteConfigUpdate();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.

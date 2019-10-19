@@ -46,7 +46,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
 }
 
 void VhdsSubscription::updateOnDemand(const std::set<std::string>& aliases) {
-  subscription_->addResourceAliases(aliases);
+  subscription_->requestAliasResolution(aliases);
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

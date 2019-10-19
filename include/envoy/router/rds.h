@@ -57,13 +57,13 @@ public:
   /**
    * Callback used to request an update to the route configuration from the management server.
    * @param for_domain supplies the domain name that virtual hosts must match on
-   * @param cb callback to be called when the configuration update has been propagated to worker
-   * threads
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to worker threads
    * @return whether a request for a configuration update has been scheduled (returns false only
    * if VHDS isn't configured)
    */
-  virtual bool requestVirtualHostsUpdate(const std::string& for_domain,
-                                         std::function<void()> cb) PURE;
+  virtual void requestVirtualHostsUpdate(const std::string& for_domain,
+                                         std::function<void()> route_config_updated_cb) PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;

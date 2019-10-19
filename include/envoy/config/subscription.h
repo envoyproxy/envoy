@@ -96,7 +96,9 @@ public:
    * Add aliases for resources to fetch.
    * @param resources set of aliases to fetch.
    */
-  virtual void addResourceAliases(const std::set<std::string>&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual void requestAliasResolution(const std::set<std::string>&) {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

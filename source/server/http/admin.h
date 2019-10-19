@@ -181,8 +181,8 @@ private:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
     void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
-    bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
-      return false;
+    void requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     Router::ConfigConstSharedPtr config_;

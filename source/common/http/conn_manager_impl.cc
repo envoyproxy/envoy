@@ -481,11 +481,15 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
-bool ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    const HeaderString& host, std::function<void()> cb) {
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
+    const HeaderString& host, std::function<void()> route_config_updated_cb) {
   ASSERT(!host.empty());
   auto host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
-  return route_config_provider_->requestVirtualHostsUpdate(host_header, cb);
+  route_config_provider_->requestVirtualHostsUpdate(host_header, route_config_updated_cb);
+}
+
+bool ConnectionManagerImpl::RdsRouteConfigUpdateRequester::canRequestRouteConfigUpdate() {
+  return route_config_provider_->config()->usesVhds();
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
@@ -1357,9 +1361,14 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   }
 }
 
-bool ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(std::function<void()> cb) {
-  return route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
-                                                                  cb);
+void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
+    std::function<void()> route_config_updated_cb) {
+  route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
+                                                           route_config_updated_cb);
+}
+
+bool ConnectionManagerImpl::ActiveStream::canRequestRouteConfigUpdate() {
+  return route_config_update_requester_->canRequestRouteConfigUpdate();
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -2094,11 +2103,6 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
   return parent_.cached_route_.value();
 }
 
-bool ConnectionManagerImpl::ActiveStreamFilterBase::requestRouteConfigUpdate(
-    std::function<void()> cb) {
-  return parent_.requestRouteConfigUpdate(cb);
-}
-
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   parent_.cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
@@ -2248,6 +2252,15 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
+    std::function<void()> route_config_updated_cb) {
+  parent_.requestRouteConfigUpdate(route_config_updated_cb);
+}
+
+bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canRequestRouteConfigUpdate() {
+  return parent_.canRequestRouteConfigUpdate();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

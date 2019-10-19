@@ -72,8 +72,8 @@ public:
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
   void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
-  bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
-    return false;
+  void requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
 private:
@@ -196,7 +196,8 @@ public:
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
-  bool requestVirtualHostsUpdate(const std::string& for_domain, std::function<void()> cb) override;
+  void requestVirtualHostsUpdate(const std::string& for_domain,
+                                 std::function<void()> route_config_updated_cb) override;
   void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
 private:
@@ -207,8 +208,6 @@ private:
 
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
                              Server::Configuration::FactoryContext& factory_context);
-
-  //  void addConfigUpdateCallback(std::function<void()> cb);
 
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;

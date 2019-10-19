@@ -74,8 +74,8 @@ public:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
-      return false;
+    void requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     TimeSource& time_source_;

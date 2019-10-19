@@ -10,13 +10,11 @@ namespace HttpFilters {
 namespace OnDemand {
 
 void OnDemandRouteUpdate::requestRouteConfigUpdate() {
-  if (callbacks_->route() != nullptr) {
+  if (callbacks_->route() != nullptr || !callbacks_->canRequestRouteConfigUpdate()) {
     filter_return_ = FilterReturn::ContinueDecoding;
   } else {
-    auto config_update_scheduled =
-        callbacks_->requestRouteConfigUpdate([this]() -> void { onRouteConfigUpdateCompletion(); });
-    filter_return_ =
-        config_update_scheduled ? FilterReturn::StopDecoding : FilterReturn::ContinueDecoding;
+    callbacks_->requestRouteConfigUpdate([this]() -> void { onRouteConfigUpdateCompletion(); });
+    filter_return_ = FilterReturn::StopDecoding;
   }
 }
 

@@ -153,11 +153,17 @@ public:
 
   /**
    * Schedules a request for a RouteConfiguration update from the management server.
-   * @param cb callback to be called when the configuration update has been propagated to the worker
-   * thread.
-   * @return whether RouteConfiguration update has been scheduled.
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to the worker thread.
    */
-  virtual bool requestRouteConfigUpdate(std::function<void()> cb) PURE;
+  virtual void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb) PURE;
+
+  /**
+   *
+   * @return true if a RouteConfiguration update can be scheduled. Returns false if
+   * RouteConfigProvider doesn't support on-demand updates or VHDS hasn't been configured.
+   */
+  virtual bool canRequestRouteConfigUpdate() PURE;
 
   /**
    * Returns the clusterInfo for the cached route.

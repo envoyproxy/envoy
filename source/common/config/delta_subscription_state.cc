@@ -52,13 +52,13 @@ void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::stri
 // Appends aliases passed in updates_to_these_aliases parameter to the aliases that will be sent in
 // the next update request to the management server.
 void DeltaSubscriptionState::addAliasesToResolve(const std::set<std::string>& aliases) {
-  aliases_added_.insert(aliases.begin(), aliases.end());
+  requested_aliases_.insert(aliases.begin(), aliases.end());
 }
 
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
 bool DeltaSubscriptionState::subscriptionUpdatePending() const {
-  return !aliases_added_.empty() || !names_added_.empty() || !names_removed_.empty() ||
+  return !requested_aliases_.empty() || !names_added_.empty() || !names_removed_.empty() ||
          !any_request_sent_yet_in_current_stream_;
 }
 
@@ -177,9 +177,11 @@ void DeltaSubscriptionState::populateDiscoveryRequest(
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names_subscribe()));
   std::copy(names_removed_.begin(), names_removed_.end(),
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names_unsubscribe()));
+  std::copy(requested_aliases_.begin(), requested_aliases_.end(),
+            Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names_subscribe()));
   names_added_.clear();
   names_removed_.clear();
-  aliases_added_.clear();
+  requested_aliases_.clear();
 
   return request;
 }

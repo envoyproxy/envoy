@@ -41,7 +41,7 @@ public:
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
-  void addResourceAliases(const std::set<std::string>& updates_to_these_aliases) override;
+  void requestAliasResolution(const std::set<std::string>& aliases) override;
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

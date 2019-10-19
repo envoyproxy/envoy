@@ -262,17 +262,12 @@ void RdsRouteConfigProviderImpl::validateConfig(
 
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
-bool RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(const std::string& for_domain,
-                                                           std::function<void()> cb) {
-  if (!config()->usesVhds()) {
-    return false;
-  }
-
+void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
+    const std::string& for_domain, std::function<void()> route_config_updated_cb) {
   factory_context_.dispatcher().post(
       [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
-  config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push({{for_domain}, cb});
-
-  return true;
+  config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push(
+      {{for_domain}, route_config_updated_cb});
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

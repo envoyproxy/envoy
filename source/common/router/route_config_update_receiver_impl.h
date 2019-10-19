@@ -30,7 +30,7 @@ public:
   void rebuildRouteConfig(
       const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
       envoy::api::v2::RouteConfiguration& route_config);
-  bool isAliasNotResolvedReply(const envoy::api::v2::Resource& resource) const;
+  bool aliasResolutionFailed(const envoy::api::v2::Resource& resource) const;
 
   // Router::RouteConfigUpdateReceiver
   bool onRdsUpdate(const envoy::api::v2::RouteConfiguration& rc,
@@ -48,7 +48,9 @@ public:
     return route_config_proto_;
   }
   SystemTime lastUpdated() const override { return last_updated_; }
-  const std::set<std::string>& aliasesInLastVhdsUpdate() override { return aliases_in_last_update_; }
+  const std::set<std::string>& aliasesInLastVhdsUpdate() override {
+    return aliases_in_last_update_;
+  }
 
 private:
   TimeSource& time_source_;

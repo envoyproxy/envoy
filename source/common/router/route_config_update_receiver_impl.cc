@@ -74,7 +74,7 @@ void RouteConfigUpdateReceiverImpl::updateVhosts(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
   for (const auto& resource : added_resources) {
     // the management server returns empty resources For aliases that it couldn't resolve.
-    if (isAliasNotResolvedReply(resource)) {
+    if (aliasResolutionFailed(resource)) {
       continue;
     }
     envoy::api::v2::route::VirtualHost vhost =
@@ -97,7 +97,7 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
   }
 }
 
-bool RouteConfigUpdateReceiverImpl::isAliasNotResolvedReply(
+bool RouteConfigUpdateReceiverImpl::aliasResolutionFailed(
     const envoy::api::v2::Resource& resource) const {
   return !resource.has_resource();
 }
