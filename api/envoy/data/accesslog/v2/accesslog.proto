@@ -66,6 +66,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
+// [#next-free-field: 21]
 message AccessLogCommon {
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.
@@ -164,6 +165,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
+// [#next-free-field: 19]
 message ResponseFlags {
   message Unauthorized {
     // Reasons why the request was unauthorized
@@ -234,6 +236,7 @@ message ResponseFlags {
 }
 
 // Properties of a negotiated TLS connection.
+// [#next-free-field: 7]
 message TLSProperties {
   enum TLSVersion {
     VERSION_UNSPECIFIED = 0;
@@ -283,6 +286,7 @@ message TLSProperties {
   string tls_session_id = 6;
 }
 
+// [#next-free-field: 14]
 message HTTPRequestProperties {
   // The request method (RFC 7231/2616).
   // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
@@ -337,6 +341,7 @@ message HTTPRequestProperties {
   map<string, string> request_headers = 13;
 }
 
+// [#next-free-field: 7]
 message HTTPResponseProperties {
   // The HTTP response code returned by Envoy.
   google.protobuf.UInt32Value response_code = 1;

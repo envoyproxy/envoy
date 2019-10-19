@@ -18,6 +18,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tls_context_match_criteria_lib",
+    srcs = ["tls_context_match_criteria_impl.cc"],
+    hdrs = ["tls_context_match_criteria_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
@@ -29,6 +38,7 @@ envoy_cc_library(
         ":metadatamatchcriteria_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
+        ":tls_context_match_criteria_lib",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/router:router_interface",

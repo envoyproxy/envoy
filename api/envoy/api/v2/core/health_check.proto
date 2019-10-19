@@ -48,6 +48,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
+// [#next-free-field: 21]
 message HealthCheck {
   // Describes the encoding of the payload bytes in the payload.
   message Payload {
@@ -63,6 +64,7 @@ message HealthCheck {
   }
 
   // [#comment:next free field: 10]
+  // [#next-free-field: 10]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated

@@ -103,6 +103,16 @@ public:
 };
 
 /**
+ * ServerFactoryContext is an specialization of common interface for downstream and upstream network
+ * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
+ * across listeners.
+ */
+class ServerFactoryContext : public virtual CommonFactoryContext {
+public:
+  ~ServerFactoryContext() override = default;
+};
+
+/**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
@@ -110,6 +120,11 @@ public:
 class FactoryContext : public virtual CommonFactoryContext {
 public:
   ~FactoryContext() override = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
@@ -428,7 +443,8 @@ public:
    * config. Returned object will be stored in the loaded route configuration.
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
+  createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) {
     return nullptr;
   }
 

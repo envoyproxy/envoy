@@ -19,6 +19,7 @@
 using testing::_;
 using testing::An;
 using testing::Return;
+using testing::ReturnRef;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -36,7 +37,11 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
+  HttpConnectionManagerConfigTest() {
+    ON_CALL(context_, getServerFactoryContext()).WillByDefault(ReturnRef(server_context_));
+  }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
@@ -116,7 +121,6 @@ access_log:
   ON_CALL(context_.runtime_loader_.snapshot_,
           deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
       .WillByDefault(Return(true));
-
   HttpConnectionManagerFilterConfigFactory().createFilterFactory(
       *Json::Factory::loadFromYamlString(yaml_string), context_);
 }

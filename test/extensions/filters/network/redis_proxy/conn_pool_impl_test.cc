@@ -7,8 +7,10 @@
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 #include "test/extensions/clusters/redis/mocks.h"
+#include "test/extensions/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
+#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
@@ -66,13 +68,15 @@ public:
       max_upstream_unknown_connections_reached_.value_++;
     }));
 
+    redirection_mgr_ =
+        std::make_shared<NiceMock<Extensions::Common::Redis::MockRedirectionManager>>();
     auto redis_command_stats =
         Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
-    std::unique_ptr<InstanceImpl> conn_pool_impl =
-        std::make_unique<InstanceImpl>(cluster_name_, cm_, *this, tls_,
-                                       Common::Redis::Client::createConnPoolSettings(
-                                           20, hashtagging, true, max_unknown_conns, read_policy_),
-                                       api_, std::move(store), redis_command_stats);
+    std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
+        cluster_name_, cm_, *this, tls_,
+        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
+                                                      read_policy_),
+        api_, std::move(store), redis_command_stats, redirection_mgr_);
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
@@ -214,6 +218,7 @@ public:
           RedisProxy_ConnPoolSettings_ReadPolicy_MASTER;
   NiceMock<Stats::MockCounter> upstream_cx_drained_;
   NiceMock<Stats::MockCounter> max_upstream_unknown_connections_reached_;
+  std::shared_ptr<NiceMock<Extensions::Common::Redis::MockRedirectionManager>> redirection_mgr_;
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {

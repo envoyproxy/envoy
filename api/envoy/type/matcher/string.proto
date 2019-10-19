@@ -13,6 +13,7 @@ import "validate/validate.proto";
 // [#protodoc-title: StringMatcher]
 
 // Specifies the way to match a string.
+// [#next-free-field: 6]
 message StringMatcher {
   oneof match_pattern {
     option (validate.required) = true;
