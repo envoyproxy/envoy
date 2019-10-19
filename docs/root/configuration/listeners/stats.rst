@@ -70,3 +70,4 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
    total_listeners_warming, Gauge, Number of currently warming listeners
    total_listeners_active, Gauge, Number of currently active listeners
    total_listeners_draining, Gauge, Number of currently draining listeners
+   total_listeners_stopped, Gauge, Number of listeners that have been stopped

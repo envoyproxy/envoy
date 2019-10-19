@@ -561,11 +561,12 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   }
 }
 
-void ListenerManagerImpl::stopListeners(StopListenersType listeners_type) {
-  stop_listeners_type_ = listeners_type;
+void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
+  stop_listeners_type_ = stop_listeners_type;
+  uint32_t stopped_listeners = 0;
   for (Network::ListenerConfig& listener : listeners()) {
     for (const auto& worker : workers_) {
-      if (listeners_type != StopListenersType::InboundOnly ||
+      if (stop_listeners_type != StopListenersType::InboundOnly ||
           listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
         ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
 
@@ -576,8 +577,12 @@ void ListenerManagerImpl::stopListeners(StopListenersType listeners_type) {
           warming_listeners_.erase(existing_warming_listener);
         }
         worker->stopListener(listener);
+        stopped_listeners++;
       }
     }
+  }
+  if (stopped_listeners > 0) {
+    stats_.total_listeners_stopped_.set(stopped_listeners);
   }
 }
 

@@ -1111,14 +1111,15 @@ filter_chains:
   checkStats(2, 1, 2, 0, 0, 0);
 }
 
-// Validates that StopListener functionality works correctly for inbound listeners.
-TEST_F(ListenerManagerImplTest, StopInboundListeners) {
+// Validates that StopListener functionality works correctly when only inbound listeners are
+// stopped.
+TEST_F(ListenerManagerImplTest, StopListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
 
-  // Add foo listener into warming.
+  // Add foo listener in inbound direction.
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 traffic_direction: INBOUND
@@ -1141,6 +1142,7 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(1, 0, 0, 0, 1, 0);
 
+  // Add a listener in outbound direction.
   const std::string listener_foo_outbound_yaml = R"EOF(
 name: foo_outbound
 traffic_direction: OUTBOUND
@@ -1203,8 +1205,8 @@ filter_chains:
   EXPECT_CALL(*listener_bar_outbound, onDestroy());
 }
 
-// Validates that StopListener functionality works correctly.
-TEST_F(ListenerManagerImplTest, StopListeners) {
+// Validates that StopListener functionality works correctly when all listeners are stopped.
+TEST_F(ListenerManagerImplTest, StopAllListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));

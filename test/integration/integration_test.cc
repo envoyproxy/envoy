@@ -107,7 +107,7 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  // Invoke drain listeners endpoint and validate that we can send some data.
+  // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_TRUE(admin_response->complete());
@@ -123,6 +123,9 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+
+  // Validate that the listeners have been stopped.
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_stopped", 1);
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {

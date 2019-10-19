@@ -103,6 +103,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_removed)                                                                        \
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
+  GAUGE(total_listeners_stopped, NeverImport)                                                      \
   GAUGE(total_listeners_warming, NeverImport)
 
 /**
