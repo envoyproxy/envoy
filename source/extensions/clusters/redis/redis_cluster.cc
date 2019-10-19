@@ -27,6 +27,10 @@ RedisCluster::RedisCluster(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
       cluster_refresh_timeout_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_timeout, 3000))),
+      redirect_refresh_interval_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, redirect_refresh_interval, 5000))),
+      redirect_refresh_threshold_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(redis_cluster, redirect_refresh_threshold, 5)),
       dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
       load_assignment_(cluster.has_load_assignment()
@@ -35,7 +39,14 @@ RedisCluster::RedisCluster(
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
       auth_password_(
-          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)) {
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)),
+      redirection_manager_(Common::Redis::getRedirectionManager(
+          factory_context.singletonManager(), factory_context.dispatcher(),
+          factory_context.clusterManager(), factory_context.api().timeSource())),
+      registration_handle_(redirection_manager_->registerCluster(
+          cluster.name(), redirect_refresh_interval_, redirect_refresh_threshold_, [&]() {
+            redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+          })) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -141,15 +152,16 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
             resolve_timer_ =
                 parent_.dispatcher_.createTimer([this]() -> void { startResolveDns(); });
           }
-          // if the initial dns resolved to empty, we'll skip the redis discovery phase and treat it
-          // as an empty cluster.
+          // if the initial dns resolved to empty, we'll skip the redis discovery phase and
+          // treat it as an empty cluster.
           parent_.onPreInitComplete();
           resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
         } else {
-          // Once the DNS resolve the initial set of addresses, call startResolveRedis on the
-          // RedisDiscoverySession. The RedisDiscoverySession will using the "cluster slots" command
-          // for service discovery and slot allocation. All subsequent discoveries are handled by
-          // RedisDiscoverySession and will not use DNS resolution again.
+          // Once the DNS resolve the initial set of addresses, call startResolveRedis on
+          // the RedisDiscoverySession. The RedisDiscoverySession will using the "cluster
+          // slots" command for service discovery and slot allocation. All subsequent
+          // discoveries are handled by RedisDiscoverySession and will not use DNS
+          // resolution again.
           parent_.redis_discovery_session_.registerDiscoveryAddress(std::move(response), port_);
           parent_.redis_discovery_session_.startResolveRedis();
         }
@@ -167,8 +179,8 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
           NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
               parent_.info()->statsScope().symbolTable())) {}
 
-// Convert the cluster slot IP/Port response to and address, return null if the response does not
-// match the expected type.
+// Convert the cluster slot IP/Port response to and address, return null if the response
+// does not match the expected type.
 Network::Address::InstanceConstSharedPtr
 RedisCluster::RedisDiscoverySession::RedisDiscoverySession::ProcessCluster(
     const NetworkFilters::Common::Redis::RespValue& value) {
@@ -213,8 +225,8 @@ void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event)
 
 void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
     std::list<Envoy::Network::DnsResponse>&& response, const uint32_t port) {
-  // Since the address from DNS does not have port, we need to make a new address that has port in
-  // it.
+  // Since the address from DNS does not have port, we need to make a new address that has
+  // port in it.
   for (const Network::DnsResponse& res : response) {
     ASSERT(res.address_ != nullptr);
     discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*(res.address_), port));
@@ -228,8 +240,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     return;
   }
 
-  // If hosts is empty, we haven't received a successful result from the CLUSTER SLOTS call yet.
-  // So, pick a random discovery address from dns and make a request.
+  // If hosts is empty, we haven't received a successful result from the CLUSTER SLOTS call
+  // yet. So, pick a random discovery address from dns and make a request.
   Upstream::HostSharedPtr host;
   if (parent_.hosts_.empty()) {
     const int rand_idx = parent_.random_.random() % discovery_address_list_.size();
@@ -280,9 +292,11 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
     if (slot_range.size() < 3 ||
         slot_range[SlotRangeStart].type() !=
-            NetworkFilters::Common::Redis::RespType::Integer || // Start slot range is an integer.
+            NetworkFilters::Common::Redis::RespType::Integer || // Start slot range is an
+                                                                // integer.
         slot_range[SlotRangeEnd].type() !=
-            NetworkFilters::Common::Redis::RespType::Integer) { // End slot range is an integer.
+            NetworkFilters::Common::Redis::RespType::Integer) { // End slot range is an
+                                                                // integer.
       onUnexpectedResponse(value);
       return;
     }

@@ -4,6 +4,7 @@
 #include <list>
 #include <string>
 
+#include "extensions/common/redis/redirection_mgr.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
@@ -34,8 +35,6 @@ public:
 
   MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
   MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
-
-private:
   ConnPool::InstanceSharedPtr conn_pool_;
   const MirrorPolicies policies_;
 };
@@ -68,6 +67,7 @@ public:
   MOCK_METHOD3(makeRequest_,
                Common::Redis::Client::PoolRequest*(const std::string& hash_key,
                                                    RespVariant& request, PoolCallbacks& callbacks));
+  MOCK_METHOD0(onRedirection, bool());
 };
 } // namespace ConnPool
 
@@ -86,11 +86,10 @@ public:
   MockSplitCallbacks();
   ~MockSplitCallbacks() override;
 
-  MOCK_METHOD0(connectionAllowed, bool());
-  MOCK_METHOD1(onAuth, void(const std::string& password));
-
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
+  MOCK_METHOD0(connectionAllowed, bool());
+  MOCK_METHOD1(onAuth, void(const std::string& password));
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
 };
 

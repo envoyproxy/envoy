@@ -106,7 +106,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
-      codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
+      codec_client_type_(codecClientType(config.http_health_check().use_http2()
+                                             ? envoy::type::HTTP2
+                                             : config.http_health_check().codec_client_type())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -153,14 +155,25 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inRange(uint64_t http_status) con
   return false;
 }
 
+Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_type) {
+  switch (codec_client_type) {
+  case Http::CodecClient::Type::HTTP1:
+    return Http::Protocol::Http11;
+  case Http::CodecClient::Type::HTTP2:
+    return Http::Protocol::Http2;
+  case Http::CodecClient::Type::HTTP3:
+    return Http::Protocol::Http3;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
       hostname_(parent_.host_value_.empty() ? parent_.cluster_.info()->name()
                                             : parent_.host_value_),
-      protocol_(parent_.codec_client_type_ == Http::CodecClient::Type::HTTP1
-                    ? Http::Protocol::Http11
-                    : Http::Protocol::Http2),
+      protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
@@ -302,7 +315,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     }
   }
 
-  if (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2) {
+  if (response_headers_->ProxyConnection() && protocol_ < Http::Protocol::Http2) {
     const bool close =
         absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
@@ -331,11 +344,17 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
-  if (use_http2) {
+Http::CodecClient::Type
+HttpHealthCheckerImpl::codecClientType(const envoy::type::CodecClientType& type) {
+  switch (type) {
+  case envoy::type::HTTP3:
+    return Http::CodecClient::Type::HTTP3;
+  case envoy::type::HTTP2:
     return Http::CodecClient::Type::HTTP2;
-  } else {
+  case envoy::type::HTTP1:
     return Http::CodecClient::Type::HTTP1;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

@@ -114,8 +114,8 @@ private:
     ClientCallbacks& callbacks_;
     Stats::StatName command_;
     bool canceled_{};
-    Stats::CompletableTimespanPtr aggregate_request_timer_;
-    Stats::CompletableTimespanPtr command_request_timer_;
+    Stats::TimespanPtr aggregate_request_timer_;
+    Stats::TimespanPtr command_request_timer_;
   };
 
   void onConnectOrOpTimeout();

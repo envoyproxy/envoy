@@ -28,6 +28,7 @@ enum SerializationType {
 }
 
 // [#comment:next free field: 6]
+// [#next-free-field: 6]
 message DubboProxy {
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];

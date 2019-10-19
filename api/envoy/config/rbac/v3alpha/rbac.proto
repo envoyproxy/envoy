@@ -99,6 +99,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
+// [#next-free-field: 10]
 message Permission {
   // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
   // each are applied with the associated behavior.
@@ -160,6 +161,7 @@ message Permission {
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
+// [#next-free-field: 9]
 message Principal {
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.

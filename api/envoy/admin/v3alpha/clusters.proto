@@ -21,6 +21,7 @@ message Clusters {
 }
 
 // Details an individual cluster's current status.
+// [#next-free-field: 6]
 message ClusterStatus {
   // Name of the cluster.
   string name = 1;
@@ -69,6 +70,7 @@ message ClusterStatus {
 }
 
 // Current state of a particular host.
+// [#next-free-field: 9]
 message HostStatus {
   // Address of this host.
   api.v3alpha.core.Address address = 1;
@@ -119,6 +121,7 @@ message HostStatus {
 }
 
 // Health status for a host.
+// [#next-free-field: 7]
 message HostHealthStatus {
   // The host is currently failing active health checks.
   bool failed_active_health_check = 1;

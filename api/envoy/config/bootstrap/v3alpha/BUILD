@@ -9,7 +9,6 @@ api_proto_package(
         "//envoy/api/v3alpha:pkg",
         "//envoy/api/v3alpha/auth:pkg",
         "//envoy/api/v3alpha/core:pkg",
-        "//envoy/config/bootstrap/v2:pkg",
         "//envoy/config/metrics/v3alpha:pkg",
         "//envoy/config/overload/v2alpha:pkg",
         "//envoy/config/trace/v3alpha:pkg",
