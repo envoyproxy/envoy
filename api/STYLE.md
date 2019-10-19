@@ -85,7 +85,7 @@ In addition, the following conventions should be followed:
   at the top that specifies the next free field number. E.g.,
 
   ```
-  // [#comment:next free field: 28]
+  // [#next-free-field: 28]
   ```
 
 ## Package organization

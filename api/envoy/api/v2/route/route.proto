@@ -28,7 +28,6 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 18]
 // [#next-free-field: 18]
 message VirtualHost {
   enum TlsRequirementType {
@@ -155,7 +154,6 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#comment:next free field: 15]
 // [#next-free-field: 16]
 message Route {
   reserved 6;
@@ -240,7 +238,6 @@ message Route {
 // multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
-// [#comment:next free field: 11]
 message WeightedCluster {
   // [#next-free-field: 11]
   message ClusterWeight {
@@ -428,7 +425,6 @@ message RouteMatch {
   TlsContextMatchOptions tls_context = 11;
 }
 
-// [#comment:next free field: 11]
 // [#next-free-field: 12]
 message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
@@ -502,7 +498,6 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#comment:next free field: 30]
 // [#next-free-field: 30]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
@@ -860,7 +855,6 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#comment:next free field: 10]
 // [#next-free-field: 11]
 message RetryPolicy {
   message RetryPriority {

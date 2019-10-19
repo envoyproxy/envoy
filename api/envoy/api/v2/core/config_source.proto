@@ -102,7 +102,6 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#comment:next free field: 6]
 // [#next-free-field: 6]
 message ConfigSource {
   oneof config_source_specifier {
