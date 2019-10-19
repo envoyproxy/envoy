@@ -563,7 +563,6 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
 
 void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
   stop_listeners_type_ = stop_listeners_type;
-  uint32_t stopped_listeners = 0;
   for (Network::ListenerConfig& listener : listeners()) {
     for (const auto& worker : workers_) {
       if (stop_listeners_type != StopListenersType::InboundOnly ||
@@ -577,12 +576,12 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
           warming_listeners_.erase(existing_warming_listener);
         }
         worker->stopListener(listener);
-        stopped_listeners++;
+        stopped_listeners_++;
       }
     }
   }
-  if (stopped_listeners > 0) {
-    stats_.total_listeners_stopped_.set(stopped_listeners);
+  if (stopped_listeners_ > 0) {
+    stats_.total_listeners_stopped_.set(stopped_listeners_);
   }
 }
 

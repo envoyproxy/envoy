@@ -201,6 +201,7 @@ private:
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
   absl::optional<StopListenersType> stop_listeners_type_;
+  uint32_t stopped_listeners_{};
   Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
