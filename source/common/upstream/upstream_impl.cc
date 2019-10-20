@@ -591,7 +591,7 @@ public:
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), random_(c.random()),
         runtime_(runtime), singleton_manager_(c.singletonManager()), tls_(c.threadLocal()),
-        validation_visitor_(c.messageValidationVisitor()), api_(c.api()) {}
+        api_(c.api()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -603,9 +603,6 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return validation_visitor_;
-  }
   Api::Api& api() override { return api_; }
 
 private:
@@ -618,7 +615,6 @@ private:
   Envoy::Runtime::Loader& runtime_;
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
 

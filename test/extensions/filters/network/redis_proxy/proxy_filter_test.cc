@@ -111,7 +111,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
 
 class RedisProxyFilterTest : public testing::Test, public Common::Redis::DecoderFactory {
 public:
-  const std::string default_config = R"EOF(
+  static constexpr const char* DefaultConfig = R"EOF(
     {
       "cluster_name": "fake_cluster",
       "stat_prefix": "foo",
@@ -135,7 +135,7 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  RedisProxyFilterTest() : RedisProxyFilterTest(default_config) {}
+  RedisProxyFilterTest() : RedisProxyFilterTest(DefaultConfig) {}
 
   ~RedisProxyFilterTest() override {
     filter_.reset();
