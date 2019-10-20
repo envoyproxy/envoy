@@ -205,6 +205,7 @@ to the file where the coverage value is being set. This aids in making the requi
 changes to the coverage threshold.
 
 .. code:: bash
+
   > ENVOY_COV_CONFIG_FILE="run_cov.sh" bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 -i --covall
   Current route coverage: 6.2948%
   Failed due to stale coverage threshold.
