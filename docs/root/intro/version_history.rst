@@ -87,7 +87,7 @@ Version history
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
   certificate validation context.
-* tracing: added tags for gRPC response status and meesage.
+* tracing: added tags for gRPC response status and message.
 * tracing: added :ref:`max_path_tag_length <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support customizing the length of the request path included in the extracted `http.url <https://github.com/opentracing/specification/blob/master/semantic_conventions.md#standard-span-tags-and-log-fields>` tag.
 * upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows draining HTTP, TCP connection pools on cluster membership change.
 * upstream: added :ref:`transport_socket_matches <envoy_api_field_Cluster.transport_socket_matches>`, support using different transport socket config when connecting to different upstream endpoints within a cluster.
