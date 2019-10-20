@@ -85,7 +85,7 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message Tracing {
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.

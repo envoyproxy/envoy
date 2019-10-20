@@ -278,4 +278,13 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "re2-2019-08-01",
         urls = ["https://github.com/google/re2/archive/2019-08-01.tar.gz"],
     ),
+    # Included to access FuzzedDataProvider.h. This is compiler agnostic but
+    # provided as part of the compiler-rt source distribution. We can't use the
+    # Clang variant as we are not a Clang-LLVM only shop today.
+    org_llvm_releases_compiler_rt = dict(
+        sha256 = "56e4cd96dd1d8c346b07b4d6b255f976570c6f2389697347a6c3dcb9e820d10e",
+        # Only allow peeking at fuzzer related files for now.
+        strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
+        urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
+    ),
 )
