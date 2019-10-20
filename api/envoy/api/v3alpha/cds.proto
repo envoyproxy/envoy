@@ -7,7 +7,6 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
-import "envoy/api/v2/auth/cert.proto";
 import "envoy/api/v3alpha/cluster/circuit_breaker.proto";
 import "envoy/api/v3alpha/cluster/filter.proto";
 import "envoy/api/v3alpha/cluster/outlier_detection.proto";

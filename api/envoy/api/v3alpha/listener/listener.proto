@@ -6,7 +6,6 @@ option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
 
-import "envoy/api/v2/auth/cert.proto";
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 
