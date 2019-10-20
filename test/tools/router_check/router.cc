@@ -74,8 +74,10 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
 
-  auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
-  auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
+  auto factory_context =
+      std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
+  auto config = std::make_unique<Router::ConfigImpl>(
+      route_config, *factory_context, ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     MessageUtil::checkForUnexpectedFields(route_config,
                                           ProtobufMessage::getStrictValidationVisitor(),
@@ -96,7 +98,7 @@ void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration&
 }
 
 RouterCheckTool::RouterCheckTool(
-    std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
+    std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
@@ -114,8 +116,11 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
     headers_finalized_ = false;
+    Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                  factory_context_->dispatcher().timeSource());
     ToolConfig tool_config = ToolConfig::create(check_config);
-    tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
+    tool_config.route_ =
+        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
     std::string test_name = check_config->getString("test_name", "");
     tests_.emplace_back(test_name, std::vector<std::string>{});
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
@@ -180,10 +185,14 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
        validation_config.tests()) {
-    active_runtime = check_config.input().runtime();
+    active_runtime_ = check_config.input().runtime();
     headers_finalized_ = false;
+    Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                  factory_context_->dispatcher().timeSource());
+
     ToolConfig tool_config = ToolConfig::create(check_config);
-    tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
+    tool_config.route_ =
+        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
     tests_.emplace_back(test_name, std::vector<std::string>{});
@@ -450,7 +459,7 @@ void RouterCheckTool::printResults() {
 bool RouterCheckTool::runtimeMock(const std::string& key,
                                   const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime.empty() && active_runtime.compare(key) == 0 &&
+  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 

@@ -17,9 +17,12 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
                          Event::Dispatcher& dispatcher)
     : type_(type), connection_(std::move(connection)), host_(host),
       idle_timeout_(host_->cluster().idleTimeout()) {
-  // Make sure upstream connections process data and then the FIN, rather than processing
-  // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for details)
-  connection_->detectEarlyCloseWhenReadDisabled(false);
+  if (type_ != Type::HTTP3) {
+    // Make sure upstream connections process data and then the FIN, rather than processing
+    // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
+    // details)
+    connection_->detectEarlyCloseWhenReadDisabled(false);
+  }
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
@@ -141,15 +144,20 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(*connection_,
-                                                           host->cluster().statsScope(), *this);
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+        *connection_, host->cluster().statsScope(), *this,
+        host->cluster().maxResponseHeadersCount());
     break;
   }
   case Type::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().statsScope(), host->cluster().http2Settings(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
     break;
+  }
+  case Type::HTTP3: {
+    // TODO(danzh) Add QUIC codec;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   }
 }

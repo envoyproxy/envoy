@@ -66,6 +66,9 @@ MockHashPolicy::~MockHashPolicy() = default;
 MockMetadataMatchCriteria::MockMetadataMatchCriteria() = default;
 MockMetadataMatchCriteria::~MockMetadataMatchCriteria() = default;
 
+MockTlsContextMatchCriteria::MockTlsContextMatchCriteria() = default;
+MockTlsContextMatchCriteria::~MockTlsContextMatchCriteria() = default;
+
 MockPathMatchCriterion::MockPathMatchCriterion() {
   ON_CALL(*this, matchType()).WillByDefault(ReturnPointee(&type_));
   ON_CALL(*this, matcher()).WillByDefault(ReturnPointee(&matcher_));
@@ -93,7 +96,7 @@ MockRouteEntry::MockRouteEntry() {
 MockRouteEntry::~MockRouteEntry() = default;
 
 MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
-  ON_CALL(*this, route(_, _)).WillByDefault(Return(route_));
+  ON_CALL(*this, route(_, _, _)).WillByDefault(Return(route_));
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));

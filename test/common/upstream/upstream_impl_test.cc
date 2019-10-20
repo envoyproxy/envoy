@@ -2083,6 +2083,43 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
+TEST_F(ClusterInfoImplTest, Timeouts) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {name: meh } } }
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+
+  const std::string explicit_timeout = R"EOF(
+    common_http_protocol_options:
+      idle_timeout: 1s
+  )EOF";
+
+  auto cluster2 = makeCluster(yaml + explicit_timeout);
+  ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+
+  const std::string no_timeout = R"EOF(
+    common_http_protocol_options:
+      idle_timeout: 0s
+  )EOF";
+  auto cluster3 = makeCluster(yaml + no_timeout);
+  EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+}
+
 class TestFilterConfigFactoryBase {
 public:
   TestFilterConfigFactoryBase(
@@ -2149,7 +2186,8 @@ public:
   }
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&,
-                                  Server::Configuration::FactoryContext&) override {
+                                  Server::Configuration::ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -2309,6 +2347,59 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   }
 }
 
+TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
+  const std::string yaml = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  protocol_selection: USE_DOWNSTREAM_PROTOCOL
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(Http::Protocol::Http10,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+}
+
+TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
+  const std::string yaml = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  http2_protocol_options: {}
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+}
+
+TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
+  const std::string yaml = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt));
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10}));
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11}));
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2}));
+}
+
 // Validate empty singleton for HostsPerLocalityImpl.
 TEST(HostsPerLocalityImpl, Empty) {
   EXPECT_FALSE(HostsPerLocalityImpl::empty()->hasLocalLocality());
@@ -2403,8 +2494,8 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
 // When a locality has endpoints that have not yet been warmed, weight calculation should ignore
 // these hosts.
 TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
-  // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are not warmed
-  // yet, so even though they are unhealthy we should not adjust the locality weight.
+  // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are not
+  // warmed yet, so even though they are unhealthy we should not adjust the locality weight.
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts_[0], hosts_[1], hosts_[2]}, {hosts_[3], hosts_[4]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};

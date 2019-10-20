@@ -36,6 +36,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
+#include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -47,16 +48,14 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address,
-                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
-                           Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory,
-                           Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system,
-                           std::unique_ptr<ProcessContext> process_context)
-    : workers_started_(false), shutdown_(false), options_(options),
+InstanceImpl::InstanceImpl(
+    Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
+    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
+    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
+    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
+    : init_manager_(init_manager), workers_started_(false), shutdown_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
@@ -76,7 +75,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()) {
+      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
+      server_context_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -200,6 +200,9 @@ void InstanceImpl::flushStatsInternal() {
       sslContextManager().daysUntilFirstCertExpires());
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->stats_recent_lookups_.set(
+      stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
+
   InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
@@ -299,8 +302,8 @@ void InstanceImpl::initialize(const Options& options,
   validation_context_.dynamic_warning_validation_visitor().setCounter(
       server_stats_->dynamic_unknown_fields_);
 
-  initialization_timer_ =
-      std::make_unique<Stats::Timespan>(server_stats_->initialization_time_ms_, timeSource());
+  initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
@@ -324,8 +327,8 @@ void InstanceImpl::initialize(const Options& options,
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), std::move(local_address), options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
+      options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 

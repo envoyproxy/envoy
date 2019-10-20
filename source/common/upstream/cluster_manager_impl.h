@@ -56,10 +56,10 @@ public:
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) override;
-  Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                   ResourcePriority priority, Http::Protocol protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Http::ConnectionPool::InstancePtr allocateConnPool(
+      Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+      Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsSharedPtr& transport_socket_options) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,

@@ -125,12 +125,13 @@ public:
   }
 
   void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
-                             const Http::HeaderMapImpl& headers) {
+                             const Http::HeaderMapImpl& response_headers_to_add,
+                             const Http::HeaderMapImpl& request_headers_to_add) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v2::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
 
-    headers.iterate(
+    response_headers_to_add.iterate(
         [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
           auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
                             ->mutable_headers()
@@ -140,7 +141,16 @@ public:
           return Http::HeaderMap::Iterate::Continue;
         },
         &response_msg);
-
+    request_headers_to_add.iterate(
+        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
+          auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
+                            ->mutable_request_headers_to_add()
+                            ->Add();
+          header->set_key(std::string(h.key().getStringView()));
+          header->set_value(std::string(h.value().getStringView()));
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &response_msg);
     ratelimit_request_->sendGrpcMessage(response_msg);
     ratelimit_request_->finishGrpcStream(Grpc::Status::Ok);
   }
@@ -162,7 +172,7 @@ public:
     initiateClientConnection();
     waitForRatelimitRequest();
     sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
-                          Http::HeaderMapImpl{});
+                          Http::HeaderMapImpl{}, Http::HeaderMapImpl{});
     waitForSuccessfulUpstreamResponse();
     cleanup();
 
@@ -201,13 +211,15 @@ TEST_P(RatelimitIntegrationTest, Ok) { basicFlow(); }
 TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  Http::TestHeaderMapImpl ratelimit_headers{{"x-ratelimit-limit", "1000"},
-                                            {"x-ratelimit-remaining", "500"}};
+  Http::TestHeaderMapImpl ratelimit_response_headers{{"x-ratelimit-limit", "1000"},
+                                                     {"x-ratelimit-remaining", "500"}};
+  Http::TestHeaderMapImpl request_headers_to_add{{"x-ratelimit-done", "true"}};
+
   sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
-                        ratelimit_headers);
+                        ratelimit_response_headers, request_headers_to_add);
   waitForSuccessfulUpstreamResponse();
 
-  ratelimit_headers.iterate(
+  ratelimit_response_headers.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
         IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
@@ -215,6 +227,15 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
         return Http::HeaderMap::Iterate::Continue;
       },
       response_.get());
+
+  request_headers_to_add.iterate(
+      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
+        FakeStream* upstream = static_cast<FakeStream*>(context);
+        Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+        EXPECT_EQ(entry.value(), upstream->headers().get(lower_key)->value().getStringView());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      upstream_request_.get());
 
   cleanup();
 
@@ -227,7 +248,7 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
   initiateClientConnection();
   waitForRatelimitRequest();
   sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
-                        Http::HeaderMapImpl{});
+                        Http::HeaderMapImpl{}, Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
   cleanup();
 
@@ -239,13 +260,13 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
 TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  Http::TestHeaderMapImpl ratelimit_headers{
+  Http::TestHeaderMapImpl ratelimit_response_headers{
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}};
   sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
-                        ratelimit_headers);
+                        ratelimit_response_headers, Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
 
-  ratelimit_headers.iterate(
+  ratelimit_response_headers.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
         IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};

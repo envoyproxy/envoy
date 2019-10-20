@@ -111,6 +111,9 @@ public:
   // Sets byte limits on upstream and downstream connections.
   void setBufferLimits(uint32_t upstream_buffer_limit, uint32_t downstream_buffer_limit);
 
+  // Set the idle timeout on downstream connections through the HttpConnectionMananger.
+  void setDownstreamHttpIdleTimeout(std::chrono::milliseconds idle_timeout);
+
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 

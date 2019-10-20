@@ -19,6 +19,7 @@ import "google/protobuf/wrappers.proto";
 message CircuitBreakers {
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`.
+  // [#next-free-field: 8]
   message Thresholds {
     // The :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.

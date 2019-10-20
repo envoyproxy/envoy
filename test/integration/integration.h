@@ -375,6 +375,9 @@ protected:
   // them in the port_map_.
   bool defer_listener_finalization_{false};
 
+  // The number of worker threads that the test server uses.
+  uint32_t concurrency_{1};
+
   // Member variables for xDS testing.
   FakeUpstream* xds_upstream_{};
   FakeHttpConnectionPtr xds_connection_;

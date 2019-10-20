@@ -8,6 +8,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/network/well_known_names.h"
 
@@ -289,7 +290,8 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 
   Stats::SymbolTable::StoragePtr storage =
       config_->scope_.symbolTable().join({config_->stat_prefix_, config_->connect_latency_});
-  config_->scope_.histogramFromStatName(Stats::StatName(storage.get()))
+  config_->scope_
+      .histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
       .recordValue(latency.count());
 
   setDynamicMetadata({{"opname", "connect_response"},
@@ -311,7 +313,8 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
   }
   Stats::SymbolTable::StoragePtr storage =
       config_->scope_.symbolTable().join({config_->stat_prefix_, opcode_latency});
-  config_->scope_.histogramFromStatName(Stats::StatName(storage.get()))
+  config_->scope_
+      .histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
       .recordValue(latency.count());
 
   setDynamicMetadata({{"opname", opname},

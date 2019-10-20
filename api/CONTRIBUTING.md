@@ -70,8 +70,3 @@ The following are some general guidelines around documentation.
 * Prefer *italics* for emphasis as `backtick` emphasis is somewhat jarring in our Sphinx theme.
 * All documentation is expected to use proper English grammar with proper punctuation. If you are
   not a fluent English speaker please let us know and we will help out.
-* Tag messages/enum/files with `[#proto-status: draft|experimental|frozen]` to
-  reflect their [API
-  status](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview#status).
-  Frozen entities do not need to be tagged except when overriding an outer scope
-  draft or experimental status.

@@ -19,6 +19,7 @@ using testing::_;
 using testing::An;
 using testing::ContainerEq;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +36,11 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
+  HttpConnectionManagerConfigTest() {
+    ON_CALL(context_, getServerFactoryContext()).WillByDefault(ReturnRef(server_context_));
+  }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
@@ -115,7 +120,6 @@ access_log:
   ON_CALL(context_.runtime_loader_.snapshot_,
           deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
       .WillByDefault(Return(true));
-
   HttpConnectionManagerFilterConfigFactory().createFilterFactory(
       *Json::Factory::loadFromYamlString(yaml_string), context_);
 }
@@ -481,6 +485,109 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
+}
+
+// Validate that deprecated idle_timeout is still ingested.
+TEST_F(HttpConnectionManagerConfigTest, DeprecatedIdleTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  idle_timeout: 1s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(1000, config.idleTimeout().value().count());
+}
+
+// Validate that idle_timeout set in common_http_protocol_options is used.
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    idle_timeout: 1s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(1000, config.idleTimeout().value().count());
+}
+
+// Validate that idle_timeout defaults to 1h
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(std::chrono::hours(1), config.idleTimeout().value());
+}
+
+// Validate that idle_timeouts can be turned off
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    idle_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_FALSE(config.idleTimeout().has_value());
+}
+
+// Check that the default max request header count is 100.
+TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(100, config.maxRequestHeadersCount());
+}
+
+// Check that max request header count is configured.
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_headers_count: 200
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(200, config.maxRequestHeadersCount());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {

@@ -12,6 +12,7 @@
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 
 #include "absl/base/thread_annotations.h"
+#include "absl/strings/numbers.h"
 #include "absl/synchronization/mutex.h"
 #include "circllhist.h"
 
@@ -26,9 +27,10 @@ namespace ConcurrencyController {
  */
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                              \
   COUNTER(rq_blocked)                                                                              \
+  GAUGE(burst_queue_size, NeverImport)                                                             \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
-  GAUGE(burst_queue_size, NeverImport)                                                             \
+  GAUGE(min_rtt_calculation_active, Accumulate)                                                    \
   GAUGE(min_rtt_msecs, NeverImport)                                                                \
   GAUGE(sample_rtt_msecs, NeverImport)
 
@@ -43,25 +45,79 @@ class GradientControllerConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   GradientControllerConfig(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
-          proto_config);
+          proto_config,
+      Runtime::Loader& runtime);
 
-  std::chrono::milliseconds minRTTCalcInterval() const { return min_rtt_calc_interval_; }
-  double jitterPercent() const { return jitter_pct_; }
-  std::chrono::milliseconds sampleRTTCalcInterval() const { return sample_rtt_calc_interval_; }
-  uint32_t maxConcurrencyLimit() const { return max_concurrency_limit_; }
-  uint32_t minRTTAggregateRequestCount() const { return min_rtt_aggregate_request_count_; }
-  double maxGradient() const { return max_gradient_; }
-  double sampleAggregatePercentile() const { return sample_aggregate_percentile_; }
+  std::chrono::milliseconds minRTTCalcInterval() const {
+    const auto ms = runtime_.snapshot().getInteger(RuntimeKeys::get().MinRTTCalcIntervalKey,
+                                                   min_rtt_calc_interval_.count());
+    return std::chrono::milliseconds(ms);
+  }
+
+  std::chrono::milliseconds sampleRTTCalcInterval() const {
+    const auto ms = runtime_.snapshot().getInteger(RuntimeKeys::get().SampleRTTCalcIntervalKey,
+                                                   sample_rtt_calc_interval_.count());
+    return std::chrono::milliseconds(ms);
+  }
+
+  uint32_t maxConcurrencyLimit() const {
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().MaxConcurrencyLimitKey,
+                                          max_concurrency_limit_);
+  }
+
+  uint32_t minRTTAggregateRequestCount() const {
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().MinRTTAggregateRequestCountKey,
+                                          min_rtt_aggregate_request_count_);
+  }
+
+  double maxGradient() const {
+    return std::max(
+        1.0, runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_));
+  }
+
+  // The percentage is normalized to the range [0.0, 1.0].
+  double sampleAggregatePercentile() const {
+    const double val = runtime_.snapshot().getDouble(
+        RuntimeKeys::get().SampleAggregatePercentileKey, sample_aggregate_percentile_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
+  }
+
+  // The percentage is normalized and clamped to the range [0.0, 1.0].
+  double jitterPercent() const {
+    const double val =
+        runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
+  }
 
 private:
+  class RuntimeKeyValues {
+  public:
+    const std::string MinRTTCalcIntervalKey =
+        "adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms";
+    const std::string SampleRTTCalcIntervalKey =
+        "adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms";
+    const std::string MaxConcurrencyLimitKey =
+        "adaptive_concurrency.gradient_controller.max_concurrency_limit";
+    const std::string MinRTTAggregateRequestCountKey =
+        "adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
+    const std::string MaxGradientKey = "adaptive_concurrency.gradient_controller.max_gradient";
+    const std::string SampleAggregatePercentileKey =
+        "adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
+    const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
+  };
+
+  using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
+
+  Runtime::Loader& runtime_;
+
   // The measured request round-trip time under ideal conditions.
   const std::chrono::milliseconds min_rtt_calc_interval_;
 
+  // The measured sample round-trip milliseconds from the previous time window.
+  const std::chrono::milliseconds sample_rtt_calc_interval_;
+
   // Randomized time delta added to the start of the minRTT calculation window.
   const double jitter_pct_;
-
-  // The measured sample round-trip time from the previous time window.
-  const std::chrono::milliseconds sample_rtt_calc_interval_;
 
   // The maximum allowed concurrency value.
   const uint32_t max_concurrency_limit_;

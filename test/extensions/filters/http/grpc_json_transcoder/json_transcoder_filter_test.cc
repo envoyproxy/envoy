@@ -2,7 +2,6 @@
 #include <functional>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
@@ -52,13 +51,12 @@ protected:
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
                  bool match_incoming_request_route = false,
                  const std::vector<std::string>& ignored_query_parameters = {}) {
-    std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
-                              "\",\"services\": [\"" + service_name + "\"]}";
-    auto json_config = Json::Factory::loadFromString(json_string);
+    const std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
+                                    "\",\"services\": [\"" + service_name + "\"]}";
     envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
-    Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
+    TestUtility::loadFromJson(json_string, proto_config);
     proto_config.set_match_incoming_request_route(match_incoming_request_route);
-    for (const std::string& query_param : ignored_query_parameters) {
+    for (const auto& query_param : ignored_query_parameters) {
       proto_config.add_ignored_query_parameters(query_param);
     }
 
@@ -196,7 +194,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
   const MethodDescriptor* method_descriptor;
-  auto status =
+  const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
   EXPECT_TRUE(status.ok());
@@ -217,7 +215,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
   const MethodDescriptor* method_descriptor;
-  auto status =
+  const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
   EXPECT_TRUE(status.ok());
@@ -236,7 +234,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
   const MethodDescriptor* method_descriptor;
-  auto status =
+  const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
   EXPECT_EQ(Code::INVALID_ARGUMENT, status.error_code());
@@ -256,7 +254,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
   const MethodDescriptor* method_descriptor;
-  auto status =
+  const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
   EXPECT_TRUE(status.ok());
@@ -275,7 +273,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
   const MethodDescriptor* method_descriptor;
-  auto status =
+  const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
   EXPECT_TRUE(status.ok());
@@ -297,7 +295,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
   const MethodDescriptor* method_descriptor;
-  auto status =
+  const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
 
   EXPECT_EQ(Code::INVALID_ARGUMENT, status.error_code());
@@ -317,11 +315,10 @@ protected:
 
   static const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   bookstoreProtoConfig() {
-    std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
-                              "\",\"services\": [\"bookstore.Bookstore\"]}";
-    auto json_config = Json::Factory::loadFromString(json_string);
-    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config{};
-    Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
+    const std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
+                                    "\",\"services\": [\"bookstore.Bookstore\"]}";
+    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
+    TestUtility::loadFromJson(json_string, proto_config);
     return proto_config;
   }
 
@@ -771,7 +768,7 @@ private:
 
 // Single headers frame with end_stream flag (trailer), no grpc-status-details-bin header.
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTrailerOnlyResponse) {
-  std::string expected_response(R"({"code":5,"message":"Resource not found"})");
+  const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
       .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
@@ -791,7 +788,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTr
 // Trailer-only response with grpc-status-details-bin header.
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingBinaryHeaderInTrailerOnlyResponse) {
-  std::string expected_response(R"({"code":5,"message":"Resource not found"})");
+  const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
       .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
@@ -815,7 +812,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
 // Also tests that a user-defined type from a proto descriptor in config can be used in details.
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingBinaryHeaderWithDetailsInTrailerOnlyResponse) {
-  std::string expected_response(
+  const std::string expected_response(
       "{\"code\":5,\"message\":\"Error\",\"details\":"
       "[{\"@type\":\"type.googleapis.com/helloworld.HelloReply\",\"message\":\"details\"}]}");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
@@ -878,7 +875,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBod
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
 
-  std::string response_json = response_data->toString();
+  const std::string response_json = response_data->toString();
   EXPECT_EQ(R"({"id":"20","theme":"Children"})", response_json);
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _)).Times(0);
@@ -897,10 +894,8 @@ class GrpcJsonTranscoderFilterPrintTest
       public GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterPrintTest() {
-    auto json_config =
-        Json::Factory::loadFromString(TestEnvironment::substitute(GetParam().config_json_));
-    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config{};
-    Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
+    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
+    TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
     config_ = new JsonTranscoderConfig(proto_config, *api_);
     filter_ = new JsonTranscoderFilter(*config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);

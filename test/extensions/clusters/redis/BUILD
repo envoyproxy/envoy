@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",
+        "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
@@ -40,7 +41,7 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/cluster/redis:redis_cluster_cc",
+        "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
     ],
 )
 
@@ -77,7 +78,7 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/cluster/redis:redis_cluster_cc",
+        "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
     ],
 )
 
