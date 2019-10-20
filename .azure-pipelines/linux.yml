@@ -1,3 +1,14 @@
+trigger:
+  branches:
+    include:
+    - 'master'
+  tags:
+    include:
+    - 'v*'
+
+# PR build config is manually overridden in Azure pipelines UI with different secrets
+pr: none
+
 jobs:
 - job: format
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
