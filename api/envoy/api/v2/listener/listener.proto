@@ -65,6 +65,7 @@ message Filter {
 // listed at the end, because that's how we want to list them in the docs.
 //
 // [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
+// [#next-free-field: 13]
 message FilterChainMatch {
   enum ConnectionSourceType {
     // Any connection source matches.
@@ -160,6 +161,7 @@ message FilterChainMatch {
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
 // various other parameters.
+// [#next-free-field: 8]
 message FilterChain {
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;

@@ -65,9 +65,9 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   g1.set(0);
   EXPECT_EQ(0, found_gauge->get().value());
 
-  Histogram& h1 = store_.histogram("h1");
+  Histogram& h1 = store_.histogram("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
-  Histogram& h2 = scope1->histogram("h2");
+  Histogram& h2 = scope1->histogram("h2", Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
@@ -119,8 +119,10 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g1.tags().size());
 
-  Histogram& h1 = store_.histogramFromStatName(makeStatName("h1"));
-  Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"));
+  Histogram& h1 =
+      store_.histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 =
+      scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
@@ -164,7 +166,7 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
 #define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
   COUNTER(test_counter)                                                                            \
   GAUGE(test_gauge, Accumulate)                                                                    \
-  HISTOGRAM(test_histogram)
+  HISTOGRAM(test_histogram, Microseconds)
 
 struct TestStats {
   ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
@@ -183,6 +185,7 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
 
   Histogram& histogram = test_stats.test_histogram_;
   EXPECT_EQ("test.test_histogram", histogram.name());
+  EXPECT_EQ(Histogram::Unit::Microseconds, histogram.unit());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {

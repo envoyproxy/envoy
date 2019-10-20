@@ -19,11 +19,11 @@ as well as the :ref:`dynamic forward proxy cluster
 must be configured together and point to the same DNS cache parameters for Envoy to operate as an
 HTTP dynamic forward proxy.
 
-.. note::
-
-  The HTTP connection manager :ref:`allow_absolute_url
-  <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` parameter has been set to true
-  to allow Envoy to proxy absolute HTTP URLs.
+This filter supports :ref:`host rewrite <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig>`
+via the :ref:`virtual host's per_filter_config <envoy_api_field_route.VirtualHost.per_filter_config>` or the
+:ref:`route's per_filter_config <envoy_api_field_route.Route.per_filter_config>`. This can be used to rewrite
+the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
+host when forwarding. See the example below within the configured routes.
 
 .. note::
 
@@ -55,14 +55,19 @@ HTTP dynamic forward proxy.
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
-            http_protocol_options:
-              allow_absolute_url: true
             route_config:
               name: local_route
               virtual_hosts:
               - name: local_service
                 domains: ["*"]
                 routes:
+                - match:
+                    prefix: "/force-host-rewrite"
+                  route:
+                    cluster: dynamic_forward_proxy_cluster
+                  per_filter_config:
+                    envoy.filters.http.dynamic_forward_proxy:
+                      host_rewrite: www.example.org
                 - match:
                     prefix: "/"
                   route:

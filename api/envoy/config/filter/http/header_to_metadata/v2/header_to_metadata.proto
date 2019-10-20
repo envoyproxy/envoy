@@ -37,6 +37,7 @@ message Config {
     BASE64 = 1;
   }
 
+  // [#next-free-field: 6]
   message KeyValuePair {
     // The namespace — if this is empty, the filter's namespace will be used.
     string metadata_namespace = 1;

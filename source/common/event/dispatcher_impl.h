@@ -58,8 +58,7 @@ public:
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                                      bool bind_to_port,
-                                      bool hand_off_restored_destination_connections) override;
+                                      bool bind_to_port) override;
   Network::UdpListenerPtr createUdpListener(Network::Socket& socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;

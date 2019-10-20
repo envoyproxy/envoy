@@ -315,6 +315,7 @@ getaddrinfo
 sendto
 ssize
 upcasts
+vectorize
 vip
 xDSes
 XFCC
@@ -395,6 +396,7 @@ codecs
 codings
 combinatorial
 comparator
+completable
 cond
 condvar
 conf
@@ -599,6 +601,7 @@ matcher
 matchers
 mcontext
 mem
+memcmp
 memcpy
 midp
 milli
@@ -688,6 +691,7 @@ rc
 readded
 readv
 realloc
+rebalanced
 rebalancing
 rebuffer
 recurse

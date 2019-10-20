@@ -3,6 +3,9 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
+    "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_package",
 )
 load(
@@ -43,6 +46,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//test/extensions/clusters/redis:redis_cluster_mocks",
+        "//test/extensions/common/redis:mocks_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/mocks/api:api_mocks",
@@ -76,6 +80,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/extensions/common/redis:redirection_mgr_interface",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",

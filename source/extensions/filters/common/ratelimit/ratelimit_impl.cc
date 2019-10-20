@@ -73,20 +73,28 @@ void GrpcClientImpl::onSuccess(
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
   }
 
-  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  if (response->headers_size()) {
+  Http::HeaderMapPtr response_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
+  if (!response->headers().empty()) {
     for (const auto& h : response->headers()) {
-      headers->addCopy(Http::LowerCaseString(h.key()), h.value());
+      response_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
-  callbacks_->complete(status, std::move(headers));
+
+  Http::HeaderMapPtr request_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
+  if (!response->request_headers_to_add().empty()) {
+    for (const auto& h : response->request_headers_to_add()) {
+      request_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
+    }
+  }
+  callbacks_->complete(status, std::move(response_headers_to_add),
+                       std::move(request_headers_to_add));
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  callbacks_->complete(LimitStatus::Error, nullptr);
+  callbacks_->complete(LimitStatus::Error, nullptr, nullptr);
   callbacks_ = nullptr;
 }
 

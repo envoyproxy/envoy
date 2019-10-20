@@ -145,6 +145,8 @@ MockConnectionSocket::MockConnectionSocket()
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
 }
 
+MockConnectionSocket::~MockConnectionSocket() = default;
+
 MockListener::MockListener() = default;
 MockListener::~MockListener() { onDestroy(); }
 
@@ -176,6 +178,9 @@ MockUdpListenerReadFilter::~MockUdpListenerReadFilter() = default;
 
 MockUdpListenerFilterManager::MockUdpListenerFilterManager() = default;
 MockUdpListenerFilterManager::~MockUdpListenerFilterManager() = default;
+
+MockConnectionBalancer::MockConnectionBalancer() = default;
+MockConnectionBalancer::~MockConnectionBalancer() = default;
 
 } // namespace Network
 } // namespace Envoy
