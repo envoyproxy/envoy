@@ -24,6 +24,27 @@ if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: "* ]] ; then
   exit 1
 fi
 
+# Testing increase coverage threshold flag - reason.
+COVERAGE_OUTPUT=$($COVERAGE_CMD "1.0" "-i" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
+echo "${COVERAGE_OUTPUT}"
+if [[ "${COVERAGE_OUTPUT}" != *"Failed due to stale coverage threshold."* ]] ; then
+  exit 1
+fi
+
+# Testing increase coverage threshold flag - increase request.
+COVERAGE_OUTPUT=$($COVERAGE_CMD "1.0" "-i" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
+echo "${COVERAGE_OUTPUT}"
+if [[ "${COVERAGE_OUTPUT}" != *"Please increase the coverage failure threshold to "* ]] ; then
+  exit 1
+fi
+
+
+# Testing increase coverage threshold flag - cov path env variable.
+COVERAGE_OUTPUT=$(ENVOY_COV_CONFIG_FILE="a_file" $COVERAGE_CMD "1.0" "-i" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
+if [[ "${COVERAGE_OUTPUT}" != *"increase the coverage failure threshold to "*" in a_file" ]] ; then
+  exit 1
+fi
+
 COMP_COVERAGE_CMD="${PATH_BIN} -c ${PATH_CONFIG}/ComprehensiveRoutes.yaml -t ${PATH_CONFIG}/ComprehensiveRoutes.golden.proto.json --details --useproto -f "
 COVERAGE_OUTPUT=$($COMP_COVERAGE_CMD "100" "--covall" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
 if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: 100%"* ]] ; then

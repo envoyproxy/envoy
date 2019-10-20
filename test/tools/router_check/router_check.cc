@@ -38,6 +38,16 @@ int main(int argc, char* argv[]) {
                   << std::endl;
         return EXIT_FAILURE;
       }
+      const auto cov_file_path = std::getenv("ENVOY_COV_CONFIG_FILE");
+      std::string cov_file_path_msg = "";
+      if (cov_file_path != nullptr) {
+        cov_file_path_msg = absl::StrCat(" in ", cov_file_path);
+      }
+      if (options.increaseCovThreshold() && current_coverage != options.failUnder()) {
+        std::cerr << "Failed due to stale coverage threshold." << std::endl;
+        std::cerr << "Please increase the coverage failure threshold to " << current_coverage
+                  << cov_file_path_msg << std::endl;
+      }
     }
   } catch (const Envoy::EnvoyException& ex) {
     std::cerr << ex.what() << std::endl;

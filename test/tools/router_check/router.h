@@ -204,6 +204,11 @@ public:
   double failUnder() const { return fail_under_; }
 
   /**
+   * @return true if required route coverage threshold should be increased.
+   */
+  bool increaseCovThreshold() const { return increase_cov_threshold_; }
+
+  /**
    * @return true if test coverage should be comprehensive.
    */
   bool comprehensiveCoverage() const { return comprehensive_coverage_; }
@@ -234,6 +239,7 @@ private:
   std::string unlabelled_test_path_;
   std::string unlabelled_config_path_;
   float fail_under_;
+  bool increase_cov_threshold_;
   bool comprehensive_coverage_;
   bool is_proto_;
   bool is_detailed_;
