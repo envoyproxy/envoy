@@ -47,6 +47,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Failed due to stale coverage threshold." << std::endl;
         std::cerr << "Please increase the coverage failure threshold to " << current_coverage
                   << cov_file_path_msg << std::endl;
+        return EXIT_FAILURE;
       }
     }
   } catch (const Envoy::EnvoyException& ex) {
