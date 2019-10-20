@@ -141,7 +141,7 @@ TEST_F(RedisRespValueTest, MoveOperationsTest) {
   InSequence s;
 
   RespValue array_value, bulkstring_value, simplestring_value, error_value, integer_value,
-      null_value;
+      null_value, composite_array_empty;
   makeBulkStringArray(array_value, {"get", "foo", "bar", "now"});
   bulkstring_value.type(RespType::BulkString);
   bulkstring_value.asString() = "foo";
@@ -151,6 +151,7 @@ TEST_F(RedisRespValueTest, MoveOperationsTest) {
   error_value.asString() = "error";
   integer_value.type(RespType::Integer);
   integer_value.asInteger() = 123;
+  composite_array_empty.type(RespType::CompositeArray);
 
   verifyMoves(array_value);
   verifyMoves(bulkstring_value);
@@ -158,6 +159,7 @@ TEST_F(RedisRespValueTest, MoveOperationsTest) {
   verifyMoves(error_value);
   verifyMoves(integer_value);
   verifyMoves(null_value);
+  verifyMoves(composite_array_empty);
 }
 
 TEST_F(RedisRespValueTest, SwapTest) {
@@ -196,6 +198,12 @@ TEST_F(RedisRespValueTest, CompositeArrayTest) {
 
   EXPECT_EQ(value1.asCompositeArray().command(), &command);
   EXPECT_EQ(value1.asCompositeArray().baseArray(), base);
+
+  RespValue value4{base, command, 1, 1};
+  EXPECT_TRUE(value1 == value1);
+  EXPECT_FALSE(value1 == value2);
+  EXPECT_FALSE(value1 == value3);
+  EXPECT_TRUE(value1 == value4);
 
   RespValue empty;
   empty.type(RespType::CompositeArray);
