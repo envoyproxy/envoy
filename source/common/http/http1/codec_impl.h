@@ -27,10 +27,7 @@ namespace Http1 {
 /**
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
-// clang-format off
-#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
-  COUNTER(metadata_not_supported_error)                                                            \
-// clang-format on
+#define ALL_HTTP1_CODEC_STATS(COUNTER) COUNTER(metadata_not_supported_error)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -97,7 +94,7 @@ private:
    */
   void endEncode();
 
-void encodeFormattedHeader(absl::string_view key, absl::string_view value);
+  void encodeFormattedHeader(absl::string_view key, absl::string_view value);
 
   bool chunk_encoding_{true};
   bool processing_100_continue_{false};
@@ -112,7 +109,8 @@ void encodeFormattedHeader(absl::string_view key, absl::string_view value);
  */
 class ResponseStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter) : StreamEncoderImpl(connection, header_key_formatter) {}
+  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -327,7 +325,8 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter) : response_encoder_(connection, header_key_formatter) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
     StreamDecoder* request_decoder_{};
