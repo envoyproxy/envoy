@@ -51,6 +51,7 @@ message Endpoint {
 }
 
 // An Endpoint that Envoy can route traffic to.
+// [#next-free-field: 6]
 message LbEndpoint {
   // Upstream host identifier or a named reference.
   oneof host_identifier {
@@ -86,6 +87,7 @@ message LbEndpoint {
 // One can have multiple LocalityLbEndpoints for a locality, but this is
 // generally only done if the different groups need to have different load
 // balancing weights or different priorities.
+// [#next-free-field: 7]
 message LocalityLbEndpoints {
   // Identifies location of where the upstream hosts run.
   core.Locality locality = 1;

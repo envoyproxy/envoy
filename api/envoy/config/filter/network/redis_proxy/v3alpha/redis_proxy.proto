@@ -16,8 +16,10 @@ import "validate/validate.proto";
 // [#protodoc-title: Redis Proxy]
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 
+// [#next-free-field: 7]
 message RedisProxy {
   // Redis connection pool settings.
+  // [#next-free-field: 9]
   message ConnPoolSettings {
     // ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
     // supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data

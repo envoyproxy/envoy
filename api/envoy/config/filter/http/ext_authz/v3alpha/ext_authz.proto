@@ -17,6 +17,7 @@ import "validate/validate.proto";
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 
+// [#next-free-field: 9]
 message ExtAuthz {
   reserved 4;
 
@@ -119,6 +120,7 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_api_field_config.filter.http.ext_authz.v3alpha.AuthorizationResponse.allowed_client_headers>`
 // for details.
+// [#next-free-field: 9]
 message HttpService {
   reserved 3, 4, 5, 6;
 

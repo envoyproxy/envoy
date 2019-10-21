@@ -4,8 +4,26 @@ from collections import namedtuple
 
 from tools.api_proto_plugin import annotations
 
-# A comment is a (raw comment, annotation map) pair.
-Comment = namedtuple('Comment', ['raw', 'annotations'])
+
+class Comment(object):
+  """Wrapper for proto source comments."""
+
+  def __init__(self, comment, file_level_annotations=None):
+    self.raw = comment
+    self.file_level_annotations = file_level_annotations
+    self.annotations = annotations.ExtractAnnotations(self.raw, file_level_annotations)
+
+  def getCommentWithTransforms(self, annotation_xforms):
+    """Return transformed comment with annotation transformers.
+
+    Args:
+      annotation_xforms: a dict of transformers for annotations in leading comment.
+
+    Returns:
+      transformed Comment object.
+    """
+    return Comment(annotations.XformAnnotation(self.raw, annotation_xforms),
+                   self.file_level_annotations)
 
 
 class SourceCodeInfo(object):
@@ -72,10 +90,8 @@ class SourceCodeInfo(object):
     """
     location = self.LocationPathLookup(path)
     if location is not None:
-      return Comment(
-          location.leading_comments,
-          annotations.ExtractAnnotations(location.leading_comments, self.file_level_annotations))
-    return Comment('', {})
+      return Comment(location.leading_comments, self.file_level_annotations)
+    return Comment('')
 
   def LeadingDetachedCommentsPathLookup(self, path):
     """Lookup leading detached comments by path in SourceCodeInfo.

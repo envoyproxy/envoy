@@ -18,7 +18,8 @@
 namespace Envoy {
 namespace Server {
 
-bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+bool validateConfig(const Options& options,
+                    const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                     Filesystem::Instance& file_system) {
   Thread::MutexBasicLockable access_log_lock;
@@ -36,13 +37,11 @@ bool validateConfig(const Options& options, Network::Address::InstanceConstShare
   }
 }
 
-ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem& time_system,
-                                       Network::Address::InstanceConstSharedPtr local_address,
-                                       Stats::IsolatedStoreImpl& store,
-                                       Thread::BasicLockable& access_log_lock,
-                                       ComponentFactory& component_factory,
-                                       Thread::ThreadFactory& thread_factory,
-                                       Filesystem::Instance& file_system)
+ValidationInstance::ValidationInstance(
+    const Options& options, Event::TimeSystem& time_system,
+    const Network::Address::InstanceConstSharedPtr& local_address, Stats::IsolatedStoreImpl& store,
+    Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
+    Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields()),
       stats_store_(store),
@@ -52,7 +51,7 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system), server_context_(*this) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -64,7 +63,7 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
 }
 
 void ValidationInstance::initialize(const Options& options,
-                                    Network::Address::InstanceConstSharedPtr local_address,
+                                    const Network::Address::InstanceConstSharedPtr& local_address,
                                     ComponentFactory& component_factory) {
   // See comments on InstanceImpl::initialize() for the overall flow here.
   //

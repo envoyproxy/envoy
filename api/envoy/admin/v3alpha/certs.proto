@@ -26,6 +26,7 @@ message Certificate {
   repeated CertificateDetails cert_chain = 2;
 }
 
+// [#next-free-field: 7]
 message CertificateDetails {
   // Path of the certificate.
   string path = 1;
