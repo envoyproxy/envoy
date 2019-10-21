@@ -23,7 +23,6 @@ import "validate/validate.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 36]
 // [#next-free-field: 36]
 message HttpConnectionManager {
   enum CodecType {
@@ -148,7 +147,6 @@ message HttpConnectionManager {
     bool unix_sockets = 1;
   }
 
-  // [#comment:next free field: 7]
   // [#next-free-field: 7]
   message SetCurrentClientCertDetails {
     reserved 2;

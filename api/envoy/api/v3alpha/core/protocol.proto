@@ -53,7 +53,6 @@ message Http1ProtocolOptions {
   string default_host_for_http_10 = 3;
 }
 
-// [#comment:next free field: 13]
 // [#next-free-field: 13]
 message Http2ProtocolOptions {
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
