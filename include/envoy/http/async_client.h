@@ -11,6 +11,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -220,15 +221,20 @@ public:
       parent_span_ = &parent_span;
       return *this;
     }
+    RequestOptions& setChildSpanName(const std::string& child_span_name) {
+      child_span_name_ = child_span_name;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
-      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_;
+      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ && child_span_name_ == src.child_span_name_;
     }
 
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.
     Tracing::Span* parent_span_{nullptr};
+    std::string child_span_name_{""};
   };
 
   /**
