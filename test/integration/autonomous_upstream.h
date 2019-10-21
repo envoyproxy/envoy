@@ -55,6 +55,11 @@ public:
   AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
                      Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
       : FakeUpstream(port, type, version, time_system) {}
+  AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
+                     FakeHttpConnection::Type type, Network::Address::IpVersion version,
+                     Event::TestTimeSystem& time_system)
+      : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system) {}
+
   ~AutonomousUpstream() override;
   bool
   createNetworkFilterChain(Network::Connection& connection,

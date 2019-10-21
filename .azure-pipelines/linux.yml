@@ -21,7 +21,11 @@ jobs:
     displayName: "Run check format scripts"
 
 - job: bazel
+  dependsOn: ["format"]
+  # For master builds, continue even if format fails
+  condition: or(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
   strategy:
+    maxParallel: 3
     matrix:
       release:
         CI_TARGET: 'bazel.release'
@@ -37,7 +41,6 @@ jobs:
       # (on Fuzzit) is not crashing envoy. This will help find bugs BEFORE merging and not after.
       fuzzit:
         CI_TARGET: 'bazel.fuzzit_regression'
-  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
@@ -61,7 +64,7 @@ jobs:
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       ENVOY_RBE: "true"
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=100 --curses=no"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=$(RbeJobs) --curses=no"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -85,6 +88,33 @@ jobs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
       artifactName: $(CI_TARGET)
     condition: always()
+
+- job: docker
+  dependsOn: ["bazel"]
+  condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/envoy_binary.tar.gz"
+      downloadType: single
+      targetPath: $(Build.StagingDirectory)
+
+  - bash: |
+      set -e
+      tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+      ci/docker_build.sh
+      ci/docker_push.sh
+      ci/docker_tag.sh
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      AZP_BRANCH: $(Build.SourceBranch)
+      CIRCLE_SHA1: $(Build.SourceVersion)
+      DOCKERHUB_USERNAME: $(DockerUsername)
+      DOCKERHUB_PASSWORD: $(DockerPassword)
 
 - job: fuzzit_fuzzing
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
@@ -116,7 +146,7 @@ jobs:
         FUZZIT_API_KEY: $(FuzzitApiKey)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         ENVOY_RBE: "true"
-        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=100 --curses=no"
+        BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=$(RbeJobs) --curses=no"
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

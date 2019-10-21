@@ -302,13 +302,15 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec
   // names to its original state upon return.
   const size_t orig_size = names.size();
   names.push_back(mongo_stats_->reply_num_docs_);
-  mongo_stats_->recordHistogram(names, message.documents().size());
+  mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Unspecified,
+                                message.documents().size());
   names[orig_size] = mongo_stats_->reply_size_;
-  mongo_stats_->recordHistogram(names, reply_documents_byte_size);
+  mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Bytes, reply_documents_byte_size);
   names[orig_size] = mongo_stats_->reply_time_ms_;
-  mongo_stats_->recordHistogram(names, std::chrono::duration_cast<std::chrono::milliseconds>(
-                                           time_source_.monotonicTime() - active_query.start_time_)
-                                           .count());
+  mongo_stats_->recordHistogram(names, Stats::Histogram::Unit::Milliseconds,
+                                std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    time_source_.monotonicTime() - active_query.start_time_)
+                                    .count());
   names.resize(orig_size);
 }
 

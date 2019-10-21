@@ -253,6 +253,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "transport_socket_match_integration_test",
+    srcs = [
+        "transport_socket_match_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/common/upstream:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "http_timeout_integration_test",
     srcs = [
         "http_timeout_integration_test.cc",
@@ -311,6 +326,7 @@ envoy_cc_test(
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/common/stats:stat_test_utility_lib",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],

@@ -31,7 +31,7 @@ private:
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::config::filter::http::buffer::v2::BufferPerRoute&,
-      Server::Configuration::FactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace BufferFilter

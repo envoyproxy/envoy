@@ -18,6 +18,7 @@
 #include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
+#include "common/stats/recent_lookups.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
@@ -161,6 +162,10 @@ public:
 
   StatNameSetPtr makeSet(absl::string_view name) override;
   void forgetSet(StatNameSet& stat_name_set) override;
+  uint64_t getRecentLookups(const RecentLookupsFn&) const override;
+  void clearRecentLookups() override;
+  void setRecentLookupCapacity(uint64_t capacity) override;
+  uint64_t recentLookupCapacity() const override;
 
 private:
   friend class StatName;
@@ -175,6 +180,9 @@ private:
 
   // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
+
+  // This must be held while updating stat_name_sets_.
+  mutable Thread::MutexBasicLockable stat_name_set_mutex_;
 
   /**
    * Decodes a vector of symbols back into its period-delimited stat name. If
@@ -241,7 +249,9 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
-  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(lock_);
+  RecentLookups recent_lookups_ GUARDED_BY(lock_);
+
+  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
 };
 
 /**
@@ -709,19 +719,33 @@ public:
     return pool_.add(str);
   }
 
+  /**
+   * Clears recent lookups.
+   */
+  void clearRecentLookups();
+
+  /**
+   * Sets the number of names recorded in the recent-lookups set.
+   *
+   * @param capacity the capacity to configure.
+   */
+  void setRecentLookupCapacity(uint64_t capacity);
+
 private:
   friend class FakeSymbolTableImpl;
   friend class SymbolTableImpl;
 
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
+  uint64_t getRecentLookups(const RecentLookups::IterFn& iter) const;
 
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_ GUARDED_BY(mutex_);
-  absl::Mutex mutex_;
+  mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
   StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
+  RecentLookups recent_lookups_ GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -109,7 +110,7 @@ enabled:
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   filter_->encodeComplete();
 }
 
@@ -152,7 +153,7 @@ enabled:
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   filter_->encodeComplete();
 }
 
@@ -225,11 +226,36 @@ TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
   time_system_.sleep(advance_time);
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
 
   filter_->onDestroy();
+}
+
+TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTestWithBody) {
+  auto mt = time_system_.monotonicTime();
+  time_system_.setMonotonicTime(mt + std::chrono::nanoseconds(123));
+
+  // Get the filter to record the request start time via decode.
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .WillOnce(Return(RequestForwardingAction::Forward));
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers));
+
+  const auto advance_time = std::chrono::nanoseconds(42);
+  mt = time_system_.monotonicTime();
+  time_system_.setMonotonicTime(mt + advance_time);
+
+  Http::TestHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers));
+  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
+  filter_->encodeComplete();
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
@@ -247,8 +273,27 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   time_system_.setMonotonicTime(mt + advance_time);
 
   Http::TestHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_CALL(*controller_, recordLatencySample(advance_time));
+  filter_->encodeComplete();
+}
+
+TEST_F(AdaptiveConcurrencyFilterTest, DisregardHealthChecks) {
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
+
+  Http::TestHeaderMapImpl request_headers;
+
+  // We do not expect a call to forwardingDecision() during decode.
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // We do not expect a call to recordLatencySample() as well.
+
   filter_->encodeComplete();
 }
 

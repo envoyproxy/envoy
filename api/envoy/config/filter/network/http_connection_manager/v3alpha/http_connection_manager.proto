@@ -11,7 +11,7 @@ import "envoy/api/v3alpha/core/protocol.proto";
 import "envoy/api/v3alpha/rds.proto";
 import "envoy/api/v3alpha/srds.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
-import "envoy/type/percent.proto";
+import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -24,6 +24,7 @@ import "validate/validate.proto";
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
 // [#comment:next free field: 36]
+// [#next-free-field: 36]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -40,6 +41,11 @@ message HttpConnectionManager {
     // (Envoy does not require HTTP/2 to take place over TLS or to use ALPN.
     // Prior knowledge is allowed).
     HTTP2 = 2;
+
+    // [#not-implemented-hide:] QUIC implementation is not production ready yet. Use this enum with
+    // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
+    // to distinguish HTTP1 and HTTP2 traffic.
+    HTTP3 = 3;
   }
 
   enum ServerHeaderTransformation {
@@ -78,6 +84,7 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
+  // [#next-free-field: 8]
   message Tracing {
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
@@ -102,14 +109,14 @@ message HttpConnectionManager {
     // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
     // <config_http_conn_man_runtime>`.
     // Default: 100%
-    type.Percent client_sampling = 3;
+    type.v3alpha.Percent client_sampling = 3;
 
     // Target percentage of requests managed by this HTTP connection manager that will be randomly
     // selected for trace generation, if not requested by the client or not forced. This field is
     // a direct analog for the runtime variable 'tracing.random_sampling' in the
     // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
     // Default: 100%
-    type.Percent random_sampling = 4;
+    type.v3alpha.Percent random_sampling = 4;
 
     // Target percentage of requests managed by this HTTP connection manager that will be traced
     // after all other sampling checks have been applied (client-directed, force tracing, random
@@ -119,7 +126,7 @@ message HttpConnectionManager {
     // analog for the runtime variable 'tracing.global_enabled' in the
     // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
     // Default: 100%
-    type.Percent overall_sampling = 5;
+    type.v3alpha.Percent overall_sampling = 5;
 
     // Whether to annotate spans with additional data. If true, spans will include logs for stream
     // events.
@@ -137,6 +144,7 @@ message HttpConnectionManager {
   }
 
   // [#comment:next free field: 7]
+  // [#next-free-field: 7]
   message SetCurrentClientCertDetails {
     reserved 2;
 
@@ -189,7 +197,7 @@ message HttpConnectionManager {
 
     // Determines if upgrades are enabled or disabled by default. Defaults to true.
     // This can be overridden on a per-route basis with :ref:`cluster
-    // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
+    // <envoy_api_field_api.v3alpha.route.RouteAction.upgrade_configs>` as documented in the
     // :ref:`upgrade documentation <arch_overview_websocket>`.
     google.protobuf.BoolValue enabled = 3;
   }
@@ -272,7 +280,7 @@ message HttpConnectionManager {
   //
   // This idle timeout applies to new streams and is overridable by the
   // :ref:`route-level idle_timeout
-  // <envoy_api_field_route.RouteAction.idle_timeout>`. Even on a stream in
+  // <envoy_api_field_api.v3alpha.route.RouteAction.idle_timeout>`. Even on a stream in
   // which the override applies, prior to receipt of the initial request
   // headers, the :ref:`stream_idle_timeout
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.stream_idle_timeout>`
@@ -467,16 +475,19 @@ message ScopedRouteConfigurationsList {
       [(validate.rules).repeated = {min_items: 1}];
 }
 
+// [#next-free-field: 6]
 message ScopedRoutes {
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
-  // keys are matched against a set of :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>`
-  // objects assembled from :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`
-  // messages distributed via SRDS (the Scoped Route Discovery Service) or assigned statically via
+  // keys are matched against a set of
+  // :ref:`Key<envoy_api_msg_api.v3alpha.ScopedRouteConfiguration.Key>` objects assembled from
+  // :ref:`ScopedRouteConfiguration<envoy_api_msg_api.v3alpha.ScopedRouteConfiguration>` messages
+  // distributed via SRDS (the Scoped Route Discovery Service) or assigned statically via
   // :ref:`scoped_route_configurations_list<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scoped_route_configurations_list>`.
   //
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
   // by this message. This key will be used to look up the routing table (i.e., the
-  // :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>`) to use for the request.
+  // :ref:`RouteConfiguration<envoy_api_msg_api.v3alpha.RouteConfiguration>`) to use for the
+  // request.
   message ScopeKeyBuilder {
     // Specifies the mechanism for constructing key fragments which are composed into scope keys.
     message FragmentBuilder {
