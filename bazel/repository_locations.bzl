@@ -17,9 +17,9 @@ REPOSITORY_LOCATIONS = dict(
         ],
     ),
     envoy_build_tools = dict(
-        sha256 = "92ccfd1fa27ffa74a86258d8c82719cdc0e13fa919eebe3bceaa0496c83d8e2b",
-        strip_prefix = "envoy-build-tools-cbd8d02d9d1521e4c01fc3f58ad4a22cf5636f30",
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/cbd8d02d9d1521e4c01fc3f58ad4a22cf5636f30.tar.gz"],
+        sha256 = "7cae08267737c77e92958b9b04b3da88cc2ce5a6ee9c572236688a1fa5f873f0",
+        strip_prefix = "envoy-build-tools-57c24964ee4965e1c35509f3f099d5ad172bd10a",
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/57c24964ee4965e1c35509f3f099d5ad172bd10a.tar.gz"],
     ),
     boringssl = dict(
         sha256 = "891352824e0f7977bc0c291b8c65076e3ed23630334841b93f346f12d4484b06",
