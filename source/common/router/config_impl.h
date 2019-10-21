@@ -378,10 +378,6 @@ public:
 
   std::string rewrite(std::string path, const absl::string_view matched_path,
                       bool case_sensitive) const {
-    ENVOY_LOG_MISC(debug, "the matched path is: {}", matched_path);
-    ENVOY_LOG_MISC(debug, "the path is: {}", path);
-    ENVOY_LOG_MISC(debug, "the case sensitivity is: {}", case_sensitive);
-    ENVOY_LOG_MISC(debug, "the prefix in PrefixPathRewriter is: {}", prefix_);
     ASSERT(case_sensitive ? absl::StartsWith(path, matched_path)
                           : absl::StartsWithIgnoreCase(path, matched_path));
     return path.replace(0, matched_path.size(), prefix_);
@@ -424,13 +420,14 @@ class RewriteBuilder {
 public:
   static std::unique_ptr<PathRewriter> build(const envoy::api::v2::route::Route& route) {
     if (!route.redirect().prefix_rewrite().empty()) {
-        return std::unique_ptr<PathRewriter>(new PrefixPathRewriter(route.redirect().prefix_rewrite()));
+      return std::unique_ptr<PathRewriter>(
+          new PrefixPathRewriter(route.redirect().prefix_rewrite()));
     }
     if (!route.route().prefix_rewrite().empty()) {
-        return std::unique_ptr<PathRewriter>(new PrefixPathRewriter(route.route().prefix_rewrite()));
+      return std::unique_ptr<PathRewriter>(new PrefixPathRewriter(route.route().prefix_rewrite()));
     }
-      return std::unique_ptr<PathRewriter>(new RegexPathRewriter(route.route().regex_rewrite().pattern(),
-                               route.route().regex_rewrite().substitution()));
+    return std::unique_ptr<PathRewriter>(new RegexPathRewriter(
+        route.route().regex_rewrite().pattern(), route.route().regex_rewrite().substitution()));
   };
 };
 

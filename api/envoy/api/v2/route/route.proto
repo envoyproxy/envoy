@@ -744,7 +744,8 @@ message RouteAction {
   // * The path pattern *^/foo/(bar)/(.*)$ paired with rewrite pattern */$1/$2* would transform
   // */foo/bar/baz/bang* into */bar/baz/bang*.
   //
-  //  [#next-major-version: RegexRewrite should be merged with prefix_rewrite and converted to a oneof.]
+  //  [#next-major-version: RegexRewrite should be merged with prefix_rewrite and converted to a
+  //  oneof.]
   RegexRewrite regex_rewrite = 30;
 
   message RegexRewrite {

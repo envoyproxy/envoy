@@ -435,7 +435,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
     }
   }
 
-  rewritePathHeader(headers, insert_envoy_original_path);
+  auto path_rewriter = getPathRewriter();
+
+  if (!path_rewriter->apply()) {
+    return;
+  } else {
+    rewritePathHeader(headers, insert_envoy_original_path);
+  }
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,

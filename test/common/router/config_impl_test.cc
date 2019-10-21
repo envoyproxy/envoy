@@ -7,7 +7,7 @@
 
 #include "envoy/api/v2/rds.pb.validate.h"
 #include "envoy/api/v2/route/route.pb.validate.h"
-#include "envoy/server/filter_config.h"\
+#include "envoy/server/filter_config.h"
 
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
