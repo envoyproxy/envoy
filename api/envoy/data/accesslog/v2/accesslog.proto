@@ -289,8 +289,7 @@ message TLSProperties {
 // [#next-free-field: 14]
 message HTTPRequestProperties {
   // The request method (RFC 7231/2616).
-  api.v2.core.RequestMethod request_method = 1
-      [(validate.rules).enum = {defined_only: true}];
+  api.v2.core.RequestMethod request_method = 1 [(validate.rules).enum = {defined_only: true}];
 
   // The scheme portion of the incoming request URI.
   string scheme = 2;
