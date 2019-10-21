@@ -115,7 +115,7 @@ response: {{}}
   std::unique_ptr<HttpGrpcAccessLog> access_log_;
 };
 
-// Test HTTP log marshalling.
+// Test HTTP log marshaling.
 TEST_F(HttpGrpcAccessLogTest, Marshalling) {
   InSequence s;
 
@@ -588,7 +588,7 @@ response: {}
   }
 }
 
-// Test HTTP log marshalling with additional headers.
+// Test HTTP log marshaling with additional headers.
 TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
   InSequence s;
 

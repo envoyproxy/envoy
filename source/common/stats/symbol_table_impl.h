@@ -496,7 +496,7 @@ private:
 
 // Represents an ordered container of StatNames. The encoding for each StatName
 // is byte-packed together, so this carries less overhead than allocating the
-// storage separately. The tradeoff is there is no random access; you can only
+// storage separately. The trade-off is there is no random access; you can only
 // iterate through the StatNames.
 //
 // The maximum size of the list is 255 elements, so the length can fit in a

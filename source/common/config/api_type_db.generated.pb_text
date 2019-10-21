@@ -4234,6 +4234,13 @@ types {
   }
 }
 types {
+  key: "envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfigPerRoute"
+  value {
+    qualified_package: "envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1"
+    proto_path: "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.proto"
+  }
+}
+types {
   key: "envoy.config.filter.http.gzip.v2.Gzip"
   value {
     qualified_package: "envoy.config.filter.http.gzip.v2"

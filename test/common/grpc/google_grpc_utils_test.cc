@@ -53,7 +53,7 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer1) {
   EXPECT_EQ(str, "test");
 }
 
-// Test building a grpc::ByteBuffer from a Bufffer::Instance with 3 slices.
+// Test building a grpc::ByteBuffer from a Buffer::Instance with 3 slices.
 TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   Buffer::BufferFragmentImpl f1("test", 4, nullptr);
@@ -72,7 +72,7 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
   EXPECT_EQ(str, "test this");
 }
 
-// Test building a Buffer::Instance from a grpc::ByteBuffer from a Bufffer::Instance with 3 slices.
+// Test building a Buffer::Instance from a grpc::ByteBuffer from a Buffer::Instance with 3 slices.
 TEST(GoogleGrpcUtilsTest, ByteBufferInstanceRoundTrip) {
   std::array<grpc::Slice, 3> slices = {
       {grpc::string("test"), grpc::string(" "), grpc::string("this")}};
