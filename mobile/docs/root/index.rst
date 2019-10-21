@@ -1,4 +1,4 @@
-Envoy Mobile documentation
+Envoy Mobile Documentation
 ==========================
 
 .. ifconfig:: release_level in ('pre-release')
@@ -12,7 +12,6 @@ Envoy Mobile documentation
   .. toctree::
     :maxdepth: 2
 
-    about_docs
     intro/intro
     start/start
     development/development
