@@ -173,9 +173,10 @@ public:
   AsyncRequest* sendRaw(absl::string_view service_full_name, absl::string_view method_name,
                         Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
                         Tracing::Span& parent_span,
-                        const absl::optional<std::chrono::milliseconds>& timeout) override;
+                        const Http::AsyncClient::RequestOptions& options) override;
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
-                           RawAsyncStreamCallbacks& callbacks) override;
+                           RawAsyncStreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions& options) override;
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
@@ -207,7 +208,7 @@ class GoogleAsyncStreamImpl : public RawAsyncStream,
 public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout);
+                        const Http::AsyncClient::StreamOptions& options);
   ~GoogleAsyncStreamImpl() override;
 
   virtual void initialize(bool buffer_body_for_retry);
@@ -272,7 +273,7 @@ private:
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;
-  const absl::optional<std::chrono::milliseconds>& timeout_;
+  const Http::AsyncClient::StreamOptions& options_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
@@ -309,7 +310,7 @@ public:
   GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                          absl::string_view method_name, Buffer::InstancePtr request,
                          RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                         const absl::optional<std::chrono::milliseconds>& timeout);
+                         const Http::AsyncClient::RequestOptions& options);
 
   void initialize(bool buffer_body_for_retry) override;
 

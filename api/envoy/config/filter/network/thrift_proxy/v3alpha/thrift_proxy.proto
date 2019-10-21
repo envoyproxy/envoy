@@ -98,8 +98,9 @@ message ThriftFilter {
 }
 
 // ThriftProtocolOptions specifies Thrift upstream protocol options. This object is used in
-// in :ref:`extension_protocol_options<envoy_api_field_Cluster.extension_protocol_options>`, keyed
-// by the name `envoy.filters.network.thrift_proxy`.
+// in
+// :ref:`extension_protocol_options<envoy_api_field_api.v3alpha.Cluster.extension_protocol_options>`,
+// keyed by the name `envoy.filters.network.thrift_proxy`.
 // [#comment:next free field: 3]
 message ThriftProtocolOptions {
   // Supplies the type of transport that the Thrift proxy should use for upstream connections.

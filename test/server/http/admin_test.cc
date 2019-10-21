@@ -36,6 +36,7 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::EndsWith;
 using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -46,6 +47,7 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -109,8 +111,8 @@ TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -255,8 +257,8 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
@@ -353,8 +355,8 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -453,9 +455,12 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1_matches"); // Will match, be used, and print
-  Stats::Histogram& h2 = store_->histogram("h2_matches"); // Will match but not be used
-  Stats::Histogram& h3 = store_->histogram("h3_not");     // Will be used but not match
+  Stats::Histogram& h1 = store_->histogram(
+      "h1_matches", Stats::Histogram::Unit::Unspecified); // Will match, be used, and print
+  Stats::Histogram& h2 = store_->histogram(
+      "h2_matches", Stats::Histogram::Unit::Unspecified); // Will match but not be used
+  Stats::Histogram& h3 = store_->histogram(
+      "h3_not", Stats::Histogram::Unit::Unspecified); // Will be used but not match
 
   EXPECT_EQ("h1_matches", h1.name());
   EXPECT_EQ("h2_matches", h2.name());
@@ -726,6 +731,37 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                            admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
                                                               data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+}
+
+TEST_P(AdminInstanceTest, StatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_LOG_CONTAINS(
+      "error", "Invalid regex: ",
+      EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
+}
+
+TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_LOG_CONTAINS(
+      "error", ": *.ptest",
+      EXPECT_EQ(Http::Code::BadRequest,
+                getCallback("/stats?format=prometheus&filter=*.ptest", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
@@ -1367,6 +1403,20 @@ TEST_P(AdminInstanceTest, GetRequestJson) {
               HasSubstr("application/json"));
 }
 
+TEST_P(AdminInstanceTest, RecentLookups) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+
+  // Recent lookup tracking is disabled by default.
+  EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
+  EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
+
+  // We can't test RecentLookups in admin unit tests as it doesn't work with a
+  // fake symbol table. However we cover this solidly in integration tests.
+}
+
 TEST_P(AdminInstanceTest, PostRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
@@ -1617,6 +1667,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1677,6 +1728,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1724,6 +1776,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = false;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1763,6 +1816,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 

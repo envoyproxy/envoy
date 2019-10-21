@@ -2,13 +2,14 @@
 
 # Diff or copy protoxform artifacts from Bazel cache back to the source tree.
 
-import glob
 import os
 import re
 import shutil
 import string
 import subprocess
 import sys
+
+from api_proto_plugin import utils
 
 from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import SourceFileLoader
@@ -69,19 +70,8 @@ def LabelPaths(label, src_suffix):
       destination is a provisional path in the Envoy source tree for copying the
       contents of source when run in fix mode.
   """
-  assert (label.startswith('@envoy_api//'))
-  proto_file_canonical = label[len('@envoy_api//'):].replace(':', '/')
-  # We use ** glob matching here to deal with the fact that we have something
-  # like
-  # bazel-bin/external/envoy_api/envoy/admin/v2alpha/pkg/envoy/admin/v2alpha/certs.proto.proto
-  # and we don't want to have to do a nested loop and slow bazel query to
-  # recover the canonical package part of the path.
-  # While we may have reformatted the file multiple times due to the transitive
-  # dependencies in the aspect above, they all look the same. So, just pick an
-  # arbitrary match and we're done.
-  glob_pattern = 'bazel-bin/external/envoy_api/**/%s.%s' % (proto_file_canonical, src_suffix)
-  src = glob.glob(glob_pattern, recursive=True)[0]
-  dst = 'api/%s' % proto_file_canonical
+  src = utils.BazelBinPathForOutputArtifact(label, src_suffix)
+  dst = 'api/%s' % utils.ProtoFileCanonicalFromLabel(label)
   return src, dst
 
 
@@ -110,7 +100,7 @@ def SyncV2(cmd, src_labels):
     src_labels: Bazel label for source protos.
   """
   for s in src_labels:
-    src, dst = LabelPaths(s, 'v2.proto')
+    src, dst = LabelPaths(s, '.v2.proto')
     SyncProtoFile(cmd, src, dst)
 
 
@@ -122,10 +112,20 @@ def SyncV3Alpha(cmd, src_labels):
     src_labels: Bazel label for source protos.
   """
   for s in src_labels:
-    src, dst = LabelPaths(s, 'v3alpha.proto')
-    # Skip unversioned package namespaces
+    src, dst = LabelPaths(s, '.v3alpha.proto')
+    # Skip empty files, this indicates this file isn't modified in next version.
+    if os.stat(src).st_size == 0:
+      continue
+    # Skip unversioned package namespaces. TODO(htuch): fix this to use the type
+    # DB and proper upgrade paths.
     if 'v2' in dst:
       dst = re.sub('v2alpha\d?|v2', 'v3alpha', dst)
+      SyncProtoFile(cmd, src, dst)
+    elif 'envoy/type/matcher' in dst:
+      dst = re.sub('/type/matcher/', '/type/matcher/v3alpha/', dst)
+      SyncProtoFile(cmd, src, dst)
+    elif 'envoy/type' in dst:
+      dst = re.sub('/type/', '/type/v3alpha/', dst)
       SyncProtoFile(cmd, src, dst)
 
 

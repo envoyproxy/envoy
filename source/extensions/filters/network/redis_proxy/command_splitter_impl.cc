@@ -146,7 +146,12 @@ bool SingleServerRequest::onRedirection(const Common::Redis::RespValue& value) {
     return false;
   }
   handle_ = conn_pool_->makeRequestToHost(host_address, *incoming_request_, *this);
-  return (handle_ != nullptr);
+
+  if (handle_ != nullptr) {
+    conn_pool_->onRedirection();
+    return true;
+  }
+  return false;
 }
 
 void SingleServerRequest::cancel() {
@@ -157,9 +162,9 @@ void SingleServerRequest::cancel() {
 SplitRequestPtr SimpleRequest::create(Router& router,
                                       Common::Redis::RespValuePtr&& incoming_request,
                                       SplitCallbacks& callbacks, CommandStats& command_stats,
-                                      TimeSource& time_source, bool latency_in_micros) {
+                                      TimeSource& time_source) {
   std::unique_ptr<SimpleRequest> request_ptr{
-      new SimpleRequest(callbacks, command_stats, time_source, latency_in_micros)};
+      new SimpleRequest(callbacks, command_stats, time_source)};
 
   const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
   if (route) {
@@ -180,7 +185,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
 
 SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source, bool latency_in_micros) {
+                                    TimeSource& time_source) {
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
   if (incoming_request->asArray().size() < 4) {
@@ -189,8 +194,7 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
     return nullptr;
   }
 
-  std::unique_ptr<EvalRequest> request_ptr{
-      new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
+  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats, time_source)};
 
   const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (route) {
@@ -233,9 +237,8 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 
 SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source, bool latency_in_micros) {
-  std::unique_ptr<MGETRequest> request_ptr{
-      new MGETRequest(callbacks, command_stats, time_source, latency_in_micros)};
+                                    TimeSource& time_source) {
+  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats, time_source)};
 
   request_ptr->num_pending_responses_ = incoming_request->asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -303,9 +306,14 @@ bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value
     return false;
   }
 
-  this->pending_requests_[index].handle_ =
-      conn_pool->makeRequestToHost(host_address, request, this->pending_requests_[index]);
-  return (this->pending_requests_[index].handle_ != nullptr);
+  pending_requests_[index].handle_ =
+      conn_pool->makeRequestToHost(host_address, request, pending_requests_[index]);
+
+  if (pending_requests_[index].handle_ != nullptr) {
+    conn_pool->onRedirection();
+    return true;
+  }
+  return false;
 }
 
 void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
@@ -358,14 +366,13 @@ void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
 
 SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source, bool latency_in_micros) {
+                                    TimeSource& time_source) {
   if ((incoming_request->asArray().size() - 1) % 2 != 0) {
     onWrongNumberOfArguments(callbacks, *incoming_request);
     command_stats.error_.inc();
     return nullptr;
   }
-  std::unique_ptr<MSETRequest> request_ptr{
-      new MSETRequest(callbacks, command_stats, time_source, latency_in_micros)};
+  std::unique_ptr<MSETRequest> request_ptr{new MSETRequest(callbacks, command_stats, time_source)};
 
   request_ptr->num_pending_responses_ = (incoming_request->asArray().size() - 1) / 2;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -460,9 +467,9 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
                                                   Common::Redis::RespValuePtr&& incoming_request,
                                                   SplitCallbacks& callbacks,
                                                   CommandStats& command_stats,
-                                                  TimeSource& time_source, bool latency_in_micros) {
+                                                  TimeSource& time_source) {
   std::unique_ptr<SplitKeysSumResultRequest> request_ptr{
-      new SplitKeysSumResultRequest(callbacks, command_stats, time_source, latency_in_micros)};
+      new SplitKeysSumResultRequest(callbacks, command_stats, time_source)};
 
   request_ptr->num_pending_responses_ = incoming_request->asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -555,22 +562,25 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      latency_in_micros_(latency_in_micros), time_source_(time_source) {
+      time_source_(time_source) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
-    addHandler(scope, stat_prefix, command, simple_command_handler_);
+    addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
 
   for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
-    addHandler(scope, stat_prefix, command, eval_command_handler_);
+    addHandler(scope, stat_prefix, command, latency_in_micros, eval_command_handler_);
   }
 
   for (const std::string& command :
        Common::Redis::SupportedCommands::hashMultipleSumResultCommands()) {
-    addHandler(scope, stat_prefix, command, split_keys_sum_result_handler_);
+    addHandler(scope, stat_prefix, command, latency_in_micros, split_keys_sum_result_handler_);
   }
 
-  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mget(), mget_handler_);
-  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), mset_handler_);
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mget(), latency_in_micros,
+             mget_handler_);
+
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), latency_in_micros,
+             mset_handler_);
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
@@ -629,7 +639,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   ENVOY_LOG(debug, "redis: splitting '{}'", request->toString());
   handler->command_stats_.total_.inc();
   SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
-      std::move(request), callbacks, handler->command_stats_, time_source_, latency_in_micros_);
+      std::move(request), callbacks, handler->command_stats_, time_source_);
   return request_ptr;
 }
 
@@ -639,15 +649,21 @@ void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
 }
 
 void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefix,
-                              const std::string& name, CommandHandler& handler) {
+                              const std::string& name, bool latency_in_micros,
+                              CommandHandler& handler) {
   std::string to_lower_name(name);
   to_lower_table_.toLowerCase(to_lower_name);
   const std::string command_stat_prefix = fmt::format("{}command.{}.", stat_prefix, to_lower_name);
+  Stats::StatNameManagedStorage storage{command_stat_prefix + std::string("latency"),
+                                        scope.symbolTable()};
   handler_lookup_table_.add(
       to_lower_name.c_str(),
       std::make_shared<HandlerData>(HandlerData{
-          CommandStats{ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix),
-                                         POOL_HISTOGRAM_PREFIX(scope, command_stat_prefix))},
+          CommandStats{ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix))
+                           scope.histogramFromStatName(storage.statName(),
+                                                       latency_in_micros
+                                                           ? Stats::Histogram::Unit::Microseconds
+                                                           : Stats::Histogram::Unit::Milliseconds)},
           handler}));
 }
 

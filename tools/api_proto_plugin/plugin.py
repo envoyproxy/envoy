@@ -57,10 +57,11 @@ def Plugin(output_descriptors):
     if cprofile_enabled:
       pr = cProfile.Profile()
       pr.enable()
-      for od in output_descriptors:
-        f = response.file.add()
-        f.name = file_proto.name + od.output_suffix
-        f.content = traverse.TraverseFile(od.xform(file_proto), od.visitor)
+    for od in output_descriptors:
+      f = response.file.add()
+      f.name = file_proto.name + od.output_suffix
+      xformed_proto = od.xform(file_proto)
+      f.content = traverse.TraverseFile(od.xform(file_proto), od.visitor) if xformed_proto else ''
     if cprofile_enabled:
       pr.disable()
       stats_stream = io.StringIO()

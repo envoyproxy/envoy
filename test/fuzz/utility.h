@@ -82,7 +82,7 @@ inline Http::TestHeaderMapImpl fromHeaders(
     // not supposed to do this.
     const std::string key =
         header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
-    if (ignore_headers.find(StringUtil::toLower(key)) != ignore_headers.end()) {
+    if (ignore_headers.find(StringUtil::toLower(key)) == ignore_headers.end()) {
       header_map.addCopy(key, replaceInvalidCharacters(header.value()));
     }
   }
