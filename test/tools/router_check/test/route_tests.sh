@@ -26,14 +26,12 @@ fi
 
 # Testing increase coverage threshold flag - reason.
 COVERAGE_OUTPUT=$($COVERAGE_CMD "1.0" "-i" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
-echo "${COVERAGE_OUTPUT}"
 if [[ "${COVERAGE_OUTPUT}" != *"Failed due to stale coverage threshold."* ]] ; then
   exit 1
 fi
 
 # Testing increase coverage threshold flag - increase request.
 COVERAGE_OUTPUT=$($COVERAGE_CMD "1.0" "-i" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
-echo "${COVERAGE_OUTPUT}"
 if [[ "${COVERAGE_OUTPUT}" != *"Please increase the coverage failure threshold to "* ]] ; then
   exit 1
 fi
@@ -41,7 +39,7 @@ fi
 
 # Testing increase coverage threshold flag - cov path env variable.
 COVERAGE_OUTPUT=$(ENVOY_COV_CONFIG_FILE="a_file" $COVERAGE_CMD "1.0" "-i" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
-if [[ "${COVERAGE_OUTPUT}" != *"increase the coverage failure threshold to "*" in a_file" ]] ; then
+if [[ "${COVERAGE_OUTPUT}" != *"in a_file"* ]] ; then
   exit 1
 fi
 
