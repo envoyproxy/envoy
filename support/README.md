@@ -6,7 +6,7 @@ automatic DCO signoff and pre-commit format checking.
 
 ## Usage
 
-To get started, you need only navigate to the Envoy project root and run:
+To get started, you need only to navigate to the Envoy project root and run:
 
 ```bash
 ./support/bootstrap
