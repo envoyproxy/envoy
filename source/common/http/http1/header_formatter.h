@@ -21,9 +21,9 @@ public:
 using HeaderKeyFormatterPtr = std::unique_ptr<HeaderKeyFormatter>;
 
 /**
- * A HeaderKeyFormatter that uppercases the first character in each word: The
+ * A HeaderKeyFormatter that upper cases the first character in each word: The
  * first character as well as any alpha character following a special
- * character is uppercased.
+ * character is upper cased.
  */
 class ProperCaseHeaderKeyFormatter : public HeaderKeyFormatter {
 public:
