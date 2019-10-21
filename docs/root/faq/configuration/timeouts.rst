@@ -1,3 +1,5 @@
+.. _faq_configuration_timeouts:
+
 How do I configure timeouts?
 ============================
 
@@ -15,6 +17,8 @@ HTTP/gRPC
 Connection timeouts
 ^^^^^^^^^^^^^^^^^^^
 
+Connection timeouts apply to the entire HTTP connection and all streams the connection carries.
+
 * The HTTP protocol :ref:`idle timeout <envoy_api_field_core.HttpProtocolOptions.idle_timeout>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream
   cluster HTTP connections. The idle timeout is the time at which a downstream or upstream
@@ -26,28 +30,39 @@ Connection timeouts
   connections use the
   :ref:`common_http_protocol_options <envoy_api_field_Cluster.common_http_protocol_options>` field
   in the cluster configuration.
+
+Stream timeouts
+^^^^^^^^^^^^^^^
+
+Stream timeouts apply to individual streams carried by an HTTP connection. Note that a stream is
+an HTTP/2 and HTTP/3 concept, however internally Envoy maps HTTP/1 requests to streams so in this
+context request/stream is interchangeable.
+
 * The HTTP connection manager :ref:`request_timeout
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`
-  is the amount of time the connection manager will allow for the *entire request* to be received
-  by the client.
+  is the amount of time the connection manager will allow for the *entire request stream* to be
+  received by the client.
 
   .. attention::
 
-    This timeout has no default value as it is not compatible with streaming requests (requests that
-    never end). See the stream idle timeout that follows. However, if using the :ref:`buffer filter
-    <config_http_filters_buffer>`, it is recommended to configure this timeout.
+    This timeout is not enforced by default as it is not compatible with streaming requests
+    (requests that never end). See the stream idle timeout that follows. However, if using the
+    :ref:`buffer filter <config_http_filters_buffer>`, it is recommended to configure this timeout.
 * The HTTP connection manager :ref:`stream_idle_timeout
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
   is the amount of time that the connection manager will allow a stream to exist with no upstream
-  or downstream activity. The default stream idle timeout if not otherwise specified is *5 minutes*.
-  This timeout is strongly recommended for streaming APIs.
+  or downstream activity. The default stream idle timeout is *5 minutes*. This timeout is strongly
+  recommended for streaming APIs (requests or responses that never end).
 
 Route timeouts
 ^^^^^^^^^^^^^^
 
+Envoy supports additional stream timeouts at the route level, as well as overriding some of the
+stream timeouts already introduced above.
+
 * A route :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` is the amount of time that
-  Envoy will wait for the upstream to respond with a complete response. This timeout does not
-  start until the entire downstream request has been received.
+  Envoy will wait for the upstream to respond with a complete response. *This timeout does not
+  start until the entire downstream request stream has been received*.
 
   .. attention::
 

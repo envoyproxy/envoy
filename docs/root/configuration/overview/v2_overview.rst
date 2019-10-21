@@ -5,7 +5,7 @@ Overview
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
-<https://developers.google.com/protocol-buffers/>`_ in the :repo:`api tree <envoy/api/>`. They
+<https://developers.google.com/protocol-buffers/>`_ in the :repo:`api tree <api/>`. They
 support:
 
 * Streaming delivery of :ref:`xDS <xds_protocol>` API updates via gRPC. This reduces

@@ -5,7 +5,7 @@ Listeners
 
 The Envoy configuration supports any number of listeners within a single process. Generally we
 recommend running a single Envoy per machine regardless of the number of configured listeners. This
-allows for easier operation and a single source of statistics. Envoy supports both TCP and UDP
+allows for easier operation and a single source of statistics. Currently Envoy only supports TCP
 listeners.
 
 Each listener is independently configured with some number :ref:`filter chains
