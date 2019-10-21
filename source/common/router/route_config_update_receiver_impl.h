@@ -23,12 +23,12 @@ public:
   void initializeVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
   void collectAliasesInUpdate(
       const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
-  bool removeVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+  void removeVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  void updateVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+  void updateVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
                     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
   void rebuildRouteConfig(
-      const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+      const std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
       envoy::api::v2::RouteConfiguration& route_config);
   bool aliasResolutionFailed(const envoy::api::v2::Resource& resource) const;
 
@@ -58,7 +58,7 @@ private:
   uint64_t last_config_hash_;
   std::string last_config_version_;
   SystemTime last_updated_;
-  std::unordered_map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
+  std::map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   std::set<std::string> aliases_in_last_update_;
