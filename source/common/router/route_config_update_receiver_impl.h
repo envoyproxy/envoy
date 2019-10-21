@@ -23,13 +23,12 @@ public:
   void initializeVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
   void collectAliasesInUpdate(
       const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
-  void removeVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
+  void removeVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  void updateVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
+  void updateVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
-  void rebuildRouteConfig(
-      const std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
-      envoy::api::v2::RouteConfiguration& route_config);
+  void rebuildRouteConfig(const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+                          envoy::api::v2::RouteConfiguration& route_config);
   bool aliasResolutionFailed(const envoy::api::v2::Resource& resource) const;
 
   // Router::RouteConfigUpdateReceiver

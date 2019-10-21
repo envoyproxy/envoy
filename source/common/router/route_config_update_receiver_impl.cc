@@ -44,7 +44,8 @@ void RouteConfigUpdateReceiverImpl::collectAliasesInUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
   aliases_in_last_update_.clear();
   for (const auto& resource : added_resources) {
-    std::copy(resource.aliases().begin(), resource.aliases().end(), std::inserter(aliases_in_last_update_, aliases_in_last_update_.end()));
+    std::copy(resource.aliases().begin(), resource.aliases().end(),
+              std::inserter(aliases_in_last_update_, aliases_in_last_update_.end()));
   }
 }
 
@@ -58,7 +59,7 @@ void RouteConfigUpdateReceiverImpl::initializeVhosts(
 
 // returns true if one or more virtual hosts have been removed from vhosts
 void RouteConfigUpdateReceiverImpl::removeVhosts(
-    std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
+    std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
   for (const auto& vhost_name : removed_vhost_names) {
     vhosts.erase(vhost_name);
@@ -67,7 +68,7 @@ void RouteConfigUpdateReceiverImpl::removeVhosts(
 
 // returns true if vhosts have been added or updated.
 void RouteConfigUpdateReceiverImpl::updateVhosts(
-    std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
+    std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
   for (const auto& resource : added_resources) {
     // the management server returns empty resources For aliases that it couldn't resolve.
@@ -86,7 +87,7 @@ void RouteConfigUpdateReceiverImpl::updateVhosts(
 }
 
 void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
-    const std::map<std::string, envoy::api::v2::route::VirtualHost> &vhosts,
+    const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     envoy::api::v2::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
   for (const auto& vhost : vhosts) {
