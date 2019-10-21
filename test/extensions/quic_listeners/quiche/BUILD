@@ -58,6 +58,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
+        ":test_utils_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
@@ -179,5 +180,14 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_utils_lib",
+    hdrs = ["test_utils.h"],
+    tags = ["nofips"],
+    deps = [
+        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )

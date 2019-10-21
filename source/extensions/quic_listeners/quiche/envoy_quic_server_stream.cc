@@ -68,8 +68,8 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     // If buffered bytes changed, update stream and session's watermark book
     // keeping.
     sendBufferSimulation().checkHighWatermark(bytes_to_send_new);
-    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(bytes_to_send_new -
-                                                                        bytes_to_send_old);
+    dynamic_cast<QuicFilterManagerConnectionImpl*>(session())->adjustBytesToSend(bytes_to_send_new -
+                                                                                 bytes_to_send_old);
   }
 }
 
@@ -209,8 +209,8 @@ void EnvoyQuicServerStream::OnCanWrite() {
   ASSERT(buffered_data_new <= buffered_data_old);
   if (buffered_data_new < buffered_data_old) {
     sendBufferSimulation().checkLowWatermark(buffered_data_new);
-    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(buffered_data_new -
-                                                                        buffered_data_old);
+    dynamic_cast<QuicFilterManagerConnectionImpl*>(session())->adjustBytesToSend(buffered_data_new -
+                                                                                 buffered_data_old);
   }
 }
 
