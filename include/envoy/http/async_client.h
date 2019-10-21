@@ -10,8 +10,8 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "absl/types/optional.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -228,7 +228,8 @@ public:
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
-      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ && child_span_name_ == src.child_span_name_;
+      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ &&
+             child_span_name_ == src.child_span_name_;
     }
 
     // The parent span that child spans are created under to trace egress requests/responses.

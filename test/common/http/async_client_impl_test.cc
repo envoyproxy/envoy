@@ -219,13 +219,11 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
 
-  EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _))
-      .WillOnce(Return(child_span));
+  EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
   expectSuccess(200);
 
-  AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
-      .setParentSpan(parent_span_)
-      .setChildSpanName(child_span_name_);
+  AsyncClient::RequestOptions options =
+      AsyncClient::RequestOptions().setParentSpan(parent_span_).setChildSpanName(child_span_name_);
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
