@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.validate.h"
+#include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
