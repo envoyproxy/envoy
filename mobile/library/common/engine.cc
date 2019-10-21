@@ -70,7 +70,14 @@ envoy_status_t Engine::run(std::string config, std::string log_level) {
   } // mutex_
 
   // The main run loop must run without holding the mutex, so that the destructor can acquire it.
-  return TS_UNCHECKED_READ(main_common_)->run() ? ENVOY_SUCCESS : ENVOY_FAILURE;
+  bool run_success = TS_UNCHECKED_READ(main_common_)->run();
+  // After the event loop has exited clean up any state that has to be cleaned from the context of
+  // main_thread_.
+  // It is important to destroy here, because otherwise the destructors will run from the context of
+  // the application's main thread, not the Engine's main_thread_.
+  postinit_callback_handler_.reset();
+  TS_UNCHECKED_READ(main_common_).reset();
+  return run_success ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
 Engine::~Engine() {
@@ -87,12 +94,11 @@ Engine::~Engine() {
       cv_.wait(mutex_);
     }
     ASSERT(main_common_);
-    // Gracefully shutdown the running envoy instance by resetting the main_common_ unique_ptr.
-    // Destroying MainCommon's member variables shutsdown things in the correct order and
-    // gracefully.
     event_dispatcher_->post([this]() -> void {
       callbacks_.on_exit();
-      TS_UNCHECKED_READ(main_common_).reset();
+      // This call will gracefully shutdown the Server::Instance and exit the event loop,
+      // returning main_thread_'s execution to Engine::run
+      TS_UNCHECKED_READ(main_common_)->server()->shutdown();
     });
   } // _mutex
 
