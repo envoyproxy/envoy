@@ -58,6 +58,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
+        ":test_utils_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
@@ -188,7 +189,12 @@ envoy_cc_test(
     name = "envoy_quic_simulated_watermark_buffer_test",
     srcs = ["envoy_quic_simulated_watermark_buffer_test.cc"],
     tags = ["nofips"],
-    deps = [
-        "//source/extensions/quic_listeners/quiche:envoy_quic_simulated_watermark_buffer_lib",
-    ],
+    deps = ["//source/extensions/quic_listeners/quiche:envoy_quic_simulated_watermark_buffer_lib"],
+)
+
+envoy_cc_test_library(
+    name = "test_utils_lib",
+    hdrs = ["test_utils.h"],
+    tags = ["nofips"],
+    deps = ["@com_googlesource_quiche//:quic_core_http_spdy_session_lib"],
 )

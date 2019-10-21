@@ -73,7 +73,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   uint64_t bytes_to_send_new = BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new,
-                      dynamic_cast<EnvoyQuicServerSession&>(*session()));
+                      dynamic_cast<QuicFilterManagerConnectionImpl&>(*session()));
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
@@ -208,7 +208,8 @@ void EnvoyQuicServerStream::OnClose() {
   if (BufferedDataBytes() > 0) {
     // If the stream is closed without sending out all bufferred data, regard
     // them as sent now and adjust connection buffer book keeping.
-    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(0 - BufferedDataBytes());
+    dynamic_cast<QuicFilterManagerConnectionImpl*>(session())->adjustBytesToSend(
+        0 - BufferedDataBytes());
   }
 }
 
@@ -220,13 +221,13 @@ void EnvoyQuicServerStream::OnCanWrite() {
   // increase.
   ASSERT(buffered_data_new <= buffered_data_old);
   maybeCheckWatermark(buffered_data_old, buffered_data_new,
-                      dynamic_cast<EnvoyQuicServerSession&>(*session()));
+                      dynamic_cast<QuicFilterManagerConnectionImpl&>(*session()));
 }
 
 uint32_t EnvoyQuicServerStream::streamId() { return id(); }
 
 Network::Connection* EnvoyQuicServerStream::connection() {
-  return dynamic_cast<EnvoyQuicServerSession*>(session());
+  return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
 }
 
 } // namespace Quic

@@ -1,33 +1,20 @@
-#include <cstddef>
-
-#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
-
-#pragma GCC diagnostic push
-// QUICHE allows unused parameters.
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-
-#include "quiche/quic/core/quic_versions.h"
-#include "quiche/quic/core/http/quic_server_session_base.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/core/quic_utils.h"
-
-#pragma GCC diagnostic pop
-
 #include <string>
 
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
-#include "test/test_common/utility.h"
+
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_server_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
-#include "test/test_common/utility.h"
-#include "test/mocks/http/stream_decoder.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_connection.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
+
+#include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -37,36 +24,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Quic {
-
-class MockQuicServerSession : public EnvoyQuicServerSession {
-public:
-  MockQuicServerSession(const quic::QuicConfig& config,
-                        const quic::ParsedQuicVersionVector& supported_versions,
-                        std::unique_ptr<EnvoyQuicServerConnection> connection,
-                        quic::QuicSession::Visitor* visitor,
-                        quic::QuicCryptoServerStream::Helper* helper,
-                        const quic::QuicCryptoServerConfig* crypto_config,
-                        quic::QuicCompressedCertsCache* compressed_certs_cache,
-                        Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
-      : EnvoyQuicServerSession(config, supported_versions, std::move(connection), visitor, helper,
-                               crypto_config, compressed_certs_cache, dispatcher,
-                               send_buffer_limit) {}
-
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyStream*(quic::QuicStreamId id));
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyStream*(quic::PendingStream* pending));
-  MOCK_METHOD0(CreateOutgoingBidirectionalStream, quic::QuicSpdyStream*());
-  MOCK_METHOD0(CreateOutgoingUnidirectionalStream, quic::QuicSpdyStream*());
-  MOCK_METHOD1(ShouldCreateIncomingStream, bool(quic::QuicStreamId id));
-  MOCK_METHOD0(ShouldCreateOutgoingBidirectionalStream, bool());
-  MOCK_METHOD0(ShouldCreateOutgoingUnidirectionalStream, bool());
-  MOCK_METHOD1(ShouldYield, bool(quic::QuicStreamId stream_id));
-  MOCK_METHOD5(WritevData,
-               quic::QuicConsumedData(quic::QuicStream* stream, quic::QuicStreamId id,
-                                      size_t write_length, quic::QuicStreamOffset offset,
-                                      quic::StreamSendingState state));
-
-  using quic::QuicServerSessionBase::ActivateStream;
-};
 
 class EnvoyQuicServerStreamTest : public testing::TestWithParam<bool> {
 public:
@@ -80,24 +37,18 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(new EnvoyQuicServerConnection(
-            quic::test::TestConnectionId(),
-            quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345), connection_helper_,
-            alarm_factory_, &writer_,
-            /*owns_writer=*/false, {quic_version_}, listener_config_, listener_stats_)),
-        quic_session_(quic_config_, {quic_version_},
-                      std::unique_ptr<EnvoyQuicServerConnection>(quic_connection_),
-                      /*visitor=*/nullptr,
-                      /*helper=*/nullptr, /*crypto_config=*/nullptr,
-                      /*compressed_certs_cache=*/nullptr, *dispatcher_,
-                      quic_config_.GetInitialSessionFlowControlWindowToSend()),
+        quic_connection_(quic::test::TestConnectionId(),
+                         quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
+                         connection_helper_, alarm_factory_, &writer_,
+                         /*owns_writer=*/false, {quic_version_}, listener_config_, listener_stats_),
+        quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
+                      quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
     quic_stream_->setDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
-    EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(Return(false));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStream*, quic::QuicStreamId, size_t write_length,
                                   quic::QuicStreamOffset, quic::StreamSendingState) {
@@ -129,8 +80,9 @@ public:
   }
 
   void TearDown() override {
-    if (quic_connection_->connected()) {
-      quic_session_.close(Network::ConnectionCloseType::NoFlush);
+    if (quic_connection_.connected()) {
+      quic_connection_.CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
+                                       quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
     }
   }
 
@@ -182,8 +134,8 @@ protected:
   quic::QuicConfig quic_config_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
-  EnvoyQuicServerConnection* quic_connection_;
-  MockQuicServerSession quic_session_;
+  EnvoyQuicServerConnection quic_connection_;
+  MockEnvoyQuicSession quic_session_;
   quic::QuicStreamId stream_id_;
   EnvoyQuicServerStream* quic_stream_;
   Http::MockStreamDecoder stream_decoder_;
