@@ -4,16 +4,22 @@ import Foundation
 @objcMembers
 public final class EnvoyClient: NSObject {
   private let engine: EnvoyEngine
-  private let runner: RunnerThread
 
-  /// Indicates whether this Envoy instance is currently active and running.
-  public var isRunning: Bool {
-    return self.runner.isExecuting
+  private enum ConfigurationType {
+    case yaml(String)
+    case typed(EnvoyConfiguration)
   }
 
-  /// Indicates whether the Envoy instance is terminated.
-  public var isTerminated: Bool {
-    return self.runner.isFinished
+  private init(configType: ConfigurationType, logLevel: LogLevel, engine: EnvoyEngine) {
+      self.engine = engine
+      super.init()
+
+      switch configType {
+      case .yaml(let configYAML):
+        self.engine.run(withConfigYAML: configYAML, logLevel: logLevel.stringValue)
+      case .typed(let config):
+        self.engine.run(withConfig: config, logLevel: logLevel.stringValue)
+      }
   }
 
   /// Initialize a new Envoy instance using a typed configuration.
@@ -21,10 +27,8 @@ public final class EnvoyClient: NSObject {
   /// - parameter config:   Configuration to use for starting Envoy.
   /// - parameter logLevel: Log level to use for this instance.
   /// - parameter engine:   The underlying engine to use for starting Envoy.
-  init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine) {
-    self.engine = engine
-    self.runner = RunnerThread(config: .typed(config), logLevel: logLevel, engine: engine)
-    self.runner.start()
+  convenience init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine) {
+    self.init(configType: .typed(config), logLevel: logLevel, engine: engine)
   }
 
   /// Initialize a new Envoy instance using a string configuration.
@@ -32,38 +36,8 @@ public final class EnvoyClient: NSObject {
   /// - parameter configYAML: Configuration yaml to use for starting Envoy.
   /// - parameter logLevel:   Log level to use for this instance.
   /// - parameter engine:     The underlying engine to use for starting Envoy.
-  init(configYAML: String, logLevel: LogLevel = .info, engine: EnvoyEngine) {
-    self.engine = engine
-    self.runner = RunnerThread(config: .yaml(configYAML), logLevel: logLevel, engine: engine)
-    self.runner.start()
-  }
-
-  // MARK: - Private
-
-  private final class RunnerThread: Thread {
-    private let engine: EnvoyEngine
-    private let config: ConfigurationType
-    private let logLevel: LogLevel
-
-    enum ConfigurationType {
-      case yaml(String)
-      case typed(EnvoyConfiguration)
-    }
-
-    init(config: ConfigurationType, logLevel: LogLevel, engine: EnvoyEngine) {
-      self.config = config
-      self.logLevel = logLevel
-      self.engine = engine
-    }
-
-    override func main() {
-      switch self.config {
-      case .yaml(let configYAML):
-        self.engine.run(withConfigYAML: configYAML, logLevel: self.logLevel.stringValue)
-      case .typed(let config):
-        self.engine.run(withConfig: config, logLevel: self.logLevel.stringValue)
-      }
-    }
+  convenience init(configYAML: String, logLevel: LogLevel = .info, engine: EnvoyEngine) {
+    self.init(configType: .yaml(configYAML), logLevel: logLevel, engine: engine)
   }
 }
 
