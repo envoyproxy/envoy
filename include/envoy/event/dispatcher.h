@@ -51,6 +51,8 @@ using PostCb = std::function<void()>;
  */
 class Dispatcher {
 public:
+  using OnPrepareCallback = std::function<void()>;
+
   virtual ~Dispatcher() = default;
 
   /**
@@ -219,7 +221,12 @@ public:
    */
   virtual bool isThreadSafe() const PURE;
 
-  virtual MonotonicTime approximateMonotonicTime() PURE;
+  /**
+   * Registers callback to be called in the event loop prior to polling for
+   * events. Overwrites |callback| from previous calls. Calling with null
+   * callback unregisters previously registered callback.
+   */
+  virtual void registerOnPrepareCallback(OnPrepareCallback callback) PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

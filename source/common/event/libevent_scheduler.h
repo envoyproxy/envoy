@@ -1,7 +1,5 @@
 #pragma once
 
-#include <functional>
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
@@ -16,7 +14,6 @@ namespace Event {
 // Implements Scheduler based on libevent.
 class LibeventScheduler : public Scheduler {
 public:
-  using OnPrepareCallback = std::function<void()>;
   LibeventScheduler();
 
   // Scheduler
@@ -51,10 +48,11 @@ public:
   void initializeStats(DispatcherStats* stats);
 
   /**
-   * Register callback to be called in the event loop prior to polling for
-   * events. Must not be called more than once. |callback| must not be null.
+   * Registers callback to be called in the event loop prior to polling for
+   * events. Overwrites |callback| from previous calls. Calling with null
+   * callback unregisters previously registered callback.
    */
-  void registerOnPrepareCallback(OnPrepareCallback callback);
+  void registerOnPrepareCallback(Dispatcher::OnPrepareCallback callback);
 
 private:
   static void onPrepare(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
@@ -66,7 +64,7 @@ private:
   timeval timeout_{};        // the poll timeout for the current event loop iteration, if available
   timeval prepare_time_{};   // timestamp immediately before polling
   timeval check_time_{};     // timestamp immediately after polling
-  OnPrepareCallback callback_{}; // callback to be called from onPrepare()
+  Dispatcher::OnPrepareCallback callback_{}; // callback to be called from onPrepare()
 };
 
 } // namespace Event

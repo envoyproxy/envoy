@@ -251,48 +251,6 @@ TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
   EXPECT_TRUE(dispatcher_->isThreadSafe());
 }
 
-class DispatcherMonotonicTimeTest : public testing::Test {
-protected:
-  DispatcherMonotonicTimeTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
-  ~DispatcherMonotonicTimeTest() override = default;
-
-  Api::ApiPtr api_;
-  DispatcherPtr dispatcher_;
-  MonotonicTime time_;
-};
-
-TEST_F(DispatcherMonotonicTimeTest, MonotonicTime) {
-  // monotonicTime is strictly monotonic.
-  dispatcher_->post([this]() {
-    {
-      time_ = dispatcher_->timeSource().monotonicTime();
-      EXPECT_LT(time_, dispatcher_->timeSource().monotonicTime());
-    }
-  });
-
-  dispatcher_->run(Dispatcher::RunType::Block);
-}
-
-TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
-  // approximateMonotonicTime is constant within one event loop run.
-  dispatcher_->post([this]() {
-    {
-      time_ = dispatcher_->approximateMonotonicTime();
-      EXPECT_EQ(time_, dispatcher_->approximateMonotonicTime());
-    }
-  });
-
-  dispatcher_->run(Dispatcher::RunType::Block);
-
-  // approximateMonotonicTime is increasing between event loop runs.
-  dispatcher_->post([this]() {
-    { EXPECT_LT(time_, dispatcher_->approximateMonotonicTime()); }
-  });
-
-  dispatcher_->run(Dispatcher::RunType::Block);
-}
-
 TEST(TimerImplTest, TimerEnabledDisabled) {
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher());

@@ -17,6 +17,9 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 LibeventScheduler::LibeventScheduler() : libevent_(event_base_new()) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
+
+  // This is thread safe.
+  evwatch_prepare_new(libevent_.get(), &onPrepare, this);
 }
 
 TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher) {
@@ -52,21 +55,12 @@ void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullpt
 void LibeventScheduler::initializeStats(DispatcherStats* stats) {
   stats_ = stats;
 
-  // These are thread safe.
-  if (!callback_) {
-    // Register prepare watcher unless already registered in registerOnPrepareCallback().
-    evwatch_prepare_new(libevent_.get(), &onPrepare, this);
-  }
+  // This is thread safe.
   evwatch_check_new(libevent_.get(), &onCheck, this);
 }
 
-void LibeventScheduler::registerOnPrepareCallback(OnPrepareCallback callback) {
+void LibeventScheduler::registerOnPrepareCallback(Dispatcher::OnPrepareCallback callback) {
   callback_ = std::move(callback);
-
-  if (!stats_) {
-    // Register prepare watcher unless already registered in initializeStats().
-    evwatch_prepare_new(libevent_.get(), &onPrepare, this);
-  }
 }
 
 void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info, void* arg) {
