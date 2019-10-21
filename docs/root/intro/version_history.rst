@@ -71,6 +71,9 @@ Version history
   header mutations wins flag <envoy_api_field_RouteConfiguration.most_specific_header_mutations_wins>`
 * router: added :ref:`respect_expected_rq_timeout <envoy_api_field_config.filter.http.router.v2.Router.respect_expected_rq_timeout>` that instructs ingress Envoy to respect :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress Envoy, when deriving timeout for upstream cluster.
 * router: added new :ref:`retriable request headers <envoy_api_field_route.RetryPolicy.retriable_request_headers>` to retry policies. Retries can now be configured to only trigger on request header match.
+* router: added the ability to match a route based on whether a TLS certificate has been
+  :ref:`presented <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.presented>` by the
+  downstream connection.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.

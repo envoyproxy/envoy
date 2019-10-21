@@ -105,12 +105,15 @@ Example configuration
             certificate_chain: { "filename": "/cert.crt" }
             private_key: { "filename": "/cert.key" }
           validation_context:
+            verify_subject_alt_name: [ foo ]
             trusted_ca:
               filename: /etc/ssl/certs/ca-certificates.crt
 
 */etc/ssl/certs/ca-certificates.crt* is the default path for the system CA bundle on Debian systems.
-This makes Envoy verify the server identity of *127.0.0.2:1234* in the same way as e.g. cURL does on
-standard Debian installations. Common paths for system CA bundles on Linux and BSD are
+:ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>` along with
+:ref:`verify_subject_alt_name <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`
+makes Envoy verify the server identity of *127.0.0.2:1234* as "foo" in the same way as e.g. cURL
+does on standard Debian installations. Common paths for system CA bundles on Linux and BSD are:
 
 * /etc/ssl/certs/ca-certificates.crt (Debian/Ubuntu/Gentoo etc.)
 * /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem (CentOS/RHEL 7)
@@ -121,6 +124,13 @@ standard Debian installations. Common paths for system CA bundles on Linux and B
 
 See the reference for :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` and
 :ref:`DownstreamTlsContexts <envoy_api_msg_auth.DownstreamTlsContext>` for other TLS options.
+
+.. attention::
+
+  If only :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>` is
+  specified, Envoy will verify the certificate chain of the presented certificate, but not its
+  subject name, hash, etc. Other validation context configuration is typically required depending
+  on the deployment.
 
 .. _arch_overview_ssl_cert_select:
 
