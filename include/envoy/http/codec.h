@@ -235,8 +235,7 @@ struct Http1Settings {
     // internals normalize everything to lowercase.)
     Default,
     // Performs proper casing of header keys: the first and all alpha characters following a
-    // non-alphanumeric
-    // character is capitalized.
+    // non-alphanumeric character is capitalized.
     ProperCase,
   };
 
