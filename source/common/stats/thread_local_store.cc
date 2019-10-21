@@ -265,7 +265,7 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   prefix_.free(symbolTable());
 }
 
-// Manages the truncation and tag-extration of stat names. Tag extraction occurs
+// Manages the truncation and tag-extraction of stat names. Tag extraction occurs
 // on the original, untruncated name so the extraction can complete properly,
 // even if the tag values are partially truncated.
 class TagExtraction {

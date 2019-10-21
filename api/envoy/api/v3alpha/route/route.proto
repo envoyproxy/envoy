@@ -573,7 +573,7 @@ message RouteAction {
       ConnectionProperties connection_properties = 3;
     }
 
-    // The flag that shortcircuits the hash computing. This field provides a
+    // The flag that short-circuits the hash computing. This field provides a
     // 'fallback' style of configuration: "if a terminal policy doesn't work,
     // fallback to rest of the policy list", it saves time when the terminal
     // policy works.
