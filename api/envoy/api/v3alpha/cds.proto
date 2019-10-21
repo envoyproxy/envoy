@@ -47,7 +47,6 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 45]
 // [#next-free-field: 45]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`

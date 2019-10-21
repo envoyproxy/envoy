@@ -63,7 +63,6 @@ message HealthCheck {
     }
   }
 
-  // [#comment:next free field: 10]
   // [#next-free-field: 11]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
