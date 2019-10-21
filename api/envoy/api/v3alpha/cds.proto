@@ -620,12 +620,13 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
-  // rate. If this setting is not specified, the value defaults to 5000ms. For
-  // cluster types other than
+  // rate. The value configured must be at least 1ms. If this setting is not specified, the
+  // value defaults to 5000ms. For cluster types other than
   // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration dns_refresh_rate = 16
+      [(validate.rules).duration = {gt {nanos: 1000000}}];
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`,
