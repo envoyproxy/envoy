@@ -14,7 +14,7 @@ Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
     const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        std::make_unique<Filter>(config.content_type(), config.withhold_grpc_frames()));
+        std::make_shared<Filter>(config.content_type(), config.withhold_grpc_frames()));
   };
 }
 
