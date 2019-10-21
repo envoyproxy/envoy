@@ -97,8 +97,11 @@ def publishGoProtobufs(repo, sha):
   git(repo, 'config', 'user.name', USER_NAME)
   git(repo, 'config', 'user.email', USER_EMAIL)
   git(repo, 'add', 'envoy')
-  git(repo, 'commit', '-s', '-m', MIRROR_MSG + sha)
-  git(repo, 'push', 'origin', BRANCH)
+  try:
+    git(repo, 'commit', '-s', '-m', MIRROR_MSG + sha)
+    git(repo, 'push', 'origin', BRANCH)
+  except:
+    print('Failed to commit changes, skipping push')
 
 
 if __name__ == "__main__":
