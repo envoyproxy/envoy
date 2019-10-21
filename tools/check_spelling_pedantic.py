@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import argparse
+import locale
 import math
 import os
 import re
@@ -534,6 +535,8 @@ def execute(files, dictionary_file, fix):
 
 
 if __name__ == "__main__":
+  locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+
   default_dictionary = os.path.join(TOOLS_DIR, 'spelling_dictionary.txt')
 
   parser = argparse.ArgumentParser(description="Check comment spelling.")
