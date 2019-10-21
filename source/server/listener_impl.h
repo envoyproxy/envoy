@@ -128,6 +128,7 @@ public:
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
   OptProcessContextRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {

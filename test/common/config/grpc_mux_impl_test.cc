@@ -596,7 +596,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   expectSendMessage(type_url, {}, "1", false, "bar");
 }
 
-//  Verifies that a messsage with some resources is rejected when there are no watches.
+//  Verifies that a message with some resources is rejected when there are no watches.
 TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
   setup();
 

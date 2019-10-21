@@ -70,6 +70,7 @@ enum Action {
   UNEJECT = 1;
 }
 
+// [#next-free-field: 12]
 message OutlierDetectionEvent {
   // In case of eject represents type of ejection that took place.
   OutlierEjectionType type = 1 [(validate.rules).enum = {defined_only: true}];

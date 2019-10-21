@@ -1,7 +1,7 @@
 .. _faq_how_to_setup_sni:
 
-How do I setup SNI?
-===================
+How do I configure SNI?
+=======================
 
 `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ is only supported in the :ref:`v2
 configuration/API <config_overview_v2>`.

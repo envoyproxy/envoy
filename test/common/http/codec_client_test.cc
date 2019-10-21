@@ -55,8 +55,8 @@ public:
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(std::move(connection), codec_, nullptr, host_,
-                                                   dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
+                                                   codec_, nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
@@ -74,6 +74,20 @@ public:
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
+
+TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+
+  EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
+  EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection, connect());
+  EXPECT_CALL(*connection, addReadFilter(_));
+  auto codec = new Http::MockClientConnection();
+
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  auto client = std::make_unique<CodecClientForTest>(
+      CodecClient::Type::HTTP3, std::move(connection), codec, nullptr, host_, dispatcher_);
+}
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   Http::StreamDecoder* inner_decoder;
@@ -282,8 +296,9 @@ public:
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_ = std::make_unique<CodecClientForTest>(std::move(client_connection), codec_, nullptr,
-                                                   host_, *dispatcher_);
+    client_ =
+        std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
+                                             codec_, nullptr, host_, *dispatcher_);
 
     int expected_callbacks = 2;
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
