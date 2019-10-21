@@ -53,7 +53,7 @@ request. The router filter supports the following features:
 .. _arch_overview_http_routing_route_scope:
 
 Route Scope
---------------
+-----------
 
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
 A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.

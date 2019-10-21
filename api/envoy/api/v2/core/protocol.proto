@@ -151,7 +151,7 @@ message Http2ProtocolOptions {
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
   // when this option is enabled, only the offending stream is terminated.
   //
-  // See [RFC7540, sec. 8.1](https://tools.ietf.org/html/rfc7540#section-8.1) for details.
+  // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
 }
 
