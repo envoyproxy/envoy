@@ -1067,4 +1067,69 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
           {":status", "200"},
       });
 }
+
+// Validates TE header is forwarded if it contains a supported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+      });
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "gzip"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {":path", "/"},
+          {":method", "GET"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+      });
+}
 } // namespace Envoy

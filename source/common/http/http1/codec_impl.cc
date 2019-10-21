@@ -514,6 +514,29 @@ int ConnectionImpl::onHeadersCompleteBase() {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
     }
+  } else if (current_header_map_->Connection()) {
+    // Remove the TE header only if the header value is not "trailers", and it is
+    // nominated by the Connection header. Per RFC7540 we should also remove the
+    // Connection header
+    // See https://github.com/envoyproxy/envoy/issues/8623
+    const auto tokens =
+        absl::StrSplit(current_header_map_->Connection()->value().getStringView(), ',');
+    const std::string& te_header = Http::Headers::get().TE.get();
+
+    for (const auto& connection_header_token : tokens) {
+      if (StringUtil::CaseInsensitiveCompare()(connection_header_token, te_header)) {
+        const auto& te_header_value = current_header_map_->TE()->value();
+        if (!te_header_value.empty() &&
+            !StringUtil::CaseInsensitiveCompare()(te_header_value.getStringView(),
+                                                  Http::Headers::get().TEValues.Trailers)) {
+          current_header_map_->removeConnection();
+          current_header_map_->remove(Http::Headers::get().TE);
+          ENVOY_CONN_LOG(trace, "removing unsupported \"TE: {}\" header", connection_,
+                         te_header_value.getStringView());
+        }
+        break;
+      }
+    }
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));
