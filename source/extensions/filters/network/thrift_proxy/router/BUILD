@@ -17,7 +17,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
-        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
         "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
     ],
 )
@@ -58,7 +57,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",

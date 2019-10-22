@@ -29,6 +29,5 @@ envoy_cc_library(
         ":sni_cluster",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/network:well_known_names",
     ],
 )

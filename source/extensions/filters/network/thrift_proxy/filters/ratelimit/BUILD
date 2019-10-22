@@ -37,6 +37,5 @@ envoy_cc_library(
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
-        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
     ],
 )

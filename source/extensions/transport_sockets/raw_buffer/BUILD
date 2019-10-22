@@ -19,6 +19,5 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/network:raw_buffer_socket_lib",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )

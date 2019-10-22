@@ -31,6 +31,5 @@ envoy_cc_library(
         ":echo",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/network:well_known_names",
     ],
 )

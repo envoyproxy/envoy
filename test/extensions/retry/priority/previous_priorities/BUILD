@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.retry_priorities.previous_priorities",
     deps = [
-        "//source/extensions/retry/priority:well_known_names",
         "//source/extensions/retry/priority/previous_priorities:config",
         "//test/mocks/upstream:upstream_mocks",
     ],

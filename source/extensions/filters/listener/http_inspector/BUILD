@@ -25,7 +25,6 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 
@@ -36,6 +35,5 @@ envoy_cc_library(
         ":http_inspector_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
     ],
 )

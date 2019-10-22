@@ -153,8 +153,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/access_loggers:well_known_names",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
@@ -318,7 +316,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )

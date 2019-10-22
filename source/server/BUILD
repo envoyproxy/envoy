@@ -74,7 +74,6 @@ envoy_cc_library(
         "//source/common/common:non_copyable",
         "//source/common/network:connection_lib",
         "//source/common/stats:timespan_lib",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 
@@ -283,8 +282,6 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 
@@ -315,8 +312,6 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],

@@ -31,6 +31,5 @@ envoy_cc_library(
         ":original_dst_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
     ],
 )

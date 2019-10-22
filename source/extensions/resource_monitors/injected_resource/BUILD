@@ -29,7 +29,6 @@ envoy_cc_library(
         ":injected_resource_monitor",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
-        "//source/extensions/resource_monitors:well_known_names",
         "//source/extensions/resource_monitors/common:factory_base_lib",
     ],
 )

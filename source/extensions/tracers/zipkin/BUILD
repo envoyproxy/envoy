@@ -56,7 +56,6 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/tracers:well_known_names",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
     ],
 )
@@ -67,7 +66,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":zipkin_lib",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

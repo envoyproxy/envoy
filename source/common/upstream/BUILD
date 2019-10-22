@@ -140,7 +140,6 @@ envoy_cc_library(
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:host_utility_lib",
         # TODO(dio): Remove dependency to health checkers extension when redis_health_check is removed.
-        "//source/extensions/health_checkers:well_known_names",
     ],
 )
 
@@ -201,7 +200,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/network:resolver_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
@@ -231,7 +229,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/clusters:well_known_names",
     ],
 )
 
@@ -247,7 +244,6 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
-        "//source/extensions/clusters:well_known_names",
     ],
 )
 
@@ -334,7 +330,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/clusters:well_known_names",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
@@ -390,7 +385,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
@@ -405,7 +399,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
@@ -491,8 +484,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/clusters:well_known_names",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
@@ -528,7 +519,6 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/clusters:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",

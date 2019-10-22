@@ -13,7 +13,6 @@ envoy_cc_library(
     hdrs = ["null_vm_plugin.h"],
     deps = [
         "//source/extensions/common/wasm:wasm_vm_interface",
-        "//source/extensions/common/wasm:well_known_names",
     ],
 )
 
@@ -27,7 +26,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/extensions/common/wasm:wasm_vm_interface",
-        "//source/extensions/common/wasm:well_known_names",
     ],
 )
 
@@ -42,6 +40,5 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/extensions/common/wasm:wasm_vm_interface",
-        "//source/extensions/common/wasm:well_known_names",
     ],
 )

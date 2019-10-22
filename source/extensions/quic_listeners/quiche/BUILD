@@ -175,7 +175,6 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//source/common/network:listen_socket_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@com_googlesource_quiche//:quic_core_connection_lib",
     ],
 )
@@ -262,7 +261,6 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],

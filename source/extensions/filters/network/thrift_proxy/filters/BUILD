@@ -41,11 +41,3 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
     ],
 )
-
-envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = [
-        "//source/common/singleton:const_singleton",
-    ],
-)

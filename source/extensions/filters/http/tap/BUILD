@@ -54,7 +54,6 @@ envoy_cc_library(
         ":tap_config_impl",
         ":tap_filter_lib",
         "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/http/tap/v2alpha:pkg_cc_proto",
     ],

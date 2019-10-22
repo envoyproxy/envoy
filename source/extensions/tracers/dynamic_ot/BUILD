@@ -30,7 +30,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":dynamic_opentracing_driver_lib",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

@@ -25,7 +25,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//source/common/config:datasource_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
@@ -120,7 +119,6 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:filter_json_lib",
         "//source/extensions/common/redis:redirection_mgr_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",

@@ -30,7 +30,6 @@ envoy_cc_library(
         "//include/envoy/server:access_log_config_interface",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/protobuf",
-        "//source/extensions/access_loggers:well_known_names",
         "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
     ],
 )

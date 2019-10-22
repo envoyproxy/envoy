@@ -9,18 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = [
-        "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
     name = "wasm_vm_interface",
     hdrs = ["wasm_vm.h"],
     deps = [
-        ":well_known_names",
         "//source/common/common:minimal_logger_lib",
     ],
 )

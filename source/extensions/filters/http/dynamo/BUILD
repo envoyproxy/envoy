@@ -45,7 +45,6 @@ envoy_cc_library(
         ":dynamo_filter_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )

@@ -16,7 +16,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":opencensus_tracer_impl",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

@@ -37,7 +37,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
     ],
 )

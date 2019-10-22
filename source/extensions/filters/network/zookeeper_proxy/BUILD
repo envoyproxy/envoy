@@ -33,7 +33,6 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
-        "//source/extensions/filters/network:well_known_names",
     ],
 )
 
@@ -43,7 +42,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":proxy_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg_cc_proto",
     ],

@@ -27,7 +27,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
     ],
 )
@@ -39,7 +38,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//source/common/config:filter_json_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
     ],

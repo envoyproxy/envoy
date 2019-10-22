@@ -34,7 +34,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",
     ],

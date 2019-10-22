@@ -18,7 +18,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:filter_config_interface",
         "//source/common/common:base64_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/config/filter/http/header_to_metadata/v2:pkg_cc_proto",
     ],
 )
@@ -30,7 +29,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/header_to_metadata:header_to_metadata_filter_lib",
     ],

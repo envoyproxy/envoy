@@ -22,7 +22,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common/ot:opentracing_driver_lib",
     ],
 )
@@ -33,7 +32,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":datadog_tracer_lib",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

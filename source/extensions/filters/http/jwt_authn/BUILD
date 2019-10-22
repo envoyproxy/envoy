@@ -58,7 +58,6 @@ envoy_cc_library(
         ":filter_config_interface",
         ":matchers_lib",
         "//include/envoy/http:filter_interface",
-        "//source/extensions/filters/http:well_known_names",
     ],
 )
 
@@ -69,7 +68,6 @@ envoy_cc_library(
     deps = [
         ":filter_lib",
         "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
     ],
 )

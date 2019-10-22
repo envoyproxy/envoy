@@ -44,7 +44,6 @@ envoy_cc_library(
         ":original_src_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
         "@envoy_api//envoy/config/filter/listener/original_src/v2alpha1:pkg_cc_proto",
     ],
 )

@@ -16,7 +16,6 @@ envoy_cc_library(
         ":rbac_filter",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/rbac/v2:pkg_cc_proto",
     ],
@@ -33,6 +32,5 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
-        "//source/extensions/filters/network:well_known_names",
     ],
 )

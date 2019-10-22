@@ -34,7 +34,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:health_checker_config_interface",
         "//source/common/common:assert_lib",
-        "//source/extensions/health_checkers:well_known_names",
     ],
 )
 

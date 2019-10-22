@@ -57,7 +57,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
-        "//source/extensions/filters/network/dubbo_proxy/filters:well_known_names",
         "@envoy_api//envoy/config/filter/dubbo/router/v2alpha1:pkg_cc_proto",
     ],
 )

@@ -27,7 +27,6 @@ envoy_cc_library(
         "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
-        "//source/extensions/filters/http:well_known_names",
     ],
 )
 
@@ -53,7 +52,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//source/common/config:filter_json_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
     ],
