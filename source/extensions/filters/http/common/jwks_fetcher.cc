@@ -54,7 +54,8 @@ public:
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(std::chrono::milliseconds(
                            DurationUtil::durationToMilliseconds(uri.timeout())))
-                       .setParentSpan(parent_span);
+                       .setParentSpan(parent_span)
+                       .setChildSpanName("JWT Remote PubKey Fetch");
     request_ =
         cm_.httpAsyncClientForCluster(uri.cluster()).send(std::move(message), *this, options);
   }
