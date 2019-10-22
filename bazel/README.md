@@ -32,7 +32,11 @@ independently sourced, the following steps should be followed:
 As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/WORKSPACE) and
 [rules for building a recent
 version](https://github.com/envoyproxy/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
-dependencies are provided.
+dependencies are provided. These are provided as is, they are only suitable for development and
+testing purposes. The specific versions of the Envoy dependencies used in this build may not be
+up-to-date with the latest security patches. See
+[this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
+for how to update or override dependencies.
 
 1. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
     On Ubuntu, run the following command:
