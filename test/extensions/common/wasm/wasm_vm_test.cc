@@ -56,7 +56,7 @@ TEST(WasmVmTest, NullVmStartup) {
   EXPECT_TRUE(wasm_vm->cloneable());
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
-  EXPECT_TRUE(wasm_vm->getUserSection("user").empty());
+  EXPECT_TRUE(wasm_vm->getCustomSection("user").empty());
 }
 
 TEST(WasmVmTest, NullVmMemory) {
@@ -84,25 +84,6 @@ TEST(WasmVmTest, NullVmMemory) {
   w.u64_ = 7;
   EXPECT_TRUE(wasm_vm->getWord(reinterpret_cast<uint64_t>(&w), &w2));
   EXPECT_EQ(w2.u64_, 7);
-}
-
-TEST(WasmVmTest, NullVmStart) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
-  EXPECT_TRUE(wasm_vm->load("test_null_vm_plugin", true));
-  wasm_vm->link("test", false);
-  // Test that context argument to start is pushed and that the effective_context_id_ is reset.
-  // Test that the original values are restored.
-  Context* context1 = reinterpret_cast<Context*>(1);
-  Context* context2 = reinterpret_cast<Context*>(2);
-  current_context_ = context1;
-  effective_context_id_ = 1;
-  EXPECT_CALL(*test_null_vm_plugin_, start()).WillOnce(Invoke([context2]() {
-    EXPECT_EQ(current_context_, context2);
-    EXPECT_EQ(effective_context_id_, 0);
-  }));
-  wasm_vm->start(context2);
-  EXPECT_EQ(current_context_, context1);
-  EXPECT_EQ(effective_context_id_, 1);
 }
 
 } // namespace
