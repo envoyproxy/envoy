@@ -822,19 +822,45 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
   }
+
+  envoy::api::v2::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name) {
+    return TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(
+        fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: {}
+                port_value: {}
+    )EOF",
+                    name, Network::Test::getLoopbackAddressString(ipVersion()),
+                    fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterFromFileIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
-// Validate basic config delivery and upgrade when ADS cluster is defined as EDS and loaded from
-// file
+// Validate if ADS cluster defined as EDS will be loaded from file and connection with ADS cluster
+// will be established.
 TEST_P(AdsClusterFromFileIntegrationTest, BasicTestWidsAdsEndpointLoadedFromFile) {
   initialize();
   createXdsConnection();
   ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
   xds_stream_->startGrpcStream();
-  xds_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"ads_eds_cluster"}, {"ads_eds_cluster"}, {}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("ads_eds_cluster")},
+      {buildClusterLoadAssignment("ads_eds_cluster")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"ads_eds_cluster"}, {}, {}));
 }
 
 } // namespace Envoy

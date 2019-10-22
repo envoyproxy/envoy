@@ -251,7 +251,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which
   // load endpoint definition from file are primary and
-  // (UNSUPPORTED_REST_LEGACY,REST,GRPC,DELTA_GRPC) EDS clusters are secondary. This two phase
+  // (REST,GRPC,DELTA_GRPC) EDS clusters are secondary. This two phase
   // loading is done because in v2 configuration each EDS cluster individually sets up a
   // subscription. When this subscription is an API source the cluster will depend on a non-EDS
   // cluster, so the non-EDS clusters must be loaded first.

@@ -1,4 +1,4 @@
-version_info: "0"
+version_info: "123"
 resources:
 - "@type": type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
   cluster_name: ads_cluster
