@@ -425,11 +425,11 @@ public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager() override;
 
-  MOCK_METHOD5(createRdsRouteConfigProvider,
+  MOCK_METHOD4(createRdsRouteConfigProvider,
                RouteConfigProviderPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, Init::Manager& init_manager, bool is_delta));
+                   const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));

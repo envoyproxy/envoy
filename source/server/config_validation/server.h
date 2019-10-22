@@ -109,11 +109,10 @@ public:
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
-                         bool is_delta) override {
-    return std::make_unique<LdsApiImpl>(
-        lds_config, clusterManager(), initManager(), stats(), listenerManager(),
-        messageValidationContext().dynamicValidationVisitor(), is_delta);
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
+                                        listenerManager(),
+                                        messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
