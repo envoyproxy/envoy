@@ -45,6 +45,8 @@ message Http1ProtocolOptions {
       // Formats the header by proper casing words: the first character and any character following
       // a special character will be capitalized if it's an alpha character. For example,
       // "content-type" becomes "Content-Type", and "foo$b#$are" becomes "Foo$B#$Are".
+      // Note that while this results in most headers following conventional casing, certain headers
+      // are not covered. For example, the "TE" header will be formatted as "Te".
       ProperCaseWords proper_case_words = 1;
     }
   }
