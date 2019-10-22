@@ -203,6 +203,24 @@ modify different aspects of the server:
   that this does not drop any data sent to statsd. It just affects local output of the
   :http:get:`/stats` command.
 
+.. _operations_admin_interface_drain:
+
+.. http:post:: /drain_listeners
+   
+   :ref:`Drains <arch_overview_draining>` all listeners.
+
+   .. http:post:: /drain_listeners?inboundonly
+
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
+   :ref:`Listener <envoy_api_msg_Listener>` is used to determine whether a listener 
+   is inbound or outbound.
+
+.. attention::
+
+   This operation directly stops the matched listeners on workers. Once listeners in a given
+   traffic direction are stopped, listener additions and modifications in that direction
+   are not allowed.
+
 .. http:get:: /server_info
 
   Outputs a JSON message containing information about the running server.
