@@ -426,14 +426,7 @@ public:
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
 
-  // Obtains new backing storage for an already existing StatName.
-  StatNameManagedStorage(StatName src, SymbolTable& table)
-      : StatNameStorage(src, table), symbol_table_(table) {}
-
   ~StatNameManagedStorage() { free(symbol_table_); }
-
-  SymbolTable& symbolTable() { return symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
 private:
   SymbolTable& symbol_table_;

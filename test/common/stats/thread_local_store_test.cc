@@ -547,6 +547,8 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Counter& noop_counter_2 = store_->counter("noop_counter_2");
   EXPECT_EQ(&noop_counter, &noop_counter_2);
   EXPECT_FALSE(noop_counter.used()); // hardcoded to return false in NullMetricImpl.
+  EXPECT_EQ(0, noop_counter.latch()); // hardcoded to 0.
+  EXPECT_EQ(0, noop_counter.use_count());  // null counter is contained in ThreadLocalStoreImpl.
 
   // Gauge
   Gauge& noop_gauge = store_->gauge("noop_gauge", Gauge::ImportMode::Accumulate);
@@ -562,6 +564,10 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_gauge.value(), 0);
   noop_gauge.sub(2);
   EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, noop_gauge.importMode());
+  EXPECT_FALSE(noop_gauge.used());  // null gauge is contained in ThreadLocalStoreImpl.
+  EXPECT_EQ(0, noop_gauge.use_count());  // null gauge is contained in ThreadLocalStoreImpl.
+
   Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&noop_gauge, &noop_gauge_2);
 
@@ -569,6 +575,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Histogram& noop_histogram =
       store_->histogram("noop_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(noop_histogram.name(), "");
+  EXPECT_FALSE(noop_histogram.used());
   Histogram& noop_histogram_2 =
       store_->histogram("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);

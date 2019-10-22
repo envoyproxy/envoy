@@ -577,6 +577,9 @@ TEST_P(StatNameTest, StatNameSet) {
 
 TEST_P(StatNameTest, RecentLookups) {
   if (GetParam() == SymbolTableType::Fake) {
+    // touch these cover coverage for fake symbol tables, but they'll have no effect.
+    table_->clearRecentLookups();
+    table_->setRecentLookupCapacity(0);
     return;
   }
 

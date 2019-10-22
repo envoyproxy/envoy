@@ -67,6 +67,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   Histogram& h1 = store_.histogram("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
+  EXPECT_TRUE(h1.use_count() == 1);
   Histogram& h2 = scope1->histogram("h2", Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
