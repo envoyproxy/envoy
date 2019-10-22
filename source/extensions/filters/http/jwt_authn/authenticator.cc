@@ -40,7 +40,7 @@ public:
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface
-  void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
+  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span, std::vector<JwtLocationConstPtr>&& tokens,
               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) override;
   void onDestroy() override;
 
@@ -78,6 +78,8 @@ private:
 
   // The HTTP request headers
   Http::HeaderMap* headers_{};
+  // The active span for the request
+  Tracing::Span* parent_span_;
   // the callback function to set payload
   SetPayloadCallback set_payload_cb_;
   // The on_done function.
@@ -90,10 +92,11 @@ private:
   TimeSource& time_source_;
 };
 
-void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
+void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span, std::vector<JwtLocationConstPtr>&& tokens,
                                SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
   ASSERT(!callback_);
   headers_ = &headers;
+  parent_span_ = &parent_span;
   tokens_ = std::move(tokens);
   set_payload_cb_ = std::move(set_payload_cb);
   callback_ = std::move(callback);
@@ -182,7 +185,7 @@ void AuthenticatorImpl::startVerify() {
     if (!fetcher_) {
       fetcher_ = create_jwks_fetcher_cb_(cm_);
     }
-    fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *this);
+    fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *parent_span_, *this);
     return;
   }
   // No valid keys for this issuer. This may happen as a result of incorrect local

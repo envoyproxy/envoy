@@ -42,6 +42,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;
+  NiceMock<Tracing::MockSpan> parent_span_;
 };
 
 TEST_F(ProviderVerifierTest, TestOkJWT) {
@@ -61,7 +62,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
   };
-  context_ = Verifier::createContext(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
 }
@@ -73,7 +74,7 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
 
   auto headers = Http::TestHeaderMapImpl{{"sec-istio-auth-userinfo", ""}};
-  context_ = Verifier::createContext(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
 }
@@ -112,7 +113,7 @@ rules:
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
-  context_ = Verifier::createContext(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_TRUE(headers.has("example-auth-userinfo"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
@@ -134,9 +135,9 @@ TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
       .WillOnce(Invoke([](const Status& status) { ASSERT_EQ(status, Status::Ok); }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  verifier_->verify(Verifier::createContext(headers, &mock_cb_));
+  verifier_->verify(Verifier::createContext(headers, parent_span_, &mock_cb_));
   headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
-  verifier_->verify(Verifier::createContext(headers, &mock_cb_));
+  verifier_->verify(Verifier::createContext(headers, parent_span_, &mock_cb_));
 }
 
 // This test verifies that requirement referencing nonexistent provider will throw exception
