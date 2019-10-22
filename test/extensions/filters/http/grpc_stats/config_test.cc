@@ -19,9 +19,9 @@ namespace {
 
 class GrpcStatsFilterConfigTest : public testing::Test {
 protected:
-  void SetUp() override {
-    envoy::config::filter::http::grpc_stats::v2alpha1::FilterConfig config{};
-    config.set_emit_filter_state(true);
+  void initialize(bool emit_filter_state) {
+    envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig config{};
+    config.set_emit_filter_state(emit_filter_state);
     GrpcStatsFilterConfig factory;
     Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context_);
     Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -41,6 +41,7 @@ protected:
 };
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
+  initialize(false);
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
@@ -62,9 +63,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
+  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
+  initialize(false);
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
@@ -84,9 +87,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
+  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
+  initialize(false);
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc+proto"},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
@@ -104,9 +109,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
+  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
+  initialize(true);
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc+proto"},
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -129,8 +136,8 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 ->statsScope()
                 .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
                 .value());
-  auto& data =
-      stream_info_.filterState().getDataMutable<GrpcStatsObject>(HttpFilterNames::get().GrpcStats);
+  const auto& data =
+      stream_info_.filterState().getDataReadOnly<GrpcStatsObject>(HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);
   EXPECT_EQ(0U, data.response_message_count);
 

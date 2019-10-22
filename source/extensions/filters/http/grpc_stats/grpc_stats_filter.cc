@@ -34,9 +34,7 @@ public:
     if (grpc_request_) {
       uint64_t delta = request_counter_.decode(data);
       if (delta > 0) {
-        if (emit_filter_state_) {
-          maybeWriteFilterState();
-        }
+        maybeWriteFilterState();
         if (doStatTracking()) {
           context_.chargeRequestMessageStat(*cluster_, *request_names_, delta);
         }
@@ -56,9 +54,7 @@ public:
     if (grpc_response_) {
       uint64_t delta = response_counter_.decode(data);
       if (delta > 0) {
-        if (emit_filter_state_) {
-          maybeWriteFilterState();
-        }
+        maybeWriteFilterState();
         if (doStatTracking()) {
           context_.chargeResponseMessageStat(*cluster_, *request_names_, delta);
         }
@@ -77,6 +73,9 @@ public:
   bool doStatTracking() const { return request_names_.has_value(); }
 
   void maybeWriteFilterState() {
+    if (!emit_filter_state_) {
+      return;
+    }
     if (filter_object_ == nullptr) {
       auto state = std::make_unique<GrpcStatsObject>();
       filter_object_ = state.get();
@@ -103,7 +102,7 @@ private:
 } // namespace
 
 Http::FilterFactoryCb GrpcStatsFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::grpc_stats::v2alpha1::FilterConfig& config,
+    const envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig& config,
     const std::string&, Server::Configuration::FactoryContext& factory_context) {
   return [&factory_context, emit_filter_state = config.emit_filter_state()](
              Http::FilterChainFactoryCallbacks& callbacks) {

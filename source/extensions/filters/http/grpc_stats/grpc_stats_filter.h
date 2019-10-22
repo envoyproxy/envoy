@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/grpc_stats/v2alpha1/config.pb.h"
-#include "envoy/config/filter/http/grpc_stats/v2alpha1/config.pb.validate.h"
+#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.h"
+#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -20,13 +20,13 @@ struct GrpcStatsObject : public StreamInfo::FilterState::Object {
 };
 
 class GrpcStatsFilterConfig
-    : public Common::FactoryBase<envoy::config::filter::http::grpc_stats::v2alpha1::FilterConfig> {
+    : public Common::FactoryBase<envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig> {
 public:
   GrpcStatsFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcStats) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::grpc_stats::v2alpha1::FilterConfig& config,
+      const envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig& config,
       const std::string&, Server::Configuration::FactoryContext&) override;
 };
 
