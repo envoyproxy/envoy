@@ -53,6 +53,7 @@ TEST(WasmVmTest, BadRuntime) {
 TEST(WasmVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
+  EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm->cloneable());
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
@@ -66,24 +67,31 @@ TEST(WasmVmTest, NullVmMemory) {
   auto m = wasm_vm->getMemory(reinterpret_cast<uint64_t>(d.data()), d.size()).value();
   EXPECT_EQ(m.data(), d.data());
   EXPECT_EQ(m.size(), d.size());
+  EXPECT_FALSE(wasm_vm->getMemory(0 /* nullptr */, 1 /* size */).has_value());
+
   uint64_t offset;
   char l;
   EXPECT_TRUE(wasm_vm->getMemoryOffset(&l, &offset));
   EXPECT_EQ(offset, reinterpret_cast<uint64_t>(&l));
+
   char c;
   char z = 'z';
   EXPECT_TRUE(wasm_vm->setMemory(reinterpret_cast<uint64_t>(&c), 1, &z));
   EXPECT_EQ(c, z);
+  EXPECT_TRUE(wasm_vm->setMemory(0 /* nullptr */, 0 /* size */, nullptr));
+  EXPECT_FALSE(wasm_vm->setMemory(0 /* nullptr */, 1 /* size */, nullptr));
 
   Word w(13);
   EXPECT_TRUE(
       wasm_vm->setWord(reinterpret_cast<uint64_t>(&w), std::numeric_limits<uint64_t>::max()));
   EXPECT_EQ(w.u64_, std::numeric_limits<uint64_t>::max());
+  EXPECT_FALSE(wasm_vm->setWord(0 /* nullptr */, 1));
 
   Word w2(0);
   w.u64_ = 7;
   EXPECT_TRUE(wasm_vm->getWord(reinterpret_cast<uint64_t>(&w), &w2));
   EXPECT_EQ(w2.u64_, 7);
+  EXPECT_FALSE(wasm_vm->getWord(0 /* nullptr */, &w2));
 }
 
 } // namespace
