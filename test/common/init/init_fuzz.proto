@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package test.common.init;
+
+// Structured input for init_fuzz_test.
+
+enum InitEntityAction {
+
+  // manager
+  INIT_MANAGER_CREATION = 0;
+  INIT_MANAGER_INITIALIZE = 1;
+  INIT_MANAGER_DESTRUCTION = 2;
+
+  // target
+  INIT_TARGET_READY = 3;
+  INIT_TARGET_DESTRUCTION = 4;
+
+  // watcher
+  INIT_WATCHER_DESTRUCTION = 5;
+
+  // add
+  INIT_MANAGER_ADD_TARGET = 6;
+}
+
+message InitAction {
+  InitEntityAction action = 1;
+  int32 param = 2;
+}
+
+message InitTestCase {
+  repeated InitAction actions = 1;
+}

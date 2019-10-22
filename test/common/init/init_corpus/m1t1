@@ -1,0 +1,13 @@
+actions {
+    action: INIT_MANAGER_ADD_TARGET
+    param: 1
+}
+
+actions {
+    action: INIT_MANAGER_INITIALIZE
+    param: 1
+}
+actions {
+    action: INIT_TARGET_READY
+    param: 1
+}
