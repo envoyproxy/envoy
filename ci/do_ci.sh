@@ -145,7 +145,7 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS+="-c dbg --config=clang-asan \
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
     --copt=-fsanitize=vptr,function --linkopt=-fsanitize=vptr,function \
     --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a \
     --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a \
