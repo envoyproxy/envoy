@@ -234,6 +234,9 @@ public:
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.
     Tracing::Span* parent_span_{nullptr};
+    // The name to give to the child span that represents the async http request.
+    // If left empty and parent_span_ is set, then the default name will have the cluster name.
+    // Only used if parent_span_ is set.
     std::string child_span_name_{""};
   };
 
