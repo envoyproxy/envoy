@@ -39,7 +39,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
-        "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
     ],
 )
 

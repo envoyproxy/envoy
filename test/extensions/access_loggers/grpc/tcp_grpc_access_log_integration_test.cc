@@ -56,8 +56,9 @@ public:
       auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
       ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
-      envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-      config_blob->UnpackTo(&tcp_proxy_config);
+      auto tcp_proxy_config =
+          MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+              *config_blob);
 
       auto* access_log = tcp_proxy_config.add_access_log();
       access_log->set_name("envoy.tcp_grpc_access_log");

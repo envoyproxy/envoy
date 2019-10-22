@@ -671,7 +671,9 @@ bool ConfigHelper::loadHttpConnectionManager(
     auto* config = hcm_filter->mutable_typed_config();
     ASSERT(config->Is<
            envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>());
-    config->UnpackTo(&hcm);
+    hcm = MessageUtil::anyConvert<
+        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
+        *config);
     return true;
   }
   return false;

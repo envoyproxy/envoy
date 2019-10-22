@@ -117,8 +117,7 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
   if (reject_unknown_dynamic_fields_) {
     EXPECT_EQ(0, test_server_->counter("listener_manager.lds.update_success")->value());
     // LDS API parsing will reject due to unknown HCM field.
-    EXPECT_TRUE(1 == test_server_->counter("listener_manager.lds.update_rejected")->value() ||
-                1 == test_server_->counter("listener_manager.lds.update_failure")->value());
+    EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_rejected")->value());
     EXPECT_EQ(nullptr, test_server_->counter("http.router.rds.route_config_0.update_success"));
     EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
@@ -170,8 +169,8 @@ TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
   if (reject_unknown_dynamic_fields_) {
     EXPECT_EQ(0, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
-    // FilesystemSubscriptionImpl will reject early at the ingestion level
-    EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_failure")->value());
+    // Unknown fields in the config result in the update_rejected counter incremented
+    EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_rejected")->value());
     EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
@@ -196,8 +195,8 @@ TEST_P(DynamicValidationIntegrationTest, EdsFailedBySubscription) {
   EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
   if (reject_unknown_dynamic_fields_) {
     EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.update_success")->value());
-    // FilesystemSubscriptionImpl will reject early at the ingestion level
-    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_failure")->value());
+    // Unknown fields in the config result in the update_rejected counter incremented
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_rejected")->value());
     EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
