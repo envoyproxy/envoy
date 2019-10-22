@@ -220,7 +220,6 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
 }
 
 // Delta- and SotW-specific concrete subclasses:
-// GrpcMuxDelta
 GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                            const Protobuf::MethodDescriptor& service_method,
                            Runtime::RandomGenerator& random, Stats::Scope& scope,
@@ -256,7 +255,6 @@ void GrpcMuxDelta::maybeUpdateQueueSizeStat(uint64_t size) {
 bool GrpcMuxDelta::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
 bool GrpcMuxDelta::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
-// GrpcMuxSotw
 GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,

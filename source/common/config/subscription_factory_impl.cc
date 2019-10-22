@@ -21,7 +21,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::api::v2::core::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks) {
-  Utility::checkLocalInfo(type_url, local_info_);
+  Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
   switch (config.config_source_specifier_case()) {

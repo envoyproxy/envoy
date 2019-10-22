@@ -87,6 +87,7 @@ envoy_cc_library(
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster_lb",
+        "//source/extensions/common/redis:redirection_mgr_interface",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
@@ -116,9 +117,9 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:filter_json_lib",
+        "//source/extensions/common/redis:redirection_mgr_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",

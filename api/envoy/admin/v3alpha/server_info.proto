@@ -12,6 +12,7 @@ import "google/protobuf/duration.proto";
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
+// [#next-free-field: 7]
 message ServerInfo {
   enum State {
     // Server is live and serving traffic.
@@ -46,6 +47,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
+// [#next-free-field: 27]
 message CommandLineOptions {
   enum IpVersion {
     v4 = 0;

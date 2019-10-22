@@ -81,12 +81,7 @@ In addition, the following conventions should be followed:
   pattern forces developers to explicitly choose the correct enum value for
   their use case, and avoid misunderstanding of the default behavior.
 
-* Proto fields should be sorted logically, not by field number. For large protos, place a comment
-  at the top that specifies the next free field number. E.g.,
-
-  ```
-  // [#comment:next free field: 28]
-  ```
+* Proto fields should be sorted logically, not by field number.
 
 ## Package organization
 

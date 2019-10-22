@@ -219,7 +219,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 }
 
-// TODO(derekargueta): #2967 - Rewrite AccessLogformatter with parser library & formal grammar
+// TODO(derekargueta): #2967 - Rewrite AccessLogFormatter with parser library & formal grammar
 std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;

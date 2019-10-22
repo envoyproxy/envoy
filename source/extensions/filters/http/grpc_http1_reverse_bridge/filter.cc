@@ -55,7 +55,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(snowp): Add an enabled flag so that this filter can be enabled on a per route basis.
+  // Disable filter per route config if applies
+  if (decoder_callbacks_->route() != nullptr) {
+    const auto* per_route_config =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+            Extensions::HttpFilters::HttpFilterNames::get().GrpcHttp1ReverseBridge,
+            decoder_callbacks_->route());
+    if (per_route_config != nullptr && per_route_config->disabled()) {
+      enabled_ = false;
+      return Http::FilterHeadersStatus::Continue;
+    }
+  }
 
   // If this is a gRPC request we:
   //  - mark this request as being gRPC
