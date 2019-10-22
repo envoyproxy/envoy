@@ -1167,6 +1167,7 @@ filter_chains:
   // Validate that stop listener is only called once - for inbound listeners.
   EXPECT_CALL(*worker_, stopListener(_)).Times(1);
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 
   // Validate that listener creation in outbound direction is allowed.
   const std::string listener_bar_outbound_yaml = R"EOF(
@@ -1237,6 +1238,7 @@ filter_chains:
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::All);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 
   // Validate that adding a listener is not allowed after all listeners are stopped.
   const std::string listener_bar_yaml = R"EOF(
@@ -1306,6 +1308,7 @@ filter_chains:
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {

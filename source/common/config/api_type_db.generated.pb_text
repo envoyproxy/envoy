@@ -4040,7 +4040,22 @@ types {
   }
 }
 types {
+  key: "envoy.config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig"
+  value {
+    qualified_package: "envoy.config.filter.http.dynamic_forward_proxy.v2alpha"
+    proto_path: "envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.proto"
+    next_version_type_name: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha.PerRouteConfig"
+  }
+}
+types {
   key: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha.FilterConfig"
+  value {
+    qualified_package: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha"
+    proto_path: "envoy/config/filter/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha.PerRouteConfig"
   value {
     qualified_package: "envoy.config.filter.http.dynamic_forward_proxy.v3alpha"
     proto_path: "envoy/config/filter/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.proto"

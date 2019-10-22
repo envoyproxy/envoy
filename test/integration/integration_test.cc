@@ -125,7 +125,7 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 
   // Validate that the listeners have been stopped.
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_stopped", 1);
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {

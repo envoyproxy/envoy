@@ -576,12 +576,9 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
           warming_listeners_.erase(existing_warming_listener);
         }
         worker->stopListener(listener);
-        stopped_listeners_++;
+        stats_.listener_stopped_.inc();
       }
     }
-  }
-  if (stopped_listeners_ > 0) {
-    stats_.total_listeners_stopped_.set(stopped_listeners_);
   }
 }
 

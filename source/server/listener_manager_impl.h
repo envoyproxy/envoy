@@ -101,11 +101,10 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
+  COUNTER(listener_stopped)                                                                        \
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
-  GAUGE(total_listeners_stopped, NeverImport)                                                      \
   GAUGE(total_listeners_warming, NeverImport)
-
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
  */
@@ -201,7 +200,6 @@ private:
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
   absl::optional<StopListenersType> stop_listeners_type_;
-  uint32_t stopped_listeners_{};
   Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;

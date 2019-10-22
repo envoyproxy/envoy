@@ -459,8 +459,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("OK\n", response->body());
 
   // Validate that the listener stopped stat is not used and still zero.
-  EXPECT_FALSE(test_server_->gauge("listener_manager.total_listeners_stopped")->used());
-  EXPECT_EQ(0, test_server_->gauge("listener_manager.total_listeners_stopped")->value());
+  EXPECT_FALSE(test_server_->counter("listener_manager.listener_stopped")->used());
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
 
   // Now validate that the drain_listeners stops the listeners.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
@@ -470,7 +470,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ("OK\n", response->body());
 
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_stopped", 1);
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
 // Validates that the inboundonly drains inbound listeners.
@@ -491,7 +491,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   EXPECT_EQ("OK\n", response->body());
 
   // Validate that the inbound listener has been stopped.
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_stopped", 1);
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
