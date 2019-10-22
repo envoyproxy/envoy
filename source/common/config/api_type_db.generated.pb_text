@@ -5995,6 +5995,14 @@ types {
   }
 }
 types {
+  key: "envoy.config.trace.v2.XRayConfig"
+  value {
+    qualified_package: "envoy.config.trace.v2"
+    proto_path: "envoy/config/trace/v2/trace.proto"
+    next_version_type_name: "envoy.config.trace.v3alpha.XRayConfig"
+  }
+}
+types {
   key: "envoy.config.trace.v2.ZipkinConfig"
   value {
     qualified_package: "envoy.config.trace.v2"
@@ -6061,6 +6069,13 @@ types {
 }
 types {
   key: "envoy.config.trace.v3alpha.Tracing.Http"
+  value {
+    qualified_package: "envoy.config.trace.v3alpha"
+    proto_path: "envoy/config/trace/v3alpha/trace.proto"
+  }
+}
+types {
+  key: "envoy.config.trace.v3alpha.XRayConfig"
   value {
     qualified_package: "envoy.config.trace.v3alpha"
     proto_path: "envoy/config/trace/v3alpha/trace.proto"
