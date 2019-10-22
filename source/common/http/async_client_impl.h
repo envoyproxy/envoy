@@ -395,7 +395,7 @@ private:
   bool send_xff_{true};
 
   friend class AsyncClientImpl;
-  friend class AsyncClientImplRouteTest;
+  friend class AsyncClientImplUnitTest;
 };
 
 class AsyncRequestImpl final : public AsyncClient::Request,
