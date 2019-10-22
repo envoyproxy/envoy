@@ -20,10 +20,10 @@ namespace {
 class GrpcStatsFilterConfigTest : public testing::Test {
 protected:
   void SetUp() override {
-    std::string json_string = "{}";
-    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+    envoy::config::filter::http::grpc_stats::v2alpha1::FilterConfig config{};
+    config.set_emit_filter_state(true);
     GrpcStatsFilterConfig factory;
-    Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context_);
+    Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context_);
     Http::MockFilterChainFactoryCallbacks filter_callback;
 
     ON_CALL(filter_callback, addStreamFilter(_)).WillByDefault(testing::SaveArg<0>(&filter_));
@@ -129,6 +129,10 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 ->statsScope()
                 .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
                 .value());
+  auto& data =
+      stream_info_.filterState().getDataMutable<GrpcStatsObject>(HttpFilterNames::get().GrpcStats);
+  EXPECT_EQ(2U, data.request_message_count);
+  EXPECT_EQ(0U, data.response_message_count);
 
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc+proto"},
                                            {":status", "200"}};
@@ -147,6 +151,8 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 ->statsScope()
                 .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
                 .value());
+  EXPECT_EQ(2U, data.request_message_count);
+  EXPECT_EQ(2U, data.response_message_count);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(*b1, true));
   EXPECT_EQ(2U, decoder_callbacks_.clusterInfo()
@@ -158,6 +164,8 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 ->statsScope()
                 .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
                 .value());
+  EXPECT_EQ(2U, data.request_message_count);
+  EXPECT_EQ(3U, data.response_message_count);
 }
 
 } // namespace

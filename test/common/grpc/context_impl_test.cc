@@ -34,8 +34,8 @@ TEST(GrpcContextTest, ChargeStats) {
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.total").value());
 
-  context.chargeRequestStat(cluster, request_names, 3);
-  context.chargeResponseStat(cluster, request_names, 4);
+  context.chargeRequestMessageStat(cluster, request_names, 3);
+  context.chargeResponseMessageStat(cluster, request_names, 4);
   EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.request_message_count").value());
   EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.response_message_count").value());
 

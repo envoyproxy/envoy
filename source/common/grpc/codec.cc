@@ -98,7 +98,7 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   return true;
 }
 
-uint64_t FrameInspector::decode(Buffer::Instance& data) {
+uint64_t FrameInspector::decode(const Buffer::Instance& data) {
   uint64_t count = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, count);
   data.getRawSlices(slices.begin(), count);

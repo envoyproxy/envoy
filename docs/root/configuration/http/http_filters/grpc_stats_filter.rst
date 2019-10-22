@@ -8,9 +8,9 @@ gRPC Statistics
 * This filter should be configured with the name *envoy.filters.http.grpc_stats*.
 
 This is a filter which enables telemetry of gRPC calls. Additionally, the
-filter detects message boundaries in the streaming gRPC calls and emits the
-message counts for both the request and the response. The filter emits
-statistics in the *cluster.<route target cluster>.grpc.* namespace.
+filter detects message boundaries in streaming gRPC calls and emits the message
+counts for both the request and the response. The filter emits statistics in
+the *cluster.<route target cluster>.grpc.* namespace.
 
 More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
 

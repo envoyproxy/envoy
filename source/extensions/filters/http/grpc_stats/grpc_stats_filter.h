@@ -1,9 +1,11 @@
 #pragma once
 
+#include "envoy/config/filter/http/grpc_stats/v2alpha1/config.pb.h"
+#include "envoy/config/filter/http/grpc_stats/v2alpha1/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -11,12 +13,21 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcStats {
 
-class GrpcStatsFilterConfig : public Common::EmptyHttpFilterConfig {
-public:
-  GrpcStatsFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcStats) {}
+// Filter state exposing the gRPC message counts.
+struct GrpcStatsObject : public StreamInfo::FilterState::Object {
+  uint64_t request_message_count = 0;
+  uint64_t response_message_count = 0;
+};
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override;
+class GrpcStatsFilterConfig
+    : public Common::FactoryBase<envoy::config::filter::http::grpc_stats::v2alpha1::FilterConfig> {
+public:
+  GrpcStatsFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcStats) {}
+
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::grpc_stats::v2alpha1::FilterConfig& config,
+      const std::string&, Server::Configuration::FactoryContext&) override;
 };
 
 } // namespace GrpcStats

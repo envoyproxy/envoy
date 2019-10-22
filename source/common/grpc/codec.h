@@ -96,11 +96,11 @@ class FrameInspector {
 public:
   // Decodes the given buffer with GRPC data frame and updates the frame count.
   // Returns the increase in the frame count.
-  uint64_t decode(Buffer::Instance& input);
+  uint64_t decode(const Buffer::Instance& input);
 
   // Returns the current frame count, corresponding to the request/response
   // message count. Counter is incremented on a frame start.
-  uint64_t frame_count() const { return count_; }
+  uint64_t frameCount() const { return count_; }
 
   // Returns the current state in the frame parsing.
   State state() const { return state_; }

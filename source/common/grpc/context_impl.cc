@@ -71,8 +71,8 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
   chargeStat(cluster, Protocol::Grpc, request_names, success);
 }
 
-void ContextImpl::chargeRequestStat(const Upstream::ClusterInfo& cluster,
-                                    const RequestNames& request_names, uint64_t amount) {
+void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
+                                           const RequestNames& request_names, uint64_t amount) {
   const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
       {protocolStatName(Protocol::Grpc), request_names.service_, request_names.method_});
   const Stats::StatName prefix(prefix_storage.get());
@@ -84,8 +84,8 @@ void ContextImpl::chargeRequestStat(const Upstream::ClusterInfo& cluster,
       .add(amount);
 }
 
-void ContextImpl::chargeResponseStat(const Upstream::ClusterInfo& cluster,
-                                     const RequestNames& request_names, uint64_t amount) {
+void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
+                                            const RequestNames& request_names, uint64_t amount) {
   const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
       {protocolStatName(Protocol::Grpc), request_names.service_, request_names.method_});
   const Stats::StatName prefix(prefix_storage.get());

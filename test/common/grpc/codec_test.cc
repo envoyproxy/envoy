@@ -176,7 +176,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     EXPECT_EQ(0, counter.decode(buffer));
     EXPECT_EQ(counter.state(), State::FH_FLAG);
-    EXPECT_EQ(counter.frame_count(), 0);
+    EXPECT_EQ(counter.frameCount(), 0);
   }
 
   {
@@ -185,7 +185,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer, {0});
     EXPECT_EQ(1, counter.decode(buffer));
     EXPECT_EQ(counter.state(), State::FH_LEN_0);
-    EXPECT_EQ(counter.frame_count(), 1);
+    EXPECT_EQ(counter.frameCount(), 1);
   }
 
   {
@@ -194,7 +194,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer, {1, 0, 0, 0, 1, 0xFF});
     EXPECT_EQ(1, counter.decode(buffer));
     EXPECT_EQ(counter.state(), State::FH_FLAG);
-    EXPECT_EQ(counter.frame_count(), 1);
+    EXPECT_EQ(counter.frameCount(), 1);
   }
 
   {
@@ -203,11 +203,11 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer1, {1, 0, 0, 0});
     EXPECT_EQ(1, counter.decode(buffer1));
     EXPECT_EQ(counter.state(), State::FH_LEN_3);
-    EXPECT_EQ(counter.frame_count(), 1);
+    EXPECT_EQ(counter.frameCount(), 1);
     Buffer::OwnedImpl buffer2;
     Buffer::addSeq(buffer2, {1, 0xFF});
     EXPECT_EQ(0, counter.decode(buffer2));
-    EXPECT_EQ(counter.frame_count(), 1);
+    EXPECT_EQ(counter.frameCount(), 1);
   }
 
   {
@@ -217,7 +217,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer, {0, 0, 0, 0, 2, 0xFF, 0xFF});
     EXPECT_EQ(2, counter.decode(buffer));
     EXPECT_EQ(counter.state(), State::FH_FLAG);
-    EXPECT_EQ(counter.frame_count(), 2);
+    EXPECT_EQ(counter.frameCount(), 2);
   }
 
   {
@@ -230,7 +230,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     EXPECT_EQ(1, counter.decode(buffer1));
     EXPECT_EQ(1, counter.decode(buffer2));
     EXPECT_EQ(counter.state(), State::FH_FLAG);
-    EXPECT_EQ(counter.frame_count(), 2);
+    EXPECT_EQ(counter.frameCount(), 2);
   }
 
   {
@@ -243,7 +243,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     Buffer::addSeq(buffer, {0});
     EXPECT_EQ(2, counter.decode(buffer));
     EXPECT_EQ(counter.state(), State::FH_LEN_0);
-    EXPECT_EQ(counter.frame_count(), 2);
+    EXPECT_EQ(counter.frameCount(), 2);
   }
 
   {
@@ -252,7 +252,7 @@ TEST(GrpcCodecTest, FrameInspectorTest) {
     FrameInspector counter;
     Buffer::addRepeated(buffer, 10, 0);
     EXPECT_EQ(2, counter.decode(buffer));
-    EXPECT_EQ(counter.frame_count(), 2);
+    EXPECT_EQ(counter.frameCount(), 2);
   }
 }
 
