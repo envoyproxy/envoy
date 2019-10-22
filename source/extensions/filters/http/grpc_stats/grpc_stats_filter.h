@@ -11,12 +11,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcStats {
 
-// Filter state exposing the gRPC message counts.
-struct GrpcMessageCounterObject : public StreamInfo::FilterState::Object {
-  uint64_t request_message_count = 0;
-  uint64_t response_message_count = 0;
-};
-
 class GrpcStatsFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
   GrpcStatsFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcStats) {}

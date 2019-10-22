@@ -68,8 +68,8 @@ private:
   const Stats::StatName failure_;
   const Stats::StatName total_;
   const Stats::StatName zero_;
-  const Stats::StatName request_count_;
-  const Stats::StatName response_count_;
+  const Stats::StatName request_message_count_;
+  const Stats::StatName response_message_count_;
 };
 
 } // namespace Grpc

@@ -12,18 +12,6 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "message_counter_test",
-    srcs = ["message_counter_test.cc"],
-    extension_name = "envoy.filters.http.grpc_stats",
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/extensions/filters/http/grpc_stats:message_counter_lib",
-        "//test/common/buffer:utility_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.http.grpc_stats",

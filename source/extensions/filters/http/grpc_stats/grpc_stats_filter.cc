@@ -1,12 +1,11 @@
-#include "extensions/filters/http/grpc_stats/config.h"
+#include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 
+#include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/grpc/context_impl.h"
-
-#include "extensions/filters/http/grpc_stats/message_counter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,9 +34,8 @@ public:
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     if (grpc_request_) {
-      uint64_t delta = IncrementMessageCounter(data, &request_counter_);
+      uint64_t delta = request_counter_.decode(data);
       if (delta > 0) {
-        maybeWriteState();
         if (doStatTracking()) {
           context_.chargeRequestStat(*cluster_, *request_names_, delta);
         }
@@ -66,9 +64,8 @@ public:
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool) override {
     if (grpc_response_) {
-      uint64_t delta = IncrementMessageCounter(data, &response_counter_);
+      uint64_t delta = response_counter_.decode(data);
       if (delta > 0) {
-        maybeWriteState();
         if (cluster_ && request_names_) {
           context_.chargeResponseStat(*cluster_, *request_names_, delta);
         }
@@ -88,30 +85,17 @@ public:
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
-  void maybeWriteState() {
-    if (filter_object_ == nullptr) {
-      auto state = std::make_unique<GrpcMessageCounterObject>();
-      filter_object_ = state.get();
-      decoder_callbacks_->streamInfo().filterState().setData(
-          HttpFilterNames::get().GrpcStats, std::move(state),
-          StreamInfo::FilterState::StateType::Mutable);
-    }
-    filter_object_->request_message_count = request_counter_.count;
-    filter_object_->response_message_count = response_counter_.count;
-  }
-
   bool doStatTracking() const { return request_names_.has_value(); }
 
 private:
   Grpc::Context& context_;
   bool grpc_request_{false};
   bool grpc_response_{false};
-  GrpcMessageCounter request_counter_;
-  GrpcMessageCounter response_counter_;
+  Grpc::FrameInspector request_counter_;
+  Grpc::FrameInspector response_counter_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestNames> request_names_;
-  GrpcMessageCounterObject* filter_object_{};
 };
 
 } // namespace

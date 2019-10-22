@@ -12,21 +12,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "message_counter_lib",
-    srcs = ["message_counter.cc"],
-    hdrs = ["message_counter.h"],
-    deps = ["//include/envoy/buffer:buffer_interface"],
-)
-
-envoy_cc_library(
     name = "config",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
+    srcs = ["grpc_stats_filter.cc"],
+    hdrs = ["grpc_stats_filter.h"],
     deps = [
-        ":message_counter_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/grpc:context_lib",
         "//source/extensions/filters/http:well_known_names",

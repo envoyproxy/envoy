@@ -11,8 +11,8 @@ ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
       grpc_(stat_name_pool_.add("grpc")), grpc_web_(stat_name_pool_.add("grpc-web")),
       success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
       total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")),
-      request_count_(stat_name_pool_.add("request_count")),
-      response_count_(stat_name_pool_.add("response_count")) {}
+      request_message_count_(stat_name_pool_.add("request_message_count")),
+      response_message_count_(stat_name_pool_.add("response_message_count")) {}
 
 // Makes a stat name from a string, if we don't already have one for it.
 // This always takes a lock on mutex_, and if we haven't seen the name
@@ -76,9 +76,12 @@ void ContextImpl::chargeRequestStat(const Upstream::ClusterInfo& cluster,
   const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
       {protocolStatName(Protocol::Grpc), request_names.service_, request_names.method_});
   const Stats::StatName prefix(prefix_storage.get());
-  const Stats::SymbolTable::StoragePtr request_count = symbol_table_.join({prefix, request_count_});
+  const Stats::SymbolTable::StoragePtr request_message_count =
+      symbol_table_.join({prefix, request_message_count_});
 
-  cluster.statsScope().counterFromStatName(Stats::StatName(request_count.get())).add(amount);
+  cluster.statsScope()
+      .counterFromStatName(Stats::StatName(request_message_count.get()))
+      .add(amount);
 }
 
 void ContextImpl::chargeResponseStat(const Upstream::ClusterInfo& cluster,
@@ -86,10 +89,12 @@ void ContextImpl::chargeResponseStat(const Upstream::ClusterInfo& cluster,
   const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
       {protocolStatName(Protocol::Grpc), request_names.service_, request_names.method_});
   const Stats::StatName prefix(prefix_storage.get());
-  const Stats::SymbolTable::StoragePtr response_count =
-      symbol_table_.join({prefix, response_count_});
+  const Stats::SymbolTable::StoragePtr response_message_count =
+      symbol_table_.join({prefix, response_message_count_});
 
-  cluster.statsScope().counterFromStatName(Stats::StatName(response_count.get())).add(amount);
+  cluster.statsScope()
+      .counterFromStatName(Stats::StatName(response_message_count.get()))
+      .add(amount);
 }
 
 absl::optional<ContextImpl::RequestNames>

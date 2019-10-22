@@ -21,5 +21,5 @@ More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/m
   <grpc service>.<grpc method>.success, Counter, Total successful service/method calls
   <grpc service>.<grpc method>.failure, Counter, Total failed service/method calls
   <grpc service>.<grpc method>.total, Counter, Total service/method calls
-  <grpc service>.<grpc method>.request_count, Counter, Total request message count for service/method calls
-  <grpc service>.<grpc method>.response_count, Counter, Total response message count for service/method calls
+  <grpc service>.<grpc method>.request_message_count, Counter, Total request message count for service/method calls
+  <grpc service>.<grpc method>.response_message_count, Counter, Total response message count for service/method calls
