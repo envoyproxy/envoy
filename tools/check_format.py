@@ -274,7 +274,7 @@ def whitelistedForHistogramSiSuffix(name):
 
 
 def whitelistedForStdRegex(file_path):
-  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
+  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST or file_path.endswith(DOCS_SUFFIX)
 
 
 def whitelistedForGrpcInit(file_path):
