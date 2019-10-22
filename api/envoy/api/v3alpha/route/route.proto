@@ -746,9 +746,7 @@ message RouteAction {
   RequestMirrorPolicy request_mirror_policy = 10;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
-  // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
-  // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-  core.RoutingPriority priority = 11;
+  core.RoutingPriority priority = 11 [(validate.rules).enum = {defined_only: true}];
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
