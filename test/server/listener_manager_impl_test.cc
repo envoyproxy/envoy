@@ -1007,6 +1007,7 @@ dynamic_listeners:
 )EOF");
 }
 
+// Verify that errors tracked on endListenerUpdate show up in the config dump/
 TEST_F(ListenerManagerImplTest, ConfigDumpWithExternalError) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   InSequence s;
