@@ -36,8 +36,8 @@ TEST(GrpcContextTest, ChargeStats) {
 
   context.chargeRequestStat(cluster, request_names, 3);
   context.chargeResponseStat(cluster, request_names, 4);
-  EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.request_count").value());
-  EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.response_count").value());
+  EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.request_message_count").value());
+  EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.response_message_count").value());
 
   Http::TestHeaderMapImpl trailers;
   Http::HeaderEntry& status = trailers.insertGrpcStatus();
