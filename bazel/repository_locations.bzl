@@ -118,9 +118,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.4.tar.gz"],
     ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "fc820a305e2f410fade1a3260f09229f15c0494fc089b0100312cd64a33a38c0",
-        strip_prefix = "nghttp2-1.39.2",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.39.2/nghttp2-1.39.2.tar.gz"],
+        sha256 = "25b623cd04dc6a863ca3b34ed6247844effe1aa5458229590b3f56a6d53cd692",
+        strip_prefix = "nghttp2-1.39.1",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.39.1/nghttp2-1.39.1.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
