@@ -102,7 +102,7 @@ public:
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&, bool, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&, ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
