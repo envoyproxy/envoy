@@ -449,7 +449,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
-  // Validate that the inboundonly does not stop the default listener.
+  // Validate that the "inboundonly" does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",
                                                 downstreamProtocol(), version_);
@@ -473,7 +473,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
-// Validates that the inboundonly drains inbound listeners.
+// Validates that the "inboundonly" drains inbound listeners.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
