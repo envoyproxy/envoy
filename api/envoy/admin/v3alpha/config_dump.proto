@@ -59,7 +59,6 @@ message BootstrapConfigDump {
 // Envoy's listener manager fills this message with all currently known listeners. Listener
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
-// [#next-free-field: 6]
 message ListenersConfigDump {
   // Describes a statically loaded listener.
   message StaticListener {
@@ -85,6 +84,7 @@ message ListenersConfigDump {
   }
 
   // Describes a dynamically loaded listener via the LDS API.
+  // [#next-free-field: 6]
   message DynamicListener {
     // The name or unique id of this listener, pulled from the DynamicListenerState config.
     string name = 1;

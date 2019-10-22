@@ -151,6 +151,14 @@ types {
   }
 }
 types {
+  key: "envoy.admin.v2alpha.ListenersConfigDump.DynamicListenerState"
+  value {
+    qualified_package: "envoy.admin.v2alpha"
+    proto_path: "envoy/admin/v2alpha/config_dump.proto"
+    next_version_type_name: "envoy.admin.v3alpha.ListenersConfigDump.DynamicListenerState"
+  }
+}
+types {
   key: "envoy.admin.v2alpha.ListenersConfigDump.StaticListener"
   value {
     qualified_package: "envoy.admin.v2alpha"
@@ -295,6 +303,14 @@ types {
   }
 }
 types {
+  key: "envoy.admin.v2alpha.UpdateFailureState"
+  value {
+    qualified_package: "envoy.admin.v2alpha"
+    proto_path: "envoy/admin/v2alpha/config_dump.proto"
+    next_version_type_name: "envoy.admin.v3alpha.UpdateFailureState"
+  }
+}
+types {
   key: "envoy.admin.v3alpha.BootstrapConfigDump"
   value {
     qualified_package: "envoy.admin.v3alpha"
@@ -428,6 +444,13 @@ types {
   }
 }
 types {
+  key: "envoy.admin.v3alpha.ListenersConfigDump.DynamicListenerState"
+  value {
+    qualified_package: "envoy.admin.v3alpha"
+    proto_path: "envoy/admin/v3alpha/config_dump.proto"
+  }
+}
+types {
   key: "envoy.admin.v3alpha.ListenersConfigDump.StaticListener"
   value {
     qualified_package: "envoy.admin.v3alpha"
@@ -551,6 +574,13 @@ types {
   value {
     qualified_package: "envoy.admin.v3alpha"
     proto_path: "envoy/admin/v3alpha/tap.proto"
+  }
+}
+types {
+  key: "envoy.admin.v3alpha.UpdateFailureState"
+  value {
+    qualified_package: "envoy.admin.v3alpha"
+    proto_path: "envoy/admin/v3alpha/config_dump.proto"
   }
 }
 types {
@@ -5995,6 +6025,14 @@ types {
   }
 }
 types {
+  key: "envoy.config.trace.v2.XRayConfig"
+  value {
+    qualified_package: "envoy.config.trace.v2"
+    proto_path: "envoy/config/trace/v2/trace.proto"
+    next_version_type_name: "envoy.config.trace.v3alpha.XRayConfig"
+  }
+}
+types {
   key: "envoy.config.trace.v2.ZipkinConfig"
   value {
     qualified_package: "envoy.config.trace.v2"
@@ -6061,6 +6099,13 @@ types {
 }
 types {
   key: "envoy.config.trace.v3alpha.Tracing.Http"
+  value {
+    qualified_package: "envoy.config.trace.v3alpha"
+    proto_path: "envoy/config/trace/v3alpha/trace.proto"
+  }
+}
+types {
+  key: "envoy.config.trace.v3alpha.XRayConfig"
   value {
     qualified_package: "envoy.config.trace.v3alpha"
     proto_path: "envoy/config/trace/v3alpha/trace.proto"
