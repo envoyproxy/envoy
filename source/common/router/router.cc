@@ -270,7 +270,7 @@ FilterUtility::StrictHeaderChecker::checkHeader(Http::HeaderMap& headers,
                                &Router::RetryStateImpl::parseRetryGrpcOn);
   }
   // Should only validate headers for which we have implemented a validator.
-  NOT_REACHED_GCOVR_EXCL_LINE
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
