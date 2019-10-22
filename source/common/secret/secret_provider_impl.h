@@ -50,5 +50,25 @@ private:
   Secret::CertificateValidationContextPtr certificate_validation_context_;
 };
 
+class TlsSessionTicketKeysConfigProviderImpl : public TlsSessionTicketKeysConfigProvider {
+public:
+  TlsSessionTicketKeysConfigProviderImpl(
+      const envoy::api::v2::auth::TlsSessionTicketKeys& tls_session_ticket_keys);
+
+  const envoy::api::v2::auth::TlsSessionTicketKeys* secret() const override {
+    return tls_session_ticket_keys_.get();
+  }
+
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::api::v2::auth::TlsSessionTicketKeys&)>) override {
+    return nullptr;
+  }
+
+  Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
+
+private:
+  Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
+};
+
 } // namespace Secret
 } // namespace Envoy

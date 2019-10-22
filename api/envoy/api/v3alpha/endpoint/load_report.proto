@@ -19,6 +19,7 @@ import "validate/validate.proto";
 // :ref:`LoadStatsResponse.load_reporting_interval<envoy_api_field_service.load_stats.v3alpha.LoadStatsResponse.load_reporting_interval>`.
 // Stats per upstream region/zone and optionally per subzone.
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+// [#next-free-field: 9]
 message UpstreamLocalityStats {
   // Name of zone, region and optionally endpoint group these metrics were
   // collected from. Zone and region names could be empty if unknown.
@@ -54,6 +55,7 @@ message UpstreamLocalityStats {
 }
 
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+// [#next-free-field: 8]
 message UpstreamEndpointStats {
   // Upstream host address.
   core.Address address = 1;
@@ -109,6 +111,7 @@ message EndpointLoadMetricStats {
 // :ref:`LoadStatsRequest<envoy_api_msg_service.load_stats.v3alpha.LoadStatsRequest>`
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // Next ID: 7
+// [#next-free-field: 7]
 message ClusterStats {
   message DroppedRequests {
     // Identifier for the policy specifying the drop.

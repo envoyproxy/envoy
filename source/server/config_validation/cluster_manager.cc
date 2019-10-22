@@ -14,9 +14,9 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
 
 CdsApiPtr
 ValidationClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                           bool is_delta, ClusterManager& cm) {
+                                           ClusterManager& cm) {
   // Create the CdsApiImpl...
-  ProdClusterManagerFactory::createCds(cds_config, is_delta, cm);
+  ProdClusterManagerFactory::createCds(cds_config, cm);
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;
 }

@@ -289,7 +289,6 @@ message StatsdSink {
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_api_msg_config.metrics.v3alpha.StatsConfig>`.
-// [#comment:next free field: 3]
 message DogStatsdSink {
   reserved 2;
 
