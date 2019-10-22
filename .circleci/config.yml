@@ -141,6 +141,7 @@ workflows:
             tags:
               only: /^v.*/
       - api
+      - go_control_plane_mirror
       - filter_example_mirror
       - coverage
       - coverage_publish:

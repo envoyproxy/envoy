@@ -344,7 +344,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   auto packet = std::unique_ptr<quic::QuicReceivedPacket>(
       quic::test::ConstructReceivedPacket(*encrypted_packet, connection_helper_.GetClock()->Now()));
 
-  // Receiving above packet should trigger filter chain retrival.
+  // Receiving above packet should trigger filter chain retrieval.
   Network::MockFilterChainManager filter_chain_manager;
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   Network::MockFilterChain filter_chain;

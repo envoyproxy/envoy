@@ -19,8 +19,10 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1:pkg_cc_proto",
     ],
 )
 

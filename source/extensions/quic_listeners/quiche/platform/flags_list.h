@@ -9,7 +9,7 @@
 
 // The contents of this file are based off of
 // //third_party/quic/core:quic_flags_list in google3, with the addition of
-// testonly flags for testing http2 and spdy flags APIs.
+// test-only flags for testing http2 and spdy flags APIs.
 // TODO(mpwarres): include generated flags_list.h as part of QUICHE.
 
 #if defined(QUICHE_FLAG)
