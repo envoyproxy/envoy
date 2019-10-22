@@ -293,9 +293,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "GET", "/runtime", response));
   EXPECT_EQ("application/json", ContentType(response));
 
-  response = request("/runtime_modify?foo=bar&foo1=bar1", "POST");
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", request("admin", "POST", "/runtime_modify?foo=bar&foo1=bar1", response));
 
   EXPECT_EQ("200", request("admin", "GET", "/runtime?format=json", response));
   EXPECT_EQ("application/json", ContentType(response));
