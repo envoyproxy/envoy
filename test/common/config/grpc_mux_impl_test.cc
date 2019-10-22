@@ -625,7 +625,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   expectSendMessage(type_url, {}, "1", false, "bar");
 }
 
-// Verifies that a messsage with some resources is accepted even when there are no watches.
+// Verifies that a message with some resources is accepted even when there are no watches.
 // Rationale: SotW gRPC xDS has always been willing to accept updates that include
 // uninteresting resources. It should not matter whether those uninteresting resources
 // are accompanied by interesting ones.
