@@ -129,14 +129,14 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
       if (is_content_length_allowed_) {
-        encodeFormattedHeader(Headers::get().ContentLength.get().c_str(), "0");
+        encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else {
-      encodeFormattedHeader(Headers::get().TransferEncoding.get().c_str(),
-                            Headers::get().TransferEncodingValues.Chunked.c_str());
+      encodeFormattedHeader(Headers::get().TransferEncoding.get(),
+                            Headers::get().TransferEncodingValues.Chunked);
       // We do not apply chunk encoding for HTTP upgrades.
       // If there is a body in a WebSocket Upgrade response, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
