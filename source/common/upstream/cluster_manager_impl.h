@@ -68,7 +68,7 @@ public:
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
@@ -237,9 +237,6 @@ public:
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
 
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
-
-  // TODO(fredlas) remove once SotW and delta are unified.
-  bool xdsIsDelta() const override { return xds_is_delta_; }
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
@@ -483,7 +480,6 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
-  bool xds_is_delta_{};
   Config::SubscriptionFactoryImpl subscription_factory_;
 };
 

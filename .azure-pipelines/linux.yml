@@ -1,3 +1,14 @@
+trigger:
+  branches:
+    include:
+    - 'master'
+  tags:
+    include:
+    - 'v*'
+
+# PR build config is manually overridden in Azure pipelines UI with different secrets
+pr: none
+
 jobs:
 - job: format
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
@@ -122,7 +133,7 @@ jobs:
   # this runs on every push to master / merge to master. this will build the fuzzers and will update them on Fuzzit where
   # they will run asynchronously. Essentially this will make sure that the latest master version is always being fuzzed
   # continuously.
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'), ne(variables['Build.Reason'], 'PullRequest'))
+  condition: and(succeeded(), ne(variables['FuzzitApiKey'], ''), eq(variables['Build.SourceBranch'], 'refs/heads/master'), ne(variables['Build.Reason'], 'PullRequest'))
   pool:
     vmImage: 'Ubuntu 16.04'
   steps:

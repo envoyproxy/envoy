@@ -10,8 +10,6 @@ import "envoy/api/v3alpha/route/route.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 import "envoy/type/v3alpha/range.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "validate/validate.proto";
 
 // [#protodoc-title: Dubbo Proxy Route Configuration]

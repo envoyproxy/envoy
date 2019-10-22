@@ -100,7 +100,7 @@ uint64_t fractionalPercentDenominatorToInt(
 // @param default_value supplies the default if the field is not present.
 //
 // TODO(anirudhmurali): Recommended to capture and validate NaN values in PGV
-// Issue: https://github.com/lyft/protoc-gen-validate/issues/85
+// Issue: https://github.com/envoyproxy/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
   (!std::isnan((message).field_name().value())                                                     \

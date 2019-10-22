@@ -36,6 +36,8 @@ public:
                             GrpcMuxCallbacks& callbacks) override;
 
   // GrpcMux
+  // TODO(fredlas) PR #8478 will remove this.
+  bool isDelta() const override { return false; }
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
@@ -133,6 +135,8 @@ public:
                             GrpcMuxCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
+  // TODO(fredlas) PR #8478 will remove this.
+  bool isDelta() const override { return false; }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
   bool paused(const std::string&) const override { return false; }
