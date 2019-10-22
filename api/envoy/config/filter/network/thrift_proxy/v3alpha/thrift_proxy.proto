@@ -54,7 +54,7 @@ enum ProtocolType {
   TWITTER = 4;
 }
 
-// [#comment:next free field: 6]
+// [#next-free-field: 6]
 message ThriftProxy {
   // Supplies the type of transport that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_TRANSPORT<envoy_api_enum_value_config.filter.network.thrift_proxy.v3alpha.TransportType.AUTO_TRANSPORT>`.
@@ -78,7 +78,6 @@ message ThriftProxy {
 }
 
 // ThriftFilter configures a Thrift filter.
-// [#comment:next free field: 3]
 message ThriftFilter {
   // The name of the filter to instantiate. The name must match a supported
   // filter. The built-in filters are:
@@ -101,7 +100,6 @@ message ThriftFilter {
 // in
 // :ref:`extension_protocol_options<envoy_api_field_api.v3alpha.Cluster.extension_protocol_options>`,
 // keyed by the name `envoy.filters.network.thrift_proxy`.
-// [#comment:next free field: 3]
 message ThriftProtocolOptions {
   // Supplies the type of transport that the Thrift proxy should use for upstream connections.
   // Selecting

@@ -16,8 +16,10 @@ import "validate/validate.proto";
 // [#protodoc-title: Redis Proxy]
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 
+// [#next-free-field: 7]
 message RedisProxy {
   // Redis connection pool settings.
+  // [#next-free-field: 9]
   message ConnPoolSettings {
     // ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
     // supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
@@ -209,8 +211,8 @@ message RedisProxy {
   //
   // When using the above routes, the following prefixes would be sent to:
   //
-  // * 'get abc:users' would retrive the key 'abc:users' from cluster_b.
-  // * 'get ab:users' would retrive the key 'ab:users' from cluster_a.
+  // * 'get abc:users' would retrieve the key 'abc:users' from cluster_b.
+  // * 'get ab:users' would retrieve the key 'ab:users' from cluster_a.
   // * 'get z:users' would return a NoUpstreamHost error. A :ref:`catch-all
   //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
   //   would have retrieved the key from that cluster instead.
@@ -220,7 +222,7 @@ message RedisProxy {
   // configuring the backing clusters.
   PrefixRoutes prefix_routes = 5;
 
-  // Authenticate Redis client connections locally by forcing downstream clients to issue a 'Redis
+  // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
   // AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other
   // command. If an AUTH command's password matches this password, an "OK" response will be returned
   // to the client. If the AUTH command password does not match this password, then an "ERR invalid
@@ -235,7 +237,7 @@ message RedisProxy {
 // :ref:`extension_protocol_options<envoy_api_field_Cluster.extension_protocol_options>`, keyed
 // by the name `envoy.redis_proxy`.
 message RedisProtocolOptions {
-  // Upstream server password as defined by the `requirepass directive
+  // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.
   api.v2.core.DataSource auth_password = 1;
 }

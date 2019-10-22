@@ -96,7 +96,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.
 TEST_F(AuthenticatorTest, TestForwardJwt) {
-  // Confit forward_jwt flag
+  // Config forward_jwt flag
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_forward(true);
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
@@ -119,7 +119,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
 
 // This test verifies the Jwt payload is set.
 TEST_F(AuthenticatorTest, TestSetPayload) {
-  // Confit payload_in_metadata flag
+  // Config payload_in_metadata flag
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
       "my_payload");
   CreateAuthenticator();

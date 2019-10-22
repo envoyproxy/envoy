@@ -36,6 +36,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
+#include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -74,7 +75,8 @@ InstanceImpl::InstanceImpl(
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()) {
+      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
+      server_context_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -198,6 +200,9 @@ void InstanceImpl::flushStatsInternal() {
       sslContextManager().daysUntilFirstCertExpires());
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->stats_recent_lookups_.set(
+      stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
+
   InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
@@ -297,8 +302,8 @@ void InstanceImpl::initialize(const Options& options,
   validation_context_.dynamic_warning_validation_visitor().setCounter(
       server_stats_->dynamic_unknown_fields_);
 
-  initialization_timer_ =
-      std::make_unique<Stats::Timespan>(server_stats_->initialization_time_ms_, timeSource());
+  initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
@@ -322,8 +327,8 @@ void InstanceImpl::initialize(const Options& options,
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), std::move(local_address), options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
+      options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
@@ -400,13 +405,7 @@ void InstanceImpl::initialize(const Options& options,
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config()) {
-    const bool is_delta =
-        bootstrap_.dynamic_resources().lds_config().api_config_source().api_type() ==
-            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
-        (bootstrap_.dynamic_resources().has_ads_config() &&
-         bootstrap_.dynamic_resources().ads_config().api_type() ==
-             envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
-    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(), is_delta);
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
   }
 
   // We have to defer RTDS initialization until after the cluster manager is

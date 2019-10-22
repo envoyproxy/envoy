@@ -19,7 +19,7 @@ public:
   ScopePtr createScope(const std::string& name) override;
   Counter& counterFromStatName(StatName name) override;
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName name) override;
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
   Counter& counter(const std::string& name) override {
@@ -30,9 +30,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName());
+    return histogramFromStatName(storage.statName(), unit);
   }
 
   OptionalCounter findCounter(StatName name) const override;

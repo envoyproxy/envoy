@@ -61,7 +61,7 @@ namespace Config {
 //   2) According to the API type, create a class derived from
 //   ConfigSubscriptionInstance or DeltaConfigSubscriptionInstance; this is the entity responsible
 //   for owning and managing the Envoy::Config::Subscription<ConfigProto> that provides the
-//   underlying config subscription, and the Config implemention shared by associated providers.
+//   underlying config subscription, and the Config implementation shared by associated providers.
 //     a) For a ConfigProvider::ApiType::Full subscription instance (i.e., a
 //     ConfigSubscriptionInstance child):
 //     - When subscription callbacks (onConfigUpdate, onConfigUpdateFailed) are issued by the

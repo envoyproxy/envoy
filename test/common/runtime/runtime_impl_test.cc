@@ -814,10 +814,10 @@ public:
     EXPECT_CALL(init_manager_, add(_)).WillRepeatedly(Invoke([this](const Init::Target& target) {
       init_target_handles_.emplace_back(target.createHandle("test"));
     }));
-    ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+    ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _))
         .WillByDefault(testing::Invoke(
             [this](const envoy::api::v2::core::ConfigSource&, absl::string_view, Stats::Scope&,
-                   Config::SubscriptionCallbacks& callbacks, bool) -> Config::SubscriptionPtr {
+                   Config::SubscriptionCallbacks& callbacks) -> Config::SubscriptionPtr {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
               rtds_subscriptions_.push_back(ret.get());
               rtds_callbacks_.push_back(&callbacks);
