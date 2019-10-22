@@ -417,7 +417,7 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
       }
       first_reservable_slice--;
       if (slices_[first_reservable_slice]->dataSize() != 0) {
-        // There is some content in this slice, so anything in front of it is nonreservable.
+        // There is some content in this slice, so anything in front of it is non-reservable.
         break;
       }
     }

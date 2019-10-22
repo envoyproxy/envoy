@@ -45,6 +45,14 @@ public:
   findStaticCertificateValidationContextProvider(const std::string& name) const PURE;
 
   /**
+   * @param name a name of the static TlsSessionTicketKeysConfigProviderSharedPtr.
+   * @return the TlsSessionTicketKeysConfigProviderSharedPtr. Returns nullptr
+   * if the static tls session ticket keys are not found.
+   */
+  virtual TlsSessionTicketKeysConfigProviderSharedPtr
+  findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const PURE;
+
+  /**
    * @param tls_certificate the protobuf config of the TLS certificate.
    * @return a TlsCertificateConfigProviderSharedPtr created from tls_certificate.
    */
@@ -61,6 +69,13 @@ public:
   createInlineCertificateValidationContextProvider(
       const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
       PURE;
+
+  /**
+   * @param tls_certificate the protobuf config of the TLS session ticket keys.
+   * @return a TlsSessionTicketKeysConfigProviderSharedPtr created from session_ticket_keys.
+   */
+  virtual TlsSessionTicketKeysConfigProviderSharedPtr createInlineTlsSessionTicketKeysProvider(
+      const envoy::api::v2::auth::TlsSessionTicketKeys& tls_certificate) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
@@ -89,6 +104,22 @@ public:
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
+      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
+
+  /**
+   * Finds and returns a dynamic secret provider associated to SDS config. Create
+   * a new one if such provider does not exist.
+   *
+   * @param config_source a protobuf message object containing a SDS config source.
+   * @param config_name a name that uniquely refers to the SDS config source.
+   * @param secret_provider_context context that provides components for creating and initializing
+   * secret provider.
+   * @return TlsSessionTicketKeysConfigProviderSharedPtr the dynamic tls session ticket keys secret
+   * provider.
+   */
+  virtual TlsSessionTicketKeysConfigProviderSharedPtr
+  findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };

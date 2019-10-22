@@ -591,9 +591,9 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   InSequence s;
 
   auto* lds_api = new MockLdsApi();
-  EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
+  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
   envoy::api::v2::core::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config, false);
+  manager_->createLdsApi(lds_config);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(

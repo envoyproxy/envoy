@@ -2083,6 +2083,43 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
+TEST_F(ClusterInfoImplTest, Timeouts) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
+                                   baz: {name: meh } } }
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+
+  const std::string explicit_timeout = R"EOF(
+    common_http_protocol_options:
+      idle_timeout: 1s
+  )EOF";
+
+  auto cluster2 = makeCluster(yaml + explicit_timeout);
+  ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+
+  const std::string no_timeout = R"EOF(
+    common_http_protocol_options:
+      idle_timeout: 0s
+  )EOF";
+  auto cluster3 = makeCluster(yaml + no_timeout);
+  EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+}
+
 class TestFilterConfigFactoryBase {
 public:
   TestFilterConfigFactoryBase(
@@ -2149,7 +2186,8 @@ public:
   }
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&,
-                                  Server::Configuration::FactoryContext&) override {
+                                  Server::Configuration::ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -2653,7 +2691,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
   setUpHostSetWithOPFAndTestPicks(200, 50, 50);
 };
 
-// Verifies that partionHosts correctly splits hosts based on their health flags.
+// Verifies that partitionHosts correctly splits hosts based on their health flags.
 TEST(HostPartitionTest, PartitionHosts) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   HostVector hosts{

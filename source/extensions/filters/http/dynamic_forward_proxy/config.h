@@ -27,7 +27,7 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig& config,
-      Server::Configuration::FactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 DECLARE_FACTORY(DynamicForwardProxyFilterFactory);

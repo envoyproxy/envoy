@@ -101,12 +101,12 @@ public:
         filter_chain_factory_builder_);
   }
 
-  // Intermedia states.
+  // Intermediate states.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::vector<std::shared_ptr<Network::MockConnectionSocket>> sockets_;
 
-  // Reuseable template.
+  // Reusable template.
   const std::string filter_chain_yaml = R"EOF(
       filter_chain_match:
         destination_port: 10000
