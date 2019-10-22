@@ -191,6 +191,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
   EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
@@ -227,6 +228,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ("ext_authz_error", filter_callbacks_.details_);
 }
@@ -258,6 +260,7 @@ TEST_F(HttpFilterTest, ErrorOpen) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
   EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
@@ -289,6 +292,11 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counter("ext_authz.failure_mode_allowed")
+                    .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
 }
@@ -581,6 +589,7 @@ TEST_F(HttpFilterTest, ClearCache) {
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
@@ -619,6 +628,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
@@ -657,6 +667,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
@@ -693,6 +704,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
@@ -728,6 +740,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   response.headers_to_append = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"bar"}, "foo"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
@@ -762,6 +775,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ("ext_authz_denied", filter_callbacks_.details_);
 }
 
@@ -936,6 +950,7 @@ TEST_F(HttpFilterTestParam, OkResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
   // decodeData() and decodeTrailers() are called after continueDecoding().
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -961,6 +976,7 @@ TEST_F(HttpFilterTestParam, ImmediateOkResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
@@ -987,11 +1003,12 @@ TEST_F(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, config_->stats().denied_.value());
   // When request is denied, no call to continueDecoding(). As a result, decodeData() and
   // decodeTrailer() will not be called.
 }
-//
+
 // Test that an synchronous ok response from the authorization service passing additional HTTP
 // attributes to the upstream.
 TEST_F(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
@@ -1049,6 +1066,7 @@ TEST_F(HttpFilterTestParam, ImmediateDeniedResponse) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, config_->stats().denied_.value());
   // When request is denied, no call to continueDecoding(). As a result, decodeData() and
   // decodeTrailer() will not be called.
@@ -1104,6 +1122,7 @@ TEST_F(HttpFilterTestParam, DeniedResponseWith403) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
@@ -1149,6 +1168,7 @@ TEST_F(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
@@ -1199,6 +1219,7 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_4xx").value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());

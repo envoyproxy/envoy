@@ -176,6 +176,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
       }
     }
+    if (cluster_) {
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
+    }
     stats_.ok_.inc();
     continueDecoding();
     break;
@@ -187,6 +190,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     stats_.denied_.inc();
 
     if (cluster_) {
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
+
       Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                              cluster_->statsScope(),
                                              empty_stat_name,
@@ -218,10 +223,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   case CheckStatus::Error: {
+    if (cluster_) {
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
+    }
     stats_.error_.inc();
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
       stats_.failure_mode_allowed_.inc();
+      if (cluster_) {
+        config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
+      }
       continueDecoding();
     } else {
       ENVOY_STREAM_LOG(
