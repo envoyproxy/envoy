@@ -30,38 +30,15 @@ class Envoy private constructor(
   constructor(engine: EnvoyEngine, envoyConfiguration: EnvoyConfiguration, logLevel: LogLevel = LogLevel.INFO) : this(engine, envoyConfiguration, null, logLevel)
   constructor(engine: EnvoyEngine, configurationYAML: String, logLevel: LogLevel = LogLevel.INFO) : this(engine, null, configurationYAML, logLevel)
 
-  // Dedicated thread for running this instance of Envoy.
-  private val runner: Thread = Thread(ThreadGroup("Envoy"), Runnable {
+  /**
+   * Create a new Envoy instance.
+   */
+  init {
     if (envoyConfiguration == null) {
       engine.runWithConfig(configurationYAML, logLevel.level)
     }else {
       engine.runWithConfig(envoyConfiguration, logLevel.level)
     }
-  })
-
-  /**
-   * Create a new Envoy instance. The Envoy runner Thread is started as part of instance
-   * initialization with the configuration provided. If the Envoy native library and its
-   * dependencies haven't been loaded and initialized yet, this will happen lazily when
-   * the first instance is created.
-   */
-  init {
-    runner.start()
-  }
-
-  /**
-   * Returns whether the Envoy instance is currently active and running.
-   */
-  fun isRunning(): Boolean {
-    val state = runner.state
-    return state != Thread.State.NEW && state != Thread.State.TERMINATED
-  }
-
-  /**
-   * Returns whether the Envoy instance is terminated.
-   */
-  fun isTerminated(): Boolean {
-    return runner.state == Thread.State.TERMINATED
   }
 
   override fun send(request: Request, responseHandler: ResponseHandler): StreamEmitter {
