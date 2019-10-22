@@ -451,6 +451,50 @@ TEST_P(IntegrationAdminTest, Admin) {
   envoy::admin::v2alpha::SecretsConfigDump secret_config_dump;
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
+
+  // Validate that the "inboundonly" does not stop the default listener.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
+                                                "/drain_listeners?inboundonly", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  // Validate that the listener stopped stat is not used and still zero.
+  EXPECT_FALSE(test_server_->counter("listener_manager.listener_stopped")->used());
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
+
+  // Now validate that the drain_listeners stops the listeners.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+}
+
+// Validates that the "inboundonly" drains inbound listeners.
+TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    inbound_listener->set_traffic_direction(envoy::api::v2::core::TrafficDirection::INBOUND);
+    inbound_listener->set_name("inbound_0");
+  });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly", "", downstreamProtocol(),
+      version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  // Validate that the inbound listener has been stopped.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
