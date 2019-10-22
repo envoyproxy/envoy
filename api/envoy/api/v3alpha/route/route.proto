@@ -28,7 +28,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -159,7 +159,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message Route {
   reserved 6;
 
