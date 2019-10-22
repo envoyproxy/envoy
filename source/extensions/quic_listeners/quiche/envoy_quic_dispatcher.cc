@@ -50,7 +50,7 @@ quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
   // point.
   // TODO(danzh): change QUIC interface to pass in self address as it is already
   // known. In this way, filter chain can be retrieved at this point. But one
-  // thing to pay attention is that if the retrival fails, connection needs to
+  // thing to pay attention is that if the retrieval fails, connection needs to
   // be closed, and it should be added to time wait list instead of session map.
   connection_handler_.incNumConnections();
   return quic_session;

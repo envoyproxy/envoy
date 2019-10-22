@@ -318,15 +318,18 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     }
     Buffer::Instance& source_buffer = *buffers[source_index];
     if (action.move().length() == 0) {
-      target_buffer.move(source_buffer);
       if (source_buffer.length() > max_alloc) {
         break;
       }
+      target_buffer.move(source_buffer);
       allocated += source_buffer.length();
     } else {
       const uint32_t source_length =
           std::min(static_cast<uint32_t>(source_buffer.length()), action.move().length());
       const uint32_t move_length = clampSize(max_alloc, source_length);
+      if (move_length == 0) {
+        break;
+      }
       target_buffer.move(source_buffer, move_length);
       allocated += move_length;
     }

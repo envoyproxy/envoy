@@ -105,6 +105,14 @@ public:
   Event::SimulatedTimeSystem time_system_;
 };
 
+// TODO(fredlas) #8478 will delete this.
+TEST_F(GrpcMuxImplTest, JustForCoverageTodoDelete) {
+  setup();
+  NullGrpcMuxImpl fake;
+  EXPECT_FALSE(grpc_mux_->isDelta());
+  EXPECT_FALSE(fake.isDelta());
+}
+
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
 // (via RAII).
 TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
@@ -596,7 +604,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   expectSendMessage(type_url, {}, "1", false, "bar");
 }
 
-//  Verifies that a messsage with some resources is rejected when there are no watches.
+//  Verifies that a message with some resources is rejected when there are no watches.
 TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
   setup();
 

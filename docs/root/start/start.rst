@@ -158,7 +158,7 @@ gauge peoples' interests we will add more sandboxes demonstrating different
 features. The following sandboxes are available:
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     sandboxes/cors
     sandboxes/csrf
@@ -179,7 +179,7 @@ In addition to the proxy itself, Envoy is also bundled as part of several open
 source distributions that target specific use cases.
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     distro/ambassador
     distro/gloo

@@ -52,7 +52,7 @@ rm -rf bazel-bin/external/envoy_api
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
-  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY3
+  --action_env=ENVOY_BLOB_SHA --host_force_python=PY3
 
 # We do ** matching below to deal with Bazel cache blah (source proto artifacts
 # are nested inside source package targets).
