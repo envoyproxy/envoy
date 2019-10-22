@@ -61,7 +61,8 @@ public:
    * @param parent_span the active span to create children under
    * @param receiver the receiver of the fetched JWKS or error.
    */
-  virtual void fetch(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span, JwksReceiver& receiver) PURE;
+  virtual void fetch(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+                     JwksReceiver& receiver) PURE;
 
   /*
    * Factory method for creating a JwksFetcher.

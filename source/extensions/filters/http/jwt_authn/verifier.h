@@ -85,7 +85,8 @@ public:
       const AuthFactory& factory, const Extractor& extractor_for_allow_fail);
 
   // Factory method for creating verifier contexts.
-  static ContextSharedPtr createContext(Http::HeaderMap& headers, Tracing::Span& parent_span, Callbacks* callback);
+  static ContextSharedPtr createContext(Http::HeaderMap& headers, Tracing::Span& parent_span,
+                                        Callbacks* callback);
 };
 
 using ContextSharedPtr = std::shared_ptr<Verifier::Context>;

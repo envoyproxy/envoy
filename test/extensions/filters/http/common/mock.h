@@ -14,7 +14,8 @@ namespace Common {
 class MockJwksFetcher : public JwksFetcher {
 public:
   MOCK_METHOD0(cancel, void());
-  MOCK_METHOD3(fetch, void(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span, JwksReceiver& receiver));
+  MOCK_METHOD3(fetch, void(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+                           JwksReceiver& receiver));
 };
 
 // A mock HTTP upstream.

@@ -312,7 +312,8 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
 
 } // namespace
 
-ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Tracing::Span& parent_span, Callbacks* callback) {
+ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Tracing::Span& parent_span,
+                                         Callbacks* callback) {
   return std::make_shared<ContextImpl>(headers, parent_span, callback);
 }
 

@@ -59,7 +59,8 @@ public:
       out_payload_ = payload;
     };
     auto tokens = filter_config_->getExtractor().extract(headers);
-    auth_->verify(headers, parent_span_, std::move(tokens), std::move(set_payload_cb), std::move(on_complete_cb));
+    auth_->verify(headers, parent_span_, std::move(tokens), std::move(set_payload_cb),
+                  std::move(on_complete_cb));
   }
 
   JwtAuthentication proto_config_;
@@ -78,10 +79,10 @@ public:
 // It also verifies Jwks cache with 10 JWT authentications, but only one Jwks fetch.
 TEST_F(AuthenticatorTest, TestOkJWTandCache) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
-          [this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksSuccess(std::move(jwks_));
-          }));
+      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
 
   // Test OK pubkey and its cache
   for (int i = 0; i < 10; i++) {
@@ -101,10 +102,10 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_forward(true);
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
-          [this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksSuccess(std::move(jwks_));
-          }));
+      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
 
   // Test OK pubkey and its cache
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
@@ -125,10 +126,10 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
       "my_payload");
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
-          [this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksSuccess(std::move(jwks_));
-          }));
+      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
 
   // Test OK pubkey and its cache
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
@@ -146,10 +147,10 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
 // This test verifies the Jwt with non existing kid
 TEST_F(AuthenticatorTest, TestJwtWithNonExistKid) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
-          [this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksSuccess(std::move(jwks_));
-          }));
+      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
 
   // Test OK pubkey and its cache
   auto headers =
@@ -249,10 +250,10 @@ TEST_F(AuthenticatorTest, TestIssuerNotFound) {
 // This test verifies that when Jwks fetching fails, JwksFetchFail status is returned.
 TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(
-          Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks);
-          }));
+      .WillOnce(Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                          JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks);
+      }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwksFetchFail, headers);
@@ -287,10 +288,10 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   provider0.clear_forward_payload_header();
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
-          [this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksSuccess(std::move(jwks_));
-          }));
+      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::Ok, headers);
@@ -312,10 +313,10 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
 
   CreateAuthenticator(nullptr, absl::nullopt);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
-          [this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksSuccess(std::move(jwks_));
-          }));
+      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
 
   auto headers = Http::TestHeaderMapImpl{
       {"a", "Bearer " + std::string(ExpiredToken)},
@@ -360,12 +361,12 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   CreateAuthenticator(nullptr, absl::nullopt);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            ::google::jwt_verify::JwksPtr jwks = Jwks::createFrom(PublicKey, Jwks::JWKS);
-            EXPECT_TRUE(jwks->getStatus() == Status::Ok);
-            receiver.onJwksSuccess(std::move(jwks));
-          }));
+      .WillRepeatedly(Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                                JwksFetcher::JwksReceiver& receiver) {
+        ::google::jwt_verify::JwksPtr jwks = Jwks::createFrom(PublicKey, Jwks::JWKS);
+        EXPECT_TRUE(jwks->getStatus() == Status::Ok);
+        receiver.onJwksSuccess(std::move(jwks));
+      }));
 
   auto headers = Http::TestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
@@ -386,10 +387,10 @@ TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
       std::vector<std::string>{"invalid_service"});
   CreateAuthenticator(check_audience.get());
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
-          [this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            receiver.onJwksSuccess(std::move(jwks_));
-          }));
+      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
@@ -402,11 +403,11 @@ TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
 // This test verifies that when invalid JWKS is fetched, an JWKS error status is returned.
 TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(
-          Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
-            auto jwks = Jwks::createFrom(PublicKey, Jwks::PEM);
-            receiver.onJwksSuccess(std::move(jwks));
-          }));
+      .WillOnce(Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+                          JwksFetcher::JwksReceiver& receiver) {
+        auto jwks = Jwks::createFrom(PublicKey, Jwks::PEM);
+        receiver.onJwksSuccess(std::move(jwks));
+      }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwksPemBadBase64, headers);

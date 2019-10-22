@@ -52,10 +52,11 @@ public:
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());
     auto options = Http::AsyncClient::RequestOptions()
-        .setTimeout(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri.timeout())))
-        .setParentSpan(parent_span);
-    request_ = cm_.httpAsyncClientForCluster(uri.cluster())
-                   .send(std::move(message), *this, options);
+                       .setTimeout(std::chrono::milliseconds(
+                           DurationUtil::durationToMilliseconds(uri.timeout())))
+                       .setParentSpan(parent_span);
+    request_ =
+        cm_.httpAsyncClientForCluster(uri.cluster()).send(std::move(message), *this, options);
   }
 
   // HTTP async receive methods

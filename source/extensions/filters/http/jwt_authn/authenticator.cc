@@ -40,8 +40,9 @@ public:
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface
-  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span, std::vector<JwtLocationConstPtr>&& tokens,
-              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) override;
+  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+              std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
+              AuthenticatorCallback callback) override;
   void onDestroy() override;
 
   TimeSource& timeSource() { return time_source_; }
@@ -92,7 +93,8 @@ private:
   TimeSource& time_source_;
 };
 
-void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span, std::vector<JwtLocationConstPtr>&& tokens,
+void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+                               std::vector<JwtLocationConstPtr>&& tokens,
                                SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
   ASSERT(!callback_);
   headers_ = &headers;
