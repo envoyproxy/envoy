@@ -301,6 +301,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   } else {
     name = server_.random().uuid();
   }
+
   auto it = error_state_tracker_.find(name);
   try {
     return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
@@ -321,6 +322,15 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
 bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::Listener& config,
                                                       const std::string& version_info,
                                                       bool added_via_api, const std::string& name) {
+
+  if (listenersStopped(config)) {
+    ENVOY_LOG(
+        debug,
+        "listener {} can not be added because listeners in the traffic direction {} are stopped",
+        name, envoy::api::v2::core::TrafficDirection_Name(config.traffic_direction()));
+    return false;
+  }
+
   const uint64_t hash = MessageUtil::hash(config);
   ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
 
@@ -465,12 +475,12 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
     draining_it->listener_->debugLog("removing listener");
     for (const auto& worker : workers_) {
-      // Once the drain time has completed via the drain manager's timer, we tell the workers to
-      // remove the listener.
+      // Once the drain time has completed via the drain manager's timer, we tell the workers
+      // to remove the listener.
       worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-        // The remove listener completion is called on the worker thread. We post back to the main
-        // thread to avoid locking. This makes sure that we don't destroy the listener while filters
-        // might still be using its context (stats, etc.).
+        // The remove listener completion is called on the worker thread. We post back to the
+        // main thread to avoid locking. This makes sure that we don't destroy the listener
+        // while filters might still be using its context (stats, etc.).
         server_.dispatcher().post([this, draining_it]() -> void {
           if (--draining_it->workers_pending_removal_ == 0) {
             draining_it->listener_->debugLog("listener removal complete");
@@ -543,6 +553,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+
   (*existing_warming_listener)->debugLog("warm complete. updating active listener");
   if (existing_active_listener != active_listeners_.end()) {
     drainListener(std::move(*existing_active_listener));
@@ -616,9 +627,24 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   }
 }
 
-void ListenerManagerImpl::stopListeners() {
-  for (const auto& worker : workers_) {
-    worker->stopListeners();
+void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
+  stop_listeners_type_ = stop_listeners_type;
+  for (Network::ListenerConfig& listener : listeners()) {
+    for (const auto& worker : workers_) {
+      if (stop_listeners_type != StopListenersType::InboundOnly ||
+          listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
+        ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
+
+        auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+        // Destroy a warming listener directly.
+        if (existing_warming_listener != warming_listeners_.end()) {
+          (*existing_warming_listener)->debugLog("removing warming listener");
+          warming_listeners_.erase(existing_warming_listener);
+        }
+        worker->stopListener(listener);
+        stats_.listener_stopped_.inc();
+      }
+    }
   }
 }
 
