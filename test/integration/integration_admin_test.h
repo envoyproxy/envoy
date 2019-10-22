@@ -23,6 +23,14 @@ public:
     initialize();
   }
 
+  absl::string_view request(const std::string port_key, const std::string method,
+                            const std::string endpoint, BufferingStreamDecoderPtr& response) {
+    response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
+                                                  downstreamProtocol(), version_);
+    EXPECT_TRUE(response->complete());
+    return response->headers().Status()->value().getStringView();
+  }
+
   /**
    *  Destructor for an individual test.
    */
