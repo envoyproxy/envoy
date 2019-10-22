@@ -5,7 +5,7 @@ from collections import namedtuple
 import re
 
 # Key-value annotation regex.
-ANNOTATION_REGEX = re.compile('\[#([\w-]+?):(.*?)\]\s?', re.DOTALL)
+ANNOTATION_REGEX = re.compile('\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
 
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'
@@ -13,6 +13,9 @@ DOC_TITLE_ANNOTATION = 'protodoc-title'
 # Not implemented yet annotation on leading comments, leading to hiding of
 # field.
 NOT_IMPLEMENTED_HIDE_ANNOTATION = 'not-implemented-hide'
+
+# For large protos, place a comment at the top that specifies the next free field number.
+NEXT_FREE_FIELD_ANNOTATION = 'next-free-field'
 
 # Comment that allows for easy searching for things that need cleaning up in the next major
 # API version.
@@ -24,6 +27,7 @@ COMMENT_ANNOTATION = 'comment'
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
+    NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
 ])
@@ -61,6 +65,44 @@ def ExtractAnnotations(s, inherited_annotations=None):
       raise AnnotationError('Unknown annotation: %s' % annotation)
     annotations[group[0]] = group[1].lstrip()
   return annotations
+
+
+def XformAnnotation(s, annotation_xforms):
+  """Return transformed string with annotation transformers.
+
+  The annotation will be replaced with the new value returned by the transformer.
+  If the transformer returns None, then the annotation will be removed.
+  If the annotation presented in transformers doesn't exist in the original string,
+  a new annotation will be appended to the end of string.
+
+  Args:
+    annotation_xforms: a dict of transformers for annotations.
+
+  Returns:
+    transformed string.
+  """
+  present_annotations = set()
+
+  def xform(match):
+    annotation, content, trailing = match.groups()
+    present_annotations.add(annotation)
+    annotation_xform = annotation_xforms.get(annotation)
+    if annotation_xform:
+      value = annotation_xform(annotation)
+      return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
+    else:
+      return match.group(0)
+
+  def append(s, annotation, content):
+    return '%s [#%s: %s]\n' % (s, annotation, content)
+
+  xformed = re.sub(ANNOTATION_REGEX, xform, s)
+  for annotation, xform in sorted(annotation_xforms.items()):
+    if annotation not in present_annotations:
+      value = xform(None)
+      if value is not None:
+        xformed = append(xformed, annotation, value)
+  return xformed
 
 
 def WithoutAnnotations(s):

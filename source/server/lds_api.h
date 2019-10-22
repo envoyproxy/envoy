@@ -24,7 +24,7 @@ class LdsApiImpl : public LdsApi,
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
              Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
-             ProtobufMessage::ValidationVisitor& validation_visitor, bool is_delta);
+             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }

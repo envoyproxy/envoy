@@ -36,6 +36,7 @@ envoy_cc_test_library(
         "//source/common/common:stack_array",
         "//source/common/memory:stats_lib",
         "//source/common/network:address_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
 

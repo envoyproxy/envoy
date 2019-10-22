@@ -72,7 +72,8 @@ have prior experience. To get started:
 
 The Envoy team meets every other Tuesday at 9am PT. The public Google calendar is here: https://goo.gl/PkDijT
 
-Meeting minutes are here: https://goo.gl/5Cergb
+* Meeting minutes are [here](https://goo.gl/5Cergb)
+* Recorded videos are posted [here](https://www.youtube.com/channel/UCvqbFHwN-nwalWPjPUKpvTA/videos?view=0&sort=dd&shelf_id=1)
 
 ## Security
 

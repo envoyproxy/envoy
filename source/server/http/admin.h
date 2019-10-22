@@ -153,6 +153,7 @@ public:
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
+  Server::Instance& server() { return server_; }
 
 private:
   /**
@@ -288,6 +289,18 @@ private:
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
+  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
+                                       Http::HeaderMap& response_headers,
+                                       Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
+                                            Http::HeaderMap& response_headers,
+                                            Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
+                                              Http::HeaderMap& response_headers,
+                                              Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
+                                             Http::HeaderMap& response_headers,
+                                             Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerReady(absl::string_view path_and_query, Http::HeaderMap& response_headers,

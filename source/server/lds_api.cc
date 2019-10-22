@@ -17,13 +17,13 @@ namespace Server {
 LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, bool is_delta)
+                       ProtobufMessage::ValidationVisitor& validation_visitor)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
       lds_config, Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
-      *scope_, *this, is_delta);
+      *scope_, *this);
   init_manager.add(init_target_);
 }
 
