@@ -1195,7 +1195,6 @@ public:
 
 // Test the extended fake route that AsyncClient uses.
 TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
-
   EXPECT_EQ(nullptr, route_impl_.decorator());
   EXPECT_EQ(nullptr, route_impl_.tracingConfig());
   EXPECT_EQ(nullptr, route_impl_.perFilterConfig(""));
@@ -1236,5 +1235,6 @@ TEST_F(AsyncClientImplUnitTest, NullConfig) {
 TEST_F(AsyncClientImplUnitTest, NullVirtualHost) {
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), vhost_.retryShadowBufferLimit());
 }
+
 } // namespace Http
 } // namespace Envoy
