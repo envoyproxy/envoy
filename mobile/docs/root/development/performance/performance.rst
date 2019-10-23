@@ -1,6 +1,6 @@
 .. _dev_performance:
 
-Performance Analysis
+Performance analysis
 ====================
 
 .. toctree::

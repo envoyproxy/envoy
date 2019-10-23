@@ -1,6 +1,6 @@
 .. _dev_performance_size:
 
-Analysis of Binary Size
+Analysis of binary size
 =======================
 
 In order to be able to tackle binary size analysis,
@@ -141,7 +141,6 @@ config used in this type of analysis is::
 Open issues regarding size
 --------------------------
 
-
 ``perf/size`` is a label tagging all current open issues that can improve
 binary size. Check out the issues `here
 <https://github.com/lyft/envoy-mobile/labels/perf%2Fsize>`_. After performing
@@ -160,8 +159,10 @@ The test_binary_size_size as built by the toolchain against the architecture
 described above compiles to a stripped size of 8.9mb and a compressed size of
 3mb.
 
-CI Integration
+CI integration
 --------------
 
-TODO: add when the integration is live.
-https://github.com/lyft/envoy-mobile/issues/181
+CI validates that no PR increases the binary size of the library above a specific
+threshold specified in the :repo:`perf.yml configuration <.github/workflows/perf.yml>`.
+
+The status of this job is reported on PRs in the ``perf / size_compare`` task.
