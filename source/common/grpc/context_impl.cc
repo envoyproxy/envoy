@@ -10,7 +10,9 @@ ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
     : symbol_table_(symbol_table), stat_name_pool_(symbol_table),
       grpc_(stat_name_pool_.add("grpc")), grpc_web_(stat_name_pool_.add("grpc-web")),
       success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
-      total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")) {}
+      total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")),
+      request_message_count_(stat_name_pool_.add("request_message_count")),
+      response_message_count_(stat_name_pool_.add("response_message_count")) {}
 
 // Makes a stat name from a string, if we don't already have one for it.
 // This always takes a lock on mutex_, and if we haven't seen the name
@@ -67,6 +69,32 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
                              const RequestNames& request_names, bool success) {
   chargeStat(cluster, Protocol::Grpc, request_names, success);
+}
+
+void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
+                                           const RequestNames& request_names, uint64_t amount) {
+  const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
+      {protocolStatName(Protocol::Grpc), request_names.service_, request_names.method_});
+  const Stats::StatName prefix(prefix_storage.get());
+  const Stats::SymbolTable::StoragePtr request_message_count =
+      symbol_table_.join({prefix, request_message_count_});
+
+  cluster.statsScope()
+      .counterFromStatName(Stats::StatName(request_message_count.get()))
+      .add(amount);
+}
+
+void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
+                                            const RequestNames& request_names, uint64_t amount) {
+  const Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
+      {protocolStatName(Protocol::Grpc), request_names.service_, request_names.method_});
+  const Stats::StatName prefix(prefix_storage.get());
+  const Stats::SymbolTable::StoragePtr response_message_count =
+      symbol_table_.join({prefix, response_message_count_});
+
+  cluster.statsScope()
+      .counterFromStatName(Stats::StatName(response_message_count.get()))
+      .add(amount);
 }
 
 absl::optional<ContextImpl::RequestNames>
