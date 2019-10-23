@@ -433,7 +433,7 @@ virtual_hosts:
   EXPECT_TRUE(provider2->configInfo().has_value());
 
   EXPECT_EQ(provider_.get(), provider2.get())
-      << "same rds config provider object should be generate";
+      << "fail to obtain the same rds config provider object";
 
   // So this means that both provider have same subscription.
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
@@ -469,6 +469,51 @@ virtual_hosts:
 
   EXPECT_EQ(0UL,
             route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
+}
+
+TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
+
+  Buffer::OwnedImpl data;
+  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+  setup();
+
+  EXPECT_FALSE(provider_->configInfo().has_value());
+
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context2;
+
+  Init::WatcherImpl real_watcher("real", []() {});
+  Init::ManagerImpl real_init_manager("real");
+
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds_, mock_factory_context2, "foo_prefix", real_init_manager, false);
+
+  EXPECT_FALSE(provider2->configInfo().has_value());
+
+  EXPECT_EQ(provider_.get(), provider2.get())
+      << "fail to obtain the same rds config provider object";
+  real_init_manager.initialize(real_watcher);
+  EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
+
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
+    route_configs.Add()->PackFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+name: foo_route_config
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+)EOF"));
+
+    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+        route_configs, "1");
+
+    EXPECT_TRUE(provider_->configInfo().has_value());
+    EXPECT_TRUE(provider2->configInfo().has_value());
+    EXPECT_EQ(Init::Manager::State::Initialized, real_init_manager.state());
+  }
 }
 
 // Negative test for protoc-gen-validate constraints.

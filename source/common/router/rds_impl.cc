@@ -236,26 +236,27 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
   auto it = dynamic_route_config_providers_.find(manager_identifier);
 
   if (it == dynamic_route_config_providers_.end()) {
-
     // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
-
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         rds, manager_identifier, factory_context.getServerFactoryContext(),
         factory_context.messageValidationVisitor(), factory_context.initManager(), stat_prefix,
         *this, is_delta));
 
     init_manager.add(subscription->init_target_);
-    std::shared_ptr<RdsRouteConfigProviderImpl> provider{
+    std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
-    dynamic_route_config_providers_.insert({manager_identifier, provider /* to_weak */});
-    return provider;
+    dynamic_route_config_providers_.insert({manager_identifier, new_provider /* to_weak */});
+    return new_provider;
   } else {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
     // in the RdsRouteConfigSubscription destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
-    return it->second.lock();
+    auto existing_provider = it->second.lock();
+    RELEASE_ASSERT(existing_provider != nullptr, "");
+    init_manager.add(existing_provider->subscription_->init_target_);
+    return existing_provider;
   }
 }
 
