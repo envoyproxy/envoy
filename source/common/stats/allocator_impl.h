@@ -47,12 +47,6 @@ private:
       return a->statName() == b->statName();
     }
     bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
-    // This comparison pattern does not currently occur due to the implementation of
-    // absl::flat_hash_map, so commenting it out to reduce coverage noise. If a new
-    // version of absl is released then this may need to be uncommented to resolve
-    // a compile error:
-    //
-    // bool operator()(StatName a, const Metric* b) const { return a == b->statName(); }
   };
 
   // An unordered set of HeapStatData pointers which keys off the key()
