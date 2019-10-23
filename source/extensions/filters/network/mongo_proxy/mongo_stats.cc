@@ -44,9 +44,10 @@ void MongoStats::incCounter(const std::vector<Stats::StatName>& names) {
   scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
-void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names, uint64_t sample) {
+void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names,
+                                 Stats::Histogram::Unit unit, uint64_t sample) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get())).recordValue(sample);
+  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(sample);
 }
 
 } // namespace MongoProxy

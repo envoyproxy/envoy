@@ -18,6 +18,8 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
+#include "udpa/type/v1/typed_struct.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -254,25 +256,48 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
   return load_assignment;
 }
 
+namespace {
+absl::string_view protoTypeUrlToDescriptorFullName(absl::string_view type_url) {
+  size_t pos = type_url.find_last_of('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
+}
+} // namespace
+
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
-  static const std::string& struct_type =
+  static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+  static const std::string typed_struct_type =
+      udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
   if (!typed_config.value().empty()) {
 
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-    absl::string_view type = typed_config.type_url();
-    size_t pos = type.find_last_of('/');
-    if (pos != absl::string_view::npos) {
-      type = type.substr(pos + 1);
-    }
+    absl::string_view type = protoTypeUrlToDescriptorFullName(typed_config.type_url());
 
-    // out_proto is expecting Struct, unpack directly
-    if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
+    if (type == typed_struct_type) {
+      udpa::type::v1::TypedStruct typed_struct;
+      typed_config.UnpackTo(&typed_struct);
+      // if out_proto is expecting Struct, return directly
+      if (out_proto.GetDescriptor()->full_name() == struct_type) {
+        out_proto.CopyFrom(typed_struct.value());
+      } else {
+        type = protoTypeUrlToDescriptorFullName(typed_struct.type_url());
+        if (type != out_proto.GetDescriptor()->full_name()) {
+          throw EnvoyException("Invalid proto type.\nExpected " +
+                               out_proto.GetDescriptor()->full_name() +
+                               "\nActual: " + std::string(type));
+        }
+        MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+      }
+    } // out_proto is expecting Struct, unpack directly
+    else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
       typed_config.UnpackTo(&out_proto);
     } else {
       ProtobufWkt::Struct struct_config;

@@ -94,9 +94,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "connection_balancer_interface",
+    hdrs = ["connection_balancer.h"],
+    deps = [
+        ":listen_socket_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
     deps = [
+        ":connection_balancer_interface",
         ":connection_interface",
         ":listen_socket_interface",
         "//include/envoy/stats:stats_interface",
