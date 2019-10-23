@@ -46,6 +46,7 @@ public:
 using TlsCertificatePtr = std::unique_ptr<envoy::api::v2::auth::TlsCertificate>;
 using CertificateValidationContextPtr =
     std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>;
+using TlsSessionTicketKeysPtr = std::unique_ptr<envoy::api::v2::auth::TlsSessionTicketKeys>;
 
 using TlsCertificateConfigProvider = SecretProvider<envoy::api::v2::auth::TlsCertificate>;
 using TlsCertificateConfigProviderSharedPtr = std::shared_ptr<TlsCertificateConfigProvider>;
@@ -54,6 +55,11 @@ using CertificateValidationContextConfigProvider =
     SecretProvider<envoy::api::v2::auth::CertificateValidationContext>;
 using CertificateValidationContextConfigProviderSharedPtr =
     std::shared_ptr<CertificateValidationContextConfigProvider>;
+
+using TlsSessionTicketKeysConfigProvider =
+    SecretProvider<envoy::api::v2::auth::TlsSessionTicketKeys>;
+using TlsSessionTicketKeysConfigProviderSharedPtr =
+    std::shared_ptr<TlsSessionTicketKeysConfigProvider>;
 
 } // namespace Secret
 } // namespace Envoy

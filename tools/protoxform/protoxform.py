@@ -15,10 +15,15 @@ import os
 import re
 import subprocess
 
+from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
+from tools.api_proto_plugin import traverse
 from tools.api_proto_plugin import visitor
 from tools.protoxform import migrate
 from tools.protoxform import options
+from tools.protoxform import utils
+from tools.type_whisperer import type_whisperer
+from tools.type_whisperer.types_pb2 import Types
 
 from google.api import annotations_pb2
 from google.protobuf import text_format
@@ -26,6 +31,8 @@ from validate import validate_pb2
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
                       'AllowShortFunctionsOnASingleLine: false}')
+
+NEXT_FREE_FIELD_MIN = 5
 
 
 class ProtoXformError(Exception):
@@ -89,17 +96,38 @@ def FormatComments(comments):
   return FormatBlock(comments)
 
 
-def FormatTypeContextComments(type_context):
+def CreateNextFreeFieldXform(msg_proto):
+  """Return the next free field number annotation transformer of a message.
+
+  Args:
+    msg_proto: DescriptorProto for message.
+
+  Returns:
+    the next free field number annotation transformer.
+  """
+  next_free = max(
+      sum([
+          [f.number + 1 for f in msg_proto.field],
+          [rr.end for rr in msg_proto.reserved_range],
+          [ex.end for ex in msg_proto.extension_range],
+      ], [1]))
+  return lambda _: next_free if next_free > NEXT_FREE_FIELD_MIN else None
+
+
+def FormatTypeContextComments(type_context, annotation_xforms=None):
   """Format the leading/trailing comments in a given TypeContext.
 
   Args:
     type_context: contextual information for message/enum/field.
+    annotation_xforms: a dict of transformers for annotations in leading comment.
 
   Returns:
     Tuple of formatted leading and trailing comment blocks.
   """
-  leading = FormatComments(
-      list(type_context.leading_detached_comments) + [type_context.leading_comment.raw])
+  leading_comment = type_context.leading_comment
+  if annotation_xforms:
+    leading_comment = leading_comment.getCommentWithTransforms(annotation_xforms)
+  leading = FormatComments(list(type_context.leading_detached_comments) + [leading_comment.raw])
   trailing = FormatBlock(FormatComments([type_context.trailing_comment]))
   return leading, trailing
 
@@ -114,6 +142,20 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   Returns:
     Formatted proto header as a string.
   """
+  # Load the type database.
+  typedb = utils.LoadTypeDb()
+  # Figure out type dependencies in this .proto.
+  types = Types()
+  text_format.Merge(traverse.TraverseFile(file_proto, type_whisperer.TypeWhispererVisitor()), types)
+  type_dependencies = sum([list(t.type_dependencies) for t in types.types.values()], [])
+  for service in file_proto.service:
+    for m in service.method:
+      type_dependencies.extend([m.input_type[1:], m.output_type[1:]])
+  # Determine the envoy/ import paths from type deps.
+  envoy_proto_paths = set(
+      typedb.types[t].proto_path
+      for t in type_dependencies
+      if t.startswith('envoy.') and typedb.types[t].proto_path != file_proto.name)
 
   def CamelCase(s):
     return ''.join(t.capitalize() for t in re.split('[\._]', s))
@@ -140,14 +182,16 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options += ['option java_generic_services = true;']
   options_block = FormatBlock('\n'.join(options))
 
-  envoy_imports = []
+  envoy_imports = list(envoy_proto_paths)
   google_imports = []
   infra_imports = []
   misc_imports = []
 
   for d in file_proto.dependency:
     if d.startswith('envoy/'):
-      envoy_imports.append(d)
+      # We ignore existing envoy/ imports, since these are computed explicitly
+      # from type_dependencies.
+      pass
     elif d.startswith('google/'):
       google_imports.append(d)
     elif d.startswith('validate/'):
@@ -412,9 +456,15 @@ class ProtoFormatVisitor(visitor.Visitor):
                                            formatted_options, reserved_fields, joined_values)
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
+    # Skip messages synthesized to represent map types.
+    if msg_proto.options.map_entry:
+      return ''
     if options.HasHideOption(msg_proto.options):
       return ''
-    leading_comment, trailing_comment = FormatTypeContextComments(type_context)
+    annotation_xforms = {
+        annotations.NEXT_FREE_FIELD_ANNOTATION: CreateNextFreeFieldXform(msg_proto)
+    }
+    leading_comment, trailing_comment = FormatTypeContextComments(type_context, annotation_xforms)
     formatted_options = FormatOptions(msg_proto.options)
     formatted_enums = FormatBlock('\n'.join(nested_enums))
     formatted_msgs = FormatBlock('\n'.join(nested_msgs))

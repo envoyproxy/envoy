@@ -5,8 +5,6 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/assert.h"
-
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -19,7 +17,7 @@ namespace Envoy {
  *   #define MY_COOL_STATS(COUNTER, GAUGE, HISTOGRAM)     \
  *     COUNTER(counter1)                                  \
  *     GAUGE(gauge1, mode)                                \
- *     HISTOGRAM(histogram1)
+ *     HISTOGRAM(histogram1, unit)
  *     ...
  *
  * By convention, starting with #7083, we sort the lines of this macro block, so
@@ -40,10 +38,11 @@ namespace Envoy {
 // Fully-qualified for use in external callsites.
 #define GENERATE_COUNTER_STRUCT(NAME) Envoy::Stats::Counter& NAME##_;
 #define GENERATE_GAUGE_STRUCT(NAME, MODE) Envoy::Stats::Gauge& NAME##_;
-#define GENERATE_HISTOGRAM_STRUCT(NAME) Envoy::Stats::Histogram& NAME##_;
+#define GENERATE_HISTOGRAM_STRUCT(NAME, UNIT) Envoy::Stats::Histogram& NAME##_;
 
 #define FINISH_STAT_DECL_(X) #X)),
 #define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
+#define FINISH_STAT_DECL_UNIT_(X, UNIT) #X), Envoy::Stats::Histogram::Unit::UNIT),
 
 static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_view token) {
   if (prefix.empty()) {
@@ -55,9 +54,9 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
   return absl::StrCat(prefix, ".", token);
 }
 
-#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(statPrefixJoin(PREFIX, FINISH_STAT_DECL_
-#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
-#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
+#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_UNIT_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")

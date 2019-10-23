@@ -9,7 +9,7 @@ option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/service/auth/v3alpha/attribute_context.proto";
-import "envoy/type/http_status.proto";
+import "envoy/type/v3alpha/http_status.proto";
 
 import "google/rpc/status.proto";
 
@@ -38,7 +38,7 @@ message CheckRequest {
 message DeniedHttpResponse {
   // This field allows the authorization service to send a HTTP response status
   // code to the downstream client other than 403 (Forbidden).
-  type.HttpStatus status = 1 [(validate.rules).message = {required: true}];
+  type.v3alpha.HttpStatus status = 1 [(validate.rules).message = {required: true}];
 
   // This field allows the authorization service to send HTTP response headers
   // to the downstream client.

@@ -27,8 +27,6 @@
 namespace Envoy {
 namespace TcpProxy {
 
-using ::Envoy::Network::UpstreamServerName;
-
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
@@ -60,8 +58,12 @@ Config::SharedConfig::SharedConfig(
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
-    idle_timeout_ =
-        std::chrono::milliseconds(DurationUtil::durationToMilliseconds(config.idle_timeout()));
+    const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
+    if (timeout > 0) {
+      idle_timeout_ = std::chrono::milliseconds(timeout);
+    }
+  } else {
+    idle_timeout_ = std::chrono::hours(1);
   }
 }
 
@@ -370,28 +372,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (downstreamConnection()) {
-    absl::string_view server_name = "";
-    std::vector<std::string> application_protocols;
-    if (downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
-            UpstreamServerName::key())) {
-      const auto& original_requested_server_name =
-          downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
-              UpstreamServerName::key());
-      server_name = original_requested_server_name.value();
-    }
-
-    if (downstreamConnection()->streamInfo().filterState().hasData<Network::ApplicationProtocols>(
-            Network::ApplicationProtocols::key())) {
-      const auto& alpn =
-          downstreamConnection()
-              ->streamInfo()
-              .filterState()
-              .getDataReadOnly<Network::ApplicationProtocols>(Network::ApplicationProtocols::key());
-      application_protocols = alpn.value();
-    }
-
-    transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::vector<std::string>{}, std::vector<std::string>{application_protocols});
+    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+        downstreamConnection()->streamInfo().filterState());
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(

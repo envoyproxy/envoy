@@ -39,7 +39,7 @@ BufferFilterFactory::createFilterFactory(const Json::Object& json_config,
 Router::RouteSpecificFilterConfigConstSharedPtr
 BufferFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config,
-    Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const BufferFilterSettings>(proto_config);
 }
 

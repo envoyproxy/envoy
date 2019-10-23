@@ -34,7 +34,8 @@ namespace Server {
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
                                   bool allow_unknown_static_fields = false,
-                                  bool reject_unknown_dynamic_fields = false);
+                                  bool reject_unknown_dynamic_fields = false,
+                                  uint32_t concurrency = 1);
 
 class TestDrainManager : public DrainManager {
 public:
@@ -90,9 +91,9 @@ public:
     return wrapped_scope_->gaugeFromStatName(name, import_mode);
   }
 
-  Histogram& histogramFromStatName(StatName name) override {
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatName(name);
+    return wrapped_scope_->histogramFromStatName(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
@@ -106,9 +107,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName());
+    return histogramFromStatName(storage.statName(), unit);
   }
 
   OptionalCounter findCounter(StatName name) const override {
@@ -162,14 +163,14 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name) override {
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatName(name);
+    return store_.histogramFromStatName(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogram(name);
+    return store_.histogram(name, unit);
   }
   OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
@@ -236,7 +237,8 @@ public:
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
          absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt,
-         bool allow_unknown_static_fields = false, bool reject_unknown_dynamic_fields = false);
+         bool allow_unknown_static_fields = false, bool reject_unknown_dynamic_fields = false,
+         uint32_t concurrency = 1);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -256,7 +258,8 @@ public:
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization,
              absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-             bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields);
+             bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+             uint32_t concurrency);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
     TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
@@ -336,7 +339,8 @@ private:
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
                      absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-                     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields);
+                     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                     uint32_t concurrency);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

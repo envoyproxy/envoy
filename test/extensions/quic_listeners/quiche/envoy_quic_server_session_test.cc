@@ -344,7 +344,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   auto packet = std::unique_ptr<quic::QuicReceivedPacket>(
       quic::test::ConstructReceivedPacket(*encrypted_packet, connection_helper_.GetClock()->Now()));
 
-  // Receiving above packet should trigger filter chain retrival.
+  // Receiving above packet should trigger filter chain retrieval.
   Network::MockFilterChainManager filter_chain_manager;
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   Network::MockFilterChain filter_chain;
@@ -354,7 +354,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
                   *socket.remoteAddress());
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(self_address), *socket.localAddress());
         EXPECT_EQ(listener_config_.socket().ioHandle().fd(), socket.ioHandle().fd());
-        EXPECT_EQ(Extensions::TransportSockets::TransportSocketNames::get().Quic,
+        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                   socket.detectedTransportProtocol());
         return &filter_chain;
       }));

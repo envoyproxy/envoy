@@ -24,6 +24,7 @@ public:
   // Http::AsyncClient
   AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,
                              const RequestOptions&) override;
+
   AsyncClient::Stream* start(StreamCallbacks& callbacks, const StreamOptions&) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }

@@ -24,14 +24,15 @@ namespace ConcurrencyController {
 
 GradientControllerConfig::GradientControllerConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
-        proto_config)
-    : min_rtt_calc_interval_(std::chrono::milliseconds(
+        proto_config,
+    Runtime::Loader& runtime)
+    : runtime_(runtime),
+      min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
-      jitter_pct_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), jitter, 15) /
-          100.0),
       sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
           proto_config.concurrency_limit_params().concurrency_update_interval()))),
+      jitter_pct_(
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), jitter, 15)),
       max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.concurrency_limit_params(), max_concurrency_limit, 1000)),
       min_rtt_aggregate_request_count_(
@@ -39,8 +40,7 @@ GradientControllerConfig::GradientControllerConfig(
       max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
                                                     max_gradient, 2.0)),
       sample_aggregate_percentile_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50) /
-          100.0) {}
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)) {}
 
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
@@ -68,6 +68,7 @@ GradientController::GradientController(GradientControllerConfig config,
     sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   });
 
+  enterMinRTTSamplingWindow();
   sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   stats_.concurrency_limit_.set(concurrency_limit_.load());
 }
@@ -80,6 +81,8 @@ GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
 
 void GradientController::enterMinRTTSamplingWindow() {
   absl::MutexLock ml(&sample_mutation_mtx_);
+
+  stats_.min_rtt_calculation_active_.set(1);
 
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
@@ -102,6 +105,7 @@ void GradientController::updateMinRTT() {
         std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
     updateConcurrencyLimit(deferred_limit_value_.load());
     deferred_limit_value_.store(0);
+    stats_.min_rtt_calculation_active_.set(0);
   }
 
   min_rtt_calc_timer_->enableTimer(

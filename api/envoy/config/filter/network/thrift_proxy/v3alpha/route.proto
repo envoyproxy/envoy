@@ -16,7 +16,6 @@ import "validate/validate.proto";
 // [#protodoc-title: Thrift Proxy Route Configuration]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
-// [#comment:next free field: 3]
 message RouteConfiguration {
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
   string name = 1;
@@ -26,7 +25,6 @@ message RouteConfiguration {
   repeated Route routes = 2;
 }
 
-// [#comment:next free field: 3]
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
@@ -35,7 +33,6 @@ message Route {
   RouteAction route = 2 [(validate.rules).message = {required: true}];
 }
 
-// [#comment:next free field: 5]
 message RouteMatch {
   oneof match_specifier {
     option (validate.required) = true;
@@ -61,7 +58,7 @@ message RouteMatch {
   //   This does not invert matching done as part of the :ref:`headers field
   //   <envoy_api_field_config.filter.network.thrift_proxy.v3alpha.RouteMatch.headers>` field. To
   //   invert header matching, see :ref:`invert_match
-  //   <envoy_api_field_route.HeaderMatcher.invert_match>`.
+  //   <envoy_api_field_api.v3alpha.route.HeaderMatcher.invert_match>`.
   bool invert = 3;
 
   // Specifies a set of headers that the route should match on. The router will check the request’s
@@ -72,7 +69,6 @@ message RouteMatch {
   repeated api.v3alpha.route.HeaderMatcher headers = 4;
 }
 
-// [#comment:next free field: 5]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;

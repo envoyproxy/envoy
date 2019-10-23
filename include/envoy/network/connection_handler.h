@@ -44,14 +44,6 @@ public:
   virtual void addListener(ListenerConfig& config) PURE;
 
   /**
-   * Find a listener based on the provided listener address value.
-   * @param address supplies the address value.
-   * @return a pointer to the listener or nullptr if not found.
-   * Ownership of the listener is NOT transferred
-   */
-  virtual Network::Listener* findListenerByAddress(const Network::Address::Instance& address) PURE;
-
-  /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
    * listeners will be closed.
    * @param listener_tag supplies the tag passed to addListener().
