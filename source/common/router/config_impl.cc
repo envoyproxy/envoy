@@ -274,6 +274,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
+      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
       metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
       decorator_(parseDecorator(route)), route_tracing_(parseRouteTracing(route)),
@@ -874,6 +876,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.typed_per_filter_config(), virtual_host.per_filter_config(),
                           factory_context, validator),
+      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_(virtual_host.include_request_attempt_count()),
       virtual_cluster_catch_all_(stat_name_pool_) {
 

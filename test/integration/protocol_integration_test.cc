@@ -469,6 +469,34 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
+// Very similar set-up to RetryHittingBufferLimits but using the route specific cap.
+TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
+  auto host = config_helper_.createVirtualHost("nobody.com", "/");
+  host.mutable_per_request_buffer_limit_bytes()->set_value(0);
+  config_helper_.addVirtualHost(host);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "nobody.com"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
 // Test hitting the dynamo filter with too many request bytes to buffer. Ensure the connection
 // manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
