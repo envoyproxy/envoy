@@ -46,7 +46,6 @@ Version 1.12.0 (pending)
   *cluster.<route target cluster>.ext_authz.* namespace is deprecated.
   Use *http.<stat_prefix>.ext_authz.* namespace to access same counters instead.
 
-
 Version 1.11.2 (October 8, 2019)
 ================================
 * Use of :ref:`idle_timeout
