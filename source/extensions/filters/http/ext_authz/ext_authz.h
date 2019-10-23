@@ -135,7 +135,7 @@ private:
   ExtAuthzFilterStats stats_;
 
 public:
-  // todo deprecate cluster scope stats counters in favour of filter scope stats
+  // todo deprecate cluster scope stats counters in favor of filter scope stats
   // (ExtAuthzFilterStats stats_).
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
