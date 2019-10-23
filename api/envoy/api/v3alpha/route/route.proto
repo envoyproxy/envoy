@@ -28,7 +28,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -145,6 +145,11 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
+
+  // The maximum bytes which will be buffered for retries and shadowing.
+  // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
+  // value of this and the listener per_connection_buffer_limit_bytes.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -154,7 +159,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message Route {
   reserved 6;
 
@@ -230,6 +235,11 @@ message Route {
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
   Tracing tracing = 15;
+
+  // The maximum bytes which will be buffered for retries and shadowing.
+  // If set, the bytes actually buffered will be the minimum value of this and the
+  // listener per_connection_buffer_limit_bytes.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_api.v3alpha.route.RouteAction.cluster>` field that
