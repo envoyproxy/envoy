@@ -16,7 +16,6 @@ import "validate/validate.proto";
 // [#protodoc-title: Thrift Proxy Route Configuration]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
-// [#comment:next free field: 3]
 message RouteConfiguration {
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
   string name = 1;
@@ -26,7 +25,6 @@ message RouteConfiguration {
   repeated Route routes = 2;
 }
 
-// [#comment:next free field: 3]
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
@@ -35,7 +33,6 @@ message Route {
   RouteAction route = 2 [(validate.rules).message = {required: true}];
 }
 
-// [#comment:next free field: 5]
 message RouteMatch {
   oneof match_specifier {
     option (validate.required) = true;
@@ -72,7 +69,6 @@ message RouteMatch {
   repeated api.v2.route.HeaderMatcher headers = 4;
 }
 
-// [#comment:next free field: 5]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;

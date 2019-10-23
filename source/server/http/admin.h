@@ -153,6 +153,7 @@ public:
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
+  Server::Instance& server() { return server_; }
 
 private:
   /**
@@ -285,9 +286,24 @@ private:
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
                                  AdminStream&);
+  Http::Code handlerDrainListeners(absl::string_view path_and_query,
+                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                   AdminStream&);
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
+  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
+                                       Http::HeaderMap& response_headers,
+                                       Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
+                                            Http::HeaderMap& response_headers,
+                                            Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
+                                              Http::HeaderMap& response_headers,
+                                              Buffer::Instance& response, AdminStream&);
+  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
+                                             Http::HeaderMap& response_headers,
+                                             Buffer::Instance& response, AdminStream&);
   Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerReady(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -327,6 +343,9 @@ private:
     const std::string& name() const override { return name_; }
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+    envoy::api::v2::core::TrafficDirection direction() const override {
+      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 

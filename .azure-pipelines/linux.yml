@@ -1,3 +1,14 @@
+trigger:
+  branches:
+    include:
+    - 'master'
+  tags:
+    include:
+    - 'v*'
+
+# PR build config is manually overridden in Azure pipelines UI with different secrets
+pr: none
+
 jobs:
 - job: format
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
@@ -89,13 +100,40 @@ jobs:
       artifactName: $(CI_TARGET)
     condition: always()
 
+- job: docker
+  dependsOn: ["bazel"]
+  condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: current
+      artifactName: "bazel.release"
+      itemPattern: "bazel.release/envoy_binary.tar.gz"
+      downloadType: single
+      targetPath: $(Build.StagingDirectory)
+
+  - bash: |
+      set -e
+      tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
+      ci/docker_build.sh
+      ci/docker_push.sh
+      ci/docker_tag.sh
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      AZP_BRANCH: $(Build.SourceBranch)
+      CIRCLE_SHA1: $(Build.SourceVersion)
+      DOCKERHUB_USERNAME: $(DockerUsername)
+      DOCKERHUB_PASSWORD: $(DockerPassword)
+
 - job: fuzzit_fuzzing
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   # this runs on every push to master / merge to master. this will build the fuzzers and will update them on Fuzzit where
   # they will run asynchronously. Essentially this will make sure that the latest master version is always being fuzzed
   # continuously.
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'), ne(variables['Build.Reason'], 'PullRequest'))
+  condition: and(succeeded(), ne(variables['FuzzitApiKey'], ''), eq(variables['Build.SourceBranch'], 'refs/heads/master'), ne(variables['Build.Reason'], 'PullRequest'))
   pool:
     vmImage: 'Ubuntu 16.04'
   steps:

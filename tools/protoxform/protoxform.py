@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 
+from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import traverse
 from tools.api_proto_plugin import visitor
@@ -30,6 +31,8 @@ from validate import validate_pb2
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
                       'AllowShortFunctionsOnASingleLine: false}')
+
+NEXT_FREE_FIELD_MIN = 5
 
 
 class ProtoXformError(Exception):
@@ -93,17 +96,38 @@ def FormatComments(comments):
   return FormatBlock(comments)
 
 
-def FormatTypeContextComments(type_context):
+def CreateNextFreeFieldXform(msg_proto):
+  """Return the next free field number annotation transformer of a message.
+
+  Args:
+    msg_proto: DescriptorProto for message.
+
+  Returns:
+    the next free field number annotation transformer.
+  """
+  next_free = max(
+      sum([
+          [f.number + 1 for f in msg_proto.field],
+          [rr.end for rr in msg_proto.reserved_range],
+          [ex.end for ex in msg_proto.extension_range],
+      ], [1]))
+  return lambda _: next_free if next_free > NEXT_FREE_FIELD_MIN else None
+
+
+def FormatTypeContextComments(type_context, annotation_xforms=None):
   """Format the leading/trailing comments in a given TypeContext.
 
   Args:
     type_context: contextual information for message/enum/field.
+    annotation_xforms: a dict of transformers for annotations in leading comment.
 
   Returns:
     Tuple of formatted leading and trailing comment blocks.
   """
-  leading = FormatComments(
-      list(type_context.leading_detached_comments) + [type_context.leading_comment.raw])
+  leading_comment = type_context.leading_comment
+  if annotation_xforms:
+    leading_comment = leading_comment.getCommentWithTransforms(annotation_xforms)
+  leading = FormatComments(list(type_context.leading_detached_comments) + [leading_comment.raw])
   trailing = FormatBlock(FormatComments([type_context.trailing_comment]))
   return leading, trailing
 
@@ -437,7 +461,10 @@ class ProtoFormatVisitor(visitor.Visitor):
       return ''
     if options.HasHideOption(msg_proto.options):
       return ''
-    leading_comment, trailing_comment = FormatTypeContextComments(type_context)
+    annotation_xforms = {
+        annotations.NEXT_FREE_FIELD_ANNOTATION: CreateNextFreeFieldXform(msg_proto)
+    }
+    leading_comment, trailing_comment = FormatTypeContextComments(type_context, annotation_xforms)
     formatted_options = FormatOptions(msg_proto.options)
     formatted_enums = FormatBlock('\n'.join(nested_enums))
     formatted_msgs = FormatBlock('\n'.join(nested_msgs))
