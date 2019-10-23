@@ -13,10 +13,10 @@ public class EnvoyHTTPStream {
   private final long streamHandle;
   private final JvmCallbackContext callbacksContext;
 
-  EnvoyHTTPStream(long streamHandle, EnvoyHTTPCallbacks callbacks) {
+  EnvoyHTTPStream(long streamHandle, EnvoyHTTPCallbacks callbacks, boolean bufferForRetry) {
     this.streamHandle = streamHandle;
     callbacksContext = new JvmCallbackContext(callbacks);
-    JniLibrary.startStream(streamHandle, callbacksContext);
+    JniLibrary.startStream(streamHandle, callbacksContext, bufferForRetry);
   }
 
   /**
@@ -36,8 +36,9 @@ public class EnvoyHTTPStream {
    *
    * @param data,      the data to send.
    * @param endStream, supplies whether this is the last data in the streamHandle.
-   * @throws UnsupportedOperationException - if the provided buffer is neither a direct ByteBuffer
-   *     nor backed by an on-heap byte array.
+   * @throws UnsupportedOperationException - if the provided buffer is neither a
+   *                                       direct ByteBuffer nor backed by an
+   *                                       on-heap byte array.
    */
   public void sendData(ByteBuffer data, boolean endStream) {
     if (data.isDirect()) {

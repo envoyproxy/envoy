@@ -6,10 +6,13 @@ public interface EnvoyEngine {
   /**
    * Creates a new stream with the provided callbacks.
    *
-   * @param callbacks The callbacks for receiving callbacks from the stream.
+   * @param callbacks      The callbacks for receiving callbacks from the stream.
+   * @param bufferForRetry Whether this stream should be buffered to support
+   *                       future retries. Must be true for requests that support
+   *                       retrying.
    * @return A stream that may be used for sending data.
    */
-  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks);
+  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean bufferForRetry);
 
   /**
    * Run the Envoy engine with the provided yaml string and log level.
@@ -23,7 +26,7 @@ public interface EnvoyEngine {
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
-   * @param logLevel The log level to use when starting Envoy.
+   * @param logLevel           The log level to use when starting Envoy.
    * @return int A status indicating if the action was successful.
    */
   int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
