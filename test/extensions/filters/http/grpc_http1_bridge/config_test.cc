@@ -16,7 +16,7 @@ namespace {
 TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GrpcHttp1BridgeFilterConfig factory;
-  const auto proto_config = factory.createEmptyConfigProto().get();
+  auto* proto_config = factory.createEmptyConfigProto().get();
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));

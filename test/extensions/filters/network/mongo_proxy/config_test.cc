@@ -191,7 +191,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
     percentage:
       numerator: 1
       denominator: HUNDRED
-    fixed_delay: 1s
+    fixed_delay: 0.001s
   )EOF";
 
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy proto_config;
