@@ -70,23 +70,23 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
         return header_matcher;
       }()) {}
 
-void HeaderUtility::getAllOfHeader(const Http::HeaderMap& headers, absl::string_view key,
+void HeaderUtility::getAllOfHeader(const HeaderMap& headers, absl::string_view key,
                                    std::vector<absl::string_view>& out) {
   auto args = std::make_pair(LowerCaseString(std::string(key)), &out);
 
   headers.iterate(
-      [](const HeaderEntry& header, void* context) -> Envoy::Http::HeaderMap::Iterate {
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         auto key_ret =
             static_cast<std::pair<LowerCaseString, std::vector<absl::string_view>*>*>(context);
         if (header.key() == key_ret->first.get().c_str()) {
           key_ret->second->emplace_back(header.value().getStringView());
         }
-        return Envoy::Http::HeaderMap::Iterate::Continue;
+        return HeaderMap::Iterate::Continue;
       },
       &args);
 }
 
-bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
+bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
   // No headers to match is considered a match.
   if (!config_headers.empty()) {
@@ -100,9 +100,8 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   return true;
 }
 
-bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
-                                 const HeaderData& header_data) {
-  const Http::HeaderEntry* header = request_headers.get(header_data.name_);
+bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderData& header_data) {
+  const HeaderEntry* header = request_headers.get(header_data.name_);
 
   if (header == nullptr) {
     return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
@@ -144,17 +143,23 @@ bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
                                      header_value.size()) != 0);
 }
 
-void HeaderUtility::addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add) {
+void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
   headers_to_add.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        Http::HeaderString k;
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+        HeaderString k;
         k.setCopy(header.key().getStringView());
-        Http::HeaderString v;
+        HeaderString v;
         v.setCopy(header.value().getStringView());
-        static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
-        return Http::HeaderMap::Iterate::Continue;
+        static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
+        return HeaderMap::Iterate::Continue;
       },
       &headers);
+}
+
+bool HeaderUtility::isEnvoyInternalRequest(const HeaderMap& headers) {
+  const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
+  return internal_request_header != nullptr &&
+         internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
 } // namespace Http

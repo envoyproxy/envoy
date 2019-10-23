@@ -1,6 +1,7 @@
 #include <string>
 
 #include "common/http/conn_manager_utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -128,7 +129,7 @@ public:
                                                        random_, local_info_)
             ->asString();
     ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
-    ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
+    ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
     return ret;
   }
 
