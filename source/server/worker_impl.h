@@ -48,7 +48,7 @@ public:
   void start(GuardDog& guard_dog) override;
   void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
   void stop() override;
-  void stopListener(Network::ListenerConfig& listener) override;
+  void stopListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
   void stopListeners(std::function<void()> completion) override;
 
 private:

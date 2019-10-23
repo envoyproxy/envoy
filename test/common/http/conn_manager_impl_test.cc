@@ -4422,7 +4422,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  // Verify that once the decoder_filters_[0]'s contineDecoding() is called, decoder_filters_[1]'s
+  // Verify that once the decoder_filters_[0]'s continueDecoding() is called, decoder_filters_[1]'s
   // decodeHeaders() is called, and both filters receive data and trailers consequently.
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, _))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -4450,7 +4450,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  // Verify that once the decoder_filters_[1]'s contineDecoding() is called, both data and trailers
+  // Verify that once the decoder_filters_[1]'s continueDecoding() is called, both data and trailers
   // go through the second filter.
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
   EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
@@ -4740,7 +4740,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1.get()));
   EXPECT_CALL(*scopedRouteConfigProvider()->config<Router::MockScopedConfig>(), getRouteConfig(_))
-      // 1. decodeHeaders() snaping route config.
+      // 1. decodeHeaders() snapping route config.
       // 2. refreshCachedRoute() later in the same decodeHeaders().
       .Times(2);
   EXPECT_CALL(

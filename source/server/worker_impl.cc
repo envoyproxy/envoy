@@ -88,10 +88,13 @@ void WorkerImpl::stop() {
   }
 }
 
-void WorkerImpl::stopListener(Network::ListenerConfig& listener) {
+void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<void()> completion) {
   ASSERT(thread_);
   const uint64_t listener_tag = listener.listenerTag();
-  dispatcher_->post([this, listener_tag]() -> void { handler_->stopListeners(listener_tag); });
+  dispatcher_->post([this, listener_tag, completion]() -> void {
+    handler_->stopListeners(listener_tag);
+    completion();
+  });
 }
 
 void WorkerImpl::stopListeners(std::function<void()> completion) {

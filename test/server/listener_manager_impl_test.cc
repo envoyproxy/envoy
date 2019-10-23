@@ -16,6 +16,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "envoy/server/listener_manager.h"
 #include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
@@ -591,9 +592,9 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   InSequence s;
 
   auto* lds_api = new MockLdsApi();
-  EXPECT_CALL(listener_factory_, createLdsApi_(_, _)).WillOnce(Return(lds_api));
+  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
   envoy::api::v2::core::ConfigSource lds_config;
-  manager_->createLdsApi(lds_config, false);
+  manager_->createLdsApi(lds_config);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(
@@ -698,7 +699,7 @@ dynamic_draining_listeners:
   // removal.
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version3", true));
@@ -894,7 +895,7 @@ filter_chains:
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Remove foo into draining.
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(1, 0, 1, 0, 0, 1);
@@ -1008,7 +1009,7 @@ filter_chains:
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(1, 0, 1, 0, 0, 1);
@@ -1098,7 +1099,7 @@ filter_chains:
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(2, 1, 2, 0, 0, 1);
@@ -1109,6 +1110,206 @@ filter_chains:
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
   checkStats(2, 1, 2, 0, 0, 0);
+}
+
+// Validates that StopListener functionality works correctly when only inbound listeners are
+// stopped.
+TEST_F(ListenerManagerImplTest, StopListeners) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener in inbound direction.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  checkStats(1, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Add a listener in outbound direction.
+  const std::string listener_foo_outbound_yaml = R"EOF(
+name: foo_outbound
+traffic_direction: OUTBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1239
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_outbound = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo_outbound->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_outbound_yaml), "", true));
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_foo_outbound->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(2UL, manager_->listeners().size());
+
+  // Validate that stop listener is only called once - for inbound listeners.
+  EXPECT_CALL(*worker_, stopListener(_, _)).Times(1);
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+
+  // Validate that listener creation in outbound direction is allowed.
+  const std::string listener_bar_outbound_yaml = R"EOF(
+name: bar_outbound
+traffic_direction: OUTBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1237
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_bar_outbound = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_outbound_yaml), "", true));
+  EXPECT_EQ(3UL, manager_->listeners().size());
+  worker_->callAddCompletion(true);
+
+  // Validate that adding a listener in stopped listener's traffic direction is not allowed.
+  const std::string listener_bar_yaml = R"EOF(
+name: bar
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1235
+filter_chains:
+- filters: []
+  )EOF";
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_CALL(*listener_foo_outbound, onDestroy());
+  EXPECT_CALL(*listener_bar_outbound, onDestroy());
+}
+
+// Validates that StopListener functionality works correctly when all listeners are stopped.
+TEST_F(ListenerManagerImplTest, StopAllListeners) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  checkStats(1, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  manager_->stopListeners(ListenerManager::StopListenersType::All);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+
+  // Validate that adding a listener is not allowed after all listeners are stopped.
+  const std::string listener_bar_yaml = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1235
+filter_chains:
+- filters: []
+  )EOF";
+  EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true));
+}
+
+// Validate that stopping a warming listener, removes directly from warming listener list.
+TEST_F(ListenerManagerImplTest, StopWarmingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  checkStats(1, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: fake
+    config: {}
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Stop foo which should remove warming listener.
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 }
 
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {
@@ -1133,7 +1334,7 @@ filter_chains:
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   worker_->callAddCompletion(false);
 
@@ -1146,7 +1347,7 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
 }
 
-TEST_F(ListenerManagerImplTest, StopListeners) {
+TEST_F(ListenerManagerImplTest, StopListeners2) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1171,7 +1372,7 @@ filter_chains:
 
   EXPECT_CALL(*worker_, stopListeners(_));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  manager_->stopListeners();
+  manager_->stopListeners(ListenerManager::StopListenersType::All);
 
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_EQ(1UL, manager_->listeners().size());

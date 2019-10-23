@@ -1,7 +1,7 @@
 .. _common_configuration_zone_aware_routing:
 
-How do I setup zone aware routing?
-==================================
+How do I configure zone aware routing?
+======================================
 
 There are several steps required for enabling :ref:`zone aware routing <arch_overview_load_balancing_zone_aware_routing>`
 between source service ("cluster_a") and destination service ("cluster_b").

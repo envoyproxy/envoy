@@ -24,3 +24,10 @@ message FilterConfig {
   // simple binary encoded protobuf.
   bool withhold_grpc_frames = 2;
 }
+
+// gRPC reverse bridge filter configuration per virtualhost/route/weighted-cluster level.
+message FilterConfigPerRoute {
+  // If true, disables gRPC reverse bridge filter for this particular vhost or route.
+  // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+  bool disabled = 1;
+}
