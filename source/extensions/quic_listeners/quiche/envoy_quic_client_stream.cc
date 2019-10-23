@@ -8,7 +8,6 @@
 
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/http/quic_header_list.h"
-#include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
 #include "extensions/quic_listeners/quiche/platform/quic_mem_slice_span_impl.h"
 
@@ -67,8 +66,8 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
     // If buffered bytes changed, update stream and session's watermark book
     // keeping.
     sendBufferSimulation().checkHighWatermark(bytes_to_send_new);
-    dynamic_cast<EnvoyQuicClientSession*>(session())->adjustBytesToSend(bytes_to_send_new -
-                                                                        bytes_to_send_old);
+    dynamic_cast<QuicFilterManagerConnectionImpl*>(session())->adjustBytesToSend(bytes_to_send_new -
+                                                                                 bytes_to_send_old);
   }
 }
 
@@ -173,10 +172,11 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyStream::OnTrailingHeadersComplete(fin, frame_len, header_list);
+  ASSERT(trailers_decompressed());
   if (session()->connection()->connected() &&
       (quic::VersionUsesQpack(transport_version()) || sequencer()->IsClosed()) &&
       !FinishedReadingTrailers()) {
-    // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
+    // Before QPack, trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
     ASSERT(decoder() != nullptr);
     decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
@@ -204,15 +204,15 @@ void EnvoyQuicClientStream::OnCanWrite() {
   ASSERT(buffered_data_new <= buffered_data_old);
   if (buffered_data_new < buffered_data_old) {
     sendBufferSimulation().checkLowWatermark(buffered_data_new);
-    dynamic_cast<EnvoyQuicClientSession*>(session())->adjustBytesToSend(buffered_data_new -
-                                                                        buffered_data_old);
+    dynamic_cast<QuicFilterManagerConnectionImpl*>(session())->adjustBytesToSend(buffered_data_new -
+                                                                                 buffered_data_old);
   }
 }
 
 uint32_t EnvoyQuicClientStream::streamId() { return id(); }
 
 Network::Connection* EnvoyQuicClientStream::connection() {
-  return dynamic_cast<EnvoyQuicClientSession*>(session());
+  return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
 }
 
 } // namespace Quic

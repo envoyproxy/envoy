@@ -51,6 +51,7 @@ Http::StreamEncoder&
 QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
   auto stream = dynamic_cast<EnvoyQuicClientStream*>(
       quic_client_session_.CreateOutgoingBidirectionalStream());
+  ASSERT(stream != nullptr, "Fail to create QUIC stream.");
   stream->setDecoder(response_decoder);
   return *stream;
 }

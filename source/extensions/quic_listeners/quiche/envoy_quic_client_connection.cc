@@ -10,38 +10,6 @@
 namespace Envoy {
 namespace Quic {
 
-Network::ConnectionSocketPtr
-createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
-                       Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::IoHandlePtr io_handle = peer_addr->socket(Network::Address::SocketType::Datagram);
-  auto connection_socket =
-      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle), local_addr, peer_addr);
-  connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
-  connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-  if (options != nullptr) {
-    connection_socket->addOptions(options);
-  }
-  if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
-    connection_socket->close();
-    ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
-    return connection_socket;
-  }
-  local_addr->bind(connection_socket->ioHandle().fd());
-  ASSERT(local_addr->ip());
-  if (local_addr->ip()->port() == 0) {
-    // Get ephemeral port number.
-    local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
-  }
-  if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::api::v2::core::SocketOption::STATE_BOUND)) {
-    ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
-    connection_socket->close();
-  }
-  return connection_socket;
-}
-
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id,
     Network::Address::InstanceConstSharedPtr& initial_peer_address,

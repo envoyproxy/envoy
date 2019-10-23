@@ -61,6 +61,7 @@ public:
     auto session = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, supported_versions_, std::move(connection), server_id_, &crypto_config_,
         &push_promise_index_, *dispatcher_, 0);
+    session->Initialize();
     return session;
   }
 

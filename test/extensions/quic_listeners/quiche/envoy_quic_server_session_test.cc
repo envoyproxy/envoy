@@ -40,8 +40,6 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
-#include <iostream>
-
 namespace Envoy {
 namespace Quic {
 

@@ -12,12 +12,11 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     : QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config, push_promise_index) {
-  Initialize();
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
-  QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
+  quic_connection_ = nullptr;
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const {

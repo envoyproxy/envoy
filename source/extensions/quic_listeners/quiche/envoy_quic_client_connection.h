@@ -23,6 +23,14 @@ public:
                             Event::Dispatcher& dispatcher,
                             const Network::ConnectionSocket::OptionsSharedPtr& options);
 
+  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
+                            quic::QuicConnectionHelperInterface& helper,
+                            quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
+                            bool owns_writer,
+                            const quic::ParsedQuicVersionVector& supported_versions,
+                            Event::Dispatcher& dispatcher,
+                            Network::ConnectionSocketPtr&& connection_socket);
+
   // Overridden to un-register all file events.
   ~EnvoyQuicClientConnection() override;
 
@@ -39,14 +47,6 @@ private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory,
-                            const quic::ParsedQuicVersionVector& supported_versions,
-                            Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket);
-
-  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
-                            quic::QuicConnectionHelperInterface& helper,
-                            quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
-                            bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket);
