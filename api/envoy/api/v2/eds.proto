@@ -46,8 +46,10 @@ service EndpointDiscoveryService {
 // for each endpoint is determined by both its load_balancing_weight, and the
 // load_balancing_weight of its locality. First, a locality will be selected,
 // then an endpoint within that locality will be chose based on its weight.
+// [#next-free-field: 6]
 message ClusterLoadAssignment {
   // Load balancing policy settings.
+  // [#next-free-field: 6]
   message Policy {
     message DropOverload {
       // Identifier for the policy specifying the drop.

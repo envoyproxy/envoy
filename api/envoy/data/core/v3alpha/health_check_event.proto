@@ -28,6 +28,7 @@ enum HealthCheckerType {
   REDIS = 3;
 }
 
+// [#next-free-field: 10]
 message HealthCheckEvent {
   HealthCheckerType health_checker_type = 1 [(validate.rules).enum = {defined_only: true}];
 

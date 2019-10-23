@@ -15,7 +15,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: HTTP scoped routing configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
-//
+
 // The Scoped Routes Discovery Service (SRDS) API distributes
 // :ref:`ScopedRouteConfiguration<envoy_api_msg.ScopedRouteConfiguration>`
 // resources. Each ScopedRouteConfiguration resource represents a "routing
@@ -97,7 +97,6 @@ service ScopedRoutesDiscoveryService {
 // would result in the routing table defined by the `route-config1`
 // RouteConfiguration being assigned to the HTTP request/stream.
 //
-// [#comment:next free field: 4]
 message ScopedRouteConfiguration {
   // Specifies a key which is matched against the output of the
   // :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRoutes.scope_key_builder>`

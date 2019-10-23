@@ -310,6 +310,10 @@ public:
   MOCK_METHOD0(udpListenerFactory, const Network::ActiveUdpListenerFactory*());
   MOCK_METHOD0(connectionBalancer, ConnectionBalancer&());
 
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   testing::NiceMock<MockListenSocket> socket_;
   Stats::IsolatedStoreImpl scope_;

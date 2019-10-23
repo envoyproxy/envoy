@@ -9,7 +9,6 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.tcp_proxy.v3alp
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
-import "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -19,6 +18,7 @@ import "validate/validate.proto";
 // [#protodoc-title: TCP Proxy]
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 
+// [#next-free-field: 11]
 message TcpProxy {
 
   // Allows for specification of multiple upstream clusters along with weights
@@ -67,9 +67,13 @@ message TcpProxy {
 
   // The idle timeout for connections managed by the TCP proxy filter. The idle timeout
   // is defined as the period in which there are no bytes sent or received on either
-  // the upstream or downstream connection. If not set, connections will never be closed
-  // by the TCP proxy due to being idle.
-  google.protobuf.Duration idle_timeout = 8 [(validate.rules).duration = {gt {}}];
+  // the upstream or downstream connection. If not set, the default idle timeout is 1 hour. If set
+  // to 0s, the timeout will be disabled.
+  //
+  // .. warning::
+  //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
+  //   FIN packets, etc.
+  google.protobuf.Duration idle_timeout = 8;
 
   // [#not-implemented-hide:] The idle timeout for connections managed by the TCP proxy
   // filter. The idle timeout is defined as the period in which there is no

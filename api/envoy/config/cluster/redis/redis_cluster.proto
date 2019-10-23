@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.cluster.redis";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 
@@ -21,6 +22,11 @@ import "validate/validate.proto";
 // topology. A random node in the cluster is queried for the topology using the `CLUSTER SLOTS
 // command <https://redis.io/commands/cluster-slots>`_. This result is then stored locally, and
 // updated at user-configured intervals.
+//
+// Additionally, if
+// :ref:`enable_redirection<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_redirection>`
+// is true, then moved and ask redirection errors from upstream servers will trigger a topology
+// refresh when they exceed a user-configured error threshold.
 //
 // Example:
 //
@@ -40,6 +46,8 @@ import "validate/validate.proto";
 //       value:
 //         cluster_refresh_rate: 30s
 //         cluster_refresh_timeout: 0.5s
+//         redirect_refresh_interval: 10s
+//         redirect_refresh_threshold: 10
 
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.
@@ -47,4 +55,13 @@ message RedisClusterConfig {
 
   // Timeout for topology refresh request. If not set, this defaults to 3s.
   google.protobuf.Duration cluster_refresh_timeout = 2 [(validate.rules).duration = {gt {}}];
+
+  // The minimum interval that must pass after triggering a topology refresh request before a new
+  // request can possibly be triggered again. Any redirection errors received during one of these
+  // time intervals are ignored. If not set, this defaults to 5s.
+  google.protobuf.Duration redirect_refresh_interval = 3;
+
+  // The number of redirection errors that must be received before
+  // triggering a topology refresh request. If not set, this defaults to 5.
+  google.protobuf.UInt32Value redirect_refresh_threshold = 4;
 }

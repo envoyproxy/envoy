@@ -47,6 +47,7 @@ import "validate/validate.proto";
 //       cache_duration:
 //         seconds: 300
 //
+// [#next-free-field: 10]
 message JwtProvider {
   // Specify the `principal <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ that issued
   // the JWT, usually a URL or an email address.
@@ -261,6 +262,7 @@ message ProviderWithAudiences {
 //          - provider_name: provider-B
 //          - provider_name: provider-C
 //
+// [#next-free-field: 6]
 message JwtRequirement {
   oneof requires_type {
     // Specify a required provider name.

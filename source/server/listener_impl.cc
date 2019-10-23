@@ -241,6 +241,9 @@ ServerLifecycleNotifier& ListenerImpl::lifecycleNotifier() {
   return parent_.server_.lifecycleNotifier();
 }
 OptProcessContextRef ListenerImpl::processContext() { return parent_.server_.processContext(); }
+Configuration::ServerFactoryContext& ListenerImpl::getServerFactoryContext() const {
+  return parent_.server_.serverFactoryContext();
+}
 
 bool ListenerImpl::createNetworkFilterChain(
     Network::Connection& connection,

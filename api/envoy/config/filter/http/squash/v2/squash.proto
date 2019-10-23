@@ -14,6 +14,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Squash]
 // Squash :ref:`configuration overview <config_http_filters_squash>`.
 
+// [#next-free-field: 6]
 message Squash {
   // The name of the cluster that hosts the Squash server.
   string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
