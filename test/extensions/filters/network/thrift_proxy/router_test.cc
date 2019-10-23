@@ -739,7 +739,8 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
   destroyRouter();
 }
 
-TEST_P(ThriftRouterFieldTypeTest, StripServiceName) {
+// Ensure the service name gets stripped when strip_service_name = true.
+TEST_P(ThriftRouterFieldTypeTest, StripServiceNameEnabled) {
   FieldType field_type = GetParam();
 
   initializeRouter();
@@ -749,6 +750,22 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceName) {
   completeRequest();
 
   EXPECT_EQ("method", metadata_->methodName());
+
+  returnResponse();
+  destroyRouter();
+}
+
+// Ensure the service name prefix isn't stripped when strip_service_name = false.
+TEST_P(ThriftRouterFieldTypeTest, StripServiceNameDisabled) {
+  FieldType field_type = GetParam();
+
+  initializeRouter();
+  startRequest(MessageType::Call, "Service:method", false);
+  connectUpstream();
+  sendTrivialStruct(field_type);
+  completeRequest();
+
+  EXPECT_EQ("Service:method", metadata_->methodName());
 
   returnResponse();
   destroyRouter();
