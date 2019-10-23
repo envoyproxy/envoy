@@ -19,6 +19,7 @@ import "validate/validate.proto";
 
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
 // <envoy_api_msg_core.ApiConfigSource>` and filter configurations.
+// [#next-free-field: 6]
 message GrpcService {
   message EnvoyGrpc {
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
@@ -27,6 +28,7 @@ message GrpcService {
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
   }
 
+  // [#next-free-field: 7]
   message GoogleGrpc {
     // See https://grpc.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html.
     message SslCredentials {
@@ -60,6 +62,7 @@ message GrpcService {
       }
     }
 
+    // [#next-free-field: 7]
     message CallCredentials {
       message ServiceAccountJWTAccessCredentials {
         string json_key = 1;

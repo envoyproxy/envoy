@@ -59,9 +59,10 @@ Stats::Counter& DynamoStats::counter(const Stats::StatNameVec& names) {
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
-Stats::Histogram& DynamoStats::histogram(const Stats::StatNameVec& names) {
+Stats::Histogram& DynamoStats::histogram(const Stats::StatNameVec& names,
+                                         Stats::Histogram::Unit unit) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()));
+  return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit);
 }
 
 Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_name,

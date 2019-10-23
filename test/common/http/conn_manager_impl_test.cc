@@ -765,11 +765,12 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   std::shared_ptr<Router::MockRoute> route = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster_name));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
-      .WillOnce(Invoke([&](const Http::HeaderMap& header_map, uint64_t) {
-        EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
-        return route;
-      }));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
+      .WillOnce(
+          Invoke([&](const Http::HeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t) {
+            EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
+            return route;
+          }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainFactoryCallbacks&) -> void {}));
 
@@ -1552,7 +1553,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
   }));
 
   // This should not be called as we don't have request headers.
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(0);
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _)).Times(0);
 
   EXPECT_CALL(*filter, encodeHeaders(_, _))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -3259,7 +3260,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
       .WillOnce(Return(route1))
       .WillOnce(Return(route2))
       .WillOnce(Return(nullptr));
@@ -3663,7 +3664,9 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(stream_, resetStream(_));
-  decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
+  EXPECT_LOG_CONTAINS(
+      "debug", "Resetting stream. Response data too large and headers have already been sent",
+      decoder_filters_[0]->callbacks_->encodeData(fake_response, false););
 
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
@@ -4152,7 +4155,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
     decoder->decodeData(fake_data, true);
   }));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
   setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -4234,7 +4237,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
     decoder->decodeTrailers(std::move(trailers));
   }));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
   setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -4328,7 +4331,7 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
     decoder->decodeData(fake_data2, true);
   }));
 
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _));
   setupFilterChain(3, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
@@ -4490,7 +4493,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  // Verify that once the decoder_filters_[0]'s contineDecoding() is called, decoder_filters_[1]'s
+  // Verify that once the decoder_filters_[0]'s continueDecoding() is called, decoder_filters_[1]'s
   // decodeHeaders() is called, and both filters receive data and trailers consequently.
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, _))
       .WillOnce(Return(FilterHeadersStatus::Continue));
@@ -4518,7 +4521,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  // Verify that once the decoder_filters_[1]'s contineDecoding() is called, both data and trailers
+  // Verify that once the decoder_filters_[1]'s continueDecoding() is called, both data and trailers
   // go through the second filter.
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
   EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
@@ -4714,7 +4717,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
   std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1.get()));
-  EXPECT_CALL(*route_config_, route(_, _)).WillOnce(Return(route1));
+  EXPECT_CALL(*route_config_, route(_, _, _)).WillOnce(Return(route1));
   // First no-scope-found request will be handled by decoder_filters_[0].
   setupFilterChain(1, 0);
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -4748,8 +4751,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       std::make_shared<NiceMock<Router::MockConfig>>();
   std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(*route_config1, route(_, _)).WillRepeatedly(Return(route1));
-  EXPECT_CALL(*route_config2, route(_, _)).WillRepeatedly(Return(route2));
+  EXPECT_CALL(*route_config1, route(_, _, _)).WillRepeatedly(Return(route1));
+  EXPECT_CALL(*route_config2, route(_, _, _)).WillRepeatedly(Return(route2));
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
               getRouteConfig(_))
@@ -4808,13 +4811,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1.get()));
   EXPECT_CALL(*scopedRouteConfigProvider()->config<Router::MockScopedConfig>(), getRouteConfig(_))
-      // 1. decodeHeaders() snaping route config.
+      // 1. decodeHeaders() snapping route config.
       // 2. refreshCachedRoute() later in the same decodeHeaders().
       .Times(2);
   EXPECT_CALL(
       *static_cast<const Router::MockConfig*>(
           scopedRouteConfigProvider()->config<Router::MockScopedConfig>()->route_config_.get()),
-      route(_, _))
+      route(_, _, _))
       .WillOnce(Return(route1));
   StreamDecoder* decoder = nullptr;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
@@ -4835,6 +4838,71 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, NewConnection) {
+  setup(false, "", true, true);
+
+  filter_callbacks_.connection_.stream_info_.protocol_ = absl::nullopt;
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
+  EXPECT_EQ(Network::FilterStatus::Continue, conn_manager_->onNewConnection());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_total_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
+
+  filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
+  codec_->protocol_ = Http::Protocol::Http3;
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, protocol());
+  EXPECT_CALL(*codec_, protocol()).Times(AtLeast(1));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_active_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
+  setup(false, "envoy-custom-server", false);
+
+  filter_callbacks_.connection_.stream_info_.protocol_ = Envoy::Http::Protocol::Http3;
+  codec_->protocol_ = Http::Protocol::Http3;
+  EXPECT_EQ(Network::FilterStatus::StopIteration, conn_manager_->onNewConnection());
+
+  // Store the basic request encoder during filter chain setup.
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_NE(nullptr, headers.ForwardedFor());
+        EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  // Pretend to get a new stream and then fire a headers only request into it. Then we respond into
+  // the filter.
+  NiceMock<MockStreamEncoder> encoder;
+  StreamDecoder& decoder = conn_manager_->newStream(encoder);
+  HeaderMapPtr headers{
+      new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  decoder.decodeHeaders(std::move(headers), true);
+
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  filter->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_http3_total_.value());
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+  conn_manager_.reset();
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

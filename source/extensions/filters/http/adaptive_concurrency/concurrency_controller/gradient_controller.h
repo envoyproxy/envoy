@@ -27,9 +27,10 @@ namespace ConcurrencyController {
  */
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                              \
   COUNTER(rq_blocked)                                                                              \
+  GAUGE(burst_queue_size, NeverImport)                                                             \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
-  GAUGE(burst_queue_size, NeverImport)                                                             \
+  GAUGE(min_rtt_calculation_active, Accumulate)                                                    \
   GAUGE(min_rtt_msecs, NeverImport)                                                                \
   GAUGE(sample_rtt_msecs, NeverImport)
 
@@ -70,36 +71,39 @@ public:
   }
 
   double maxGradient() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_);
+    return std::max(
+        1.0, runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_));
   }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double sampleAggregatePercentile() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().SampleAggregatePercentileKey,
-                                         sample_aggregate_percentile_) /
-           100.0;
+    const double val = runtime_.snapshot().getDouble(
+        RuntimeKeys::get().SampleAggregatePercentileKey, sample_aggregate_percentile_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
-  // The percentage is normalized to the range [0.0, 1.0].
+  // The percentage is normalized and clamped to the range [0.0, 1.0].
   double jitterPercent() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_) / 100.0;
+    const double val =
+        runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
 private:
   class RuntimeKeyValues {
   public:
     const std::string MinRTTCalcIntervalKey =
-        "http.adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms";
+        "adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms";
     const std::string SampleRTTCalcIntervalKey =
-        "http.adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms";
+        "adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms";
     const std::string MaxConcurrencyLimitKey =
-        "http.adaptive_concurrency.gradient_controller.max_concurrency_limit";
+        "adaptive_concurrency.gradient_controller.max_concurrency_limit";
     const std::string MinRTTAggregateRequestCountKey =
-        "http.adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
-    const std::string MaxGradientKey = "http.adaptive_concurrency.gradient_controller.max_gradient";
+        "adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
+    const std::string MaxGradientKey = "adaptive_concurrency.gradient_controller.max_gradient";
     const std::string SampleAggregatePercentileKey =
-        "http.adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
-    const std::string JitterPercentKey = "http.adaptive_concurrency.gradient_controller.jitter";
+        "adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
+    const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;

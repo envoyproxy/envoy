@@ -41,6 +41,7 @@ message TapConfig {
 
 // Tap match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
+// [#next-free-field: 9]
 message MatchPredicate {
   // A set of match configurations used for logical operations.
   message MatchSet {

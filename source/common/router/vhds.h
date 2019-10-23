@@ -41,7 +41,7 @@ class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router> {
 public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
-                   Server::Configuration::FactoryContext& factory_context,
+                   Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
                    std::unordered_set<RouteConfigProvider*>& route_config_providers);
   ~VhdsSubscription() override { init_target_.ready(); }
