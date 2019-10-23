@@ -32,6 +32,7 @@ message FaultAbort {
   type.v3alpha.FractionalPercent percentage = 3;
 }
 
+// [#next-free-field: 14]
 message HTTPFault {
   // If specified, the filter will inject delays based on the values in the
   // object.

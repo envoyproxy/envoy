@@ -10,14 +10,12 @@ import "envoy/api/v3alpha/route/route.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 import "envoy/type/v3alpha/range.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "validate/validate.proto";
 
 // [#protodoc-title: Dubbo Proxy Route Configuration]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
 
-// [#comment:next free field: 6]
+// [#next-free-field: 6]
 message RouteConfiguration {
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
   string name = 1;
@@ -36,7 +34,6 @@ message RouteConfiguration {
   repeated Route routes = 5;
 }
 
-// [#comment:next free field: 3]
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
@@ -45,7 +42,6 @@ message Route {
   RouteAction route = 2 [(validate.rules).message = {required: true}];
 }
 
-// [#comment:next free field: 3]
 message RouteMatch {
   // Method level routing matching.
   MethodMatch method = 1;
@@ -57,7 +53,6 @@ message RouteMatch {
   repeated api.v3alpha.route.HeaderMatcher headers = 2;
 }
 
-// [#comment:next free field: 3]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -73,7 +68,6 @@ message RouteAction {
   }
 }
 
-// [#comment:next free field: 5]
 message MethodMatch {
   // The parameter matching type.
   message ParameterMatchSpecifier {
