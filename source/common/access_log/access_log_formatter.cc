@@ -25,9 +25,10 @@ static const std::string UnspecifiedValueString = "-";
 namespace {
 
 // Matches newline pattern in a StartTimeFormatter format string.
-const std::regex& getStartTimeNewlinePattern(){
-    CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
-const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "\n")};
+const std::regex& getStartTimeNewlinePattern() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
+}
+const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
