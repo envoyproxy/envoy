@@ -653,7 +653,7 @@ private:
    */
   void doEndStream(ActiveStream& stream);
 
-  void resetAllStreams();
+  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
   void onIdleTimeout();
   void onDrainTimeout();
   void startDrainSequence();
