@@ -683,6 +683,11 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return optional maximum connection duration timeout for upstream connection pool connections.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;

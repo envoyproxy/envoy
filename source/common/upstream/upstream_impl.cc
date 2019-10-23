@@ -730,6 +730,13 @@ ClusterInfoImpl::ClusterInfoImpl(
     idle_timeout_ = std::chrono::hours(1);
   }
 
+  if (config.common_http_protocol_options().has_max_connection_duration()) {
+    max_connection_duration_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        config.common_http_protocol_options().max_connection_duration()));
+    } else {
+      max_connection_duration_ = absl::nullopt;
+    }
+  
   if (config.has_eds_cluster_config()) {
     if (config.type() != envoy::api::v2::Cluster::EDS) {
       throw EnvoyException("eds_cluster_config set in a non-EDS cluster");
@@ -775,8 +782,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
-  // transport socket implementation based on the tls_context. We copy by value first then override
-  // if necessary.
+  // transport socket implementation based on the tls_context. We copy by value first then
+  // override if necessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
@@ -978,8 +985,8 @@ void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   // Every time a host changes Health Check state we cause a full healthy host recalculation which
   // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
   // can also block worker threads by doing this repeatedly. There is no reason to do this
-  // as we will not start taking traffic until we are initialized. By blocking Health Check updates
-  // while initializing we can avoid this.
+  // as we will not start taking traffic until we are initialized. By blocking Health Check
+  // updates while initializing we can avoid this.
   if (initialization_complete_callback_ != nullptr) {
     return;
   }
@@ -1233,12 +1240,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
   bool hosts_changed = false;
 
-  // Go through and see if the list we have is different from what we just got. If it is, we make a
-  // new host list and raise a change notification. This uses an N^2 search given that this does not
-  // happen very often and the list sizes should be small (see
+  // Go through and see if the list we have is different from what we just got. If it is, we make
+  // a new host list and raise a change notification. This uses an N^2 search given that this does
+  // not happen very often and the list sizes should be small (see
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
-  // possible for DNS to return the same address multiple times, and a bad EDS implementation could
-  // do the same thing.
+  // possible for DNS to return the same address multiple times, and a bad EDS implementation
+  // could do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
   std::unordered_set<std::string> existing_hosts_for_current_priority(
@@ -1267,13 +1274,13 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         health_checker_ != nullptr && existing_host_found &&
         *existing_host->second->healthCheckAddress() != *host->healthCheckAddress();
 
-    // When there is a match and we decided to do in-place update, we potentially update the host's
-    // health check flag and metadata. Afterwards, the host is pushed back into the final_hosts,
-    // i.e. hosts that should be preserved in the current priority.
+    // When there is a match and we decided to do in-place update, we potentially update the
+    // host's health check flag and metadata. Afterwards, the host is pushed back into the
+    // final_hosts, i.e. hosts that should be preserved in the current priority.
     if (existing_host_found && !skip_inplace_host_update) {
       existing_hosts_for_current_priority.emplace(existing_host->first);
-      // If we find a host matched based on address, we keep it. However we do change weight inline
-      // so do that here.
+      // If we find a host matched based on address, we keep it. However we do change weight
+      // inline so do that here.
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
@@ -1331,8 +1338,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     }
   }
 
-  // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
-  // loop.
+  // Remove hosts from current_priority_hosts that were matched to an existing host in the
+  // previous loop.
   for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
     auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
 
@@ -1350,13 +1357,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     hosts_changed = true;
   }
 
-  // The remaining hosts are hosts that are not referenced in the config update. We remove them from
-  // the priority if any of the following is true:
+  // The remaining hosts are hosts that are not referenced in the config update. We remove them
+  // from the priority if any of the following is true:
   // - Active health checking is not enabled.
   // - The removed hosts are failing active health checking OR have been explicitly marked as
   //   unhealthy by a previous EDS update. We do not count outlier as a reason to remove a host
   //   or any other future health condition that may be added so we do not use the health() API.
-  // - We have explicitly configured the cluster to remove hosts regardless of active health status.
+  // - We have explicitly configured the cluster to remove hosts regardless of active health
+  // status.
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {

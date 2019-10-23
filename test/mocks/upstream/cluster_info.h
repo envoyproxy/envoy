@@ -74,6 +74,7 @@ public:
   MOCK_CONST_METHOD0(addedViaApi, bool());
   MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>());
+  MOCK_CONST_METHOD0(maxConnectionDuration, const absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
