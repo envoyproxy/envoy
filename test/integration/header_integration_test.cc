@@ -1138,6 +1138,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
 }
 
 // Validates TE header is stripped if it contains an unsupported value
+// Also validate the behavior if a nominated header does not exist
 TEST_P(HeaderIntegrationTest, TestTeHeaderGzipTrailersSanitized) {
   initializeFilter(HeaderMode::Append, false);
   performRequest(
@@ -1149,7 +1150,6 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderGzipTrailersSanitized) {
           {"x-request-foo", "downstram"},
           {"connection", "te, mike, sam, will, close"},
           {"te", "gzip, trailers"},
-          {"mike", "foo"},
           {"sam", "bar"},
           {"will", "baz"},
       },

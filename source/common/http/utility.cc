@@ -413,36 +413,40 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
     StringUtil::CaseUnorderedSet tokens_to_remove{};
 
     // Determine whether the nominated header contains unsupported values
-    HeaderString& nominated_header_value = headers.get(lcs_header_to_remove)->value();
-    for (const auto& header_value : absl::StrSplit(nominated_header_value.getStringView(), ',')) {
+    HeaderEntry* nominated_header = headers.get(lcs_header_to_remove);
 
-      const absl::string_view header_sv = StringUtil::trim(header_value);
+    if (nominated_header) {
+      const HeaderString& nominated_header_value = nominated_header->value();
+      for (const auto& header_value : absl::StrSplit(nominated_header_value.getStringView(), ',')) {
 
-      // Check whether TE contains multiple values and remove everything except "trailers"
-      if (StringUtil::CaseInsensitiveCompare()(header_to_remove, Http::Headers::get().TE.get()) &&
-          (StringUtil::CaseInsensitiveCompare()(header_sv,
-                                                Http::Headers::get().TEValues.Trailers))) {
-        keep_header = true;
-      } else {
-        const std::string header_value_string(header_sv.data(), header_sv.size());
-        ENVOY_LOG_TO_LOGGER(logger, trace, "Sanitizing nominated header [{}] value [{}]",
-                            header_to_remove, header_value_string);
-        tokens_to_remove.insert(header_value_string);
+        const absl::string_view header_sv = StringUtil::trim(header_value);
+
+        // Check whether TE contains multiple values and remove everything except "trailers"
+        if (StringUtil::CaseInsensitiveCompare()(header_to_remove, Http::Headers::get().TE.get()) &&
+            (StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                  Http::Headers::get().TEValues.Trailers))) {
+          keep_header = true;
+        } else {
+          const std::string header_value_string(header_sv.data(), header_sv.size());
+          ENVOY_LOG_TO_LOGGER(logger, trace, "Sanitizing nominated header [{}] value [{}]",
+                              header_to_remove, header_value_string);
+          tokens_to_remove.insert(header_value_string);
+        }
       }
-    }
 
-    // We found tokens in an expected header that needed removal. If after removing them the
-    // set is empty, we will remove that header. Conversely, we will move on to examining the
-    // next nominated header
-    if (keep_header && tokens_to_remove.size()) {
-      const std::string new_value = StringUtil::removeTokens(nominated_header_value.getStringView(),
-                                                             ",", tokens_to_remove, ",");
-      if (new_value.empty()) {
-        keep_header = false;
-      } else {
-        nominated_header_value.clear();
-        nominated_header_value.setCopy(new_value.data(), new_value.size());
-        continue;
+      // We found tokens in an expected header that needed removal. If after removing them the
+      // set is empty, we will remove that header. Conversely, we will move on to examining the
+      // next nominated header
+      if (keep_header && tokens_to_remove.size()) {
+        const std::string new_value = StringUtil::removeTokens(
+            nominated_header_value.getStringView(), ",", tokens_to_remove, ",");
+        if (new_value.empty()) {
+          keep_header = false;
+        } else {
+          nominated_header->value().clear();
+          nominated_header->value().setCopy(new_value.data(), new_value.size());
+          continue;
+        }
       }
     }
 
