@@ -89,7 +89,7 @@ public:
 
 private:
   Grpc::Context& context_;
-  bool emit_filter_state_;
+  const bool emit_filter_state_;
   GrpcStatsObject* filter_object_{};
   bool grpc_request_{false};
   bool grpc_response_{false};
@@ -112,7 +112,7 @@ Http::FilterFactoryCb GrpcStatsFilterConfig::createFilterFactoryFromProtoTyped(
 }
 
 /**
- * Static registration for the gRPC-Web filter. @see RegisterFactory.
+ * Static registration for the gRPC stats filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(GrpcStatsFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
