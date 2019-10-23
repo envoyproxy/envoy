@@ -55,7 +55,7 @@ for how to update or override dependencies.
 
     On Fedora (maybe also other red hat distros), run the following:
     ```
-    dnf install cmake libtool libstdc++ ninja-build lld patch aspell-en
+    dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
     ```
 
     On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).

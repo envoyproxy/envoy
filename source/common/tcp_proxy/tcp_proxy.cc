@@ -58,8 +58,12 @@ Config::SharedConfig::SharedConfig(
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
-    idle_timeout_ =
-        std::chrono::milliseconds(DurationUtil::durationToMilliseconds(config.idle_timeout()));
+    const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
+    if (timeout > 0) {
+      idle_timeout_ = std::chrono::milliseconds(timeout);
+    }
+  } else {
+    idle_timeout_ = std::chrono::hours(1);
   }
 }
 

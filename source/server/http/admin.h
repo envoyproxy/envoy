@@ -286,6 +286,9 @@ private:
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
                                  AdminStream&);
+  Http::Code handlerDrainListeners(absl::string_view path_and_query,
+                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                   AdminStream&);
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
@@ -340,6 +343,9 @@ private:
     const std::string& name() const override { return name_; }
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+    envoy::api::v2::core::TrafficDirection direction() const override {
+      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
