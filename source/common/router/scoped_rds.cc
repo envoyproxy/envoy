@@ -176,7 +176,6 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
                 scoped_route_info->scopeName(), version_info);
     } catch (const EnvoyException& e) {
       exception_msgs.emplace_back(fmt::format("{}", e.what()));
-      ENVOY_LOG_MISC(error, "Errors: {}", absl::StrJoin(exception_msgs, ";;;;"));
     }
   }
   return any_applied;
