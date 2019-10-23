@@ -42,26 +42,6 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
-
-  encode_header_cb_ = [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-    absl::string_view key_to_use = header.key().getStringView();
-    uint32_t key_size_to_use = header.key().size();
-    // Translate :authority -> host so that upper layers do not need to deal with this.
-    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-      key_to_use = absl::string_view(Headers::get().HostLegacy.get());
-      key_size_to_use = Headers::get().HostLegacy.get().size();
-    }
-
-    // Skip all headers starting with ':' that make it here.
-    if (key_to_use[0] == ':') {
-      return HeaderMap::Iterate::Continue;
-    }
-
-    static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(key_to_use,
-                                                                    header.value().getStringView());
-
-    return HeaderMap::Iterate::Continue;
-  };
 }
 
 void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
@@ -98,7 +78,27 @@ void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
-  headers.iterate(encode_header_cb_, this);
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+        absl::string_view key_to_use = header.key().getStringView();
+        uint32_t key_size_to_use = header.key().size();
+        // Translate :authority -> host so that upper layers do not need to deal with this.
+        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
+          key_size_to_use = Headers::get().HostLegacy.get().size();
+        }
+
+        // Skip all headers starting with ':' that make it here.
+        if (key_to_use[0] == ':') {
+          return HeaderMap::Iterate::Continue;
+        }
+
+        static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
+            key_to_use, header.value().getStringView());
+
+        return HeaderMap::Iterate::Continue;
+      },
+      this);
 
   if (headers.ContentLength()) {
     saw_content_length = true;

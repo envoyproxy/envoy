@@ -6,13 +6,13 @@ namespace Http1 {
 std::string ProperCaseHeaderKeyFormatter::format(absl::string_view key) const {
   auto copy = std::string(key);
 
-  bool shouldCapitalize = true;
+  bool should_capitalize = true;
   for (char& c : copy) {
-    if (shouldCapitalize && isalpha(c)) {
+    if (should_capitalize && isalpha(c)) {
       c = static_cast<char>(toupper(c));
     }
 
-    shouldCapitalize = !isalpha(c) && !isdigit(c);
+    should_capitalize = !isalpha(c) && !isdigit(c);
   }
 
   return copy;

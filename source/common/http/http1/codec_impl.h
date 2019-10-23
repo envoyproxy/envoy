@@ -100,8 +100,7 @@ private:
   bool processing_100_continue_{false};
   bool is_response_to_head_request_{false};
   bool is_content_length_allowed_{true};
-  HeaderMap::ConstIterateCb encode_header_cb_;
-  HeaderKeyFormatter* header_key_formatter_;
+  const HeaderKeyFormatter* const header_key_formatter_;
 };
 
 /**
