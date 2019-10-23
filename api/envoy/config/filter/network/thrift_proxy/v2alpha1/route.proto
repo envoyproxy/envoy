@@ -31,11 +31,6 @@ message Route {
 
   // Route request to some upstream cluster.
   RouteAction route = 2 [(validate.rules).message = {required: true}];
-
-  // Strip the service prefix from the method name, if there's a prefix. For
-  // example, the method call Service:method would end up being just method.
-  // Defaults to false.
-  bool strip_service_name = 3;
 }
 
 message RouteMatch {
@@ -100,6 +95,11 @@ message RouteAction {
   // N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
   // action with the header name ":method-name".
   repeated api.v2.route.RateLimit rate_limits = 4;
+
+  // Strip the service prefix from the method name, if there's a prefix. For
+  // example, the method call Service:method would end up being just method.
+  // Defaults to false.
+  bool strip_service_name = 5;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the

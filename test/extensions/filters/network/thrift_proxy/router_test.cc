@@ -107,12 +107,11 @@ public:
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
+    EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
 
     if (strip_service_name) {
-      EXPECT_CALL(*route_, stripServiceName()).WillOnce(Return(true));
+      EXPECT_CALL(route_entry_, stripServiceName()).WillOnce(Return(true));
     }
-
-    EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
 
     initializeMetadata(msg_type, method);
 

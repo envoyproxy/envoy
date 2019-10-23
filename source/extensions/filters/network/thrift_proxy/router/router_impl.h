@@ -39,10 +39,10 @@ public:
     return metadata_match_criteria_.get();
   }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  bool stripServiceName() const override { return strip_service_name_; };
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
-  bool stripServiceName() const override { return strip_service_name_; };
 
   virtual RouteConstSharedPtr matches(const MessageMetadata& metadata,
                                       uint64_t random_value) const PURE;
@@ -71,10 +71,10 @@ private:
       return parent_.metadataMatchCriteria();
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
+    bool stripServiceName() const override { return parent_.stripServiceName(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
-    bool stripServiceName() const override { return parent_.stripServiceName(); }
 
   private:
     const RouteEntryImplBase& parent_;

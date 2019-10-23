@@ -25,7 +25,7 @@ RouteEntryImplBase::RouteEntryImplBase(
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       rate_limit_policy_(route.route().rate_limits()),
-      strip_service_name_(route.strip_service_name()) {
+      strip_service_name_(route.route().strip_service_name()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -258,7 +258,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
 
-  if (route_->stripServiceName()) {
+  if (route_entry_->stripServiceName()) {
     const auto& method = metadata->methodName();
     const auto pos = method.find(':');
     if (pos != std::string::npos) {

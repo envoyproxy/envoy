@@ -37,6 +37,11 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the route.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+
+  /**
+   * @return bool should the service name prefix be stripped from the method.
+   */
+  virtual bool stripServiceName() const PURE;
 };
 
 /**
@@ -50,11 +55,6 @@ public:
    * @return the route entry or nullptr if there is no matching route for the request.
    */
   virtual const RouteEntry* routeEntry() const PURE;
-
-  /**
-   * @return bool should the service name prefix be stripped from the method.
-   */
-  virtual bool stripServiceName() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
