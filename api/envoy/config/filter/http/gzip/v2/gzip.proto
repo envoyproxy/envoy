@@ -15,7 +15,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Gzip]
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Gzip {
   enum CompressionStrategy {
     DEFAULT = 0;
