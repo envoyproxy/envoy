@@ -11,6 +11,7 @@
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::google::jwt_verify::Status;
+using ::testing::Eq;
 using ::testing::NiceMock;
 
 namespace Envoy {
@@ -65,6 +66,33 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
+}
+
+TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
+      "my_payload");
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
+  }));
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+
+  auto options = Http::AsyncClient::RequestOptions()
+                     .setTimeout(std::chrono::milliseconds(5 * 1000))
+                     .setParentSpan(parent_span_)
+                     .setChildSpanName("JWT Remote PubKey Fetch");
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, Eq(options))).Times(1);
+
+  auto headers = Http::TestHeaderMapImpl{
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {"sec-istio-auth-userinfo", ""},
+  };
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
 }
 
 TEST_F(ProviderVerifierTest, TestMissedJWT) {

@@ -142,6 +142,26 @@ TEST_F(JwksFetcherTest, TestCancel) {
   fetcher->cancel();
 }
 
+TEST_F(JwksFetcherTest, TestSpanPassedDown) {
+  // Setup
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
+  NiceMock<MockJwksReceiver> receiver;
+  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+
+  // Expectations for span
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [this](Http::MessagePtr&, Http::AsyncClient::Callbacks&,
+                 const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            EXPECT_TRUE(options.parent_span_ == &this->parent_span_);
+            EXPECT_TRUE(options.child_span_name_ == "JWT Remote PubKey Fetch");
+            return nullptr;
+          }));
+
+  // Act
+  fetcher->fetch(uri_, parent_span_, receiver);
+}
+
 } // namespace
 } // namespace Common
 } // namespace HttpFilters
