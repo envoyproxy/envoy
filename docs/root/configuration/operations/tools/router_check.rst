@@ -184,9 +184,9 @@ fields that could be tested.
   Current route coverage: 6.2948%
   Failed to meet coverage requirement: 7%
 
-When the fail under flag is set an optional flag (`-i` or `--increase-cov`) can
-be included to enforce the minimum coverage threshold matches the current coverage.
-This prevents the enforced coverage value from becoming stale as new tests are added
+When the fail under flag is set an optional flag (`-i` or `--incr-cov-fail`) can
+be included to enforce the specified fail under coverage threshold matches the current coverage.
+This prevents the specified fail under test coverage value from becoming stale as new tests are added
 and ensures coverage regressions don't occur if the value is set below the current coverage.
 
 .. note::
@@ -198,15 +198,5 @@ and ensures coverage regressions don't occur if the value is set below the curre
 
   > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 -i --covall
   Current route coverage: 6.2948%
-  Failed due to stale coverage threshold.
-
-Additionally, an optional environment variable can be set to display the path
-to the file where the coverage value is being set. This aids in making the required
-changes to the coverage threshold.
-
-.. code:: bash
-
-  > ENVOY_COV_CONFIG_FILE="run_cov.sh" bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 -i --covall
-  Current route coverage: 6.2948%
-  Failed due to stale coverage threshold.
-  Please increase the coverage failure threshold to 89.4231 in run_cov.sh
+  Failed due to stale coverage failure threshold.
+  Please increase the coverage failure threshold to match existing coverage of 89.4231%

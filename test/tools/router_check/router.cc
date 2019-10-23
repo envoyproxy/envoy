@@ -475,8 +475,8 @@ Options::Options(int argc, char** argv) {
                                      "Fail if test coverage is under a specified amount", false,
                                      0.0, "float", cmd);
   TCLAP::SwitchArg increase_cov_threshold(
-      "i", "increase-cov", "If fail-under is set, enforce coverage threshold is increased", cmd,
-      false);
+      "i", "incr-cov-fail",
+      "If fail-under is set, enforce specified test coverage threshold is increased", cmd, false);
   TCLAP::SwitchArg comprehensive_coverage(
       "", "covall", "Measure coverage by checking all route fields", cmd, false);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,

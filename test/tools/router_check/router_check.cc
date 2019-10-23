@@ -40,8 +40,8 @@ int main(int argc, char* argv[]) {
       }
       if (options.increaseCovThreshold() && current_coverage != options.failUnder()) {
         std::cerr << "Failed due to stale coverage failure threshold." << std::endl;
-        std::cerr << "Please increase the coverage failure threshold to " << current_coverage
-                  << std::endl;
+        std::cerr << "Please increase the coverage failure threshold to match existing coverage of "
+                  << current_coverage << "%" << std::endl;
         return EXIT_FAILURE;
       }
     }
