@@ -957,6 +957,15 @@ filter_chains:
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 }
 
+TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
+                                std::make_shared<Network::Address::PipeInstance>("/foo"),
+                                Network::Address::SocketType::Datagram, nullptr, true),
+                            EnvoyException,
+                            "socket type SocketType::Datagram not supported for pipes");
+}
+
 TEST_F(ListenerManagerImplTest, CantBindSocket) {
   InSequence s;
 
