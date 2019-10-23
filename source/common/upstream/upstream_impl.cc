@@ -733,10 +733,10 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (config.common_http_protocol_options().has_max_connection_duration()) {
     max_connection_duration_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         config.common_http_protocol_options().max_connection_duration()));
-    } else {
-      max_connection_duration_ = absl::nullopt;
-    }
-  
+  } else {
+    max_connection_duration_ = absl::nullopt;
+  }
+
   if (config.has_eds_cluster_config()) {
     if (config.type() != envoy::api::v2::Cluster::EDS) {
       throw EnvoyException("eds_cluster_config set in a non-EDS cluster");
