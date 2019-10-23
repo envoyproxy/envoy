@@ -424,11 +424,6 @@ public:
   // Constructs an empty StatName object.
   StatName() = default;
 
-  // Constructs a StatName object with new storage, which must be of size
-  // src.size(). This is used in the a flow where we first construct a StatName
-  // for lookup in a cache, and then on a miss need to store the data directly.
-  StatName(const StatName& src, SymbolTable::Storage memory);
-
   /**
    * Defines default hash function so StatName can be used as a key in an absl
    * hash-table without specifying a functor. See
@@ -548,7 +543,7 @@ private:
 
 // Represents an ordered container of StatNames. The encoding for each StatName
 // is byte-packed together, so this carries less overhead than allocating the
-// storage separately. The tradeoff is there is no random access; you can only
+// storage separately. The trade-off is there is no random access; you can only
 // iterate through the StatNames.
 //
 // The maximum size of the list is 255 elements, so the length can fit in a

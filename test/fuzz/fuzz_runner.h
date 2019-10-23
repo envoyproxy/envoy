@@ -6,6 +6,9 @@
 // Bring in DEFINE_PROTO_FUZZER definition as per
 // https://github.com/google/libprotobuf-mutator#integrating-with-libfuzzer.
 #include "libprotobuf_mutator/src/libfuzzer/libfuzzer_macro.h"
+// Bring in FuzzedDataProvider, see
+// https://github.com/google/fuzzing/blob/master/docs/split-inputs.md#fuzzed-data-provider
+#include "compiler_rt/fuzzer/utils/FuzzedDataProvider.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {

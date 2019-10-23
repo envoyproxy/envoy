@@ -30,8 +30,9 @@ namespace Stats {
  */
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
-  ThreadLocalHistogramImpl(StatName name, const std::string& tag_extracted_name,
-                           const std::vector<Tag>& tags, SymbolTable& symbol_table);
+  ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
+                           const std::string& tag_extracted_name, const std::vector<Tag>& tags,
+                           SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -47,13 +48,19 @@ public:
   }
 
   // Stats::Histogram
+  Histogram::Unit unit() const override {
+    // If at some point ThreadLocalHistogramImpl will hold a pointer to its parent we can just
+    // return parent's unit here and not store it separately.
+    return unit_;
+  }
   void recordValue(uint64_t value) override;
-  bool used() const override { return used_; }
 
   // Stats::Metric
   SymbolTable& symbolTable() override { return symbol_table_; }
+  bool used() const override { return used_; }
 
 private:
+  Histogram::Unit unit_;
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_;
   histogram_t* histograms_[2];
@@ -71,11 +78,14 @@ class TlsScope;
  */
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
-  ParentHistogramImpl(StatName name, Store& parent, TlsScope& tls_scope,
+  ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
                       absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
+
+  // Stats::Histogram
+  Histogram::Unit unit() const override;
   void recordValue(uint64_t value) override;
 
   /**
@@ -105,6 +115,7 @@ public:
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
+  Histogram::Unit unit_;
   Store& parent_;
   TlsScope& tls_scope_;
   histogram_t* interval_histogram_;
@@ -158,10 +169,12 @@ public:
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name) override {
-    return default_scope_->histogramFromStatName(name);
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+    return default_scope_->histogramFromStatName(name, unit);
   }
-  Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+    return default_scope_->histogram(name, unit);
+  }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
@@ -248,7 +261,7 @@ private:
     Counter& counterFromStatName(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(StatName name) override;
+    Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
@@ -264,9 +277,9 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName(), import_mode);
     }
-    Histogram& histogram(const std::string& name) override {
+    Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return histogramFromStatName(storage.statName());
+      return histogramFromStatName(storage.statName(), unit);
     }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }

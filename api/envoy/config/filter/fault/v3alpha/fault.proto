@@ -6,7 +6,6 @@ option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.fault.v3alpha";
 
-import "envoy/config/filter/fault/v2/fault.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -17,6 +16,7 @@ import "validate/validate.proto";
 
 // Delay specification is used to inject latency into the
 // HTTP/gRPC/Mongo/Redis operation or delay proxying of TCP connections.
+// [#next-free-field: 6]
 message FaultDelay {
   enum FaultDelayType {
     // Unused and deprecated.

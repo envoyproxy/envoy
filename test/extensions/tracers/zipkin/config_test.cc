@@ -17,6 +17,7 @@ namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::MockInstance> server;
+
   EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
 
@@ -41,6 +42,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   NiceMock<Server::MockInstance> server;
+
   EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
 

@@ -17,6 +17,7 @@ import "validate/validate.proto";
 
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
+// [#next-free-field: 8]
 message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
@@ -101,7 +102,7 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#comment:next free field: 6]
+// [#next-free-field: 6]
 message ConfigSource {
   oneof config_source_specifier {
     option (validate.required) = true;

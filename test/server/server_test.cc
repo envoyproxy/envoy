@@ -43,7 +43,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
-  store.histogram("histogram");
+  store.histogram("histogram", Stats::Histogram::Unit::Unspecified);
 
   std::list<Stats::SinkPtr> sinks;
   InstanceUtil::flushMetricsToSinks(sinks, store);
@@ -306,7 +306,9 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
-  EXPECT_TRUE(stats_store_.histogram("server.initialization_time").used());
+  EXPECT_TRUE(
+      stats_store_.histogram("server.initialization_time_ms", Stats::Histogram::Unit::Milliseconds)
+          .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 

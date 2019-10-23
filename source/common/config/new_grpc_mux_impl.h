@@ -34,6 +34,9 @@ public:
                           std::chrono::milliseconds init_fetch_timeout) override;
   void removeWatch(const std::string& type_url, Watch* watch) override;
 
+  // TODO(fredlas) PR #8478 will remove this.
+  bool isDelta() const override { return true; }
+
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;

@@ -200,13 +200,14 @@ following are the command line options that Envoy supports.
 
 .. option:: --drain-time-s <integer>
 
-  *(optional)* The time in seconds that Envoy will drain connections during a hot restart. See the
-  :ref:`hot restart overview <arch_overview_hot_restart>` for more information. Defaults to 600
-  seconds (10 minutes). Generally the drain time should be less than the parent shutdown time
-  set via the :option:`--parent-shutdown-time-s` option. How the two settings are configured
-  depends on the specific deployment. In edge scenarios, it might be desirable to have a very long
-  drain time. In service to service scenarios, it might be possible to make the drain and shutdown
-  time much shorter (e.g., 60s/90s).
+  *(optional)* The time in seconds that Envoy will drain connections during 
+  a :ref:`hot restart <arch_overview_hot_restart>` or when individual listeners are being
+  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`. 
+  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than 
+  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
+  settings are configured depends on the specific deployment. In edge scenarios, it might be
+  desirable to have a very long drain time. In service to service scenarios, it might be possible
+  to make the drain and shutdown ime much shorter (e.g., 60s/90s).
 
 .. option:: --parent-shutdown-time-s <integer>
 
