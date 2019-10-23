@@ -2366,7 +2366,11 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_.decodeHeaders(headers, false);
+  EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(1);
+  Buffer::OwnedImpl body("test body");
+  router_.decodeData(body, true);
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -2394,6 +2398,32 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+}
+
+TEST_F(RouterTest, NoRetryWithBodyLimit) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+
+  // Set a per route body limit which disallows any buffering.
+  EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(0));
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
+  EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  Buffer::OwnedImpl body("t");
+  router_.decodeData(body, false);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 // Verifies that when the request fails with an upstream reset (per try timeout in this case)
@@ -4367,7 +4397,7 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillOnce(Return(10));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(10));
   router_.setDecoderFilterCallbacks(callbacks_);
   // Send the headers sans-fin, and don't flag the pool as ready.
   sendRequest(false, false);
@@ -4405,7 +4435,7 @@ TEST_F(WatermarkTest, FilterWatermarks) {
 // Same as RetryRequestNotComplete but with decodeData larger than the buffer
 // limit, no retry will occur.
 TEST_F(WatermarkTest, RetryRequestNotComplete) {
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillOnce(Return(10));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(2).WillRepeatedly(Return(10));
   router_.setDecoderFilterCallbacks(callbacks_);
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;

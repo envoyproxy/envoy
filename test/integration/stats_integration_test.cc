@@ -266,6 +266,10 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
+  //
+  // If you encounter a failure here, please see
+  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_cluster, 43340); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
@@ -306,6 +310,10 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
+  //
+  // If you encounter a failure here, please see
+  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_cluster, 34998); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
@@ -337,6 +345,10 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 'release' builds, where we control the platform and tool-chain. So you
   // will need to find the correct value only after failing CI and looking
   // at the logs.
+  //
+  // If you encounter a failure here, please see
+  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_host, 1283);
   EXPECT_MEMORY_LE(m_per_host, 1315);
 }

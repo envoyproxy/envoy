@@ -699,6 +699,17 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderMap&,
+                                            Buffer::Instance& response, AdminStream&) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  ListenerManager::StopListenersType stop_listeners_type =
+      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
+                                                 : ListenerManager::StopListenersType::All;
+  server_.listenerManager().stopListeners(stop_listeners_type);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -1264,6 +1275,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
+          {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
+           true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -1273,11 +1286,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
           {"/stats/recentlookups", "Show recent stat-name lookups",
            MAKE_ADMIN_HANDLER(handlerStatsRecentLookups), false, false},
-          {"/stats/recentlookups/clear", "clear list of stat-name lookups",
+          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
            MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsClear), false, true},
           {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
            MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsDisable), false, true},
-          {"/stats/recentlookups/enable", "reset all counters to zero",
+          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
            MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsEnable), false, true},
           {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},

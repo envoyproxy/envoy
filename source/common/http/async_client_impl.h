@@ -160,7 +160,8 @@ private:
   };
 
   struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
+                                      uint64_t) const override {
       return nullptr;
     }
 
@@ -185,7 +186,9 @@ private:
       return nullptr;
     }
     bool includeAttemptCount() const override { return false; }
-
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };
@@ -223,6 +226,9 @@ private:
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
     std::chrono::milliseconds timeout() const override {
       if (timeout_) {
@@ -239,6 +245,9 @@ private:
       return absl::nullopt;
     }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+      return nullptr;
+    }
+    const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
       return nullptr;
     }
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -386,7 +395,7 @@ private:
   bool send_xff_{true};
 
   friend class AsyncClientImpl;
-  friend class AsyncClientImplRouteTest;
+  friend class AsyncClientImplUnitTest;
 };
 
 class AsyncRequestImpl final : public AsyncClient::Request,

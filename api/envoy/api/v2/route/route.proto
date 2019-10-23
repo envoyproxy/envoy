@@ -28,7 +28,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 18]
+// [#next-free-field: 19]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -145,6 +145,11 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
+
+  // The maximum bytes which will be buffered for retries and shadowing.
+  // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
+  // value of this and the listener per_connection_buffer_limit_bytes.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -154,7 +159,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#comment:next free field: 15]
+// [#next-free-field: 17]
 message Route {
   reserved 6;
 
@@ -230,6 +235,11 @@ message Route {
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
   Tracing tracing = 15;
+
+  // The maximum bytes which will be buffered for retries and shadowing.
+  // If set, the bytes actually buffered will be the minimum value of this and the
+  // listener per_connection_buffer_limit_bytes.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a
@@ -238,8 +248,8 @@ message Route {
 // multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
-// [#comment:next free field: 11]
 message WeightedCluster {
+  // [#next-free-field: 11]
   message ClusterWeight {
     reserved 7;
 
@@ -321,8 +331,14 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
+// [#next-free-field: 12]
 message RouteMatch {
   message GrpcRouteMatchOptions {
+  }
+
+  message TlsContextMatchOptions {
+    // If specified, the route will match against whether or not a certificate is presented.
+    google.protobuf.BoolValue presented = 1;
   }
 
   reserved 5;
@@ -411,9 +427,15 @@ message RouteMatch {
   // that the content-type header has a application/grpc or one of the various
   // application/grpc+ values.
   GrpcRouteMatchOptions grpc = 8;
+
+  // If specified, the client tls context will be matched against the defined
+  // match options.
+  //
+  // [#next-major-version: unify with RBAC]
+  TlsContextMatchOptions tls_context = 11;
 }
 
-// [#comment:next free field: 11]
+// [#next-free-field: 12]
 message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
   //
@@ -486,7 +508,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#comment:next free field: 30]
+// [#next-free-field: 30]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -608,7 +630,7 @@ message RouteAction {
       ConnectionProperties connection_properties = 3;
     }
 
-    // The flag that shortcircuits the hash computing. This field provides a
+    // The flag that short-circuits the hash computing. This field provides a
     // 'fallback' style of configuration: "if a terminal policy doesn't work,
     // fallback to rest of the policy list", it saves time when the terminal
     // policy works.
@@ -780,9 +802,7 @@ message RouteAction {
   RequestMirrorPolicy request_mirror_policy = 10;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
-  // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
-  // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-  core.RoutingPriority priority = 11;
+  core.RoutingPriority priority = 11 [(validate.rules).enum = {defined_only: true}];
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
@@ -843,7 +863,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#comment:next free field: 10]
+// [#next-free-field: 11]
 message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -965,6 +985,7 @@ message HedgePolicy {
   bool hedge_on_per_try_timeout = 3;
 }
 
+// [#next-free-field: 9]
 message RedirectAction {
   enum RedirectResponseCode {
     // Moved Permanently HTTP Status Code - 301.
@@ -1133,6 +1154,7 @@ message VirtualCluster {
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 message RateLimit {
+  // [#next-free-field: 7]
   message Action {
     // The following descriptor entry is appended to the descriptor:
     //
@@ -1289,6 +1311,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
+// [#next-free-field: 12]
 message HeaderMatcher {
   reserved 2, 3;
 
@@ -1366,6 +1389,7 @@ message HeaderMatcher {
 
 // Query parameter matching treats the query string of a request's :path header
 // as an ampersand-separated list of keys and/or key=value elements.
+// [#next-free-field: 7]
 message QueryParameterMatcher {
   // Specifies the name of a key that must be present in the requested
   // *path*'s query string.

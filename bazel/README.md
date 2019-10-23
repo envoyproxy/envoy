@@ -56,7 +56,7 @@ for how to update or override dependencies.
 
     On Fedora (maybe also other red hat distros), run the following:
     ```
-    dnf install cmake libtool libstdc++ ninja-build lld patch aspell-en
+    dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
     ```
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):

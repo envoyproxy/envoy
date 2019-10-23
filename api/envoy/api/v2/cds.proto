@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 45]
+// [#next-free-field: 45]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -192,6 +192,7 @@ message Cluster {
 
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
+  // [#next-free-field: 8]
   message LbSubsetConfig {
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
@@ -277,7 +278,7 @@ message Cluster {
 
     // When used with locality_weight_aware, scales the weight of each locality by the ratio
     // of hosts in the subset vs hosts in the original subset. This aims to even out the load
-    // going to an individual locality if said locality is disproportionally affected by the
+    // going to an individual locality if said locality is disproportionately affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
 
@@ -351,6 +352,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
+  // [#next-free-field: 7]
   message CommonLbConfig {
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
@@ -622,12 +624,13 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
-  // rate. If this setting is not specified, the value defaults to 5000ms. For
-  // cluster types other than
+  // rate. The value configured must be at least 1ms. If this setting is not specified, the
+  // value defaults to 5000ms. For cluster types other than
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration dns_refresh_rate = 16
+      [(validate.rules).duration = {gt {nanos: 1000000}}];
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,

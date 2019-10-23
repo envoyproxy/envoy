@@ -1,6 +1,5 @@
 #include "server/server.h"
 
-#include <atomic>
 #include <csignal>
 #include <cstdint>
 #include <functional>
@@ -55,9 +54,9 @@ InstanceImpl::InstanceImpl(
     ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
-    : init_manager_(init_manager), workers_started_(false), shutdown_(false), options_(options),
-      validation_context_(options_.allowUnknownStaticFields(),
-                          !options.rejectUnknownDynamicFields()),
+    : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
+      options_(options), validation_context_(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
@@ -75,7 +74,8 @@ InstanceImpl::InstanceImpl(
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()) {
+      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
+      server_context_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -129,11 +129,14 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clust
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
-  listener_manager_->stopListeners();
+  listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+void InstanceImpl::failHealthcheck(bool fail) {
+  live_.store(!fail);
+  server_stats_->live_.set(live_.load());
+}
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   snapped_counters_ = store.counters();
@@ -209,7 +212,7 @@ void InstanceImpl::flushStatsInternal() {
   }
 }
 
-bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
+bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
@@ -326,8 +329,8 @@ void InstanceImpl::initialize(const Options& options,
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), std::move(local_address), options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
+      options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
@@ -404,13 +407,7 @@ void InstanceImpl::initialize(const Options& options,
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config()) {
-    const bool is_delta =
-        bootstrap_.dynamic_resources().lds_config().api_config_source().api_type() ==
-            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
-        (bootstrap_.dynamic_resources().has_ads_config() &&
-         bootstrap_.dynamic_resources().ads_config().api_type() ==
-             envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
-    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(), is_delta);
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
   }
 
   // We have to defer RTDS initialization until after the cluster manager is

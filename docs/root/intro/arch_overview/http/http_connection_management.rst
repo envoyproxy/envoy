@@ -178,23 +178,6 @@ A sample redirect flow might look like this:
 Timeouts
 --------
 
-Various configurable timeouts apply to an HTTP connection and its constituent streams:
-
-* Connection-level :ref:`idle timeout
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>`:
-  this applies to the idle period where no streams are active.
-* Connection-level :ref:`drain timeout
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.drain_timeout>`:
-  this spans between an Envoy originated GOAWAY and connection termination.
-* Stream-level idle timeout: this applies to each individual stream. It may be configured at both
-  the :ref:`connection manager
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
-  and :ref:`per-route <envoy_api_field_route.RouteAction.idle_timeout>` granularity.
-  Header/data/trailer events on the stream reset the idle timeout.
-* Stream-level :ref:`per-route upstream timeout <envoy_api_field_route.RouteAction.timeout>`: this
-  applies to the upstream response, i.e. a maximum bound on the time from the end of the downstream
-  request until the end of the upstream response. This may also be specified at the :ref:`per-retry
-  <envoy_api_field_route.RetryPolicy.per_try_timeout>` granularity.
-* Stream-level :ref:`per-route gRPC max timeout
-  <envoy_api_field_route.RouteAction.max_grpc_timeout>`: this bounds the upstream timeout and allows
-  the timeout to be overridden via the *grpc-timeout* request header.
+Various configurable timeouts apply to an HTTP connection and its constituent streams. Please see
+:ref:`this FAQ entry <faq_configuration_timeouts>` for an overview of important timeout
+configuration.
