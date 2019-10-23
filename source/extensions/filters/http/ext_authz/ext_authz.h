@@ -126,7 +126,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
-  // todo stop using pool as part of deprecating cluster scope stats.
+  // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
   Stats::StatNamePool pool_;
 
   const std::vector<std::string> metadata_context_namespaces_;
@@ -135,7 +135,7 @@ private:
   ExtAuthzFilterStats stats_;
 
 public:
-  // todo deprecate cluster scope stats counters in favor of filter scope stats
+  // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
   // (ExtAuthzFilterStats stats_).
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
