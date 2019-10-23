@@ -1167,6 +1167,7 @@ filter_chains:
 
   // Validate that stop listener is only called once - for inbound listeners.
   EXPECT_CALL(*worker_, stopListener(_, _)).Times(1);
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(1);
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 
@@ -1237,6 +1238,7 @@ filter_chains:
   checkStats(1, 0, 0, 0, 1, 0);
 
   EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::All);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
@@ -1307,6 +1309,7 @@ filter_chains:
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
@@ -1346,37 +1349,6 @@ filter_chains:
 
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
 }
-
-// TEST_F(ListenerManagerImplTest, StopListeners2) {
-//   InSequence s;
-
-//   EXPECT_CALL(*worker_, start(_));
-//   manager_->startWorkers(guard_dog_);
-
-//   const std::string listener_foo_yaml = R"EOF(
-// name: foo
-// address:
-//   socket_address:
-//     address: 127.0.0.1
-//     port_value: 1234
-// filter_chains:
-// - filters: []
-//   )EOF";
-
-//   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-//   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-//   EXPECT_CALL(*worker_, addListener(_, _));
-//   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "",
-//   true)); worker_->callAddCompletion(true); checkStats(1, 0, 0, 0, 1, 0);
-
-//   EXPECT_CALL(*worker_, stopListeners(_));
-//   EXPECT_CALL(*listener_factory_.socket_, close());
-//   manager_->stopListeners(ListenerManager::StopListenersType::All);
-
-//   EXPECT_CALL(*listener_foo, onDestroy());
-//   EXPECT_EQ(1UL, manager_->listeners().size());
-//   checkStats(1, 0, 0, 0, 1, 0);
-// }
 
 TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
   const std::string yaml = R"EOF(
