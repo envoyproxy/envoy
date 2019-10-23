@@ -82,6 +82,7 @@ Version history
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
 * router check tool: add support for outputting missing tests in the detailed coverage report.
+* router check tool: add coverage reporting for direct response routes.
 * runtime: allow for the ability to parse boolean values.
 * runtime: allow for the ability to parse integers as double values and vice-versa.
 * sds: added :ref:`session_ticket_keys_sds_secret_config <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys_sds_secret_config>` for loading TLS Session Ticket Encryption Keys using SDS API.
