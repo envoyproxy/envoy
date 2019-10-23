@@ -87,6 +87,10 @@ private:
   const std::shared_ptr<InternalInitalizeFn> fn_;
 };
 
+/**
+ * A specialied Target which can be added by multiple Manager.
+ * The initialization will be triggered only once.
+ */
 class SharedTargetImpl : public Target, Logger::Loggable<Logger::Id::init> {
 public:
   /**
@@ -120,8 +124,10 @@ private:
   // The callback function, called via TargetHandleImpl by the manager
   const std::shared_ptr<InternalInitalizeFn> fn_;
 
+  // The state so as to signal the manager when a ready target is added.
   bool is_initialization_done_{false};
 
+  // To guarantee the initialization function is called once.
   std::once_flag once_flag_;
 };
 

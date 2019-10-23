@@ -246,7 +246,8 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     init_manager.add(subscription->init_target_);
     std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
-    dynamic_route_config_providers_.insert({manager_identifier, new_provider /* to_weak */});
+    dynamic_route_config_providers_.insert(
+        {manager_identifier, std::weak_ptr<RdsRouteConfigProviderImpl>(new_provider)});
     return new_provider;
   } else {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up

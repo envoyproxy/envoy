@@ -84,7 +84,8 @@ TEST(SharedTargetImplTest, OnSyncManagers) {
   EXPECT_EQ(Manager::State::Initialized, m1.state());
 }
 
-TEST(SharedTargetImplTest, OnAsyncManagers) {
+// Two managers initialize the same target at their own interests.
+TEST(SharedTargetImplTest, ConcurrentManagerInitialization) {
   ManagerImpl m1("m1");
   ManagerImpl m2("m2");
   int counter = 0;
@@ -104,8 +105,10 @@ TEST(SharedTargetImplTest, OnAsyncManagers) {
   EXPECT_EQ(Manager::State::Uninitialized, m2.state());
   m2.initialize(WatcherImpl("watcher", []() {}));
   EXPECT_EQ(Manager::State::Initialized, m2.state());
+  EXPECT_EQ(1, counter) << "target init function should be invoked only once";
 }
 
+// One manager initialized the target, followed by another manager adding the target.
 TEST(SharedTargetImplTest, OnLateManagers) {
   ManagerImpl m1("m1");
   ManagerImpl m2("m2");
@@ -126,7 +129,6 @@ TEST(SharedTargetImplTest, OnLateManagers) {
 }
 
 TEST(SharedTargetImplTest, GoneTargetIsInitialized) {
-
   ManagerImpl m("test");
   int counter = 0;
 

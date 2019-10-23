@@ -1,5 +1,7 @@
 #include "common/init/target_impl.h"
 
+#include "absl/memory/memory.h"
+
 namespace Envoy {
 namespace Init {
 
@@ -35,7 +37,7 @@ absl::string_view TargetImpl::name() const { return name_; }
 
 TargetHandlePtr TargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
-  return std::unique_ptr<TargetHandle>(
+  return absl::WrapUnique(
       new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
 }
 
@@ -67,7 +69,7 @@ absl::string_view SharedTargetImpl::name() const { return name_; }
 
 TargetHandlePtr SharedTargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
-  return std::unique_ptr<TargetHandle>(
+  return absl::WrapUnique(
       new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
 }
 
