@@ -13,6 +13,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/grpc/status.h"
 #include "common/http/exception.h"
@@ -24,6 +25,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Http {
@@ -377,6 +379,90 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
         last_comma == std::string::npos && num_to_skip == 0};
   } catch (const EnvoyException&) {
     return {nullptr, false};
+  }
+}
+
+void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& headers) {
+  // Remove any headers nominated by the Connection header
+  // See https://github.com/envoyproxy/envoy/issues/8623
+  const auto& cv = Http::Headers::get().ConnectionValues;
+  const auto& connection_header_value = headers.Connection()->value();
+
+  StringUtil::CaseUnorderedSet headers_to_remove{};
+
+  // Split the connection header and evaluate each nominated header
+  for (const auto& token : absl::StrSplit(connection_header_value.getStringView(), ',')) {
+
+    const absl::string_view token_sv = StringUtil::trim(token);
+
+    // If the Connection token value is not a nominated header, ignore it here since
+    // the connection header is removed elsewhere when the H1 request is upgraded to H2
+    if (StringUtil::CaseInsensitiveCompare()(token_sv, cv.Close) ||
+        StringUtil::CaseInsensitiveCompare()(token_sv, cv.Http2Settings) ||
+        StringUtil::CaseInsensitiveCompare()(token_sv, cv.KeepAlive) ||
+        StringUtil::CaseInsensitiveCompare()(token_sv, cv.Upgrade)) {
+      continue;
+    }
+
+    // Build the LowerCaseString for header lookup
+    const std::string header_to_remove = std::string(token_sv.data(), token_sv.size());
+    const LowerCaseString lcs_header_to_remove(header_to_remove);
+
+    // By default we will remove any nominated headers
+    bool keep_header = false;
+    StringUtil::CaseUnorderedSet tokens_to_remove{};
+
+    // Determine whether the nominated header contains unsupported values
+    HeaderString& nominated_header_value = headers.get(lcs_header_to_remove)->value();
+    for (const auto& header_value : absl::StrSplit(nominated_header_value.getStringView(), ',')) {
+
+      const absl::string_view header_sv = StringUtil::trim(header_value);
+
+      // Check whether TE contains multiple values and remove everything except "trailers"
+      if (StringUtil::CaseInsensitiveCompare()(header_to_remove, Http::Headers::get().TE.get()) &&
+          (StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                Http::Headers::get().TEValues.Trailers))) {
+        keep_header = true;
+      } else {
+        const std::string header_value_string(header_sv.data(), header_sv.size());
+        ENVOY_LOG_TO_LOGGER(logger, trace, "Sanitizing nominated header [{}] value [{}]",
+                            header_to_remove, header_value_string);
+        tokens_to_remove.insert(header_value_string);
+      }
+    }
+
+    // We found tokens in an expected header that needed removal. If after removing them the
+    // set is empty, we will remove that header. Conversely, we will move on to examining the
+    // next nominated header
+    if (keep_header && tokens_to_remove.size()) {
+      const std::string new_value = StringUtil::removeTokens(nominated_header_value.getStringView(),
+                                                             ",", tokens_to_remove, ",");
+      if (new_value.empty()) {
+        keep_header = false;
+      } else {
+        nominated_header_value.clear();
+        nominated_header_value.setCopy(new_value.data(), new_value.size());
+        continue;
+      }
+    }
+
+    if (!keep_header) {
+      ENVOY_LOG_TO_LOGGER(logger, trace, "Removing nominated header [{}]", header_to_remove);
+      headers.remove(lcs_header_to_remove);
+      headers_to_remove.insert(header_to_remove);
+    }
+  }
+
+  // Lastly remove extra nominated headers from the Connection header
+  if (!headers_to_remove.empty()) {
+    const std::string new_value = StringUtil::removeTokens(connection_header_value.getStringView(),
+                                                           ",", headers_to_remove, ",");
+
+    if (new_value.empty()) {
+      headers.removeConnection();
+    } else {
+      headers.Connection()->value(new_value);
+    }
   }
 }
 

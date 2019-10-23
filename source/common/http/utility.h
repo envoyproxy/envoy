@@ -232,6 +232,12 @@ GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_h
                                                 uint32_t num_to_skip = 0);
 
 /**
+ * Remove any headers nominated by the Connection header
+ * Sanitize the TE header if it contains unsupported values
+ */
+void sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& headers);
+
+/**
  * Get the string for the given http protocol.
  * @param protocol for which to return the string representation.
  * @return string representation of the protocol.

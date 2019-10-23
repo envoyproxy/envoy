@@ -1083,9 +1083,9 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
       },
       Http::TestHeaderMapImpl{
           {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
           {":path", "/"},
           {":method", "GET"},
+          {"x-request-foo", "downstram"},
           {"te", "trailers"},
       },
       Http::TestHeaderMapImpl{
@@ -1111,14 +1111,54 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
           {":scheme", "http"},
           {":authority", "no-headers.com"},
           {"x-request-foo", "downstram"},
-          {"connection", "te, close"},
+          {"connection", "te, mike, sam, will, close"},
           {"te", "gzip"},
+          {"mike", "foo"},
+          {"sam", "bar"},
+          {"will", "baz"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
           {":path", "/"},
           {":method", "GET"},
+          {"x-request-foo", "downstram"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+          {"connection", "close"},
+      });
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderGzipTrailersSanitized) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, close"},
+          {"te", "gzip, trailers"},
+          {"mike", "foo"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
       },
       Http::TestHeaderMapImpl{
           {"server", "envoy"},
