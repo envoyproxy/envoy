@@ -29,3 +29,5 @@ TAGS
 .vimrc
 .vs
 .vscode
+clang.bazelrc
+user.bazelrc
