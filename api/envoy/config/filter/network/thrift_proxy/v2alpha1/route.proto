@@ -69,6 +69,7 @@ message RouteMatch {
   repeated api.v2.route.HeaderMatcher headers = 4;
 }
 
+// [#next-free-field: 6]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
