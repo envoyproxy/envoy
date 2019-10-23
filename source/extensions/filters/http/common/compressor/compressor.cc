@@ -58,7 +58,7 @@ void CompressorFilterConfig::updateRegisteredEncodings() {
     auto enc = compressor_registry_.encodings_.find(item.first->content_encoding_);
     if (enc != compressor_registry_.encodings_.end()) {
       if (enc->second > item.second) {
-        compressor_registry_.encodings_[item.first->content_encoding_] = item.second;
+        enc->second = item.second;
       }
     } else {
       compressor_registry_.encodings_.insert({item.first->content_encoding_, item.second});
