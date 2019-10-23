@@ -42,6 +42,7 @@ protected:
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
     filter_ = std::make_unique<Common::Compressors::CompressorFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
   void verifyCompressedData(const uint32_t content_length) {
@@ -157,6 +158,7 @@ protected:
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
 // Test if Runtime Feature is Disabled

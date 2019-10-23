@@ -68,6 +68,8 @@ protected:
     if (filter) {
       return filter->isAcceptEncodingAllowed(headers);
     } else {
+      NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+      filter_->setDecoderFilterCallbacks(decoder_callbacks);
       return filter_->isAcceptEncodingAllowed(headers);
     }
   }
@@ -105,6 +107,8 @@ protected:
   }
 
   void doRequest(Http::TestHeaderMapImpl&& headers, bool end_stream) {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, end_stream));
   }
 
@@ -351,6 +355,8 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     CompressorFilterConfigSharedPtr config2;
     config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
     std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter2->setDecoderFilterCallbacks(decoder_callbacks);
 
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "test;Q=.5,test2;q=0.75"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
@@ -373,10 +379,40 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     CompressorFilterConfigSharedPtr config2;
     config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "gzip"));
     std::unique_ptr<CompressorFilter> gzip_filter = std::make_unique<CompressorFilter>(config2);
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    gzip_filter->setDecoderFilterCallbacks(decoder_callbacks);
 
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "gzip;q=0.75"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers, gzip_filter));
     EXPECT_EQ(1, stats.counter("test2.gzip.header_gzip").value());
+  }
+  {
+    // Test that encoding decision is cached when used by multiple filters.
+    Stats::IsolatedStoreImpl stats;
+    NiceMock<Runtime::MockLoader> runtime;
+    envoy::config::filter::http::compressor::v2::Compressor compressor;
+    TestUtility::loadFromJson("{}", compressor);
+    CompressorFilterConfigSharedPtr config1;
+    config1.reset(new MockCompressorFilterConfig(compressor, "test1.", stats, runtime, "test1"));
+    std::unique_ptr<CompressorFilter> filter1 = std::make_unique<CompressorFilter>(config1);
+    CompressorFilterConfigSharedPtr config2;
+    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
+    std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter1->setDecoderFilterCallbacks(decoder_callbacks);
+    filter2->setDecoderFilterCallbacks(decoder_callbacks);
+
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "test1;Q=.5,test2;q=0.75"}};
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers, filter1));
+    EXPECT_TRUE(isAcceptEncodingAllowed(headers, filter2));
+    EXPECT_EQ(1, stats.counter("test1.test1.header_compressor_overshadowed").value());
+    EXPECT_EQ(1, stats.counter("test2.test2.header_compressor_used").value());
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers, filter1));
+    EXPECT_EQ(2, stats.counter("test1.test1.header_compressor_overshadowed").value());
+    // These headers are ignored. Instead the cached decision is used.
+    Http::TestHeaderMapImpl headers2 = {{"accept-encoding", "fake"}};
+    EXPECT_TRUE(isAcceptEncodingAllowed(headers2, filter2));
+    EXPECT_EQ(2, stats.counter("test2.test2.header_compressor_used").value());
   }
 }
 
@@ -765,13 +801,17 @@ TEST_F(CompressorFilterTest, VaryAlreadyHasAcceptEncoding) {
 
 // Verify removeAcceptEncoding header.
 TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
+    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
   {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks2;
+    filter_->setDecoderFilterCallbacks(decoder_callbacks2);
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
@@ -780,6 +820,7 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter("{}");
+    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));

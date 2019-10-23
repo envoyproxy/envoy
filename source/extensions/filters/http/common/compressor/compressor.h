@@ -6,6 +6,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
@@ -158,6 +159,27 @@ private:
 
   void sanitizeEtagHeader(Http::HeaderMap& headers);
   void insertVaryHeader(Http::HeaderMap& headers);
+
+  class EncodingDecision : public StreamInfo::FilterState::Object {
+  public:
+    enum class HeaderStat {
+      NotValid,
+      Identity,
+      Wildcard,
+      Overshadowed,
+      Used
+    };
+    EncodingDecision(const std::string& encoding, const HeaderStat stat)
+        : encoding_(encoding), stat_(stat) {}
+    const std::string& encoding() const { return encoding_; }
+    HeaderStat stat() const { return stat_; }
+
+  private:
+    const std::string encoding_;
+    const HeaderStat stat_;
+  };
+
+  std::unique_ptr<EncodingDecision> chooseEncoding(const Http::HeaderEntry* accept_encoding) const;
 
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;

@@ -17,6 +17,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
+        "//include/envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
