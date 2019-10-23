@@ -127,8 +127,10 @@ MockWorker::MockWorker() {
             remove_listener_completion_ = completion;
           }));
 
-  ON_CALL(*this, stopListeners(_))
-      .WillByDefault(Invoke([](std::function<void()> completion) -> void { completion(); }));
+  ON_CALL(*this, stopListener(_, _))
+      .WillByDefault(Invoke([](Network::ListenerConfig&, std::function<void()> completion) -> void {
+        completion();
+      }));
 }
 MockWorker::~MockWorker() = default;
 

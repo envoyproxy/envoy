@@ -73,14 +73,6 @@ public:
    */
   virtual void stopListener(Network::ListenerConfig& listener,
                             std::function<void()> completion) PURE;
-
-  /**
-   * Stop all listeners from accepting new connections. This is used for server draining.
-   * TODO(mattklein123): We might consider adding a completion here in the future to tell us when
-   * all connections are gone. This would allow us to remove the listener more quickly depending on
-   * drain speed.
-   */
-  virtual void stopListeners(std::function<void()> completion) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

@@ -1347,37 +1347,36 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counter("listener_manager.listener_create_failure").value());
 }
 
-TEST_F(ListenerManagerImplTest, StopListeners2) {
-  InSequence s;
+// TEST_F(ListenerManagerImplTest, StopListeners2) {
+//   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
-  manager_->startWorkers(guard_dog_);
+//   EXPECT_CALL(*worker_, start(_));
+//   manager_->startWorkers(guard_dog_);
 
-  const std::string listener_foo_yaml = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-filter_chains:
-- filters: []
-  )EOF";
+//   const std::string listener_foo_yaml = R"EOF(
+// name: foo
+// address:
+//   socket_address:
+//     address: 127.0.0.1
+//     port_value: 1234
+// filter_chains:
+// - filters: []
+//   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  worker_->callAddCompletion(true);
-  checkStats(1, 0, 0, 0, 1, 0);
+//   ListenerHandle* listener_foo = expectListenerCreate(false, true);
+//   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+//   EXPECT_CALL(*worker_, addListener(_, _));
+//   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "",
+//   true)); worker_->callAddCompletion(true); checkStats(1, 0, 0, 0, 1, 0);
 
-  EXPECT_CALL(*worker_, stopListeners(_));
-  EXPECT_CALL(*listener_factory_.socket_, close());
-  manager_->stopListeners(ListenerManager::StopListenersType::All);
+//   EXPECT_CALL(*worker_, stopListeners(_));
+//   EXPECT_CALL(*listener_factory_.socket_, close());
+//   manager_->stopListeners(ListenerManager::StopListenersType::All);
 
-  EXPECT_CALL(*listener_foo, onDestroy());
-  EXPECT_EQ(1UL, manager_->listeners().size());
-  checkStats(1, 0, 0, 0, 1, 0);
-}
+//   EXPECT_CALL(*listener_foo, onDestroy());
+//   EXPECT_EQ(1UL, manager_->listeners().size());
+//   checkStats(1, 0, 0, 0, 1, 0);
+// }
 
 TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
   const std::string yaml = R"EOF(

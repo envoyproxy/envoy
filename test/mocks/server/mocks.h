@@ -333,7 +333,6 @@ public:
   MOCK_METHOD0(stop, void());
   MOCK_METHOD2(stopListener,
                void(Network::ListenerConfig& listener, std::function<void()> completion));
-  MOCK_METHOD1(stopListeners, void(std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

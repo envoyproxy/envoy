@@ -97,14 +97,6 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<v
   });
 }
 
-void WorkerImpl::stopListeners(std::function<void()> completion) {
-  ASSERT(thread_);
-  dispatcher_->post([this, completion]() -> void {
-    handler_->stopListeners();
-    completion();
-  });
-}
-
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
