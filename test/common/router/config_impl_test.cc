@@ -2833,10 +2833,12 @@ TEST_F(RouteMatcherTest, RetryVirtualHostLevel) {
 name: RetryVirtualHostLevel
 virtual_hosts:
 - domains: [www.lyft.com]
+  per_request_buffer_limit_bytes: 8
   name: www
   retry_policy: {num_retries: 3, per_try_timeout: 1s, retry_on: '5xx,gateway-error,connect-failure,reset'}
   routes:
   - match: {prefix: /foo}
+    per_request_buffer_limit_bytes: 7
     route:
       cluster: www
       retry_policy: {retry_on: connect-failure}
@@ -2863,6 +2865,9 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->retryShadowBufferLimit());
 
   // Virtual Host level retry policy kicks in.
   EXPECT_EQ(std::chrono::milliseconds(1000),
@@ -2895,6 +2900,9 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
+                    ->retryShadowBufferLimit());
 }
 
 TEST_F(RouteMatcherTest, GrpcRetry) {
