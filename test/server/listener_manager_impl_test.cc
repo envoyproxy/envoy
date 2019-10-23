@@ -8,6 +8,7 @@
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/listener_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
@@ -16,7 +17,6 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
-#include "envoy/server/listener_manager.h"
 #include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
