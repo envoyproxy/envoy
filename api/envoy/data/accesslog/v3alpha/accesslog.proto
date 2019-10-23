@@ -165,7 +165,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message ResponseFlags {
   message Unauthorized {
     // Reasons why the request was unauthorized
