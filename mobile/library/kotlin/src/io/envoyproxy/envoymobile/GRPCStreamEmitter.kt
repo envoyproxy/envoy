@@ -3,7 +3,6 @@ package io.envoyproxy.envoymobile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-
 class GRPCStreamEmitter(
     private val emitter: StreamEmitter
 ) {
@@ -11,8 +10,9 @@ class GRPCStreamEmitter(
    * Send a protobuf messageData's binary data over the gRPC stream.
    *
    * @param messageData Binary data of a protobuf messageData to send.
+   * @return GRPCStreamEmitter, this stream emitter.
    */
-  fun sendMessage(messageData: ByteBuffer) {
+  fun sendMessage(messageData: ByteBuffer): GRPCStreamEmitter {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
     // Length-Prefixed-Message = Compressed-Flag | Message-Length | Message
     // Compressed-Flag = 0 / 1, encoded as 1 byte unsigned integer
@@ -30,6 +30,7 @@ class GRPCStreamEmitter(
 
     emitter.sendData(byteBuffer)
     emitter.sendData(messageData)
+    return this
   }
 
   /**

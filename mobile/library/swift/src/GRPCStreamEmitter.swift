@@ -22,7 +22,10 @@ public final class GRPCStreamEmitter: NSObject {
   /// Send a protobuf message's binary data over the gRPC stream.
   ///
   /// - parameter messageData: Binary data of a protobuf message to send.
-  public func sendMessage(_ messageData: Data) {
+  ///
+  /// - returns: The stream emitter, for chaining syntax.
+  @discardableResult
+  public func sendMessage(_ messageData: Data) -> GRPCStreamEmitter {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
     // Length-Prefixed-Message = Compressed-Flag | Message-Length | Message
     // Compressed-Flag = 0 / 1, encoded as 1 byte unsigned integer
@@ -40,6 +43,7 @@ public final class GRPCStreamEmitter: NSObject {
     // Send prefix data followed by message data
     self.underlyingEmitter.sendData(prefixData)
     self.underlyingEmitter.sendData(messageData)
+    return self
   }
 
   /// Close this connection.

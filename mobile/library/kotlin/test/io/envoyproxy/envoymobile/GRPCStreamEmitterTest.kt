@@ -48,44 +48,40 @@ class GRPCStreamEmitterTest {
 
   @Test
   fun `prefix and data is sent on send data`() {
-    val grpcStreamEmitter = GRPCStreamEmitter(emitter)
-
     val payload = "data".toByteArray(Charsets.UTF_8)
     val message = ByteBuffer.wrap(payload)
-    grpcStreamEmitter.sendMessage(message)
+    GRPCStreamEmitter(emitter)
+      .sendMessage(message)
 
     assertThat(dataOutputStream.toByteArray()).hasSize(payload.size + GRPC_PREFIX_LENGTH)
   }
 
   @Test
   fun `compression flag is set on the first bit of the prefix`() {
-    val grpcStreamEmitter = GRPCStreamEmitter(emitter)
-
     val payload = "data".toByteArray(Charsets.UTF_8)
     val message = ByteBuffer.wrap(payload)
-    grpcStreamEmitter.sendMessage(message)
+    GRPCStreamEmitter(emitter)
+      .sendMessage(message)
 
     assertThat(dataOutputStream.toByteArray()[0]).isEqualTo(0)
   }
 
   @Test
   fun `message length is set on the 1-4 bytes of the prefix`() {
-    val grpcStreamEmitter = GRPCStreamEmitter(emitter)
-
     val payload = "data".toByteArray(Charsets.UTF_8)
     val message = ByteBuffer.wrap(payload)
-    grpcStreamEmitter.sendMessage(message)
+    GRPCStreamEmitter(emitter)
+      .sendMessage(message)
 
     assertThat(ByteBuffer.wrap(dataOutputStream.toByteArray().sliceArray(1..4)).order(ByteOrder.BIG_ENDIAN).int).isEqualTo(payload.size)
   }
 
   @Test
   fun `message is sent after the prefix`() {
-    val grpcStreamEmitter = GRPCStreamEmitter(emitter)
-
     val payload = "data".toByteArray(Charsets.UTF_8)
     val message = ByteBuffer.wrap(payload)
-    grpcStreamEmitter.sendMessage(message)
+    GRPCStreamEmitter(emitter)
+      .sendMessage(message)
 
     assertThat(dataOutputStream.toByteArray().sliceArray(GRPC_PREFIX_LENGTH until dataOutputStream.size()).toString(Charsets.UTF_8)).isEqualTo("data")
 
@@ -93,9 +89,8 @@ class GRPCStreamEmitterTest {
 
   @Test
   fun `close is called with empty data frame`() {
-    val grpcStreamEmitter = GRPCStreamEmitter(emitter)
-
-    grpcStreamEmitter.close()
+    GRPCStreamEmitter(emitter)
+      .close()
 
     assertThat(isCloseCalledWithNull).isTrue()
   }
