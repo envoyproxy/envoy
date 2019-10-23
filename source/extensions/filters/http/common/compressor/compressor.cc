@@ -156,6 +156,8 @@ CompressorFilter::chooseEncoding(const Http::HeaderEntry* accept_encoding) const
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
 
+  // allowed_compressors might be updated down the way so we have to copy the entire map,
+  // but the map is expected to be tiny.
   std::map<std::string, uint32_t> allowed_compressors(config_->registeredCompressors());
 
   for (const auto token : StringUtil::splitToken(accept_encoding->value().getStringView(), ",",
