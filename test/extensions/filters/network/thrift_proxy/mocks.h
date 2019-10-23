@@ -318,6 +318,7 @@ public:
 
   // ThriftProxy::Router::Route
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
+  MOCK_CONST_METHOD0(stripServiceName, bool());
 
   NiceMock<MockRouteEntry> route_entry_;
 };

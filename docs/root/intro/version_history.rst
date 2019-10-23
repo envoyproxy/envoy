@@ -92,6 +92,7 @@ Version history
 * tcp_proxy: the default :ref:`idle_timeout
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
+* thrift_proxy: add support for stripping service name from method when using the multiplexed protocol.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
   certificate validation context.
@@ -195,7 +196,9 @@ Version history
 * router: added a route name field to each http route in route.Route list
 * router: added several new variables for exposing information about the downstream TLS connection via :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`.
-* router: per try timeouts will no longer start before the downstream request has been received in full by the router.This ensures that the per try timeout does not account for slow downstreams and that will not start before the global timeout.
+* router: per try
+    timeouts will no longer start before the downstream request has been received in full by the
+        router.This ensures that the per try timeout does not account for slow downstreams and that will not start before the global timeout.
 * router: added :ref:`RouteAction's auto_host_rewrite_header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>` to allow upstream host header substitution with some other header's value
 * router: added support for UPSTREAM_REMOTE_ADDRESS :ref:`header formatter
   <config_http_conn_man_headers_custom_request_headers>`.

@@ -31,6 +31,11 @@ message Route {
 
   // Route request to some upstream cluster.
   RouteAction route = 2 [(validate.rules).message = {required: true}];
+
+  // Strip the service prefix from the method name, if there's a prefix. For
+  // example, the method call Service:method would end up being just method.
+  // Defaults to false.
+  bool strip_service_name = 3;
 }
 
 message RouteMatch {
