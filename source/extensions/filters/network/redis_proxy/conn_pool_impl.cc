@@ -403,10 +403,11 @@ bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
   request_handler_ = parent_.makeRequestToHost(host_address, getRequest(incoming_request_), *this);
   if (!request_handler_) {
     onResponse(std::move(value));
+    return false;
   } else {
     parent_.parent_.onRedirection();
+    return true;
   }
-  return (request_handler_ != nullptr);
 }
 
 void InstanceImpl::PendingRequest::cancel() {

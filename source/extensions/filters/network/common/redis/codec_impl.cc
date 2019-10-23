@@ -179,6 +179,7 @@ RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
   }
   case RespType::CompositeArray: {
     new (&composite_array_) CompositeArray(std::move(other.composite_array_));
+    break;
   }
   case RespType::SimpleString:
   case RespType::BulkString:

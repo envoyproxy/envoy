@@ -58,7 +58,6 @@ public:
       ASSERT(base_array_ != nullptr);
       ASSERT(base_array_->type() == RespType::Array);
       ASSERT(start <= end);
-      ASSERT(start >= 0);
       ASSERT(end < base_array_->asArray().size());
     }
 
