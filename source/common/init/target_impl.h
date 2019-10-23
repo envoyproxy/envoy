@@ -88,7 +88,7 @@ private:
 };
 
 /**
- * A specialied Target which can be added by multiple Manager.
+ * A specialized Target which can be added by multiple Manager.
  * The initialization will be triggered only once.
  */
 class SharedTargetImpl : public Target, Logger::Loggable<Logger::Id::init> {
