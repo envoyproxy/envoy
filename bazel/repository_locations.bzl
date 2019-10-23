@@ -9,17 +9,17 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.0/bazel-gazelle-v0.19.0.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "a1e273b6159ae858f53046f5bab9678cffa82a72f0bf0c0a9e4af8fddb91209c",
-        strip_prefix = "bazel-toolchains-0.29.6",
+        sha256 = "1e16833a9f0e32b292568c0dfee7bd48133c2038605757d3a430551394310006",
+        strip_prefix = "bazel-toolchains-1.1.0",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/0.29.6/bazel-toolchains-0.29.6.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.29.6.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/1.1.0/bazel-toolchains-1.1.0.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/1.1.0.tar.gz",
         ],
     ),
     envoy_build_tools = dict(
-        sha256 = "7cae08267737c77e92958b9b04b3da88cc2ce5a6ee9c572236688a1fa5f873f0",
-        strip_prefix = "envoy-build-tools-57c24964ee4965e1c35509f3f099d5ad172bd10a",
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/57c24964ee4965e1c35509f3f099d5ad172bd10a.tar.gz"],
+        sha256 = "d0f88bef8bd7f76c3684407977f5673f3d06a6c50d4ddaffb8f0e7df6b0ef69e",
+        strip_prefix = "envoy-build-tools-a6b28555badcb18d6be924c8fc1bea49971656b8",
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/a6b28555badcb18d6be924c8fc1bea49971656b8.tar.gz"],
     ),
     boringssl = dict(
         sha256 = "891352824e0f7977bc0c291b8c65076e3ed23630334841b93f346f12d4484b06",
