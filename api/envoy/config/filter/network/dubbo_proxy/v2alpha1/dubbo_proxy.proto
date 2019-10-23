@@ -27,7 +27,7 @@ enum SerializationType {
   Hessian2 = 0;
 }
 
-// [#comment:next free field: 6]
+// [#next-free-field: 6]
 message DubboProxy {
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -49,7 +49,6 @@ message DubboProxy {
 }
 
 // DubboFilter configures a Dubbo filter.
-// [#comment:next free field: 3]
 message DubboFilter {
   // The name of the filter to instantiate. The name must match a supported
   // filter.

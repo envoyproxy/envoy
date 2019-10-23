@@ -68,6 +68,12 @@ public:
   Event::SimulatedTimeSystem time_system_;
 };
 
+// TODO(fredlas) #8478 will delete this.
+TEST_F(NewGrpcMuxImplTest, JustForCoverageTodoDelete) {
+  setup();
+  EXPECT_TRUE(grpc_mux_->isDelta());
+}
+
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.
 TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   setup();
@@ -75,7 +81,7 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   grpc_mux_->addOrUpdateWatch(type_url, nullptr, {}, callbacks_, std::chrono::milliseconds(0));
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
   {

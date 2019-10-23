@@ -33,7 +33,7 @@ namespace DubboProxy {
   COUNTER(response_error_caused_connection_close)                                                  \
   COUNTER(response_success)                                                                        \
   GAUGE(request_active, Accumulate)                                                                \
-  HISTOGRAM(request_time_ms)
+  HISTOGRAM(request_time_ms, Milliseconds)
 
 /**
  * Struct definition for all dubbo proxy stats. @see stats_macros.h

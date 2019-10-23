@@ -6,6 +6,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/stats/primitive_stats_macros.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
@@ -101,6 +102,11 @@ public:
   virtual const std::string& hostname() const PURE;
 
   /**
+   * @return the transport socket factory responsible for this host.
+   */
+  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+
+  /**
    * @return the address used to connect to the host.
    */
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
@@ -138,6 +144,40 @@ public:
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
+
+#define ALL_TRANSPORT_SOCKET_MATCH_STATS(COUNTER) COUNTER(total_match_count)
+
+/**
+ * The stats for transport socket match.
+ */
+struct TransportSocketMatchStats {
+  ALL_TRANSPORT_SOCKET_MATCH_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Library to determine what transport socket configuration to use for a given host.
+ */
+class TransportSocketMatcher {
+public:
+  struct MatchData {
+    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
+              std::string name)
+        : factory_(factory), stats_(stats), name_(std::move(name)) {}
+    Network::TransportSocketFactory& factory_;
+    TransportSocketMatchStats& stats_;
+    std::string name_;
+  };
+  virtual ~TransportSocketMatcher() = default;
+
+  /**
+   * Resolve the transport socket configuration for a particular host.
+   * @param metadata the metadata of the given host.
+   * @return the match information of the transport socket selected.
+   */
+  virtual MatchData resolve(const envoy::api::v2::core::Metadata& metadata) const PURE;
+};
+
+using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
 
 } // namespace Upstream
 } // namespace Envoy

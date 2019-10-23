@@ -5,8 +5,11 @@ use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circ
 use(
   "github.com/repokitteh/modules/ownerscheck.star",
   paths=[
-    ("envoyproxy/api-shepherds!", "api/"),
-    ("envoyproxy/udpa-wg", "api/udpa/"),
+    {
+      "owner": "envoyproxy/api-shepherds!",
+      "path": "api/",
+      "label": "api",
+    },
   ],
 )
 

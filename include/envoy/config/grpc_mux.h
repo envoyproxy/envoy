@@ -113,6 +113,13 @@ public:
    */
   virtual void resume(const std::string& type_url) PURE;
 
+  // TODO(fredlas) PR #8478 will remove this.
+  /**
+   * Whether this GrpcMux is delta.
+   * @return bool whether this GrpcMux is delta.
+   */
+  virtual bool isDelta() const PURE;
+
   // For delta
   virtual Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                   const std::set<std::string>& resources,

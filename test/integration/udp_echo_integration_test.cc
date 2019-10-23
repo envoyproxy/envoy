@@ -112,7 +112,7 @@ TEST_P(UdpEchoIntegrationTest, HelloWorldOnNonLocalAddress) {
 #endif
         port));
   } else {
-    // IPv6 doesn't allow any nonlocal source address for sendmsg. And the only
+    // IPv6 doesn't allow any non-local source address for sendmsg. And the only
     // local address guaranteed in tests in loopback. Unfortunately, even if it's not
     // specified, kernel will pick this address as source address. So this test
     // only checks if IoSocketHandle::sendmsg() sets up CMSG_DATA correctly,

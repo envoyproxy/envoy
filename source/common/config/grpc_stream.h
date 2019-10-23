@@ -49,7 +49,7 @@ public:
       ENVOY_LOG(warn, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
       return;
     }
-    stream_ = async_client_->start(service_method_, *this);
+    stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
       callbacks_->onEstablishmentFailure();
