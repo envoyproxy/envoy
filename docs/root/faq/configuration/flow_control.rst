@@ -1,4 +1,4 @@
-How can I configure flow control
+How do I configure flow control?
 ================================
 
 Flow control may cause problems where Envoy is using non-streaming L7 filters, and request or

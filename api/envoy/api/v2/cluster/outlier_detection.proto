@@ -17,6 +17,7 @@ import "validate/validate.proto";
 
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
+// [#next-free-field: 21]
 message OutlierDetection {
   // The number of consecutive 5xx responses or local origin errors that are mapped
   // to 5xx error codes before a consecutive 5xx ejection

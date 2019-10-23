@@ -16,6 +16,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Rate limit]
 // Rate limit :ref:`configuration overview <config_network_filters_rate_limit>`.
 
+// [#next-free-field: 7]
 message RateLimit {
   // The prefix to use when emitting :ref:`statistics <config_network_filters_rate_limit_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];

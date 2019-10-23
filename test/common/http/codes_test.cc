@@ -245,28 +245,33 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
                                            pool_.add("from_az"),
                                            pool_.add("to_az")};
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              histogram("prefix.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope, deliverHistogramToSinks(
                                  Property(&Stats::Metric::name, "prefix.upstream_rq_time"), 5));
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.canary.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              histogram("prefix.canary.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(
       cluster_scope,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "prefix.canary.upstream_rq_time"), 5));
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.internal.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              histogram("prefix.internal.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "prefix.internal.upstream_rq_time"), 5));
   EXPECT_CALL(global_store,
-              histogram("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"));
+              histogram("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time",
+                        Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(global_store,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name,
                            "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"),
                   5));
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.zone.from_az.to_az.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope, histogram("prefix.zone.from_az.to_az.upstream_rq_time",
+                                       Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"), 5));

@@ -102,6 +102,42 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
   tls_.shutdownThread();
 }
 
+TEST_F(TcpStatsdSinkTest, SiSuffix) {
+  InSequence s;
+  expectCreateConnection();
+
+  NiceMock<Stats::MockHistogram> items;
+  items.name_ = "items";
+  items.unit_ = Stats::Histogram::Unit::Unspecified;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.items:1|ms\n"), _));
+  sink_->onHistogramComplete(items, 1);
+
+  NiceMock<Stats::MockHistogram> information;
+  information.name_ = "information";
+  information.unit_ = Stats::Histogram::Unit::Bytes;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.information:2|ms\n"), _));
+  sink_->onHistogramComplete(information, 2);
+
+  NiceMock<Stats::MockHistogram> duration_micro;
+  duration_micro.name_ = "duration";
+  duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:3|ms\n"), _));
+  sink_->onHistogramComplete(duration_micro, 3);
+
+  NiceMock<Stats::MockHistogram> duration_milli;
+  duration_milli.name_ = "duration";
+  duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:4|ms\n"), _));
+  sink_->onHistogramComplete(duration_milli, 4);
+
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  tls_.shutdownThread();
+}
+
 // Verify that when there is no statsd host we correctly empty all output buffers so we don't
 // infinitely buffer.
 TEST_F(TcpStatsdSinkTest, NoHost) {

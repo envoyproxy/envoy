@@ -140,6 +140,8 @@ const char AdminHtmlEnd[] = R"(
 
 const std::regex PromRegex("[^a-zA-Z0-9_]");
 
+const uint64_t RecentLookupsCapacity = 100;
+
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
   header_map.insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -156,11 +158,22 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
-// Helper method to get filter parameter
-absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
-  return (params.find("filter") != params.end())
-             ? absl::optional<std::regex>{std::regex(params.at("filter"))}
-             : absl::nullopt;
+// Helper method to get filter parameter, or report an error for an invalid regex.
+bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
+                 absl::optional<std::regex>& regex) {
+  auto p = params.find("filter");
+  if (p != params.end()) {
+    const std::string& pattern = p->second;
+    try {
+      regex = std::regex(pattern);
+    } catch (std::regex_error& error) {
+      // Include the offending pattern in the log, but not the error message.
+      response.add(fmt::format("Invalid regex: \"{}\"\n", error.what()));
+      ENVOY_LOG_MISC(error, "admin: Invalid regex: \"{}\": {}", error.what(), pattern);
+      return false;
+    }
+  }
+  return true;
 }
 
 // Helper method to get the format parameter
@@ -686,12 +699,61 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderMap&,
+                                            Buffer::Instance& response, AdminStream&) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  ListenerManager::StopListenersType stop_listeners_type =
+      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
+                                                 : ListenerManager::StopListenersType::All;
+  server_.listenerManager().stopListeners(stop_listeners_type);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
+  server_.stats().symbolTable().clearRecentLookups();
+  response.add("OK\n");
+  return Http::Code::OK;
+}
 
+Http::Code AdminImpl::handlerStatsRecentLookups(absl::string_view, Http::HeaderMap&,
+                                                Buffer::Instance& response, AdminStream&) {
+  Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
+  std::string table;
+  const uint64_t total =
+      symbol_table.getRecentLookups([&table](absl::string_view name, uint64_t count) {
+        table += fmt::format("{:8d} {}\n", count, name);
+      });
+  if (table.empty() && symbol_table.recentLookupCapacity() == 0) {
+    table = "Lookup tracking is not enabled. Use /stats/recentlookups/enable to enable.\n";
+  } else {
+    response.add("   Count Lookup\n");
+  }
+  response.add(absl::StrCat(table, "\ntotal: ", total, "\n"));
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerStatsRecentLookupsClear(absl::string_view, Http::HeaderMap&,
+                                                     Buffer::Instance& response, AdminStream&) {
+  server_.stats().symbolTable().clearRecentLookups();
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerStatsRecentLookupsDisable(absl::string_view, Http::HeaderMap&,
+                                                       Buffer::Instance& response, AdminStream&) {
+  server_.stats().symbolTable().setRecentLookupCapacity(0);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::HeaderMap&,
+                                                      Buffer::Instance& response, AdminStream&) {
+  server_.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
   response.add("OK\n");
   return Http::Code::OK;
 }
@@ -735,7 +797,10 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
   const bool used_only = params.find("usedonly") != params.end();
-  const absl::optional<std::regex> regex = filterParam(params);
+  absl::optional<std::regex> regex;
+  if (!filterParam(params, response, regex)) {
+    return Http::Code::BadRequest;
+  }
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -788,7 +853,10 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, H
                                              Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
-  const absl::optional<std::regex> regex = filterParam(params);
+  absl::optional<std::regex> regex;
+  if (!filterParam(params, response, regex)) {
+    return Http::Code::BadRequest;
+  }
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
                                               server_.stats().histograms(), response, used_only,
                                               regex);
@@ -1207,6 +1275,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
+          {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
+           true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -1214,6 +1284,14 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
+          {"/stats/recentlookups", "Show recent stat-name lookups",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookups), false, false},
+          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsClear), false, true},
+          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsDisable), false, true},
+          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsEnable), false, true},
           {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
