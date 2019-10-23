@@ -24,7 +24,7 @@ public:
   virtual SubscriptionPtr
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks, bool is_delta) PURE;
+                               SubscriptionCallbacks& callbacks) PURE;
 };
 
 } // namespace Config
