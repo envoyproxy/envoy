@@ -34,6 +34,10 @@ build:sanitizer --linkopt -ldl
 build:sanitizer --build_tag_filters=-no_san
 build:sanitizer --test_tag_filters=-no_san
 
+# Common flags for Clang
+build:clang --action_env=BAZEL_COMPILER=clang
+build:clang --linkopt=-fuse-ld=lld
+
 # Basic ASAN/UBSAN that works for gcc
 build:asan --config=sanitizer
 # ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
@@ -85,10 +89,10 @@ build:clang-msan --copt -fsanitize-memory-track-origins=2
 # Clang with libc++
 # TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
 # and update stats_integration_test with appropriate m_per_cluster value
+build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
-build:libc++ --host_linkopt=-fuse-ld=lld
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
@@ -131,7 +135,7 @@ build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
 
 # Docker sandbox
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build@sha256:47380d6ec4a83599fc0fce8f6ef5ee216ecb06c643d195fa43ba6c71f878a9ea
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -154,3 +158,6 @@ build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
+
+try-import clang.bazelrc
+try-import user.bazelrc

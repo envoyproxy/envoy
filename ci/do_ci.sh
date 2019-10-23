@@ -145,11 +145,7 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
-    --copt=-fsanitize=vptr,function --linkopt=-fsanitize=vptr,function \
-    --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a \
-    --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a \
-    --linkopt=-L$(dirname $(find $(llvm-config --libdir) -name libclang_rt.ubsan_standalone_cxx-x86_64.a | head -1))" 
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan"
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
