@@ -26,9 +26,7 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
-  bool is_internal_request =
-      headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() == "true");
-
+  const bool is_internal_request = Http::HeaderUtility::isEnvoyInternalRequest(headers);
   if ((is_internal_request && config_->requestType() == FilterRequestType::External) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::Internal)) {
     return;

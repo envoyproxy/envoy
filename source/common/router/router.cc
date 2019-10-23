@@ -286,12 +286,9 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
   ASSERT(response_status_code == Http::Utility::getResponseStatus(response_headers));
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
-    const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
-
     const bool is_canary = (upstream_canary_header && upstream_canary_header->value() == "true") ||
                            (upstream_host ? upstream_host->canary() : false);
-    const bool internal_request =
-        internal_request_header && internal_request_header->value() == "true";
+    const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
@@ -1222,12 +1219,8 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-
     upstream_request.upstream_host_->outlierDetector().putResponseTime(response_time);
-
-    const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
-    const bool internal_request =
-        internal_request_header && internal_request_header->value() == "true";
+    const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Http::CodeStats& code_stats = httpContext().codeStats();
     Http::CodeStats::ResponseTimingInfo info{config_.scope_,
