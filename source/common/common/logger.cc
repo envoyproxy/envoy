@@ -9,6 +9,7 @@
 #include "common/common/lock_guard.h"
 
 #include "spdlog/spdlog.h"
+#include "absl/strings/escaping.h"
 
 namespace Envoy {
 namespace Logger {
@@ -52,21 +53,6 @@ void StderrSinkDelegate::flush() {
   std::cerr << std::flush;
 }
 
-StderrEscapeNewlineSinkDelegate::StderrEscapeNewlineSinkDelegate(DelegatingLogSinkPtr log_sink)
-    : StderrSinkDelegate(log_sink) {}
-
-void StderrEscapeNewlineSinkDelegate::log(absl::string_view msg) {
-  Thread::OptionalLockGuard guard(lock_);
-  for (size_t i = 0; i < msg.size() - 1; i++) {
-    if (msg[i] == '\n') {
-      std::cerr << "\\n ";
-    } else {
-      std::cerr << msg[i];
-    }
-  }
-  std::cerr << msg[msg.size() - 1];
-}
-
 void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatter) {
   absl::MutexLock lock(&format_mutex_);
   formatter_ = std::move(formatter);
@@ -74,27 +60,27 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
 
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
-  if (!formatter_) {
-    lock.Release();
-    sink_->log(absl::string_view(msg.payload.data(), msg.payload.size()));
-    return;
+  absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
+  if (formatter_) {
+    fmt::memory_buffer formatted;
+    formatter_->format(msg, formatted);
+    msg_view = absl::string_view(formatted.data(), formatted.size());
   }
-
-  fmt::memory_buffer formatted;
-  formatter_->format(msg, formatted);
   lock.Release();
-  sink_->log(absl::string_view(formatted.data(), formatted.size()));
+
+  if (should_escape_newlines_) {
+    sink_->log(absl::CEscape(msg_view));
+    sink_->log("\r\n");
+  } else {
+    sink_->log(msg_view);
+  }
 }
 
 DelegatingLogSinkPtr DelegatingLogSink::init(bool should_escape_newlines) {
   DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
 
-  if (should_escape_newlines) {
-    delegating_sink->stderr_sink_ =
-        std::make_unique<StderrEscapeNewlineSinkDelegate>(delegating_sink);
-  } else {
-    delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
-  }
+  delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
+  delegating_sink->should_escape_newlines_ = should_escape_newlines;
 
   return delegating_sink;
 }

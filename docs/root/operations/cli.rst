@@ -132,8 +132,9 @@ following are the command line options that Envoy supports.
 
 .. option:: --log-format-escape-newlines
 
-  *(optional)* This flag enables application log sanitization to escape newline characters.
-  This prevents a single log line from spanning multiple lines in the underlying log.
+  *(optional)* This flag enables application log sanitization to escape C-style escape sequences.
+  This can be used to prevent a single log line from spanning multiple lines in the underlying log.
+  This sanitizes all escape sequences in `this list <https://en.cppreference.com/w/cpp/language/escape>`_.
 
 .. option:: --restart-epoch <integer>
 

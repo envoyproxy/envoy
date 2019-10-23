@@ -151,21 +151,6 @@ private:
 };
 
 /**
- * SinkDelegate that writes log messages to stderr and escapes new line characters.
- * That way, each call to the logger will only output one line.
- */
-class StderrEscapeNewlineSinkDelegate : public StderrSinkDelegate {
-public:
-  explicit StderrEscapeNewlineSinkDelegate(DelegatingLogSinkPtr log_sink);
-
-  // SinkDelegate
-  void log(absl::string_view msg) override;
-
-private:
-  Thread::BasicLockable* lock_{};
-};
-
-/**
  * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
  * the previous state when the DelegatingSink is destructed.
  */
@@ -214,6 +199,7 @@ private:
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
   absl::Mutex format_mutex_; // direct absl reference to break build cycle.
+  bool should_escape_newlines_;
 };
 
 /**
