@@ -195,6 +195,8 @@ Version history
 * router: added :ref:`RouteAction's auto_host_rewrite_header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>` to allow upstream host header substitution with some other header's value
 * router: added support for UPSTREAM_REMOTE_ADDRESS :ref:`header formatter
   <config_http_conn_man_headers_custom_request_headers>`.
+* router: added support for REQ(header-name) :ref:`header formatter
+  <config_http_conn_man_headers_custom_request_headers>`.
 * router: add ability to reject a request that includes invalid values for
   headers configured in :ref:`strict_check_headers <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>`
 * runtime: added support for :ref:`flexible layering configuration

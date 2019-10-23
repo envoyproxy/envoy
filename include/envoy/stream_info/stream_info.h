@@ -20,6 +20,11 @@
 
 namespace Envoy {
 
+namespace Http {
+class HeaderMap;
+class LowerCaseString;
+} // namespace Http
+
 namespace Router {
 class RouteEntry;
 } // namespace Router
@@ -494,6 +499,17 @@ public:
    *         failed.
    */
   virtual const std::string& upstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param request headers.
+   */
+  virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
+
+  /**
+   * @param request header name.
+   * @return request header value.
+   */
+  virtual std::string getRequestHeader(const Http::LowerCaseString& name) const PURE;
 };
 
 } // namespace StreamInfo

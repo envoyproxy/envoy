@@ -13,6 +13,7 @@
 #include "common/json/json_loader.h"
 #include "common/stream_info/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 
@@ -162,6 +163,26 @@ parsePerRequestStateField(absl::string_view param_str) {
   };
 }
 
+// Parses the parameter for REQ and returns a function suitable for accessing the specified
+// request header from an StreamInfo::StreamInfo. Expects a string formatted as:
+//   (<header_name>)
+std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
+parseRequestHeader(absl::string_view param_str) {
+  param_str = StringUtil::trim(param_str);
+  if (param_str.empty() || param_str.front() != '(' || param_str.back() != ')') {
+    throw EnvoyException(formatPerRequestStateParseException(param_str));
+  }
+  param_str = param_str.substr(1, param_str.size() - 2); // trim parens
+  if (param_str.empty()) {
+    throw EnvoyException(formatPerRequestStateParseException(param_str));
+  }
+
+  Http::LowerCaseString param{std::string(param_str)};
+  return [param](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+    return stream_info.getRequestHeader(param);
+  };
+}
+
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
 StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor(
@@ -302,6 +323,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
   } else if (field_name.find("PER_REQUEST_STATE") == 0) {
     field_extractor_ =
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
+  } else if (field_name.find("REQ") == 0) {
+    field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

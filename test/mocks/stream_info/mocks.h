@@ -81,6 +81,8 @@ public:
   MOCK_CONST_METHOD0(requestedServerName, const std::string&());
   MOCK_METHOD1(setUpstreamTransportFailureReason, void(absl::string_view));
   MOCK_CONST_METHOD0(upstreamTransportFailureReason, const std::string&());
+  MOCK_METHOD1(setRequestHeaders, void(const Http::HeaderMap&));
+  MOCK_CONST_METHOD1(getRequestHeader, std::string(const Http::LowerCaseString&));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
