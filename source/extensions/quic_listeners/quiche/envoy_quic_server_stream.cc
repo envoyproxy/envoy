@@ -34,7 +34,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSp
           // This should be larger than 8k to fully utilize congestion control
           // window. And no larger than the max stream flow control window for
           // the stream to buffer all the data.
-          // Ideally this limit should also corelate to peer's receive window
+          // Ideally this limit should also correlate to peer's receive window
           // but not fully depends on that.
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
@@ -68,7 +68,11 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   uint64_t bytes_to_send_old = BufferedDataBytes();
   // QUIC stream must take all.
   WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
-  ASSERT(data.length() == 0);
+  if (data.length() > 0) {
+    // Send buffer didn't take all the data, threshold needs to be adjusted.
+    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    return;
+  }
 
   uint64_t bytes_to_send_new = BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
@@ -89,7 +93,7 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
-  // Higher layers expect calling resetStream() to immediately raise reset callbacks.
+  // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(reason);
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
@@ -106,7 +110,7 @@ void EnvoyQuicServerStream::switchStreamBlockState(bool should_block) {
   if (should_block) {
     sequencer()->SetBlockedUntilFlush();
   } else {
-    ASSERT(read_disable_counter_ == 0, "readDisable called in btw.");
+    ASSERT(read_disable_counter_ == 0, "readDisable called in between.");
     sequencer()->SetUnblocked();
   }
 }
@@ -206,7 +210,7 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
   if (BufferedDataBytes() > 0) {
-    // If the stream is closed without sending out all bufferred data, regard
+    // If the stream is closed without sending out all buffered data, regard
     // them as sent now and adjust connection buffer book keeping.
     dynamic_cast<QuicFilterManagerConnectionImpl*>(session())->adjustBytesToSend(
         0 - BufferedDataBytes());

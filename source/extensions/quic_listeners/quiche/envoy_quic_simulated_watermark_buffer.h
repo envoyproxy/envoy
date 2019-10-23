@@ -10,8 +10,9 @@ namespace Envoy {
 namespace Quic {
 
 // A class, together with a stand alone buffer, used to achieve the purpose of WatermarkBuffer.
-// Itself doesn't have buffer or do bookeeping of buffered bytes. But provided with buffered_bytes,
+// Itself doesn't have buffer or bookkeep buffered bytes. But provided with buffered_bytes,
 // it re-acts upon crossing high/low watermarks.
+// It's no-op if provided low and high watermark are 0.
 class EnvoyQuicSimulatedWatermarkBuffer {
 public:
   EnvoyQuicSimulatedWatermarkBuffer(uint32_t low_watermark, uint32_t high_watermark,
@@ -28,8 +29,7 @@ public:
 
   void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_above_high_watermark_ && bytes_buffered > high_watermark_) {
-      // This is the first time for the buffer to cross the high watermark
-      // since it was once below low watermark.
+      // Transitioning from below low watermark to above high watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross high watermark {}",
                           bytes_buffered, high_watermark_);
       is_above_high_watermark_ = true;
@@ -40,8 +40,7 @@ public:
 
   void checkLowWatermark(uint32_t bytes_buffered) {
     if (low_watermark_ > 0 && !is_below_low_watermark_ && bytes_buffered < low_watermark_) {
-      // This is the first time for the buffer to cross the low watermark
-      // since it was once above high watermark.
+      // Transitioning from above high watermark to below low watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross low watermark {}",
                           bytes_buffered, low_watermark_);
       is_below_low_watermark_ = true;

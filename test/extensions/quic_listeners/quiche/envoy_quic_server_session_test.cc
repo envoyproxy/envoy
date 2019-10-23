@@ -76,17 +76,7 @@ public:
 // Derive to have simpler priority mechanism.
 class TestEnvoyQuicServerSession : public EnvoyQuicServerSession {
 public:
-  TestEnvoyQuicServerSession(const quic::QuicConfig& config,
-                             const quic::ParsedQuicVersionVector& supported_versions,
-                             std::unique_ptr<EnvoyQuicConnection> connection,
-                             quic::QuicSession::Visitor* visitor,
-                             quic::QuicCryptoServerStream::Helper* helper,
-                             const quic::QuicCryptoServerConfig* crypto_config,
-                             quic::QuicCompressedCertsCache* compressed_certs_cache,
-                             Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
-      : EnvoyQuicServerSession(config, supported_versions, std::move(connection), visitor, helper,
-                               crypto_config, compressed_certs_cache, dispatcher,
-                               send_buffer_limit) {}
+  using EnvoyQuicServerSession::EnvoyQuicServerSession;
 
   bool ShouldYield(quic::QuicStreamId /*stream_id*/) override {
     // Never yield to other stream so that it's easier to predict stream write
@@ -429,11 +419,8 @@ TEST_P(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
 
 class TestQuicCryptoServerStream : public quic::QuicCryptoServerStream {
 public:
-  explicit TestQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
-                                      quic::QuicCompressedCertsCache* compressed_certs_cache,
-                                      quic::QuicServerSessionBase* session,
-                                      quic::QuicCryptoServerStream::Helper* helper)
-      : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
+  using quic::QuicCryptoServerStream::QuicCryptoServerStream;
+
   bool encryption_established() const override { return true; }
 };
 
@@ -618,8 +605,8 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   envoy_quic_session_.OnCanWrite();
   EXPECT_TRUE(stream2->flow_controller()->IsBlocked());
 
-  // Resetting stream3 should lower the bufferred bytes, but callbacks will not
-  // be triggered because reset callback has been already triggerred.
+  // Resetting stream3 should lower the buffered bytes, but callbacks will not
+  // be triggered because reset callback has been already triggered.
   EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, ""));
   // Connection buffered data book keeping should also be updated.
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark());

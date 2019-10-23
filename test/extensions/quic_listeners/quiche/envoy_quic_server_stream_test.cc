@@ -43,7 +43,7 @@ public:
                          /*owns_writer=*/false, {quic_version_}, listener_config_, listener_stats_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
+        stream_id_(VersionUsesQpack(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
     quic_stream_->setDecoder(stream_decoder_);
@@ -72,7 +72,7 @@ public:
 
     trailers_.OnHeaderBlockStart();
     trailers_.OnHeader("key1", "value1");
-    if (quic_version_.transport_version != quic::QUIC_VERSION_99) {
+    if (!quic::VersionUsesQpack(quic_version_.transport_version)) {
       // ":final-offset" is required and stripped off by quic.
       trailers_.OnHeader(":final-offset", absl::StrCat("", request_body_.length()));
     }
@@ -94,7 +94,7 @@ public:
           EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                     headers->Method()->value().getStringView());
         }));
-    if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
       quic_stream_->OnHeadersDecoded(request_headers_);
     } else {
       quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
@@ -111,7 +111,7 @@ public:
           }
         }));
     std::string data = payload;
-    if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
       std::unique_ptr<char[]> data_buffer;
       quic::HttpEncoder encoder;
       quic::QuicByteCount data_frame_header_length =
@@ -168,7 +168,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   std::string data = request_body_;
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
@@ -222,7 +222,7 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
 
   std::string data = request_body_;
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
@@ -262,7 +262,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   // Disable reading one more time.
   quic_stream_->readDisable(true);
   std::string second_part_request("bbb");
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
@@ -281,7 +281,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 
   // This data frame should also be buffered.
   std::string last_part_request("ccc");
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
@@ -315,7 +315,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   headers->Method()->value().getStringView());
       }));
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
     quic_stream_->OnHeadersDecoded(request_headers_);
   } else {
     quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
@@ -333,7 +333,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         quic_stream_->readDisable(false);
       }));
   std::string data = payload;
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
@@ -345,7 +345,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   quic_stream_->OnStreamFrame(frame);
 
   std::string last_part_request("bbb");
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
     std::unique_ptr<char[]> data_buffer;
     quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =

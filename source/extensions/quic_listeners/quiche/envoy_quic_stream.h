@@ -42,6 +42,9 @@ public:
     }
 
     if (status_changed && !in_decode_data_callstack_) {
+      // Avoid calling this while decoding data because transient disabling and
+      // enabling reading may trigger another decoding data inside the
+      // callstack which messes up stream state.
       switchStreamBlockState(disable);
     }
   }
@@ -84,7 +87,7 @@ protected:
     return decoder_;
   }
 
-  // True once end of stream is propergated to Envoy. Envoy doesn't expect to be
+  // True once end of stream is propagated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
   bool end_stream_decoded_{false};
