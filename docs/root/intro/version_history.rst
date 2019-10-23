@@ -88,6 +88,8 @@ Version history
   :ref:`per-worker watchdog stats <operations_performance_watchdog>` to help diagnosing event
   loop imbalance and general performance issues.
 * stats: added unit support to histogram.
+* tcp_proxy: the default :ref:`idle_timeout
+  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
