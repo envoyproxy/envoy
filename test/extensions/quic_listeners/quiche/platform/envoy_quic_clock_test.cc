@@ -61,17 +61,25 @@ TEST(EnvoyQuicClockTest, ApproximateNow) {
   EnvoyQuicClock clock(*dispatcher);
 
   // ApproximateTime() is cached.
+  // Its value does not change only because time passes.
+  const quic::QuicTime time_at_beginning = clock.Now();
+  EXPECT_EQ(clock.ApproximateNow(), time_at_beginning);
   const int kDeltaMicroseconds = 10;
-  quic::QuicTime approximate_now1 = clock.ApproximateNow();
   time_system.sleep(std::chrono::microseconds(kDeltaMicroseconds));
-  quic::QuicTime approximate_now2 = clock.ApproximateNow();
-  EXPECT_EQ(approximate_now1, approximate_now2);
+  EXPECT_EQ(clock.ApproximateNow(), time_at_beginning);
 
   // Calling Now() updates ApproximateTime().
-  quic::QuicTime now = clock.Now();
-  approximate_now2 = clock.ApproximateNow();
-  EXPECT_EQ(now, approximate_now2);
-  EXPECT_EQ(now, approximate_now1 + quic::QuicTime::Delta::FromMicroseconds(kDeltaMicroseconds));
+  clock.Now();
+  const auto kDelta = quic::QuicTime::Delta::FromMicroseconds(kDeltaMicroseconds);
+  EXPECT_EQ(clock.ApproximateNow(), time_at_beginning + kDelta);
+
+  // Running the event loop calls the prepare callback which updates
+  // ApproximateTime(), as long as there is at least one task posted.
+  time_system.sleep(std::chrono::microseconds(kDeltaMicroseconds));
+  EXPECT_EQ(clock.ApproximateNow(), time_at_beginning + kDelta);
+  dispatcher->post([]() {});
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(clock.ApproximateNow(), time_at_beginning + 2 * kDelta);
 }
 
 } // namespace Quic
