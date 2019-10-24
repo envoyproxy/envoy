@@ -46,13 +46,13 @@ protected:
     ZlibDecompressorImpl decompressor;
     decompressor.init(window_bits);
 
-    decompressor.decompress(accumulation_buffer, buffer);
-    std::string decompressed_text{buffer.toString()};
+    const int result = decompressor.decompress(accumulation_buffer, buffer);
+    const std::string decompressed_text{buffer.toString()};
 
     ASSERT_EQ(compressor.checksum(), decompressor.checksum());
     ASSERT_EQ(original_text.length(), decompressed_text.length());
     EXPECT_EQ(original_text, decompressed_text);
-    EXPECT_EQ(0, decompressor.decompressionError());
+    EXPECT_EQ(0, result);
   }
 
   static const int64_t gzip_window_bits{31};
@@ -87,13 +87,13 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   decompressor.init(gzip_window_bits);
   EXPECT_EQ(0, decompressor.checksum());
 
-  decompressor.decompress(compressor_buffer, decompressor_output_buffer);
+  const int result = decompressor.decompress(compressor_buffer, decompressor_output_buffer);
 
   drainBuffer(compressor_buffer);
   drainBuffer(decompressor_output_buffer);
 
   EXPECT_EQ(compressor.checksum(), decompressor.checksum());
-  EXPECT_EQ(0, decompressor.decompressionError());
+  EXPECT_EQ(0, result);
 }
 
 // Exercises compression and decompression by compressing some data, decompressing it and then
@@ -130,8 +130,8 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   ZlibDecompressorImpl decompressor;
   decompressor.init(gzip_window_bits);
 
-  decompressor.decompress(accumulation_buffer, buffer);
-  std::string decompressed_text{buffer.toString()};
+  const int result = decompressor.decompress(accumulation_buffer, buffer);
+  const std::string decompressed_text{buffer.toString()};
 
   // Check decompressor's internal state isn't broken.
   drainBuffer(buffer);
@@ -142,7 +142,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   EXPECT_EQ(original_text, decompressed_text);
-  EXPECT_EQ(0, decompressor.decompressionError());
+  EXPECT_EQ(0, result);
 }
 
 TEST_F(ZlibDecompressorImplTest, UninitializedDecompression) {
@@ -150,11 +150,11 @@ TEST_F(ZlibDecompressorImplTest, UninitializedDecompression) {
     Buffer::OwnedImpl output_buffer;
     ZlibDecompressorImpl decompressor;
     TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
-    decompressor.decompress(input_buffer, output_buffer);
-    EXPECT_EQ(-2, decompressor.decompressionError());
+    const int result = decompressor.decompress(input_buffer, output_buffer);
+    EXPECT_EQ(-2, result);
 }
 
-// Tests decompressionError() stores an error code when decompression fails.
+// Tests returning an error code when decompression fails.
 TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl accumulation_buffer;
@@ -169,8 +169,8 @@ TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
 
   ZlibDecompressorImpl decompressor;
   decompressor.init(gzip_window_bits);
-  decompressor.decompress(accumulation_buffer, buffer);
-  EXPECT_EQ(-3, decompressor.decompressionError());
+  const int result = decompressor.decompress(accumulation_buffer, buffer);
+  EXPECT_EQ(-3, result);
 }
 
 // Exercises decompression with a very small output buffer.
@@ -205,13 +205,13 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   ZlibDecompressorImpl decompressor(16);
   decompressor.init(gzip_window_bits);
 
-  decompressor.decompress(accumulation_buffer, buffer);
-  std::string decompressed_text{buffer.toString()};
+  const int result = decompressor.decompress(accumulation_buffer, buffer);
+  const std::string decompressed_text{buffer.toString()};
 
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   EXPECT_EQ(original_text, decompressed_text);
-  EXPECT_EQ(0, decompressor.decompressionError());
+  EXPECT_EQ(0, result);
 }
 
 // Exercises decompression with other supported zlib initialization params.
@@ -268,13 +268,13 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   drainBuffer(buffer);
   ASSERT_EQ(0, buffer.length());
 
-  decompressor.decompress(accumulation_buffer, buffer);
-  std::string decompressed_text{buffer.toString()};
+  const int result = decompressor.decompress(accumulation_buffer, buffer);
+  const std::string decompressed_text{buffer.toString()};
 
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   EXPECT_EQ(original_text, decompressed_text);
-  EXPECT_EQ(0, decompressor.decompressionError());
+  EXPECT_EQ(0, result);
 }
 
 } // namespace

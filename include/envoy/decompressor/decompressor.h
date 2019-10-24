@@ -16,11 +16,10 @@ public:
    * Decompresses data from one buffer into another buffer.
    * @param input_buffer supplies the buffer with compressed data.
    * @param output_buffer supplies the buffer to output decompressed data.
+   * @return the status code from decompression. A negative integer indicates failure.
    */
-  virtual void decompress(const Buffer::Instance& input_buffer,
+  virtual int decompress(const Buffer::Instance& input_buffer,
                           Buffer::Instance& output_buffer) PURE;
-
-  virtual int decompressionError() const PURE;
 };
 
 } // namespace Decompressor
