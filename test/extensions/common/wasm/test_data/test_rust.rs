@@ -7,7 +7,7 @@ extern "C" {
 }
 
 #[no_mangle]
-extern "C" fn __post_instantiate() {
+extern "C" fn _start() {
     unsafe { ping() }
 }
 

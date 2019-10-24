@@ -91,7 +91,6 @@ The following attributes are exposed to the language runtime:
    connection.tls_version, string, TLS version of the downstream TLS connection
    upstream.address, string, Upstream connection remote address
    upstream.port, int, Upstream connection remote port
-   upstream.mtls, bool, Indicates whether TLS is applied to the upstream connection and the peer ceritificate is presented
 
 
 Most attributes are optional and provide the default value based on the type of the attribute.

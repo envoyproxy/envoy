@@ -265,7 +265,7 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   prefix_.free(symbolTable());
 }
 
-// Manages the truncation and tag-extration of stat names. Tag extraction occurs
+// Manages the truncation and tag-extraction of stat names. Tag extraction occurs
 // on the original, untruncated name so the extraction can complete properly,
 // even if the tag values are partially truncated.
 class TagExtraction {
@@ -459,7 +459,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   return gauge;
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name) {
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
+                                                                  Histogram::Unit unit) {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
@@ -502,7 +503,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
     TagExtraction extraction(parent_, final_stat_name);
 
     RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
-        final_stat_name, parent_, *this, extraction.tagExtractedName(), extraction.tags()));
+        final_stat_name, unit, parent_, *this, extraction.tagExtractedName(), extraction.tags()));
     central_ref = &central_cache_.histograms_[stat->statName()];
     *central_ref = stat;
   }
@@ -552,7 +553,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   std::string tag_extracted_name =
       parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(name, tag_extracted_name, tags, symbolTable()));
+      new ThreadLocalHistogramImpl(name, parent.unit(), tag_extracted_name, tags, symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -562,12 +563,13 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   return *hist_tls_ptr;
 }
 
-ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name,
+ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
                                                    const std::string& tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
-    : HistogramImplHelper(name, tag_extracted_name, tags, symbol_table), current_active_(0),
-      used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
+    : HistogramImplHelper(name, tag_extracted_name, tags, symbol_table), unit_(unit),
+      current_active_(0), used_(false), created_thread_id_(std::this_thread::get_id()),
+      symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -590,19 +592,21 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(*other_histogram);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(StatName name, Store& parent, TlsScope& tls_scope,
-                                         absl::string_view tag_extracted_name,
+ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
+                                         TlsScope& tls_scope, absl::string_view tag_extracted_name,
                                          const std::vector<Tag>& tags)
-    : MetricImpl(name, tag_extracted_name, tags, parent.symbolTable()), parent_(parent),
-      tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
-      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false) {}
+    : MetricImpl(name, tag_extracted_name, tags, parent.symbolTable()), unit_(unit),
+      parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
+      cumulative_histogram_(hist_alloc()), interval_statistics_(interval_histogram_),
+      cumulative_statistics_(cumulative_histogram_), merged_(false) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   MetricImpl::clear(symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
+
+Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
   Histogram& tls_histogram = tls_scope_.tlsHistogram(statName(), *this);

@@ -412,7 +412,8 @@ stat_prefix: name
   EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
       .WillOnce(Return(&conn_pool));
 
-  request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+  request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
+                              nullptr);
 
   conn_pool.poolReady(upstream_connection);
 

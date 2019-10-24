@@ -23,29 +23,20 @@ function setup_gcc_toolchain() {
 
 function setup_clang_toolchain() {
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export PATH=/usr/lib/llvm-8/bin:$PATH
-    export CC=clang
-    export CXX=clang++
-    export BAZEL_COMPILER=clang
-    export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
-    echo "$CC/$CXX toolchain configured"
+    export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
   else
     export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang ${BAZEL_BUILD_OPTIONS}"
   fi
+  echo "clang toolchain configured"
 }
 
 function setup_clang_libcxx_toolchain() {
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export PATH=/usr/lib/llvm-8/bin:$PATH
-    export CC=clang
-    export CXX=clang++
-    export BAZEL_COMPILER=clang
-    export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
     export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
-    echo "$CC/$CXX toolchain with libc++ configured"
   else
     export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
   fi
+  echo "clang toolchain with libc++ configured"
 }
 
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
@@ -68,13 +59,14 @@ export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 export USER=bazel
 export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
+export PATH=/opt/llvm/bin:$PATH
+export CLANG_FORMAT=clang-format
 
-if [[ -f "/etc/redhat-release" ]]
-then
-  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
-else
-  export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-8/bin --linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+if [[ -f "/etc/redhat-release" ]]; then
+  export BAZEL_BUILD_EXTRA_OPTIONS+="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
 fi
+
+bazel/setup_clang.sh /opt/llvm
 
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
@@ -130,5 +122,6 @@ trap cleanup EXIT
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"

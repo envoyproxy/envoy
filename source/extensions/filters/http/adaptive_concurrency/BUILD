@@ -2,7 +2,7 @@ licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that dynamically adjusts the number of allowed concurrent
 # requests based on sampled latencies.
-# Public docs: TODO (tonya11en)
+# Public docs: docs/root/configuration/http_filters/adaptive_concurrency_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -31,7 +31,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
         "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
