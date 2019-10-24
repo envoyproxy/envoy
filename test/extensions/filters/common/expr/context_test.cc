@@ -209,8 +209,8 @@ TEST(Context, ResponseAttributes) {
   {
     auto value = response[CelValue::CreateString(Size)];
     EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsInt64());
-    EXPECT_EQ(123, value.value().Int64OrDie());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(123, value.value().Uint64OrDie());
   }
 
   {

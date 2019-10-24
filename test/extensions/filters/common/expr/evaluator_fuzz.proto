@@ -6,7 +6,7 @@ import "google/api/expr/v1alpha1/syntax.proto";
 import "test/fuzz/common.proto";
 import "validate/validate.proto";
 
-// Structured input for rbac_fuzz_test.
+// Structured input for fuzz test.
 
 message EvaluatorTestCase {
   google.api.expr.v1alpha1.Expr expression = 1 [(validate.rules).message.required = true];
