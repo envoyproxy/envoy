@@ -1,39 +1,21 @@
 diff --git a/mocktracer/BUILD b/mocktracer/BUILD
-index 3b22bab..894eeea 100644
+index 3b22bab..d425e2e 100644
 --- a/mocktracer/BUILD
 +++ b/mocktracer/BUILD
-@@ -7,13 +7,19 @@ cc_library(
+@@ -7,11 +7,13 @@ cc_library(
      deps = [
          "//:opentracing",
      ],
 +    alwayslink = 1,
  )
- 
+
  cc_binary(
      name = "libmocktracer_plugin.so",
-+    linkopts = [
-+        "-Wl,--version-script=$(location :tracer-export-map.ld)",
-+    ],
      linkshared = 1,
 +    linkstatic = 1,
      visibility = ["//visibility:public"],
      deps = [
--        "//mocktracer:mocktracer"
-+        "//mocktracer",
-+        "//mocktracer:tracer-export-map.ld",
-     ],
- )
-diff --git a/mocktracer/tracer-export-map.ld b/mocktracer/tracer-export-map.ld
-new file mode 100644
-index 0000000..66a4a4f
---- /dev/null
-+++ b/mocktracer/tracer-export-map.ld
-@@ -0,0 +1,5 @@
-+{
-+  global:
-+    OpenTracingMakeTracerFactory;
-+  local: *;
-+};
+         "//mocktracer:mocktracer"
 diff --git a/src/dynamic_load_unix.cpp b/src/dynamic_load_unix.cpp
 index 17e08fd..7e8ac02 100644
 --- a/src/dynamic_load_unix.cpp
@@ -41,7 +23,7 @@ index 17e08fd..7e8ac02 100644
 @@ -35,7 +35,13 @@ DynamicallyLoadTracingLibrary(const char* shared_library,
                                std::string& error_message) noexcept try {
    dlerror();  // Clear any existing error.
- 
+
 -  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL);
 +  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL
 +#if defined(__has_feature)
