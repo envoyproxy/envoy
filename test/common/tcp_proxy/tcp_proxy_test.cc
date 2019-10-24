@@ -55,7 +55,7 @@ namespace {
 Config constructConfigFromYaml(const std::string& yaml,
                                Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(json, tcp_proxy);
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
   return Config(tcp_proxy, context);
 }
 
