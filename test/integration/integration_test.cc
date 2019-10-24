@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "common/network/utility.h"
 #include "envoy/config/accesslog/v2/file.pb.h"
 
 #include "common/http/header_map_impl.h"
@@ -96,7 +97,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  uint32_t http_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(http_port);
   Http::TestHeaderMapImpl request_headers{{":method", "HEAD"},
                                           {":path", "/test/long/url"},
                                           {":scheme", "http"},
@@ -106,6 +108,13 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  EXPECT_THROW_WITH_REGEX(
+      Network::TcpListenSocket(
+          Network::Utility::getAddressWithPort(
+              *Network::Test::getCanonicalLoopbackAddress(GetParam()), http_port),
+          nullptr, true),
+      EnvoyException, "Address already in use");
 
   // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
@@ -126,6 +135,11 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   // Validate that the listeners have been stopped.
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+
+  Network::TcpListenSocket socket(
+      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                           http_port),
+      nullptr, true);
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {

@@ -584,10 +584,10 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
                   listener->socket().close();
                 }
               }
+              stats_.listener_stopped_.inc();
             });
           }
         });
-        stats_.listener_stopped_.inc();
       }
     }
   }
