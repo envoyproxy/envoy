@@ -801,6 +801,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/stats:stats_lib",
+        "//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )
 
