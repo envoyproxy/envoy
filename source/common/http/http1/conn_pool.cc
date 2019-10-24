@@ -6,6 +6,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/upstream.h"
 
@@ -27,10 +28,12 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           const Http::Http1Settings& settings,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
       socket_options_(options), transport_socket_options_(transport_socket_options),
-      upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
+      upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })),
+      settings_(settings) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
   while (!ready_clients_.empty()) {

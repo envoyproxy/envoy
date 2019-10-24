@@ -1,6 +1,8 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/http/codec.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/http/codec_client.h"
@@ -45,7 +47,7 @@ public:
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+                     Upstream::ResourcePriority::Default, nullptr, Http1Settings(), nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 

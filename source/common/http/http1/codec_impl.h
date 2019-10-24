@@ -125,7 +125,8 @@ private:
  */
 class RequestStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection, nullptr) {}
+  RequestStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
 
   // Http::StreamEncoder
@@ -368,7 +369,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       ConnectionCallbacks& callbacks, const uint32_t max_response_headers_count);
+                       ConnectionCallbacks& callbacks, const Http1Settings& settings,
+                       const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -400,6 +402,7 @@ private:
   std::list<PendingResponse> pending_responses_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
+  const HeaderKeyFormatterPtr header_key_formatter_;
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
