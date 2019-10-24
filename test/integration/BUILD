@@ -26,6 +26,7 @@ envoy_cc_test_library(
         "ads_integration.h",
     ],
     data = [
+        "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
     deps = [
