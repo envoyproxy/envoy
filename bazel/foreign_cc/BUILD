@@ -11,10 +11,7 @@ configure_make(
         "--enable-shared=no",
         "--enable-frame-pointers",
         "--disable-libunwind",
-    ] + select({
-        "//bazel:apple": ["AR=/usr/bin/ar"],
-        "//conditions:default": [],
-    }),
+    ],
     lib_source = "@com_github_gperftools_gperftools//:all",
     linkopts = ["-lpthread"],
     make_commands = ["make install-libLTLIBRARIES install-perftoolsincludeHEADERS"],
