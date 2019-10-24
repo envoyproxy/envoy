@@ -71,11 +71,7 @@ bool ZlibDecompressorImpl::inflateNext() {
   }
 
   decompression_status_code_ = result;
-  if (result < 0) {
-    return false;
-  }
-
-  return true;
+  return result >= 0;
 }
 
 void ZlibDecompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
