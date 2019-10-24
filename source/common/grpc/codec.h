@@ -49,21 +49,21 @@ public:
 // The next four "L" bytes represent the message length in BigEndian format.
 enum class State {
   // Waiting for decoding the flags (1 byte) of the GRPC data frame.
-  FH_FLAG,
+  FhFlag,
   // Waiting for decoding the 1st byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_0,
+  FhLen0,
   // Waiting for decoding the 2nd byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_1,
+  FhLen1,
   // Waiting for decoding the 3rd byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_2,
+  FhLen2,
   // Waiting for decoding the 4th byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_3,
+  FhLen3,
   // Waiting for decoding the data.
-  DATA,
+  Data,
 };
 
 class Decoder {
@@ -88,38 +88,6 @@ public:
   bool hasBufferedData() const { return state_ != State::FhFlag; }
 
 private:
-  // Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
-  // header:
-  //
-  // -----------------------------------------------------------------------
-  // |R|R|R|R|R|R|R|R|C|      L     |      L     |      L     |      L     |
-  // -----------------------------------------------------------------------
-  //    Flag (1 byte)                Message Length (4 bytes)
-  //
-  // A fixed header consists of five bytes.
-  // The first byte is the Flag. The last one "C" bit indicates if the message
-  // is compressed or not (0 is uncompressed, 1 is compressed). The other seven
-  // "R" bits are reserved for future use.
-  // The next four "L" bytes represent the message length in BigEndian format.
-  enum class State {
-    // Waiting for decoding the flags (1 byte) of the GRPC data frame.
-    FhFlag,
-    // Waiting for decoding the 1st byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FhLen0,
-    // Waiting for decoding the 2nd byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FhLen1,
-    // Waiting for decoding the 3rd byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FhLen2,
-    // Waiting for decoding the 4th byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FhLen3,
-    // Waiting for decoding the data.
-    Data,
-  };
-
   State state_;
   Frame frame_;
 };
