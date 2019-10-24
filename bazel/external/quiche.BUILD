@@ -3120,7 +3120,7 @@ envoy_cc_test_library(
     hdrs = [
         "quiche/quic/test_tools/quic_server_session_base_peer.h",
     ],
-    copts = quiche_copt,
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
