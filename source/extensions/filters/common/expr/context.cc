@@ -124,7 +124,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
       return CelValue::CreateInt64(code.value());
     }
   } else if (value == Size) {
-    return CelValue::CreateInt64(info_.bytesSent());
+    return CelValue::CreateUint64(info_.bytesSent());
   } else if (value == Headers) {
     return CelValue::CreateMap(&headers_);
   } else if (value == Trailers) {
@@ -186,9 +186,13 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (value == Address) {
     if (local_) {
-      return CelValue::CreateString(info_.downstreamLocalAddress()->asStringView());
+      if (info_.downstreamLocalAddress() != nullptr) {
+        return CelValue::CreateString(info_.downstreamLocalAddress()->asStringView());
+      }
     } else {
-      return CelValue::CreateString(info_.downstreamRemoteAddress()->asStringView());
+      if (info_.downstreamLocalAddress() != nullptr) {
+        return CelValue::CreateString(info_.downstreamRemoteAddress()->asStringView());
+      }
     }
   } else if (value == Port) {
     if (local_) {

@@ -17,4 +17,5 @@ message StreamInfo {
   uint64 start_time = 2;
   google.protobuf.UInt32Value response_code = 3;
   envoy.api.v2.core.Metadata upstream_metadata = 4;
+  string requested_server_name = 5;
 }
