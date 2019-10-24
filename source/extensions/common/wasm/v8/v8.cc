@@ -46,7 +46,7 @@ public:
 
   // v8 is currently not clonable.
   bool cloneable() override { return false; }
-  std::unique_ptr<WasmVm> clone() override { return nullptr; }
+  WasmVmPtr clone() override { return nullptr; }
 
   uint64_t getMemorySize() override;
   absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) override;
