@@ -9,6 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "header_formatter_test",
+    srcs = ["header_formatter_test.cc"],
+    deps = [
+        "//source/common/http/http1:header_formatter_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     deps = [
