@@ -165,7 +165,7 @@ message AccessLogCommon {
 }
 
 // Flags indicating occurrences during request/response processing.
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message ResponseFlags {
   message Unauthorized {
     // Reasons why the request was unauthorized
@@ -233,6 +233,9 @@ message ResponseFlags {
   // Indicates that the request was rejected because an envoy request header failed strict
   // validation.
   bool invalid_envoy_request_headers = 18;
+
+  // Indicates there was an HTTP protocol error on the downstream request.
+  bool downstream_protocol_error = 19;
 }
 
 // Properties of a negotiated TLS connection.

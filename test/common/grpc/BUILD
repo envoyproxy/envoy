@@ -42,6 +42,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
+        "//test/common/buffer:utility_lib",
         "//test/proto:helloworld_proto_cc_proto",
     ],
 )

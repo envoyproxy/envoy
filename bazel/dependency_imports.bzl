@@ -4,7 +4,7 @@ load("@envoy_build_tools//toolchains:rbe_toolchains_config.bzl", "rbe_toolchains
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
 # go version for rules_go
-GO_VERSION = "1.12.8"
+GO_VERSION = "1.13.3"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     rules_foreign_cc_dependencies()

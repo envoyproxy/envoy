@@ -14,9 +14,15 @@ namespace Expr {
 BuilderPtr createBuilder(Protobuf::Arena* arena) {
   google::api::expr::runtime::InterpreterOptions options;
 
-  // Conformance with spec/go runtimes requires this setting
-  options.partial_string_match = true;
+  // Security-oriented defaults
+  options.enable_comprehension = false;
+  options.enable_regex = true;
+  options.regex_max_program_size = 100;
+  options.enable_string_conversion = false;
+  options.enable_string_concat = false;
+  options.enable_list_concat = false;
 
+  // Enable constant folding (performance optimization)
   if (arena != nullptr) {
     options.constant_folding = true;
     options.constant_arena = arena;
@@ -24,7 +30,7 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
 
   auto builder = google::api::expr::runtime::CreateCelExpressionBuilder(options);
   auto register_status =
-      google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry());
+      google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry(), options);
   if (!register_status.ok()) {
     throw EnvoyException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
