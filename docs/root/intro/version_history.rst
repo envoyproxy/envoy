@@ -96,7 +96,7 @@ Version history
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
-* tls: Remove TLS 1.0 and 1.1 from client defaults
+* tls: remove TLS 1.0 and 1.1 from client defaults
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
   certificate validation context.
 * tracing: added tags for gRPC response status and message.
