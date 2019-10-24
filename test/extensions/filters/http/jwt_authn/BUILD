@@ -81,7 +81,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//source/extensions/filters/http/jwt_authn:jwks_cache_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
