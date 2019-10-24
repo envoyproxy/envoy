@@ -96,9 +96,8 @@ Engine::~Engine() {
     ASSERT(main_common_);
     event_dispatcher_->post([this]() -> void {
       callbacks_.on_exit();
-      // This call will gracefully shutdown the Server::Instance and exit the event loop,
-      // returning main_thread_'s execution to Engine::run
-      TS_UNCHECKED_READ(main_common_)->server()->shutdown();
+      // Exit the event loop and finish up in Engine::run(...)
+      event_dispatcher_->exit();
     });
   } // _mutex
 
