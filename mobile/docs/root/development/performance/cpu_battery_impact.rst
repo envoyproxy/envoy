@@ -3,6 +3,11 @@
 Analysis of CPU/battery impact
 ==============================
 
+.. warning::
+
+  These analyses have not been updated since Envoy Mobile added interfaces for performing
+  network requests directly using the library. They will be re-run as part of :issue:`#536 <536>`.
+
 Modified versions of the "hello world" example apps were used to run these experiments:
 
 - :tree:`Android control app <8636711/examples/kotlin/control>`
@@ -43,8 +48,6 @@ Android
 -------
 
 Valid through SHA :tree:`8636711 <8636711>`.
-
-TODO(buildbreaker): Update battery percentages
 
 Envoy:
 
