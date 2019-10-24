@@ -99,7 +99,6 @@ message RouteAction {
 
   // Strip the service prefix from the method name, if there's a prefix. For
   // example, the method call Service:method would end up being just method.
-  // Defaults to false.
   bool strip_service_name = 5;
 }
 
