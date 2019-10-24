@@ -944,13 +944,9 @@ filter:
       - URX
       - SI
       - IH
-<<<<<<< HEAD
+      - DPE      
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-=======
-      - DPE
-config:
->>>>>>> master
   path: /dev/null
   )EOF";
 
@@ -1010,8 +1006,9 @@ typed_config:
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
       "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\"]]): name: \"envoy.file_access_log\"\nfilter {\n  "
-      "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  fields {\n  "
-      "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  }\n}\n");
+      "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
+      "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
+      "}\n}\n");
 }
 
 TEST_F(AccessLogImplTest, ValidateTypedConfig) {
