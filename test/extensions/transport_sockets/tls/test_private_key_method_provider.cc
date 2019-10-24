@@ -237,9 +237,14 @@ static ssl_private_key_result_t ecdsaPrivateKeyComplete(SSL* ssl, uint8_t* out, 
                             TestPrivateKeyMethodProvider::ecdsaConnectionIndex());
 }
 
-Ssl::BoringSslPrivateKeyMethodSharedPtr
-TestPrivateKeyMethodProvider::getBoringSslPrivateKeyMethod() {
-  return method_;
+void TestPrivateKeyMethodProvider::installBoringSslPrivateKeyMethod(SSL_CTX* ssl_ctx) {
+#ifdef BORINGSSL_FIPS
+  if (!checkFips()) {
+    throw EnvoyException(
+        fmt::format("Private key method doesn't support FIPS mode with current parameters"));
+  }
+#endif
+  SSL_CTX_set_private_key_method(ssl_ctx, method_.get());
 }
 
 bool TestPrivateKeyMethodProvider::checkFips() {

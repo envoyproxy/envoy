@@ -6,14 +6,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
-NOBORINGSSL_SKIP_TARGETS = {
-    # The lua filter depends on BoringSSL
-    "lua": "envoy.filters.http.lua",
-
-    # These two extensions are supposed to be replaced with alternative extensions.
-    "tls": "envoy.transport_sockets.tls",
-    "tls_inspector": "envoy.filters.listener.tls_inspector",
-}
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.

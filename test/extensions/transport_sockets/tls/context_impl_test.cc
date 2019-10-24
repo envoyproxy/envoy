@@ -29,6 +29,7 @@ using Envoy::Protobuf::util::MessageDifferencer;
 using testing::EndsWith;
 using testing::NiceMock;
 using testing::ReturnRef;
+using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -1271,7 +1272,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
       "Failed to load incomplete certificate from ");
 }
 
-TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
+TEST_F(ServerContextConfigImplTest, PrivateKeyMethodInstallFailure) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   Stats::IsolatedStoreImpl store;
@@ -1286,6 +1287,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
       .WillOnce(Return(private_key_method_provider_ptr));
+  EXPECT_CALL(*private_key_method_provider_ptr, installBoringSslPrivateKeyMethod(_))
+      .WillOnce(Throw(EnvoyException("Failed to install BoringSSL private key method")));
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -1303,7 +1306,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   EXPECT_THROW_WITH_MESSAGE(
       Envoy::Ssl::ServerContextSharedPtr server_ctx(
           manager.createSslServerContext(store, server_context_config, std::vector<std::string>{})),
-      EnvoyException, "Failed to get BoringSSL private key method from provider");
+      EnvoyException, "Failed to install BoringSSL private key method");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {

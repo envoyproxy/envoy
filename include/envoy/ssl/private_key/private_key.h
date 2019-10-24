@@ -20,8 +20,6 @@ class TransportSocketFactoryContext;
 
 namespace Ssl {
 
-using BoringSslPrivateKeyMethodSharedPtr = std::shared_ptr<SSL_PRIVATE_KEY_METHOD>;
-
 class PrivateKeyMethodProvider {
 public:
   virtual ~PrivateKeyMethodProvider() = default;
@@ -50,11 +48,10 @@ public:
   virtual bool checkFips() PURE;
 
   /**
-   * Get the private key methods from the provider.
-   * @return the private key methods associated with this provider and
-   * configuration.
+   * Install the BoringSSL private key method.
+   * @param ssl a SSL connection object.
    */
-  virtual BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() PURE;
+  virtual void installBoringSslPrivateKeyMethod(SSL_CTX* ssl) PURE;
 };
 
 using PrivateKeyMethodProviderSharedPtr = std::shared_ptr<PrivateKeyMethodProvider>;
