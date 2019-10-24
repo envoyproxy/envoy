@@ -202,7 +202,7 @@ private:
  */
 class ObjectHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, ObjectHandler> {
 public:
-  ObjectHandler(LineCountingStringStream& stream) : state_(ExpectRoot), stream_(stream){};
+  ObjectHandler(LineCountingStringStream& stream) : state_(State::ExpectRoot), stream_(stream){};
 
   bool StartObject();
   bool EndObject(rapidjson::SizeType);
@@ -224,7 +224,7 @@ public:
 private:
   bool handleValueEvent(FieldSharedPtr ptr);
 
-  enum State {
+  enum class State {
     ExpectRoot,
     ExpectKeyOrEndObject,
     ExpectValueOrStartObjectArray,
@@ -541,20 +541,20 @@ bool ObjectHandler::StartObject() {
   object->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
-  case ExpectValueOrStartObjectArray:
+  case State::ExpectValueOrStartObjectArray:
     stack_.top()->insert(key_, object);
     stack_.push(object);
-    state_ = ExpectKeyOrEndObject;
+    state_ = State::ExpectKeyOrEndObject;
     return true;
-  case ExpectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->append(object);
     stack_.push(object);
-    state_ = ExpectKeyOrEndObject;
+    state_ = State::ExpectKeyOrEndObject;
     return true;
-  case ExpectRoot:
+  case State::ExpectRoot:
     root_ = object;
     stack_.push(object);
-    state_ = ExpectKeyOrEndObject;
+    state_ = State::ExpectKeyOrEndObject;
     return true;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -563,16 +563,16 @@ bool ObjectHandler::StartObject() {
 
 bool ObjectHandler::EndObject(rapidjson::SizeType) {
   switch (state_) {
-  case ExpectKeyOrEndObject:
+  case State::ExpectKeyOrEndObject:
     stack_.top()->setLineNumberEnd(stream_.getLineNumber());
     stack_.pop();
 
     if (stack_.empty()) {
-      state_ = ExpectFinished;
+      state_ = State::ExpectFinished;
     } else if (stack_.top()->isObject()) {
-      state_ = ExpectKeyOrEndObject;
+      state_ = State::ExpectKeyOrEndObject;
     } else if (stack_.top()->isArray()) {
-      state_ = ExpectArrayValueOrEndArray;
+      state_ = State::ExpectArrayValueOrEndArray;
     }
     return true;
   default:
@@ -582,9 +582,9 @@ bool ObjectHandler::EndObject(rapidjson::SizeType) {
 
 bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
   switch (state_) {
-  case ExpectKeyOrEndObject:
+  case State::ExpectKeyOrEndObject:
     key_ = std::string(value, size);
-    state_ = ExpectValueOrStartObjectArray;
+    state_ = State::ExpectValueOrStartObjectArray;
     return true;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -596,19 +596,19 @@ bool ObjectHandler::StartArray() {
   array->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
-  case ExpectValueOrStartObjectArray:
+  case State::ExpectValueOrStartObjectArray:
     stack_.top()->insert(key_, array);
     stack_.push(array);
-    state_ = ExpectArrayValueOrEndArray;
+    state_ = State::ExpectArrayValueOrEndArray;
     return true;
-  case ExpectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->append(array);
     stack_.push(array);
     return true;
-  case ExpectRoot:
+  case State::ExpectRoot:
     root_ = array;
     stack_.push(array);
-    state_ = ExpectArrayValueOrEndArray;
+    state_ = State::ExpectArrayValueOrEndArray;
     return true;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -617,16 +617,16 @@ bool ObjectHandler::StartArray() {
 
 bool ObjectHandler::EndArray(rapidjson::SizeType) {
   switch (state_) {
-  case ExpectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->setLineNumberEnd(stream_.getLineNumber());
     stack_.pop();
 
     if (stack_.empty()) {
-      state_ = ExpectFinished;
+      state_ = State::ExpectFinished;
     } else if (stack_.top()->isObject()) {
-      state_ = ExpectKeyOrEndObject;
+      state_ = State::ExpectKeyOrEndObject;
     } else if (stack_.top()->isArray()) {
-      state_ = ExpectArrayValueOrEndArray;
+      state_ = State::ExpectArrayValueOrEndArray;
     }
 
     return true;
@@ -668,11 +668,11 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
   ptr->setLineNumberStart(stream_.getLineNumber());
 
   switch (state_) {
-  case ExpectValueOrStartObjectArray:
-    state_ = ExpectKeyOrEndObject;
+  case State::ExpectValueOrStartObjectArray:
+    state_ = State::ExpectKeyOrEndObject;
     stack_.top()->insert(key_, ptr);
     return true;
-  case ExpectArrayValueOrEndArray:
+  case State::ExpectArrayValueOrEndArray:
     stack_.top()->append(ptr);
     return true;
   default:
