@@ -25,6 +25,16 @@ namespace {
 class RequestFrameCommentTest : public ::testing::Test {};
 class ResponseFrameCommentTest : public ::testing::Test {};
 
+// Creates and sets up a stream to reply to.
+void setupStream(ClientCodecFrameInjector& codec, TestClientConnectionImpl& connection) {
+  codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
+  codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
+  // Setup a single stream to inject frames as a reply to.
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  codec.request_encoder_->encodeHeaders(request_headers, true);
+}
+
 // Validate that a simple Huffman encoded request HEADERS frame can be decoded.
 TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
   FileFrame header{"request_header_corpus/simple_example_huffman"};
@@ -46,14 +56,17 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
-  codec.write(WellKnownFrames::clientConnectionPrefaceFrame());
-  codec.write(WellKnownFrames::defaultSettingsFrame());
-  codec.write(WellKnownFrames::initialWindowUpdateFrame());
+  TestServerConnectionImpl connection(
+      codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+  codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
+  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
   TestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   expected_headers.addCopy("foo", "barbaz");
   EXPECT_CALL(codec.request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame());
+  codec.write(header.frame(), connection);
 }
 
 // Validate that a simple Huffman encoded response HEADERS frame can be decoded.
@@ -75,13 +88,18 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
-  codec.write(WellKnownFrames::defaultSettingsFrame());
-  codec.write(WellKnownFrames::initialWindowUpdateFrame());
+  TestClientConnectionImpl connection(
+      codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+  setupStream(codec, connection);
+
+  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
   TestHeaderMapImpl expected_headers;
   expected_headers.addCopy(":status", "200");
   expected_headers.addCopy("compression", "test");
   EXPECT_CALL(codec.response_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame());
+  codec.write(header.frame(), connection);
 }
 
 // Validate that a simple non-Huffman request HEADERS frame with no static table user either can be
@@ -114,14 +132,17 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
-  codec.write(WellKnownFrames::clientConnectionPrefaceFrame());
-  codec.write(WellKnownFrames::defaultSettingsFrame());
-  codec.write(WellKnownFrames::initialWindowUpdateFrame());
+  TestServerConnectionImpl connection(
+      codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+  codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
+  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
   TestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   expected_headers.addCopy("foo", "barbaz");
   EXPECT_CALL(codec.request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame());
+  codec.write(header.frame(), connection);
 }
 
 // Validate that a simple non-Huffman response HEADERS frame with no static table user either can be
@@ -145,13 +166,18 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
-  codec.write(WellKnownFrames::defaultSettingsFrame());
-  codec.write(WellKnownFrames::initialWindowUpdateFrame());
+  TestClientConnectionImpl connection(
+      codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+  setupStream(codec, connection);
+
+  codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+  codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
   TestHeaderMapImpl expected_headers;
   expected_headers.addCopy(":status", "200");
   expected_headers.addCopy("compression", "test");
   EXPECT_CALL(codec.response_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-  codec.write(header.frame());
+  codec.write(header.frame(), connection);
 }
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS frame doesn't crash or
@@ -169,13 +195,16 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
-      codec.write(WellKnownFrames::clientConnectionPrefaceFrame());
-      codec.write(WellKnownFrames::defaultSettingsFrame());
-      codec.write(WellKnownFrames::initialWindowUpdateFrame());
+      TestServerConnectionImpl connection(
+          codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
+      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
       try {
         EXPECT_CALL(codec.request_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
         EXPECT_CALL(codec.server_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
-        codec.write(header.frame());
+        codec.write(header.frame(), connection);
       } catch (const CodecProtocolException& e) {
         ENVOY_LOG_MISC(trace, "CodecProtocolException: {}", e.what());
       }
@@ -185,7 +214,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
 }
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS frame doesn't crash or
-// trigger ASSERTs. This is a litmus test for the HTTP/2 codec (nghttp2) to demonsrate that it
+// trigger ASSERTs. This is a litmus test for the HTTP/2 codec (nghttp2) to demonstrate that it
 // doesn't suffer from the issue reported for http-parser in CVE-2019-9900. See also
 // https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a non-compressed frame with no
 // Huffman encoding to simplify.
@@ -199,12 +228,17 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
-      codec.write(WellKnownFrames::defaultSettingsFrame());
-      codec.write(WellKnownFrames::initialWindowUpdateFrame());
+      TestClientConnectionImpl connection(
+          codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      setupStream(codec, connection);
+
+      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
       try {
         EXPECT_CALL(codec.response_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
         EXPECT_CALL(codec.client_stream_callbacks_, onResetStream(_, _)).Times(AnyNumber());
-        codec.write(header.frame());
+        codec.write(header.frame(), connection);
       } catch (const CodecProtocolException& e) {
         ENVOY_LOG_MISC(trace, "CodecProtocolException: {}", e.what());
       }
@@ -215,7 +249,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS field name or value
 // yields a CodecProtocolException or stream reset. This is a litmus test for the HTTP/2 codec
-// (nghttp2) to demonsrate that it doesn't suffer from the issue reported for http-parser in
+// (nghttp2) to demonstrate that it doesn't suffer from the issue reported for http-parser in
 // CVE-2019-9900. See also https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a
 // non-compressed frame with no Huffman encoding to simplify.
 TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
@@ -229,16 +263,19 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
-      codec.write(WellKnownFrames::clientConnectionPrefaceFrame());
-      codec.write(WellKnownFrames::defaultSettingsFrame());
-      codec.write(WellKnownFrames::initialWindowUpdateFrame());
+      TestServerConnectionImpl connection(
+          codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
+      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
       bool stream_reset = false;
       EXPECT_CALL(codec.request_decoder_, decodeHeaders_(_, _)).Times(0);
       EXPECT_CALL(codec.server_stream_callbacks_, onResetStream(_, _))
           .WillRepeatedly(InvokeWithoutArgs([&stream_reset] { stream_reset = true; }));
       bool codec_exception = false;
       try {
-        codec.write(header.frame());
+        codec.write(header.frame(), connection);
       } catch (const CodecProtocolException& e) {
         codec_exception = true;
       }
@@ -250,7 +287,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
 
 // Validate that corrupting any single byte with {NUL, CR, LF} in a HEADERS field name or value
 // yields a CodecProtocolException or stream reset. This is a litmus test for the HTTP/2 codec
-// (nghttp2) to demonsrate that it doesn't suffer from the issue reported for http-parser in
+// (nghttp2) to demonstrate that it doesn't suffer from the issue reported for http-parser in
 // CVE-2019-9900. See also https://httpwg.org/specs/rfc7540.html#rfc.section.10.3. We use a
 // non-compressed frame with no Huffman encoding to simplify.
 TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
@@ -264,15 +301,20 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
-      codec.write(WellKnownFrames::defaultSettingsFrame());
-      codec.write(WellKnownFrames::initialWindowUpdateFrame());
+      TestClientConnectionImpl connection(
+          codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.settings_,
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
+      setupStream(codec, connection);
+
+      codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
+      codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
       bool stream_reset = false;
       EXPECT_CALL(codec.response_decoder_, decodeHeaders_(_, _)).Times(0);
       EXPECT_CALL(codec.client_stream_callbacks_, onResetStream(_, _))
           .WillRepeatedly(InvokeWithoutArgs([&stream_reset] { stream_reset = true; }));
       bool codec_exception = false;
       try {
-        codec.write(header.frame());
+        codec.write(header.frame(), connection);
       } catch (const CodecProtocolException& e) {
         codec_exception = true;
       }

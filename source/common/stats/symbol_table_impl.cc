@@ -16,10 +16,6 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
-StatName::StatName(const StatName& src, SymbolTable::Storage memory) : size_and_data_(memory) {
-  memcpy(memory, src.size_and_data_, src.size());
-}
-
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
@@ -126,6 +122,7 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
   // ref-counts in this.
   {
     Thread::LockGuard lock(lock_);
+    recent_lookups_.lookup(name);
     for (auto& token : tokens) {
       symbols.push_back(toSymbol(token));
     }
@@ -207,16 +204,94 @@ void SymbolTableImpl::free(const StatName& stat_name) {
   }
 }
 
-StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
+uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
+  uint64_t total = 0;
+  absl::flat_hash_map<std::string, uint64_t> name_count_map;
+
+  // We don't want to hold stat_name_set_mutex while calling the iterator, so
+  // buffer lookup_data.
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    for (StatNameSet* stat_name_set : stat_name_sets_) {
+      total +=
+          stat_name_set->getRecentLookups([&name_count_map](absl::string_view str, uint64_t count) {
+            name_count_map[std::string(str)] += count;
+          });
+    }
+  }
+
+  // We also don't want to hold lock_ while calling the iterator, but we need it
+  // to access recent_lookups_.
+  {
+    Thread::LockGuard lock(lock_);
+    recent_lookups_.forEach(
+        [&name_count_map](absl::string_view str, uint64_t count)
+            NO_THREAD_SAFETY_ANALYSIS { name_count_map[std::string(str)] += count; });
+    total += recent_lookups_.total();
+  }
+
+  // Now we have the collated name-count map data: we need to vectorize and
+  // sort. We define the pair with the count first as std::pair::operator<
+  // prioritizes its first element over its second.
+  using LookupCount = std::pair<uint64_t, absl::string_view>;
+  std::vector<LookupCount> lookup_data;
+  lookup_data.reserve(name_count_map.size());
+  for (const auto& iter : name_count_map) {
+    lookup_data.emplace_back(LookupCount(iter.second, iter.first));
+  }
+  std::sort(lookup_data.begin(), lookup_data.end());
+  for (const LookupCount& lookup_count : lookup_data) {
+    iter(lookup_count.second, lookup_count.first);
+  }
+  return total;
+}
+
+void SymbolTableImpl::setRecentLookupCapacity(uint64_t capacity) {
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    for (StatNameSet* stat_name_set : stat_name_sets_) {
+      stat_name_set->setRecentLookupCapacity(capacity);
+    }
+  }
+
+  {
+    Thread::LockGuard lock(lock_);
+    recent_lookups_.setCapacity(capacity);
+  }
+}
+
+void SymbolTableImpl::clearRecentLookups() {
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    for (StatNameSet* stat_name_set : stat_name_sets_) {
+      stat_name_set->clearRecentLookups();
+    }
+  }
+  {
+    Thread::LockGuard lock(lock_);
+    recent_lookups_.clear();
+  }
+}
+
+uint64_t SymbolTableImpl::recentLookupCapacity() const {
   Thread::LockGuard lock(lock_);
-  // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
+  return recent_lookups_.capacity();
+}
+
+StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
+  const uint64_t capacity = recentLookupCapacity();
+  // make_unique does not work with private ctor, even though SymbolTableImpl is a friend.
   StatNameSetPtr stat_name_set(new StatNameSet(*this, name));
-  stat_name_sets_.insert(stat_name_set.get());
+  stat_name_set->setRecentLookupCapacity(capacity);
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    stat_name_sets_.insert(stat_name_set.get());
+  }
   return stat_name_set;
 }
 
 void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
-  Thread::LockGuard lock(lock_);
+  Thread::LockGuard lock(stat_name_set_mutex_);
   stat_name_sets_.erase(&stat_name_set);
 }
 
@@ -484,9 +559,26 @@ StatName StatNameSet::getDynamic(absl::string_view token) {
     Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
     if (stat_name_ref.empty()) { // Note that builtin_stat_names_ already has one for "".
       stat_name_ref = pool_.add(token);
+      recent_lookups_.lookup(token);
     }
     return stat_name_ref;
   }
+}
+
+uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) const {
+  absl::MutexLock lock(&mutex_);
+  recent_lookups_.forEach(iter);
+  return recent_lookups_.total();
+}
+
+void StatNameSet::clearRecentLookups() {
+  absl::MutexLock lock(&mutex_);
+  recent_lookups_.clear();
+}
+
+void StatNameSet::setRecentLookupCapacity(uint64_t capacity) {
+  absl::MutexLock lock(&mutex_);
+  recent_lookups_.setCapacity(capacity);
 }
 
 } // namespace Stats

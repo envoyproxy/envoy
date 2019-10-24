@@ -32,7 +32,7 @@ namespace Server {
   COUNTER(no_filter_chain_match)                                                                   \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
   GAUGE(downstream_pre_cx_active, Accumulate)                                                      \
-  HISTOGRAM(downstream_cx_length_ms)
+  HISTOGRAM(downstream_cx_length_ms, Milliseconds)
 
 /**
  * Wrapper struct for listener stats. @see stats_macros.h

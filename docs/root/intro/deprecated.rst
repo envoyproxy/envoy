@@ -39,11 +39,20 @@ Version 1.12.0 (pending)
   has been deprecated in favor of the `traffic_direction` field in
   :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
   specified.
+* The `use_http2` field in
+  :ref:`HTTP health checker <envoy_api_msg_core.HealthCheck.HttpHealthCheck>` has been deprecated in
+  favor of the `codec_client_type` field.
+* The use of :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>` for
+  gRPC stats has been deprecated in favor of the dedicated :ref:`gRPC stats
+  filter <config_http_filters_grpc_stats>`
 
-1.11.2 (October 8, 2019)
-========================
-* Use of :ref:`idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>` is deprecated. Use :ref:`idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>` instead.
-
+Version 1.11.2 (October 8, 2019)
+================================
+* Use of :ref:`idle_timeout
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>`
+  is deprecated. Use :ref:`common_http_protocol_options
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+  instead.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

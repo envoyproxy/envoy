@@ -9,6 +9,10 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
+// Strong assertion that applies across all compilation modes and doesn't rely
+// on gtest, which only provides soft fails that don't trip oss-fuzz failures.
+#define FUZZ_ASSERT(x) RELEASE_ASSERT(x, "")
+
 namespace Envoy {
 namespace Fuzz {
 
@@ -82,7 +86,7 @@ inline Http::TestHeaderMapImpl fromHeaders(
     // not supposed to do this.
     const std::string key =
         header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
-    if (ignore_headers.find(StringUtil::toLower(key)) != ignore_headers.end()) {
+    if (ignore_headers.find(StringUtil::toLower(key)) == ignore_headers.end()) {
       header_map.addCopy(key, replaceInvalidCharacters(header.value()));
     }
   }

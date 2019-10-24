@@ -5,8 +5,8 @@ Overview
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
-<https://developers.google.com/protocol-buffers/>`_ in the `data plane API
-repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They support
+<https://developers.google.com/protocol-buffers/>`_ in the :repo:`api tree <api/>`. They
+support:
 
 * Streaming delivery of :ref:`xDS <xds_protocol>` API updates via gRPC. This reduces
   resource requirements and can lower the update latency.
@@ -334,7 +334,7 @@ The management server could respond to EDS requests with:
 
 .. _config_overview_v2_management_server:
 
-Management server
+xDS API endpoints
 -----------------
 
 A v2 xDS management server will implement the below endpoints as required for
@@ -421,8 +421,69 @@ for the service definition. This is used by Envoy as a client when
             cluster_name: some_xds_cluster
 
 is set in the :ref:`rds
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field
+of the :ref:`HttpConnectionManager
 <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
+
+.. http:post:: /envoy.api.v2.ScopedRoutesDiscoveryService/StreamScopedRoutes
+
+See :repo:`srds.proto
+<api/envoy/api/v2/srds.proto>`
+for the service definition. This is used by Envoy as a client when
+
+.. code-block:: yaml
+
+    name: some_scoped_route_name
+    scoped_rds:
+      config_source:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: some_xds_cluster
+
+is set in the :ref:`scoped_routes
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_routes>`
+field of the :ref:`HttpConnectionManager
+<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
+
+.. http:post:: /envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets
+
+See :repo:`sds.proto
+<api/envoy/service/discovery/v2/srds.proto>`
+for the service definition. This is used by Envoy as a client when
+
+.. code-block:: yaml
+
+    name: some_secret_name
+    config_source:
+      api_config_source:
+        api_type: GRPC
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
+
+is set inside a :ref:`SdsSecretConfig <envoy_api_msg_auth.SdsSecretConfig>` message. This message
+is used in various places such as the :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`.
+
+.. http:post:: /envoy.service.discovery.v2.RuntimeDiscoveryService/StreamRuntime
+
+See :repo:`rtds.proto
+<api/envoy/service/discovery/v2/rtds.proto>`
+for the service definition. This is used by Envoy as a client when
+
+.. code-block:: yaml
+
+    name: some_runtime_layer_name
+    config_source:
+      api_config_source:
+        api_type: GRPC
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
+
+is set inside the :ref:`rtds_layer <envoy_api_field_config.bootstrap.v2.RuntimeLayer.rtds_layer>`
+field.
 
 REST endpoints
 ^^^^^^^^^^^^^^

@@ -9,17 +9,23 @@ import subprocess
 from pathlib import Path
 
 
+def runBazelBuildForCompilationDatabase(bazel_options, bazel_targets):
+  query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(
+      ' union '.join(bazel_targets))
+  build_targets = subprocess.check_output(["bazel", "query", query]).decode().splitlines()
+  subprocess.check_call(["bazel", "build"] + bazel_options + build_targets)
+
+
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.sh
 def generateCompilationDatabase(args):
   # We need to download all remote outputs for generated source code, we don't care about built
   # binaries so just always strip and use dynamic link to minimize download size.
   bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", "")) + [
       "-c", "fastbuild", "--build_tag_filters=-manual",
-      "--experimental_remote_download_outputs=all", "--strip=always",
-      "--define=dynamic_link_tests=true"
+      "--experimental_remote_download_outputs=all", "--strip=always"
   ]
   if args.run_bazel_build:
-    subprocess.check_call(["bazel", "build"] + bazel_options + args.bazel_targets)
+    runBazelBuildForCompilationDatabase(bazel_options, args.bazel_targets)
 
   subprocess.check_call(["bazel", "build"] + bazel_options + [
       "--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect",
@@ -60,7 +66,7 @@ def isCompileTarget(target, args):
 
 
 def modifyCompileCommand(target, args):
-  _, options = target["command"].split(" ", 1)
+  cc, options = target["command"].split(" ", 1)
 
   # Workaround for bazel added C++11 options, those doesn't affect build itself but
   # clang-tidy will misinterpret them.
@@ -76,7 +82,7 @@ def modifyCompileCommand(target, args):
     options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
     options += " -Wno-unused-function"
 
-  target["command"] = " ".join(["clang++", options])
+  target["command"] = " ".join([cc, options])
   return target
 
 

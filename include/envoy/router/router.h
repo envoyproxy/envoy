@@ -436,6 +436,16 @@ public:
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCount() const PURE;
+
+  /**
+   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
+   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
+   *         as other limits may apply.
+   *         If a per route limit exists, it takes precedence over this configuration.
+   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
+   *         rather than no limit applies.
+   */
+  virtual uint32_t retryShadowBufferLimit() const PURE;
 };
 
 /**
@@ -507,6 +517,15 @@ public:
   virtual MetadataMatchCriteriaConstPtr
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
+
+class TlsContextMatchCriteria {
+public:
+  virtual ~TlsContextMatchCriteria() = default;
+
+  virtual const absl::optional<bool>& presented() const PURE;
+};
+
+using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
 
 /**
  * Type of path matching that a route entry uses.
@@ -604,6 +623,15 @@ public:
   virtual const RetryPolicy& retryPolicy() const PURE;
 
   /**
+   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
+   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
+   *         as other limits may apply.
+   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
+   *         rather than no limit applies.
+   */
+  virtual uint32_t retryShadowBufferLimit() const PURE;
+
+  /**
    * @return const ShadowPolicy& the shadow policy for the route. All routes have a shadow policy
    *         even if no shadowing takes place.
    */
@@ -681,6 +709,12 @@ public:
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
+   * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
+   * tls context match criteria, nullptr is returned.
+   */
+  virtual const TlsContextMatchCriteria* tlsContextMatchCriteria() const PURE;
+
+  /**
    * @return const PathMatchCriterion& the match criterion for this route.
    */
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
@@ -699,6 +733,16 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   };
+
+  /**
+   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
+   * host's. Or nullptr if none of them exist.
+   */
+  template <class Derived>
+  const Derived* mostSpecificPerFilterConfigTyped(const std::string& name) const {
+    const Derived* config = perFilterConfigTyped<Derived>(name);
+    return config ? config : virtualHost().perFilterConfigTyped<Derived>(name);
+  }
 
   /**
    * True if the virtual host this RouteEntry belongs to is configured to include the attempt
@@ -835,6 +879,7 @@ public:
    * @return the route or nullptr if there is no matching route for the request.
    */
   virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
 
   /**

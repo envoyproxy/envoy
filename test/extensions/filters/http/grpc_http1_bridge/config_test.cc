@@ -14,10 +14,15 @@ namespace GrpcHttp1Bridge {
 namespace {
 
 TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
+  std::string json_string = R"EOF(
+  {
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GrpcHttp1BridgeFilterConfig factory;
-  auto* proto_config = factory.createEmptyConfigProto().get();
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

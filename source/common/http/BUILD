@@ -169,7 +169,7 @@ envoy_cc_library(
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
-        "//include/envoy/stats:timespan",
+        "//include/envoy/stats:timespan_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/buffer:buffer_lib",
@@ -186,6 +186,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/runtime:uuid_util_lib",
+        "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
@@ -289,7 +290,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
-        "//include/envoy/stats:timespan",
+        "//include/envoy/stats:timespan_interface",
     ],
 )
 
