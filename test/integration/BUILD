@@ -603,7 +603,6 @@ envoy_cc_test(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:resources_lib",
-        "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:health_checker_lib",
@@ -802,6 +801,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/stats:stats_lib",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )
 

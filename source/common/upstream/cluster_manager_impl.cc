@@ -25,7 +25,6 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/json/config_schemas.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"

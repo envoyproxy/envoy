@@ -18,7 +18,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:filter_json_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:ratelimit_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_mocks",

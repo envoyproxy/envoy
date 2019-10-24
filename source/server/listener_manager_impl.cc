@@ -63,14 +63,9 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     Config::Utility::validateTerminalFilters(filters[i].name(), "network",
                                              factory.isTerminalFilter(), i == filters.size() - 1);
 
-    Network::FilterFactoryCb callback;
-    if (Config::Utility::allowDeprecatedV1Config(context.runtime(), *filter_config)) {
-      callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
-    } else {
-      auto message = Config::Utility::translateToFactoryConfig(
-          proto_config, context.messageValidationVisitor(), factory);
-      callback = factory.createFilterFactoryFromProto(*message, context);
-    }
+    auto message = Config::Utility::translateToFactoryConfig(
+        proto_config, context.messageValidationVisitor(), factory);
+    Network::FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
     ret.push_back(callback);
   }
   return ret;

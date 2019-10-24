@@ -2,7 +2,6 @@
 
 #include "common/common/regex.h"
 #include "common/common/utility.h"
-#include "common/config/rds_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -62,13 +61,6 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
     break;
   }
 }
-
-HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
-    : HeaderData([&config] {
-        envoy::api::v2::route::HeaderMatcher header_matcher;
-        Envoy::Config::RdsJson::translateHeaderMatcher(config, header_matcher);
-        return header_matcher;
-      }()) {}
 
 void HeaderUtility::getAllOfHeader(const HeaderMap& headers, absl::string_view key,
                                    std::vector<absl::string_view>& out) {

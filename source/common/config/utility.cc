@@ -12,7 +12,6 @@
 #include "common/config/json_utility.h"
 #include "common/config/resources.h"
 #include "common/config/well_known_names.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_matcher_impl.h"
@@ -183,20 +182,6 @@ std::chrono::milliseconds
 Utility::configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source) {
   return std::chrono::milliseconds(
       PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 15000));
-}
-
-void Utility::translateRdsConfig(
-    const Json::Object& json_rds,
-    envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
-  json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-
-  const std::string name = json_rds.getString("route_config_name", "");
-  rds.set_route_config_name(name);
-
-  translateApiConfigSource(json_rds.getString("cluster"),
-                           json_rds.getInteger("refresh_delay_ms", 30000),
-                           json_rds.getString("api_type", ApiType::get().UnsupportedRestLegacy),
-                           *rds.mutable_config_source()->mutable_api_config_source());
 }
 
 RateLimitSettings
