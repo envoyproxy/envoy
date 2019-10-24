@@ -263,7 +263,7 @@ template <typename T, typename U> constexpr T convertValTypesToArgsTuple(const U
 // V8 implementation.
 
 bool V8::load(const std::string& code, bool /* allow_precompiled */) {
-  ENVOY_LOG(trace, "[wasm] load()");
+  ENVOY_LOG(trace, "load()");
   store_ = wasm::Store::make(engine());
   RELEASE_ASSERT(store_ != nullptr, "");
 
@@ -275,7 +275,7 @@ bool V8::load(const std::string& code, bool /* allow_precompiled */) {
 }
 
 absl::string_view V8::getCustomSection(absl::string_view name) {
-  ENVOY_LOG(trace, "[wasm] getCustomSection(\"{}\")", name);
+  ENVOY_LOG(trace, "getCustomSection(\"{}\")", name);
   ASSERT(source_.get() != nullptr);
 
   const byte_t* end = source_.get() + source_.size();
@@ -298,7 +298,7 @@ absl::string_view V8::getCustomSection(absl::string_view name) {
       pos += len;
       rest -= (pos - start);
       if (len == name.size() && ::memcmp(pos - len, name.data(), len) == 0) {
-        ENVOY_LOG(trace, "[wasm] getCustomSection(\"{}\") found, size: {}", name, rest);
+        ENVOY_LOG(trace, "getCustomSection(\"{}\") found, size: {}", name, rest);
         return {pos, rest};
       }
     }
@@ -308,7 +308,7 @@ absl::string_view V8::getCustomSection(absl::string_view name) {
 }
 
 void V8::link(absl::string_view debug_name) {
-  ENVOY_LOG(trace, "[wasm] link(\"{}\")", debug_name);
+  ENVOY_LOG(trace, "link(\"{}\")", debug_name);
   ASSERT(module_ != nullptr);
 
   const auto import_types = module_.get()->imports();
@@ -322,7 +322,7 @@ void V8::link(absl::string_view debug_name) {
     switch (import_type->kind()) {
 
     case wasm::EXTERN_FUNC: {
-      ENVOY_LOG(trace, "[wasm] link(), export host func: {}.{} ({} -> {})", module, name,
+      ENVOY_LOG(trace, "link(), export host func: {}.{} ({} -> {})", module, name,
                 printValTypes(import_type->func()->params()),
                 printValTypes(import_type->func()->results()));
 
@@ -345,7 +345,7 @@ void V8::link(absl::string_view debug_name) {
     } break;
 
     case wasm::EXTERN_GLOBAL: {
-      ENVOY_LOG(trace, "[wasm] link(), export host global: {}.{} ({})", module, name,
+      ENVOY_LOG(trace, "link(), export host global: {}.{} ({})", module, name,
                 printValKind(import_type->global()->content()->kind()));
 
       auto it = host_globals_.find(absl::StrCat(module, ".", name));
@@ -357,7 +357,7 @@ void V8::link(absl::string_view debug_name) {
     } break;
 
     case wasm::EXTERN_MEMORY: {
-      ENVOY_LOG(trace, "[wasm] link(), export host memory: {}.{} (min: {} max: {})", module, name,
+      ENVOY_LOG(trace, "link(), export host memory: {}.{} (min: {} max: {})", module, name,
                 import_type->memory()->limits().min, import_type->memory()->limits().max);
 
       ASSERT(memory_ == nullptr);
@@ -367,7 +367,7 @@ void V8::link(absl::string_view debug_name) {
     } break;
 
     case wasm::EXTERN_TABLE: {
-      ENVOY_LOG(trace, "[wasm] link(), export host table: {}.{} (min: {} max: {})", module, name,
+      ENVOY_LOG(trace, "link(), export host table: {}.{} (min: {} max: {})", module, name,
                 import_type->table()->limits().min, import_type->table()->limits().max);
 
       ASSERT(table_ == nullptr);
@@ -398,7 +398,7 @@ void V8::link(absl::string_view debug_name) {
     switch (export_type->kind()) {
 
     case wasm::EXTERN_FUNC: {
-      ENVOY_LOG(trace, "[wasm] link(), import module func: {} ({} -> {})", name,
+      ENVOY_LOG(trace, "link(), import module func: {} ({} -> {})", name,
                 printValTypes(export_type->func()->params()),
                 printValTypes(export_type->func()->results()));
 
@@ -408,12 +408,12 @@ void V8::link(absl::string_view debug_name) {
 
     case wasm::EXTERN_GLOBAL: {
       // TODO(PiotrSikora): add support when/if needed.
-      ENVOY_LOG(trace, "[wasm] link(), import module global: {} ({}) --- IGNORED", name,
+      ENVOY_LOG(trace, "link(), import module global: {} ({}) --- IGNORED", name,
                 printValKind(export_type->global()->content()->kind()));
     } break;
 
     case wasm::EXTERN_MEMORY: {
-      ENVOY_LOG(trace, "[wasm] link(), import module memory: {} (min: {} max: {})", name,
+      ENVOY_LOG(trace, "link(), import module memory: {} (min: {} max: {})", name,
                 export_type->memory()->limits().min, export_type->memory()->limits().max);
 
       ASSERT(export_item->memory() != nullptr);
@@ -423,7 +423,7 @@ void V8::link(absl::string_view debug_name) {
 
     case wasm::EXTERN_TABLE: {
       // TODO(PiotrSikora): add support when/if needed.
-      ENVOY_LOG(trace, "[wasm] link(), import module table: {} (min: {} max: {}) --- IGNORED", name,
+      ENVOY_LOG(trace, "link(), import module table: {} (min: {} max: {}) --- IGNORED", name,
                 export_type->table()->limits().min, export_type->table()->limits().max);
     } break;
     }
@@ -431,12 +431,12 @@ void V8::link(absl::string_view debug_name) {
 }
 
 uint64_t V8::getMemorySize() {
-  ENVOY_LOG(trace, "[wasm] getMemorySize()");
+  ENVOY_LOG(trace, "getMemorySize()");
   return memory_->data_size();
 }
 
 absl::optional<absl::string_view> V8::getMemory(uint64_t pointer, uint64_t size) {
-  ENVOY_LOG(trace, "[wasm] getMemory({}, {})", pointer, size);
+  ENVOY_LOG(trace, "getMemory({}, {})", pointer, size);
   ASSERT(memory_ != nullptr);
   if (pointer + size > memory_->data_size()) {
     return absl::nullopt;
@@ -445,7 +445,7 @@ absl::optional<absl::string_view> V8::getMemory(uint64_t pointer, uint64_t size)
 }
 
 bool V8::getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) {
-  ENVOY_LOG(trace, "[wasm] getMemoryOffset({})", host_pointer);
+  ENVOY_LOG(trace, "getMemoryOffset({})", host_pointer);
   ASSERT(memory_ != nullptr);
   if (static_cast<char*>(host_pointer) >= memory_->data() ||
       static_cast<char*>(host_pointer) <= memory_->data() + memory_->data_size()) {
@@ -456,7 +456,7 @@ bool V8::getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) {
 }
 
 bool V8::setMemory(uint64_t pointer, uint64_t size, const void* data) {
-  ENVOY_LOG(trace, "[wasm] setMemory({}, {})", pointer, size);
+  ENVOY_LOG(trace, "setMemory({}, {})", pointer, size);
   ASSERT(memory_ != nullptr);
   if (pointer + size > memory_->data_size()) {
     return false;
@@ -466,7 +466,7 @@ bool V8::setMemory(uint64_t pointer, uint64_t size, const void* data) {
 }
 
 bool V8::getWord(uint64_t pointer, Word* word) {
-  ENVOY_LOG(trace, "[wasm] getWord({})", pointer);
+  ENVOY_LOG(trace, "getWord({})", pointer);
   auto size = sizeof(uint32_t);
   if (pointer + size > memory_->data_size()) {
     return false;
@@ -478,7 +478,7 @@ bool V8::getWord(uint64_t pointer, Word* word) {
 }
 
 bool V8::setWord(uint64_t pointer, Word word) {
-  ENVOY_LOG(trace, "[wasm] setWord({}, {})", pointer, word.u64_);
+  ENVOY_LOG(trace, "setWord({}, {})", pointer, word.u64_);
   auto size = sizeof(uint32_t);
   if (pointer + size > memory_->data_size()) {
     return false;
@@ -491,7 +491,7 @@ bool V8::setWord(uint64_t pointer, Word word) {
 template <typename T>
 std::unique_ptr<Global<T>> V8::registerHostGlobalImpl(absl::string_view module_name,
                                                       absl::string_view name, T initial_value) {
-  ENVOY_LOG(trace, "[wasm] registerHostGlobal(\"{}.{}\", {})", module_name, name, initial_value);
+  ENVOY_LOG(trace, "registerHostGlobal(\"{}.{}\", {})", module_name, name, initial_value);
   auto value = makeVal(initial_value);
   auto type = wasm::GlobalType::make(wasm::ValType::make(value.kind()), wasm::CONST);
   auto global = wasm::Global::make(store_.get(), type.get(), value);
@@ -503,7 +503,7 @@ std::unique_ptr<Global<T>> V8::registerHostGlobalImpl(absl::string_view module_n
 template <typename... Args>
 void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_view function_name,
                                   void (*function)(void*, Args...)) {
-  ENVOY_LOG(trace, "[wasm] registerHostFunction(\"{}.{}\")", module_name, function_name);
+  ENVOY_LOG(trace, "registerHostFunction(\"{}.{}\")", module_name, function_name);
   auto data = std::make_unique<FuncData>(absl::StrCat(module_name, ".", function_name));
   auto type = wasm::FuncType::make(convertArgsTupleToValTypes<std::tuple<Args...>>(),
                                    convertArgsTupleToValTypes<std::tuple<>>());
@@ -511,13 +511,13 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
       store_.get(), type.get(),
       [](void* data, const wasm::Val params[], wasm::Val[]) -> wasm::own<wasm::Trap> {
         auto func_data = reinterpret_cast<FuncData*>(data);
-        ENVOY_LOG(trace, "[wasm] [vm->host] {}({})", func_data->name_,
+        ENVOY_LOG(trace, "[vm->host] {}({})", func_data->name_,
                   printValues(params, std::tuple_size<std::tuple<Args...>>::value));
         auto args_tuple = convertValTypesToArgsTuple<std::tuple<Args...>>(params);
         auto args = std::tuple_cat(std::make_tuple(current_context_), args_tuple);
         auto function = reinterpret_cast<void (*)(void*, Args...)>(func_data->raw_func_);
         absl::apply(function, args);
-        ENVOY_LOG(trace, "[wasm] [vm<-host] {} return: void", func_data->name_);
+        ENVOY_LOG(trace, "[vm<-host] {} return: void", func_data->name_);
         return nullptr;
       },
       data.get());
@@ -529,7 +529,7 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
 template <typename R, typename... Args>
 void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_view function_name,
                                   R (*function)(void*, Args...)) {
-  ENVOY_LOG(trace, "[wasm] registerHostFunction(\"{}.{}\")", module_name, function_name);
+  ENVOY_LOG(trace, "registerHostFunction(\"{}.{}\")", module_name, function_name);
   auto data = std::make_unique<FuncData>(absl::StrCat(module_name, ".", function_name));
   auto type = wasm::FuncType::make(convertArgsTupleToValTypes<std::tuple<Args...>>(),
                                    convertArgsTupleToValTypes<std::tuple<R>>());
@@ -537,14 +537,14 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
       store_.get(), type.get(),
       [](void* data, const wasm::Val params[], wasm::Val results[]) -> wasm::own<wasm::Trap> {
         auto func_data = reinterpret_cast<FuncData*>(data);
-        ENVOY_LOG(trace, "[wasm] [vm->host] {}({})", func_data->name_,
+        ENVOY_LOG(trace, "[vm->host] {}({})", func_data->name_,
                   printValues(params, sizeof...(Args)));
         auto args_tuple = convertValTypesToArgsTuple<std::tuple<Args...>>(params);
         auto args = std::tuple_cat(std::make_tuple(current_context_), args_tuple);
         auto function = reinterpret_cast<R (*)(void*, Args...)>(func_data->raw_func_);
         R rvalue = absl::apply(function, args);
         results[0] = makeVal(rvalue);
-        ENVOY_LOG(trace, "[wasm] [vm<-host] {} return: {}", func_data->name_, rvalue);
+        ENVOY_LOG(trace, "[vm<-host] {} return: {}", func_data->name_, rvalue);
         return nullptr;
       },
       data.get());
@@ -556,7 +556,7 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
 template <typename... Args>
 void V8::getModuleFunctionImpl(absl::string_view function_name,
                                std::function<void(Context*, Args...)>* function) {
-  ENVOY_LOG(trace, "[wasm] getModuleFunction(\"{}\")", function_name);
+  ENVOY_LOG(trace, "getModuleFunction(\"{}\")", function_name);
   auto it = module_functions_.find(function_name);
   if (it == module_functions_.end()) {
     *function = nullptr;
@@ -569,8 +569,7 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
   }
   *function = [func, function_name](Context* context, Args... args) -> void {
     wasm::Val params[] = {makeVal(args)...};
-    ENVOY_LOG(trace, "[wasm] [host->vm] {}({})", function_name,
-              printValues(params, sizeof...(Args)));
+    ENVOY_LOG(trace, "[host->vm] {}({})", function_name, printValues(params, sizeof...(Args)));
     SaveRestoreContext _saved_context(context);
     auto trap = func->call(params, nullptr);
     if (trap) {
@@ -578,14 +577,14 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
           fmt::format("Function: {} failed: {}", function_name,
                       absl::string_view(trap->message().get(), trap->message().size())));
     }
-    ENVOY_LOG(trace, "[wasm] [host<-vm] {} return: void", function_name);
+    ENVOY_LOG(trace, "[host<-vm] {} return: void", function_name);
   };
 }
 
 template <typename R, typename... Args>
 void V8::getModuleFunctionImpl(absl::string_view function_name,
                                std::function<R(Context*, Args...)>* function) {
-  ENVOY_LOG(trace, "[wasm] getModuleFunction(\"{}\")", function_name);
+  ENVOY_LOG(trace, "getModuleFunction(\"{}\")", function_name);
   auto it = module_functions_.find(function_name);
   if (it == module_functions_.end()) {
     *function = nullptr;
@@ -598,8 +597,7 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
   }
   *function = [func, function_name](Context* context, Args... args) -> R {
     wasm::Val params[] = {makeVal(args)...};
-    ENVOY_LOG(trace, "[wasm] [host->vm] {}({})", function_name,
-              printValues(params, sizeof...(Args)));
+    ENVOY_LOG(trace, "[host->vm] {}({})", function_name, printValues(params, sizeof...(Args)));
     SaveRestoreContext _saved_context(context);
     wasm::Val results[1];
     auto trap = func->call(params, results);
@@ -609,7 +607,7 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
                       absl::string_view(trap->message().get(), trap->message().size())));
     }
     R rvalue = results[0].get<typename ConvertWordTypeToUint32<R>::type>();
-    ENVOY_LOG(trace, "[wasm] [host<-vm] {} return: {}", function_name, rvalue);
+    ENVOY_LOG(trace, "[host<-vm] {} return: {}", function_name, rvalue);
     return rvalue;
   };
 }
