@@ -10,4 +10,5 @@ developing Envoy Mobile.
   :maxdepth: 2
 
   performance/performance
+  testing/testing
   tools/tools
