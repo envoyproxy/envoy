@@ -221,6 +221,7 @@ The following command operators are supported:
     * **IH**: The request was rejected because it set an invalid value for a
       :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
+    * **DPE**: The downstream request had an HTTP protocol error.
 
 %RESPONSE_TX_DURATION%
   HTTP

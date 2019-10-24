@@ -61,6 +61,7 @@ public:
 
 private:
   void initConfig();
+  void maybeAddContentLength();
 
   BufferFilterConfigSharedPtr config_;
   const BufferFilterSettings* settings_;

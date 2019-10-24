@@ -772,4 +772,95 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
 }
 
+// Check if EDS cluster defined in file is loaded before ADS request and used as xDS server
+class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
+                                          public HttpIntegrationTest {
+public:
+  AdsClusterFromFileIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            AdsIntegrationConfig(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+    create_xds_upstream_ = true;
+    use_lds_ = false;
+    sotw_or_delta_ = sotwOrDelta();
+  }
+
+  void TearDown() override {
+    cleanUpXdsConnection();
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      auto* grpc_service =
+          bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
+      // Define ADS cluster
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->set_name("ads_cluster");
+      ads_cluster->mutable_http2_protocol_options();
+      ads_cluster->set_type(envoy::api::v2::Cluster::EDS);
+      auto* ads_cluster_config = ads_cluster->mutable_eds_cluster_config();
+      auto* ads_cluster_eds_config = ads_cluster_config->mutable_eds_config();
+      // Define port of ADS cluster
+      TestEnvironment::PortMap port_map_;
+      port_map_["upstream_0"] = xds_upstream_->localAddress()->ip()->port();
+      // Path to EDS for ads_cluster
+      const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
+          "test/config/integration/server_xds.eds.ads_cluster.yaml", port_map_, version_);
+      ads_cluster_eds_config->set_path(eds_path);
+
+      // Add EDS static Cluster that uses ADS as config Source.
+      auto* ads_eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_eds_cluster->set_name("ads_eds_cluster");
+      ads_eds_cluster->set_type(envoy::api::v2::Cluster::EDS);
+      auto* eds_cluster_config = ads_eds_cluster->mutable_eds_cluster_config();
+      auto* eds_config = eds_cluster_config->mutable_eds_config();
+      eds_config->mutable_ads();
+    });
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+  }
+
+  envoy::api::v2::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name) {
+    return TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(
+        fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: {}
+                port_value: {}
+    )EOF",
+                    name, Network::Test::getLoopbackAddressString(ipVersion()),
+                    fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterFromFileIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Validate if ADS cluster defined as EDS will be loaded from file and connection with ADS cluster
+// will be established.
+TEST_P(AdsClusterFromFileIntegrationTest, BasicTestWidsAdsEndpointLoadedFromFile) {
+  initialize();
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"ads_eds_cluster"}, {"ads_eds_cluster"}, {}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("ads_eds_cluster")},
+      {buildClusterLoadAssignment("ads_eds_cluster")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"ads_eds_cluster"}, {}, {}));
+}
+
 } // namespace Envoy
