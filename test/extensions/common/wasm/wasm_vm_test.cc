@@ -122,6 +122,8 @@ TEST_F(WasmVmTest, V8BadCode) {
 TEST_F(WasmVmTest, V8Code) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
+
+  EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.v8");
   EXPECT_FALSE(wasm_vm->cloneable());
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -186,10 +188,16 @@ TEST_F(WasmVmTest, V8Memory) {
   EXPECT_EQ(sizeof("test") - 1, got.size());
   EXPECT_STREQ("test", got.data());
 
+  EXPECT_FALSE(wasm_vm->setMemory(1024 * 1024 /* out of bound */, 1 /* size */, nullptr));
+  EXPECT_FALSE(wasm_vm->getMemory(1024 * 1024 /* out of bound */, 1 /* size */).has_value());
+
   Word word(0);
   EXPECT_TRUE(wasm_vm->setWord(test_addr, std::numeric_limits<uint32_t>::max()));
   EXPECT_TRUE(wasm_vm->getWord(test_addr, &word));
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), word.u64_);
+
+  EXPECT_FALSE(wasm_vm->setWord(1024 * 1024 /* out of bound */, 1));
+  EXPECT_FALSE(wasm_vm->getWord(1024 * 1024 /* out of bound */, &word));
 }
 
 } // namespace
