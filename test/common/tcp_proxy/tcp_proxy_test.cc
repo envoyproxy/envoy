@@ -1275,6 +1275,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 // Test that the tcp proxy override ALPN from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   setup();
+  initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filterState().setData(
