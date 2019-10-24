@@ -234,10 +234,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.20.1/rules_go-v0.20.1.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "85ef7b8285296191534c8413a550e8799c5bad7ecb3a6673a55b00bd8d857ff6",
-        strip_prefix = "rules_foreign_cc-6bb0536452eaca3bad20c21ba6e7968d2eda004d",
-        # 2019-10-24
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/6bb0536452eaca3bad20c21ba6e7968d2eda004d.tar.gz"],
+        sha256 = "3184c244b32e65637a74213fc448964b687390eeeca42a36286f874c046bba15",
+        strip_prefix = "rules_foreign_cc-7bc4be735b0560289f6b86ab6136ee25d20b65b7",
+        # 2019-09-26
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/7bc4be735b0560289f6b86ab6136ee25d20b65b7.tar.gz"],
     ),
     rules_proto = dict(
         sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",
