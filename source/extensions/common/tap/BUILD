@@ -27,6 +27,7 @@ envoy_cc_library(
         ":tap_interface",
         ":tap_matcher",
         "//source/common/common:assert_lib",
+        "//source/common/common:stack_array",
     ],
 )
 
