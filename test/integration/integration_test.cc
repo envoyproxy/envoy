@@ -283,6 +283,39 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
               HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
+TEST_P(IntegrationTest, TrailersWithHttp1AndHttp2) {
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"},
+                                                          {"TE", "trailers"},
+                                                          {"Accept", "*/*"}});
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 0, true);
+
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(5, false);
+  upstream_request_->encodeTrailers(response_trailers);
+  response->waitForEndStream();
+
+  ASSERT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+
+  EXPECT_EQ(5, response->body().size());
+  EXPECT_EQ("aaaaa", response->body());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+}
+
 TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
