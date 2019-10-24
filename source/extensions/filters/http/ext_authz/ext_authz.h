@@ -45,8 +45,14 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
-        status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
-        scope_(scope), runtime_(runtime), http_context_(http_context), pool_(scope.symbolTable()),
+        status_on_error_(toErrorCode(config.status_on_error().code())),
+        filter_enabled_runtime_key_(config.filter_enabled().runtime_key()),
+        filter_enabled_default_value_(config.has_filter_enabled()
+                                          ? absl::optional<envoy::type::FractionalPercent>(
+                                                config.filter_enabled().default_value())
+                                          : absl::nullopt),
+        local_info_(local_info), scope_(scope), runtime_(runtime), http_context_(http_context),
+        pool_(scope.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
         ext_authz_ok_(pool_.add("ext_authz.ok")), ext_authz_denied_(pool_.add("ext_authz.denied")),
@@ -66,6 +72,15 @@ public:
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
 
   Http::Code statusOnError() const { return status_on_error_; }
+
+  bool filter_enabled() {
+    if (filter_enabled_default_value_.has_value()) {
+      return runtime().snapshot().featureEnabled(filter_enabled_runtime_key_,
+                                                 filter_enabled_default_value_.value());
+    }
+
+    return true;
+  }
 
   Runtime::Loader& runtime() { return runtime_; }
 
@@ -95,6 +110,8 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const Http::Code status_on_error_;
+  const std::string filter_enabled_runtime_key_;
+  const absl::optional<envoy::type::FractionalPercent> filter_enabled_default_value_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;

@@ -17,7 +17,7 @@ import "validate/validate.proto";
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ExtAuthz {
   // External authorization service configuration.
   oneof services {
@@ -82,6 +82,21 @@ message ExtAuthz {
   //    - envoy.filters.http.jwt_authn
   //
   repeated string metadata_context_namespaces = 8;
+
+  // If not specified, the filter will be enabled for all requests.
+  //
+  // If specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
+  //
+  // Parsing this field is implemented such that the runtime key's data may be represented
+  // as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
+  // as JSON/YAML and may also be represented as an integer with the assumption that the value
+  // is an integral percentage out of 100. For instance, a runtime key lookup returning the
+  // value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
+  // HUNDRED.
+  //
+  // More information on how this can be controlled via runtime can be found :ref:`here
+  // <config_http_filters_ext_authz_runtime>`.
+  api.v2.core.RuntimeFractionalPercent filter_enabled = 9;
 }
 
 // Configuration for buffering the request data.

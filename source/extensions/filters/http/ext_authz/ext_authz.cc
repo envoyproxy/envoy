@@ -90,6 +90,10 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  if (!config_->filter_enabled()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   request_headers_ = &headers;
   buffer_data_ = config_->withRequestBody() &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||

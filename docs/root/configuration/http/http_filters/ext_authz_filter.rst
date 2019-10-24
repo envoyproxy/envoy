@@ -131,3 +131,21 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."
+
+Runtime
+-------
+.. _config_http_filters_ext_authz_runtime:
+
+The external authorization filter supports the following RuntimeFractionalPercent setting:
+
+filter_enabled
+  The % of requests for which the filter is enabled. The default is
+  100/:ref:`HUNDRED <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+
+  To utilize runtime to enabled/disable the external automatically filter set the
+  :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>`
+  value of the :ref:`filter_enabled <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`
+  field.
+
+To determine if the filter is enabled you can check the runtime values via the admin panel
+at :http:get:`/runtime`.

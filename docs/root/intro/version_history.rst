@@ -107,6 +107,7 @@ Version history
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
 * zookeeper: parse responses and emit latency stats.
+* ext_authz: added :ref:`filter_enabled RuntimeFractionalPercent flag <config_http_filters_ext_authz_runtime>` to filter.
 
 1.11.2 (October 8, 2019)
 ========================
