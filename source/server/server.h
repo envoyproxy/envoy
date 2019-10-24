@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -49,9 +50,9 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
-  COUNTER(static_unknown_fields)                                                                   \
-  COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(debug_assertion_failures)                                                                \
+  COUNTER(dynamic_unknown_fields)                                                                  \
+  COUNTER(static_unknown_fields)                                                                   \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
@@ -60,10 +61,11 @@ namespace Server {
   GAUGE(memory_heap_size, Accumulate)                                                              \
   GAUGE(parent_connections, Accumulate)                                                            \
   GAUGE(state, NeverImport)                                                                        \
+  GAUGE(stats_recent_lookups, NeverImport)                                                         \
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)                                                                      \
-  HISTOGRAM(initialization_time_ms)
+  HISTOGRAM(initialization_time_ms, Milliseconds)
 
 struct ServerStats {
   ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
@@ -141,6 +143,28 @@ private:
   Event::SignalEventPtr sig_hup_;
 };
 
+class ServerFactoryContextImpl : public Configuration::ServerFactoryContext {
+public:
+  explicit ServerFactoryContextImpl(Instance& server)
+      : server_(server), server_scope_(server_.stats().createScope("")) {}
+
+  Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
+  Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
+  Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
+  Stats::Scope& scope() override { return *server_scope_; }
+  Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
+  ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
+  Admin& admin() override { return server_.admin(); }
+  TimeSource& timeSource() override { return api().timeSource(); }
+  Api::Api& api() override { return server_.api(); }
+
+private:
+  Instance& server_;
+  Stats::ScopePtr server_scope_;
+};
+
 /**
  * This is the actual full standalone server which stitches together various common components.
  */
@@ -196,8 +220,10 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   OptProcessContextRef processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
+
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
@@ -235,6 +261,7 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   bool workers_started_;
+  std::atomic<bool> live_;
   bool shutdown_;
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
@@ -283,6 +310,8 @@ private:
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
+
+  ServerFactoryContextImpl server_context_;
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;

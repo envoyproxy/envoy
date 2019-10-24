@@ -48,7 +48,7 @@ public:
   create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
              config,
          Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-         RouteConfigProviderManager& route_config_provider_manager, bool is_delta);
+         RouteConfigProviderManager& route_config_provider_manager);
 };
 
 class RouteConfigProviderManagerImpl;
@@ -131,15 +131,21 @@ private:
 
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
-      bool is_delta);
+      const uint64_t manager_identifier,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+      const std::string& stat_prefix,
+      RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
 
+  Init::Manager& getRdsConfigInitManager() { return init_manager_; }
+
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  Init::Manager& init_manager_;
   Init::TargetImpl init_target_;
   Stats::ScopePtr scope_;
   std::string stat_prefix_;
@@ -149,7 +155,6 @@ private:
   std::unordered_set<RouteConfigProvider*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Common::CallbackManager<> update_callback_manager_;
 
   friend class RouteConfigProviderManagerImpl;
@@ -190,7 +195,8 @@ private:
 
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
 
   friend class RouteConfigProviderManagerImpl;
@@ -207,7 +213,7 @@ public:
   RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-      Init::Manager& init_manager, bool is_delta) override;
+      Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,

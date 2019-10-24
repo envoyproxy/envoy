@@ -39,7 +39,9 @@ static_resources:
             catch_all_route:
               cluster: cluster_0
           settings:
-            op_timeout: 5s)EOF");
+            op_timeout: 5s
+            enable_redirection: true
+)EOF");
 }
 
 const std::string& clusterConfig() {
@@ -56,8 +58,10 @@ const std::string& clusterConfig() {
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Struct
           value:
-            cluster_refresh_rate: 1s
+            cluster_refresh_rate: 60s
             cluster_refresh_timeout: 4s
+            redirect_refresh_interval: 0s
+            redirect_refresh_threshold: 0
 )EOF");
 }
 
@@ -278,6 +282,22 @@ protected:
     return fmt::format("*2\r\n${0}\r\n{1}\r\n:{2}\r\n", address.size(), address, port);
   }
 
+  // This method encodes a fake upstream's IP address and TCP port in the
+  // same format as one would expect from a Redis server in
+  // an ask/moved redirection error.
+  std::string redisAddressAndPort(FakeUpstreamPtr& upstream) {
+    std::stringstream result;
+    if (version_ == Network::Address::IpVersion::v4) {
+      result << "127.0.0.1"
+             << ":";
+    } else {
+      result << "::1"
+             << ":";
+    }
+    result << upstream->localAddress()->ip()->port();
+    return result.str();
+  }
+
   Runtime::MockRandomGenerator* mock_rng_{};
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
@@ -312,7 +332,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithAuthIntegrationTest,
 // The fake server sends a valid response back to the client.
 // The request and response should make it through the envoy
 // proxy server code unchanged.
-
 TEST_P(RedisClusterIntegrationTest, SingleSlotMasterReplica) {
   random_index_ = 0;
 
@@ -333,7 +352,6 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotMasterReplica) {
 // Redis cluster with 2 slots. The fake server sends a valid response
 // back to the client. The request and response should
 // make it through the envoy proxy server code unchanged.
-
 TEST_P(RedisClusterIntegrationTest, TwoSlot) {
   random_index_ = 0;
 
@@ -351,6 +369,74 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
   // foo hashes to slot 12182 which is in upstream 1
   simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+// This test show the test proxy's multi-stage response to a redirection error from an upstream fake
+// redis server. The proxy will properly redirect the original "get foo" command to the second fake
+// upstream server, and connect to the first fake upstream server to rediscover the cluster's
+// topology using a "cluster slots" command.
+TEST_P(RedisClusterIntegrationTest, ClusterSlotRequestAfterRedirection) {
+  random_index_ = 0;
+
+  on_server_init_function_ = [this]() {
+    std::string cluster_slot_response = singleSlotMasterReplica(
+        fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
+    expectCallClusterSlot(random_index_, cluster_slot_response);
+  };
+
+  initialize();
+
+  // foo hashes to slot 12182 which the proxy believes is at the server reachable via
+  // fake_upstreams_[0], based on the singleSlotMasterReplica() response above.
+  std::string request = makeBulkStringArray({"get", "foo"});
+  // The actual moved redirection error that redirects to the fake_upstreams_[1] server.
+  std::string redirection_response =
+      "-MOVED 12182 " + redisAddressAndPort(fake_upstreams_[1]) + "\r\n";
+  // The "get foo" response from fake_upstreams_[1].
+  std::string response = "$3\r\nbar\r\n";
+  std::string cluster_slots_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
+  std::string proxy_to_server;
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(request);
+
+  FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2,
+      fake_upstream_connection_3;
+
+  // Data from the client should always be routed to fake_upstreams_[0] by the load balancer.
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_1));
+  EXPECT_TRUE(fake_upstream_connection_1->waitForData(request.size(), &proxy_to_server));
+  // The data in request should be received by the first server, fake_upstreams_[0].
+  EXPECT_EQ(request, proxy_to_server);
+  proxy_to_server.clear();
+
+  // Send the redirection_error response from the first fake Redis server back to the proxy.
+  EXPECT_TRUE(fake_upstream_connection_1->write(redirection_response));
+  // The proxy should initiate a new connection to the fake redis server, fake_upstreams_[1], in
+  // response.
+  EXPECT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
+
+  // The server at fake_upstreams_[1] should receive the original request unchanged.
+  EXPECT_TRUE(fake_upstream_connection_2->waitForData(request.size(), &proxy_to_server));
+  EXPECT_EQ(request, proxy_to_server);
+
+  // Send response from the second fake Redis server at fake_upstreams_[1] to the client.
+  EXPECT_TRUE(fake_upstream_connection_2->write(response));
+  redis_client->waitForData(response);
+  // The client should receive response unchanged.
+  EXPECT_EQ(response, redis_client->data());
+
+  // A new connection should be created to fake_upstreams_[0] for topology discovery.
+  proxy_to_server.clear();
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_3));
+  EXPECT_TRUE(
+      fake_upstream_connection_3->waitForData(cluster_slots_request.size(), &proxy_to_server));
+  EXPECT_EQ(cluster_slots_request, proxy_to_server);
+
+  EXPECT_TRUE(fake_upstream_connection_1->close());
+  EXPECT_TRUE(fake_upstream_connection_2->close());
+  EXPECT_TRUE(fake_upstream_connection_3->close());
+  redis_client->close();
 }
 
 // This test sends simple "set foo" and "get foo" command from a fake

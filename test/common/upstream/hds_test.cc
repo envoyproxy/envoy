@@ -85,7 +85,8 @@ protected:
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
+    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
+        envoy::type::HTTP1);
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
     auto* socket_address = health_check->add_locality_endpoints()
@@ -206,7 +207,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
       hc->mutable_unhealthy_threshold()->set_value(j + 1);
       hc->mutable_healthy_threshold()->set_value(j + 1);
       hc->mutable_grpc_health_check();
-      hc->mutable_http_health_check()->set_use_http2(false);
+      hc->mutable_http_health_check()->set_codec_client_type(envoy::type::HTTP1);
       hc->mutable_http_health_check()->set_path("/healthcheck");
     }
   }

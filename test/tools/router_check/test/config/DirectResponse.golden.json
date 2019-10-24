@@ -1,0 +1,17 @@
+[
+  {
+    "test_name": "DirectResponse",
+    "input": {
+      ":authority": "lyft.com",
+      ":path": "/ping"
+    },
+    "validate": {
+      "path_redirect": "http://lyft.com/ping",
+      "cluster_name": "",
+      "host_rewrite": "",
+      "path_rewrite": "",
+      "virtual_cluster_name": "",
+      "virtual_host_name": ""
+    }
+  }
+]

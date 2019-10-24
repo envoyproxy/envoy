@@ -34,11 +34,13 @@ namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  void complete(LimitStatus status, Http::HeaderMapPtr&& headers) override {
-    complete_(status, headers.get());
+  void complete(LimitStatus status, Http::HeaderMapPtr&& response_headers_to_add,
+                Http::HeaderMapPtr&& request_headers_to_add) override {
+    complete_(status, response_headers_to_add.get(), request_headers_to_add.get());
   }
 
-  MOCK_METHOD2(complete_, void(LimitStatus status, const Http::HeaderMap* headers));
+  MOCK_METHOD3(complete_, void(LimitStatus status, const Http::HeaderMap* response_headers_to_add,
+                               const Http::HeaderMap* request_headers_to_add));
 };
 
 class RateLimitGrpcClientTest : public testing::Test {
@@ -81,7 +83,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 
@@ -100,7 +102,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 
@@ -117,7 +119,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
                   Tracing::NullSpan::instance());
 
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _));
     client_.onFailure(Grpc::Status::Unknown, "", span_);
   }
 }

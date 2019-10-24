@@ -591,7 +591,7 @@ public:
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), random_(c.random()),
         runtime_(runtime), singleton_manager_(c.singletonManager()), tls_(c.threadLocal()),
-        validation_visitor_(c.messageValidationVisitor()), api_(c.api()) {}
+        api_(c.api()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -603,9 +603,6 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return validation_visitor_;
-  }
   Api::Api& api() override { return api_; }
 
 private:
@@ -618,7 +615,6 @@ private:
   Envoy::Runtime::Loader& runtime_;
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
 
@@ -727,6 +723,11 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (config.common_http_protocol_options().has_idle_timeout()) {
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
+    if (idle_timeout_.value().count() == 0) {
+      idle_timeout_ = absl::nullopt;
+    }
+  } else {
+    idle_timeout_ = std::chrono::hours(1);
   }
 
   if (config.has_eds_cluster_config()) {
@@ -737,8 +738,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   // TODO(htuch): Remove this temporary workaround when we have
-  // https://github.com/lyft/protoc-gen-validate/issues/97 resolved. This just provides early
-  // validation of sanity of fields that we should catch at config ingestion.
+  // https://github.com/envoyproxy/protoc-gen-validate/issues/97 resolved. This just provides
+  // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
 
   // Create upstream filter factories

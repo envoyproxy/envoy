@@ -28,7 +28,10 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     : config_(std::move(config)), controller_(std::move(controller)) {}
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
-  if (!config_->filterEnabled()) {
+  // In addition to not sampling if the filter is disabled, health checks should also not be sampled
+  // by the concurrency controller since they may potentially bias the sample aggregate to lower
+  // latency measurements.
+  if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
   }
 

@@ -156,6 +156,7 @@ envoy_cc_library(
     hdrs = ["symbol_table_impl.h"],
     external_deps = ["abseil_base"],
     deps = [
+        ":recent_lookups_lib",
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
@@ -232,6 +233,17 @@ envoy_cc_library(
         ":stats_matcher_lib",
         ":tag_producer_lib",
         "//include/envoy/thread_local:thread_local_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "timespan_lib",
+    srcs = ["timespan_impl.cc"],
+    hdrs = ["timespan_impl.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:timespan_interface",
     ],
 )
 

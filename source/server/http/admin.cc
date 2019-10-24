@@ -140,6 +140,8 @@ const char AdminHtmlEnd[] = R"(
 
 const std::regex PromRegex("[^a-zA-Z0-9_]");
 
+const uint64_t RecentLookupsCapacity = 100;
+
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
   header_map.insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -697,12 +699,61 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderMap&,
+                                            Buffer::Instance& response, AdminStream&) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  ListenerManager::StopListenersType stop_listeners_type =
+      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
+                                                 : ListenerManager::StopListenersType::All;
+  server_.listenerManager().stopListeners(stop_listeners_type);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
+  server_.stats().symbolTable().clearRecentLookups();
+  response.add("OK\n");
+  return Http::Code::OK;
+}
 
+Http::Code AdminImpl::handlerStatsRecentLookups(absl::string_view, Http::HeaderMap&,
+                                                Buffer::Instance& response, AdminStream&) {
+  Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
+  std::string table;
+  const uint64_t total =
+      symbol_table.getRecentLookups([&table](absl::string_view name, uint64_t count) {
+        table += fmt::format("{:8d} {}\n", count, name);
+      });
+  if (table.empty() && symbol_table.recentLookupCapacity() == 0) {
+    table = "Lookup tracking is not enabled. Use /stats/recentlookups/enable to enable.\n";
+  } else {
+    response.add("   Count Lookup\n");
+  }
+  response.add(absl::StrCat(table, "\ntotal: ", total, "\n"));
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerStatsRecentLookupsClear(absl::string_view, Http::HeaderMap&,
+                                                     Buffer::Instance& response, AdminStream&) {
+  server_.stats().symbolTable().clearRecentLookups();
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerStatsRecentLookupsDisable(absl::string_view, Http::HeaderMap&,
+                                                       Buffer::Instance& response, AdminStream&) {
+  server_.stats().symbolTable().setRecentLookupCapacity(0);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::HeaderMap&,
+                                                      Buffer::Instance& response, AdminStream&) {
+  server_.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
   response.add("OK\n");
   return Http::Code::OK;
 }
@@ -1224,6 +1275,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
+          {"/drain_listeners", "drain listeners", MAKE_ADMIN_HANDLER(handlerDrainListeners), false,
+           true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -1231,6 +1284,14 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
+          {"/stats/recentlookups", "Show recent stat-name lookups",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookups), false, false},
+          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsClear), false, true},
+          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsDisable), false, true},
+          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(handlerStatsRecentLookupsEnable), false, true},
           {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},

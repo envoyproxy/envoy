@@ -17,7 +17,7 @@ public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
   Stats::Counter& counter(const Stats::StatNameVec& names);
-  Stats::Histogram& histogram(const Stats::StatNameVec& names);
+  Stats::Histogram& histogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit);
 
   /**
    * Creates the partition id stats string. The stats format is
