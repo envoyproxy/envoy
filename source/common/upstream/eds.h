@@ -27,7 +27,7 @@ public:
                  Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
-  InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
+  InitializePhase initializePhase() const override { return initialize_phase_; }
 
 private:
   // Config::SubscriptionCallbacks
@@ -77,6 +77,7 @@ private:
   HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  InitializePhase initialize_phase_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {
