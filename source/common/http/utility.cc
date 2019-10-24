@@ -383,7 +383,8 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
 }
 
 void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& headers) {
-  // Remove any headers nominated by the Connection header
+  // Remove any headers nominated by the Connection header. The TE header
+  // is sanitized and removed only if it's empty after removing unsupported values
   // See https://github.com/envoyproxy/envoy/issues/8623
   const auto& cv = Http::Headers::get().ConnectionValues;
   const auto& connection_header_value = headers.Connection()->value();
@@ -422,22 +423,21 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
         const absl::string_view header_sv = StringUtil::trim(header_value);
 
         // Check whether TE contains multiple values and remove everything except "trailers"
-        if (StringUtil::CaseInsensitiveCompare()(header_to_remove, Http::Headers::get().TE.get()) &&
+        if (StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().TE.get()) &&
             (StringUtil::CaseInsensitiveCompare()(header_sv,
                                                   Http::Headers::get().TEValues.Trailers))) {
           keep_header = true;
         } else {
-          const std::string header_value_string(header_sv.data(), header_sv.size());
           ENVOY_LOG_TO_LOGGER(logger, trace, "Sanitizing nominated header [{}] value [{}]",
-                              header_to_remove, header_value_string);
-          tokens_to_remove.insert(header_value_string);
+                              token_sv, header_sv);
+          tokens_to_remove.emplace(header_sv);
         }
       }
 
       // We found tokens in an expected header that needed removal. If after removing them the
       // set is empty, we will remove that header. Conversely, we will move on to examining the
       // next nominated header
-      if (keep_header && tokens_to_remove.size()) {
+      if (keep_header && !tokens_to_remove.empty()) {
         const std::string new_value = StringUtil::removeTokens(
             nominated_header_value.getStringView(), ",", tokens_to_remove, ",");
         if (new_value.empty()) {
@@ -451,9 +451,9 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
     }
 
     if (!keep_header) {
-      ENVOY_LOG_TO_LOGGER(logger, trace, "Removing nominated header [{}]", header_to_remove);
+      ENVOY_LOG_TO_LOGGER(logger, trace, "Removing nominated header [{}]", token_sv);
       headers.remove(lcs_header_to_remove);
-      headers_to_remove.insert(header_to_remove);
+      headers_to_remove.emplace(token_sv);
     }
   }
 
