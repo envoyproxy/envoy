@@ -32,12 +32,11 @@ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Sett
 }
 
 HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
-  switch (settings.header_key_format_) {
-  case Http1Settings::HeaderKeyFormat::Default:
-    return nullptr;
-  case Http1Settings::HeaderKeyFormat::ProperCase:
+  if (settings.header_key_format_ == Http1Settings::HeaderKeyFormat::ProperCase) {
     return std::make_unique<ProperCaseHeaderKeyFormatter>();
   }
+
+  return nullptr;
 }
 } // namespace
 
