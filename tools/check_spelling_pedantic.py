@@ -535,9 +535,12 @@ def execute(files, dictionary_file, fix):
 
 
 if __name__ == "__main__":
-  # Force UTF-8 across all open and popen calls. Use 'C' as the language
-  # to handle hosts where en_US is not recognized (e.g. CI).
-  locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+  # Force UTF-8 across all open and popen calls. Fallback to 'C' as the
+  # language to handle hosts where en_US is not recognized (e.g. CI).
+  try:
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+  except:
+    locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
   default_dictionary = os.path.join(TOOLS_DIR, 'spelling_dictionary.txt')
 
