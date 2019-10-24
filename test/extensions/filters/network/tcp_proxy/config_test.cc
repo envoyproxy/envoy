@@ -34,7 +34,7 @@ INSTANTIATE_TEST_SUITE_P(IpList, RouteIpListConfigTest,
                                                   "1234::5678/128"
                                                 ],)EOF"));
 
-TEST_P(RouteIpListConfigTest, TcpProxy) {
+TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
