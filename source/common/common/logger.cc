@@ -10,6 +10,7 @@
 
 #include "spdlog/spdlog.h"
 #include "absl/strings/escaping.h"
+#include "absl/strings/strip.h"
 
 namespace Envoy {
 namespace Logger {
@@ -68,7 +69,9 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   }
   lock.Release();
 
-  if (should_escape_newlines_) {
+  if (should_escape_) {
+    msg_view = absl::StripSuffix(msg_view, "\n");
+    msg_view = absl::StripSuffix(msg_view, "\r");
     sink_->log(absl::CEscape(msg_view));
     sink_->log("\r\n");
   } else {
@@ -76,11 +79,11 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   }
 }
 
-DelegatingLogSinkPtr DelegatingLogSink::init(bool should_escape_newlines) {
+DelegatingLogSinkPtr DelegatingLogSink::init(bool should_escape) {
   DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
 
   delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
-  delegating_sink->should_escape_newlines_ = should_escape_newlines;
+  delegating_sink->should_escape_ = should_escape;
 
   return delegating_sink;
 }
@@ -92,9 +95,9 @@ Context::Context(spdlog::level::level_enum log_level, const std::string& log_for
     : Context(log_level, log_format, lock, false) {}
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock, bool should_escape_newlines)
+                 Thread::BasicLockable& lock, bool should_escape)
     : log_level_(log_level), log_format_(log_format), lock_(lock),
-      should_escape_newlines_(should_escape_newlines), save_context_(current_context) {
+      should_escape_(should_escape), save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -109,7 +112,7 @@ Context::~Context() {
 }
 
 void Context::activate() {
-  Registry::initSink(should_escape_newlines_);
+  Registry::initSink(should_escape_);
   Registry::getSink()->setLock(lock_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);

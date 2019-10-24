@@ -94,7 +94,7 @@ following are the command line options that Envoy supports.
    *(optional)* The format string to use for laying out the log message metadata. If this is not
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
 
-   When used in conjunction with ``--log-format-escape-newlines``, the logger can be configured
+   When used in conjunction with ``--log-format-escaped``, the logger can be configured
    to log in a format that is parsable by log viewers. For example, ``"%L%m%d %T.%e %t envoy] [%t][%n]%v"``
    enables out-of-the-box integration with Stackdriver Logging.
 
@@ -130,7 +130,7 @@ following are the command line options that Envoy supports.
    :%z:	ISO 8601 offset from UTC in timezone ([+/-]HH:MM) ("-07:00")
    :%%:	The % sign ("%")
 
-.. option:: --log-format-escape-newlines
+.. option:: --log-format-escaped
 
   *(optional)* This flag enables application log sanitization to escape C-style escape sequences.
   This can be used to prevent a single log line from spanning multiple lines in the underlying log.

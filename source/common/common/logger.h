@@ -182,10 +182,10 @@ public:
    * the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
    * available after construction.
    *
-   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback
+   * @param should_escape whether to escape newlines in messages logged to the fallback
    * stderr logger
    */
-  static DelegatingLogSinkPtr init(bool should_escape_newlines);
+  static DelegatingLogSinkPtr init(bool should_escape);
 
 private:
   friend class SinkDelegate;
@@ -199,7 +199,7 @@ private:
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
   absl::Mutex format_mutex_; // direct absl reference to break build cycle.
-  bool should_escape_newlines_;
+  bool should_escape_;
 };
 
 /**
@@ -218,7 +218,7 @@ public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
           Thread::BasicLockable& lock);
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape_newlines);
+          Thread::BasicLockable& lock, bool should_escape);
   ~Context();
 
 private:
@@ -227,7 +227,7 @@ private:
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
-  bool should_escape_newlines_;
+  bool should_escape_;
   Context* const save_context_;
 };
 
@@ -246,11 +246,11 @@ public:
   /**
    * Init the singleton sink to use for all loggers.
    *
-   * @param should_escape_newlines whether to escape newlines in messages logged to the fallback
+   * @param should_escape_ whether to escape c-style escape sequences in messages logged to the fallback
    * stderr logger
    */
-  static void initSink(bool should_escape_newlines) {
-    sink_ = DelegatingLogSink::init(should_escape_newlines);
+  static void initSink(bool should_escape_) {
+    sink_ = DelegatingLogSink::init(should_escape_);
   }
 
   /**

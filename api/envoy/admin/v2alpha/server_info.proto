@@ -100,8 +100,8 @@ message CommandLineOptions {
   // See :option:`--log-format` for details.
   string log_format = 10;
 
-  // See :option:`--log-format-escape-newlines` for details.
-  bool log_format_escape_newlines = 27;
+  // See :option:`--log-format-escaped` for details.
+  bool log_format_escaped = 27;
 
   // See :option:`--log-path` for details.
   string log_path = 11;
