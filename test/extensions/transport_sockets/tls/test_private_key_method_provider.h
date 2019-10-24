@@ -67,13 +67,13 @@ public:
                                 Event::Dispatcher& dispatcher) override;
   void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
-  void installBoringSslPrivateKeyMethod(SSL_CTX* ssl_ctx) override;
+  Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
   static int rsaConnectionIndex();
   static int ecdsaConnectionIndex();
 
 private:
-  std::shared_ptr<SSL_PRIVATE_KEY_METHOD> method_{};
+  Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
   bssl::UniquePtr<EVP_PKEY> pkey_;
   TestPrivateKeyConnectionTestOptions test_options_;
   std::string mode_;
