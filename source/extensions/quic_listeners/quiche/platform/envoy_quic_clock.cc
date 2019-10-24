@@ -3,33 +3,21 @@
 namespace Envoy {
 namespace Quic {
 
-EnvoyQuicClock::EnvoyQuicClock(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), approximate_now_(nowImpl()) {
-  dispatcher_.registerOnPrepareCallback(std::bind(&EnvoyQuicClock::updateApproximateNow, this));
+quic::QuicTime EnvoyQuicClock::ApproximateNow() const {
+  return quic::QuicTime::Zero() + quic::QuicTime::Delta::FromMicroseconds(microsecondsSinceEpoch(
+                                      dispatcher_.approximateMonotonicTime()));
 }
-
-EnvoyQuicClock::~EnvoyQuicClock() {
-  // Unregister callback.
-  dispatcher_.registerOnPrepareCallback({});
-}
-
-quic::QuicTime EnvoyQuicClock::ApproximateNow() const { return approximate_now_; }
 
 quic::QuicTime EnvoyQuicClock::Now() const {
-  approximate_now_ = nowImpl();
-  return approximate_now_;
+  // Since the expensive operation of obtaining time has to be performed anyway,
+  // make Dispatcher update approximate time.
+  const_cast<Event::Dispatcher&>(dispatcher_).updateApproximateMonotonicTime();
+  return ApproximateNow();
 }
 
 quic::QuicWallTime EnvoyQuicClock::WallNow() const {
   return quic::QuicWallTime::FromUNIXMicroseconds(
       microsecondsSinceEpoch(dispatcher_.timeSource().systemTime()));
-}
-
-void EnvoyQuicClock::updateApproximateNow() const { approximate_now_ = nowImpl(); }
-
-quic::QuicTime EnvoyQuicClock::nowImpl() const {
-  return quic::QuicTime::Zero() + quic::QuicTime::Delta::FromMicroseconds(microsecondsSinceEpoch(
-                                      dispatcher_.timeSource().monotonicTime()));
 }
 
 } // namespace Quic

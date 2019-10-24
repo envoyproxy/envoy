@@ -45,6 +45,9 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
 #ifdef ENVOY_HANDLE_SIGNALS
   SignalAction::registerFatalErrorHandler(*this);
 #endif
+  updateApproximateMonotonicTime();
+  base_scheduler_.registerOnPrepareCallback(
+      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
 DispatcherImpl::~DispatcherImpl() {
@@ -191,8 +194,12 @@ void DispatcherImpl::run(RunType type) {
   base_scheduler_.run(type);
 }
 
-void DispatcherImpl::registerOnPrepareCallback(OnPrepareCallback callback) {
-  base_scheduler_.registerOnPrepareCallback(callback);
+MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
+  return approximate_monotonic_time_;
+}
+
+void DispatcherImpl::updateApproximateMonotonicTime() {
+  approximate_monotonic_time_ = timeSource().monotonicTime();
 }
 
 void DispatcherImpl::runPostCallbacks() {

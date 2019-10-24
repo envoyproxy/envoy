@@ -81,11 +81,8 @@ public:
     listen_socket_ = std::make_unique<Network::NetworkListenSocket<
         Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
-    // Advance time and trigger update of EnvoyQuicClock::ApproximateTime()
-    // because zero QuicTime is considered uninitialized.
+    // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
-    connection_helper_.GetClock()->Now();
-
     EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
   }
 
