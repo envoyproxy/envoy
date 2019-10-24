@@ -3439,12 +3439,18 @@ virtual_hosts:
   EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
+/**
+ * @brief  Generate headers for testing
+ * @param ssl set true to insert "x-forwarded-proto: https", else "x-forwarded-proto: http"
+ * @param internal nullopt for no such "x-envoy-internal" header, or explicit "true/false"
+ * @return Http::TestHeaderMapImpl
+ */
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
-                                                  bool ssl, bool internal) {
+                                                  bool ssl, absl::optional<bool> internal) {
   Http::TestHeaderMapImpl headers{
       {":authority", host}, {":path", path}, {"x-forwarded-proto", ssl ? "https" : "http"}};
-  if (internal) {
-    headers.addCopy("x-envoy-internal", "true");
+  if (internal.has_value()) {
+    headers.addCopy("x-envoy-internal", internal.value() ? "true" : "false");
   }
 
   return headers;
@@ -3652,6 +3658,12 @@ virtual_hosts:
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, false);
+    EXPECT_EQ("https://api.lyft.com/foo",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "api.lyft.com", "/foo", false, absl::nullopt /* no x-envoy-internal header */);
     EXPECT_EQ("https://api.lyft.com/foo",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }

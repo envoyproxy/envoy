@@ -22,7 +22,6 @@
 #include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
@@ -1044,7 +1043,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
   if (ssl_requirements_ == SslRequirements::ALL && forwarded_proto_header->value() != "https") {
     return SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
-             forwarded_proto_header->value() != "https" && !headers.EnvoyInternalRequest()) {
+             forwarded_proto_header->value() != "https" &&
+             !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
     return SSL_REDIRECT_ROUTE;
   }
 

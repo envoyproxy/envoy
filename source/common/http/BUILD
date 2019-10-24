@@ -332,10 +332,12 @@ envoy_cc_library(
         "nghttp2",
     ],
     deps = [
+        ":header_map_lib",
+        "//include/envoy/common:regex_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/json:json_object_interface",
+        "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:rds_json_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
         "@envoy_api//envoy/type:pkg_cc_proto",
