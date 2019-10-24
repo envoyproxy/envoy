@@ -44,7 +44,7 @@ public:
   absl::string_view getCustomSection(absl::string_view name) override;
   void link(absl::string_view debug_name) override;
 
-  // v8 is currently not clonable.
+  // V8 is currently not cloneable.
   bool cloneable() override { return false; }
   WasmVmPtr clone() override { return nullptr; }
 
