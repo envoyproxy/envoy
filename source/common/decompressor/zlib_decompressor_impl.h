@@ -42,6 +42,7 @@ public:
 
   // Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
+  int decompressionError() const override { return decompression_error_; }
 
 private:
   bool inflateNext();

@@ -19,6 +19,8 @@ public:
    */
   virtual void decompress(const Buffer::Instance& input_buffer,
                           Buffer::Instance& output_buffer) PURE;
+
+  virtual int decompressionError() const PURE;
 };
 
 } // namespace Decompressor

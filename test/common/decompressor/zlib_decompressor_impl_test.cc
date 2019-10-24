@@ -3,6 +3,8 @@
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 
+#include <string>
+
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -50,7 +52,7 @@ protected:
     ASSERT_EQ(compressor.checksum(), decompressor.checksum());
     ASSERT_EQ(original_text.length(), decompressed_text.length());
     EXPECT_EQ(original_text, decompressed_text);
-    EXPECT_EQ(0, decompressor.decompression_error_);
+    EXPECT_EQ(0, decompressor.decompressionError());
   }
 
   static const int64_t gzip_window_bits{31};
@@ -58,26 +60,10 @@ protected:
   static const uint64_t default_input_size{796};
 };
 
-class ZlibDecompressorImplDeathTest : public ZlibDecompressorImplTest {
-protected:
-  static void decompressorBadInitTestHelper(int64_t window_bits) {
-    ZlibDecompressorImpl decompressor;
-    decompressor.init(window_bits);
-  }
-
-  static void unitializedDecompressorTestHelper() {
-    Buffer::OwnedImpl input_buffer;
-    Buffer::OwnedImpl output_buffer;
-    ZlibDecompressorImpl decompressor;
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
-    decompressor.decompress(input_buffer, output_buffer);
-  }
-};
-
 // Exercises death by passing bad initialization params or by calling decompress before init.
-TEST_F(ZlibDecompressorImplDeathTest, DecompressorDeathTest) {
-  EXPECT_DEATH_LOG_TO_STDERR(decompressorBadInitTestHelper(100), "assert failure: result >= 0");
-  EXPECT_DEATH_LOG_TO_STDERR(unitializedDecompressorTestHelper(), "assert failure: result == Z_OK");
+TEST(ZlibDecompressorImplDeathTest, DecompressorDeathTest) {
+  ZlibDecompressorImpl decompressor;
+  EXPECT_DEATH_LOG_TO_STDERR(decompressor.init(100), "assert failure: result >= 0");
 }
 
 // Exercises decompressor's checksum by calling it before init or decompress.
@@ -107,7 +93,7 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   drainBuffer(decompressor_output_buffer);
 
   EXPECT_EQ(compressor.checksum(), decompressor.checksum());
-  EXPECT_EQ(0, decompressor.decompression_error_);
+  EXPECT_EQ(0, decompressor.decompressionError());
 }
 
 // Exercises compression and decompression by compressing some data, decompressing it and then
@@ -156,10 +142,19 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   EXPECT_EQ(original_text, decompressed_text);
-  EXPECT_EQ(0, decompressor.decompression_error_);
+  EXPECT_EQ(0, decompressor.decompressionError());
 }
 
-// Tests decompression_error_ stores an error code when decompression fails..
+TEST_F(ZlibDecompressorImplTest, UninitializedDecompression) {
+  Buffer::OwnedImpl input_buffer;
+    Buffer::OwnedImpl output_buffer;
+    ZlibDecompressorImpl decompressor;
+    TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
+    decompressor.decompress(input_buffer, output_buffer);
+    EXPECT_EQ(-2, decompressor.decompressionError());
+}
+
+// Tests decompressionError() stores an error code when decompression fails.
 TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl accumulation_buffer;
@@ -175,7 +170,7 @@ TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
   ZlibDecompressorImpl decompressor;
   decompressor.init(gzip_window_bits);
   decompressor.decompress(accumulation_buffer, buffer);
-  EXPECT_TRUE(decompressor.decompression_error_ < 0);
+  EXPECT_EQ(-3, decompressor.decompressionError());
 }
 
 // Exercises decompression with a very small output buffer.
@@ -216,7 +211,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   EXPECT_EQ(original_text, decompressed_text);
-  EXPECT_EQ(0, decompressor.decompression_error_);
+  EXPECT_EQ(0, decompressor.decompressionError());
 }
 
 // Exercises decompression with other supported zlib initialization params.
@@ -279,7 +274,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   EXPECT_EQ(original_text, decompressed_text);
-  EXPECT_EQ(0, decompressor.decompression_error_);
+  EXPECT_EQ(0, decompressor.decompressionError());
 }
 
 } // namespace
