@@ -2,7 +2,7 @@
 
 set -e
 
-if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
+if [[ -n "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
   # mktemp will create a tempfile with u+rw permission minus umask, it will not be readable by all
   # users by default.
   GCP_SERVICE_ACCOUNT_KEY_FILE=$(mktemp -t gcp_service_account.XXXXXX.json)
@@ -18,7 +18,7 @@ if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
 fi
 
 if [[ "${BAZEL_REMOTE_CACHE}" =~ ^http ]]; then
-  if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
+  if [[ "${BAZEL_REMOTE_CACHE}" == *://storage.googleapis.com/* && -n "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
     export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
       --remote_http_cache=${BAZEL_REMOTE_CACHE} \
       --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE}"
@@ -28,7 +28,7 @@ if [[ "${BAZEL_REMOTE_CACHE}" =~ ^http ]]; then
       --remote_http_cache=${BAZEL_REMOTE_CACHE} --noremote_upload_local_results"
     echo "Set up bazel HTTP read only cache at ${BAZEL_REMOTE_CACHE}."
   fi
-elif [[ ! -z "${BAZEL_REMOTE_CACHE}" ]]; then
+elif [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
     --remote_cache=${BAZEL_REMOTE_CACHE} \
     --remote_instance_name=${BAZEL_REMOTE_INSTANCE} \
