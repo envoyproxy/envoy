@@ -36,7 +36,7 @@ public:
     envoy::api::v2::core::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, init_manager_, store_,
-                                        listener_manager_, validation_visitor_, false);
+                                        listener_manager_, validation_visitor_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
@@ -364,8 +364,8 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   )EOF";
   std::string response2_json =
       fmt::format(response2_basic,
-                  TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"),
-                  TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
   auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({

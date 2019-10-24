@@ -82,6 +82,7 @@ protected:
   std::unique_ptr<Server::HotRestart> restarter_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
   std::unique_ptr<Logger::Context> logging_context_;
+  std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::InstanceImpl> server_;
 
 private:
@@ -121,8 +122,8 @@ public:
 
 private:
 #ifdef ENVOY_HANDLE_SIGNALS
-  Envoy::SignalAction handle_sigs;
-  Envoy::TerminateHandler log_on_terminate;
+  Envoy::SignalAction handle_sigs_;
+  Envoy::TerminateHandler log_on_terminate_;
 #endif
 
   PlatformImpl platform_impl_;

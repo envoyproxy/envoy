@@ -12,6 +12,8 @@ import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "validate/validate.proto";
+
 // [#protodoc-title: Circuit breakers]
 
 // :ref:`Circuit breaking<arch_overview_circuit_break>` settings can be
@@ -19,12 +21,11 @@ import "google/protobuf/wrappers.proto";
 message CircuitBreakers {
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`.
+  // [#next-free-field: 8]
   message Thresholds {
     // The :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.
-    // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
-    // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-    core.RoutingPriority priority = 1;
+    core.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
 
     // The maximum number of connections that Envoy will make to the upstream
     // cluster. If not specified, the default is 1024.

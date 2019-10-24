@@ -24,6 +24,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -153,7 +154,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
-      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
+      max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.common_http_protocol_options(), max_headers_count,
+          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
+                                                  Http::DEFAULT_MAX_HEADERS_COUNT))),
+      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
@@ -176,6 +181,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
                                                       ))),
       merge_slashes_(config.merge_slashes()) {
+  // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
+  // idle_timeout field.
+  // TODO(asraa): Remove when idle_timeout is removed.
+  if (!idle_timeout_) {
+    idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout);
+  }
+  if (!idle_timeout_) {
+    idle_timeout_ = std::chrono::hours(1);
+  } else if (idle_timeout_.value().count() == 0) {
+    idle_timeout_ = absl::nullopt;
+  }
+
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
@@ -183,8 +200,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_, stats_prefix_, route_config_provider_manager_,
-        context_.clusterManager().xdsIsDelta());
+        config, context_, stats_prefix_, route_config_provider_manager_);
     break;
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kScopedRoutes:
@@ -324,6 +340,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP2:
     codec_type_ = CodecType::HTTP2;
     break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP3:
+    codec_type_ = CodecType::HTTP3;
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -400,14 +419,19 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb());
+        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
+        maxRequestHeadersCount());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
+        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
+        maxRequestHeadersCount());
+  case CodecType::HTTP3:
+    // TODO(danzh) create QUIC specific codec.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   case CodecType::AUTO:
-    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
-                                                           context_.scope(), http1_settings_,
-                                                           http2_settings_, maxRequestHeadersKb());
+    return Http::ConnectionManagerUtility::autoCreateCodec(
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
+        maxRequestHeadersKb(), maxRequestHeadersCount());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

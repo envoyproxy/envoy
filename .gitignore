@@ -4,12 +4,14 @@ BROWSE
 /build_*
 *.bzlc
 .cache
+.clangd
 .classpath
 .clwb/
 /ci/bazel-*
 compile_commands.json
 cscope.*
 .deps
+.devcontainer.json
 /docs/landing_source/.bundle
 /generated
 .idea/
@@ -17,6 +19,7 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
+source/common/config/api_type_db.generated.pb_text
 .settings/
 *.sw*
 tags
@@ -26,3 +29,5 @@ TAGS
 .vimrc
 .vs
 .vscode
+clang.bazelrc
+user.bazelrc

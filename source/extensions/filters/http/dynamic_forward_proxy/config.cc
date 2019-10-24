@@ -20,6 +20,13 @@ Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromP
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+DynamicForwardProxyFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig& config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const ProxyPerRouteConfig>(config);
+}
+
 /**
  * Static registration for the dynamic forward proxy filter. @see RegisterFactory.
  */

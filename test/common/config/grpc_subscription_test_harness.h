@@ -80,7 +80,7 @@ public:
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "", true);
     subscription_->start(cluster_names);

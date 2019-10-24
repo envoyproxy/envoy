@@ -221,32 +221,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     }
   }
 
-  // TODO(fredlas) HACK to support
-  // loadCluster->clusterFromProto->ClusterFactoryImplBase::create->EdsClusterFactory::createClusterImpl(),
-  // which wants to call xdsIsDelta() on us. So, we need to get our xds_is_delta_ defined before
-  // then. Once SotW and delta are unified, that is_delta bool will be gone from everywhere, and the
-  // xds_is_delta_ variable can be removed.
   const auto& dyn_resources = bootstrap.dynamic_resources();
-  if (dyn_resources.has_ads_config()) {
-    xds_is_delta_ =
-        dyn_resources.ads_config().api_type() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC;
-  } else if (dyn_resources.has_cds_config()) {
-    const auto& cds_config = dyn_resources.cds_config();
-    xds_is_delta_ =
-        cds_config.api_config_source().api_type() ==
-            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
-        (dyn_resources.has_ads_config() && dyn_resources.ads_config().api_type() ==
-                                               envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
-  } else if (dyn_resources.has_lds_config()) {
-    const auto& lds_config = dyn_resources.lds_config();
-    xds_is_delta_ =
-        lds_config.api_config_source().api_type() ==
-            envoy::api::v2::core::ApiConfigSource::DELTA_GRPC ||
-        (dyn_resources.has_ads_config() && dyn_resources.ads_config().api_type() ==
-                                               envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
-  } else {
-    xds_is_delta_ = false;
-  }
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters are primary and
@@ -326,7 +301,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (dyn_resources.has_cds_config()) {
-    cds_api_ = factory_.createCds(dyn_resources.cds_config(), xds_is_delta_, *this);
+    cds_api_ = factory_.createCds(dyn_resources.cds_config(), *this);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -1254,6 +1229,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     option->hashKey(hash_key);
   }
 
+  bool have_transport_socket_options = false;
+  if (context && context->upstreamTransportSocketOptions()) {
+    context->upstreamTransportSocketOptions()->hashKey(hash_key);
+    have_transport_socket_options = true;
+  }
+
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
@@ -1262,7 +1243,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, protocol,
-            !upstream_options->empty() ? upstream_options : nullptr);
+            !upstream_options->empty() ? upstream_options : nullptr,
+            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
       });
 
   if (pool.has_value()) {
@@ -1326,14 +1308,18 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options) {
+    Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::ConnectionPool::InstancePtr{
-        new Http::Http2::ProdConnPoolImpl(dispatcher, host, priority, options)};
+    return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           transport_socket_options);
+  } else if (protocol == Http::Protocol::Http3) {
+    // Quic connection pool is not implemented.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
-    return Http::ConnectionPool::InstancePtr{
-        new Http::Http1::ProdConnPoolImpl(dispatcher, host, priority, options)};
+    return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           transport_socket_options);
   }
 }
 
@@ -1358,10 +1344,9 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                               bool is_delta, ClusterManager& cm) {
+                                               ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, is_delta, cm, stats_,
-                            validation_context_.dynamicValidationVisitor());
+  return CdsApiImpl::create(cds_config, cm, stats_, validation_context_.dynamicValidationVisitor());
 }
 
 } // namespace Upstream

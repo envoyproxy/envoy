@@ -469,6 +469,34 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
+// Very similar set-up to RetryHittingBufferLimits but using the route specific cap.
+TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
+  auto host = config_helper_.createVirtualHost("nobody.com", "/");
+  host.mutable_per_request_buffer_limit_bytes()->set_value(0);
+  config_helper_.addVirtualHost(host);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "nobody.com"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
 // Test hitting the dynamo filter with too many request bytes to buffer. Ensure the connection
 // manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
@@ -570,6 +598,57 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"content-length", "0"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
+TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingConcatenated) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"content-length", "0"}};
+  std::vector<std::string> cookie_pieces;
+  cookie_pieces.reserve(7000);
+  for (int i = 0; i < 7000; i++) {
+    cookie_pieces.push_back(fmt::sprintf("a%x=b", i));
+  }
+  request_headers.addCopy("cookie", absl::StrJoin(cookie_pieces, "; "));
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// Validate that lots of tiny cookies doesn't cause a DoS (many cookie headers).
+TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
+  // Set header count limit to 2010.
+  uint32_t max_count = 2010;
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
+            max_count);
+      });
+  max_request_headers_count_ = max_count;
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"content-length", "0"}};
+  for (int i = 0; i < 2000; i++) {
+    request_headers.addCopy("cookie", fmt::sprintf("a%x=b", i));
+  }
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
   ASSERT_TRUE(response->complete());
@@ -843,11 +922,137 @@ name: decode-headers-only
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
-  testLargeRequestHeaders(95, 60);
+  // Send one 95 kB header with limit 60 kB and 100 headers.
+  testLargeRequestHeaders(95, 1, 60, 100);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
-  testLargeRequestHeaders(95, 96);
+  // Send one 95 kB header with limit 96 kB and 100 headers.
+  testLargeRequestHeaders(95, 1, 96, 100);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {
+  // Send 101 empty headers with limit 60 kB and 100 headers.
+  testLargeRequestHeaders(0, 101, 60, 80);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
+  // Send 145 empty headers with limit 60 kB and 150 headers.
+  testLargeRequestHeaders(0, 140, 60, 150);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
+  // Default header (and trailer) count limit is 100.
+  Http::TestHeaderMapImpl request_trailers;
+  for (int i = 0; i < 150; i++) {
+    request_trailers.addCopy("trailer", std::string(1, 'a'));
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  // Only relevant to Http2Downstream.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    // Http1 Downstream ignores trailers.
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForEndStream();
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  } else {
+    // Expect rejection.
+    // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
+    // connections without it. Likely need to reconsider whether the waits/closes should be on
+    // client or upstream.
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    response->waitForReset();
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
+  // Set header (and trailer) count limit to 200.
+  uint32_t max_count = 200;
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
+            max_count);
+      });
+  max_request_headers_count_ = max_count;
+  Http::TestHeaderMapImpl request_trailers;
+  for (int i = 0; i < 150; i++) {
+    request_trailers.addCopy("trailer", std::string(1, 'a'));
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
+  // Set timeout for 5 seconds, and ensure that a request with 20k+ headers can be sent.
+  testManyRequestHeaders(std::chrono::milliseconds(5000));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
+  testLargeRequestTrailers(60, 96);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
+  testLargeRequestTrailers(66, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
+  max_request_headers_kb_ = 96;
+  max_request_headers_count_ = 20005;
+
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(max_request_headers_kb_);
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
+            max_request_headers_count_);
+      });
+
+  Http::TestHeaderMapImpl request_trailers{};
+  for (int i = 0; i < 20000; i++) {
+    request_trailers.addCopy(std::to_string(i), "");
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData

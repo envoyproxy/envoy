@@ -9,6 +9,12 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "header_formatter_lib",
+    srcs = ["header_formatter.cc"],
+    hdrs = ["header_formatter.h"],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -32,6 +38,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/http1:header_formatter_lib",
         "//source/common/runtime:runtime_lib",
     ],
 )
@@ -49,7 +56,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:timespan",
+        "//include/envoy/stats:timespan_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:linked_object",
         "//source/common/common:utility_lib",
@@ -60,6 +67,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
     ],
 )

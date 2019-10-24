@@ -101,7 +101,7 @@ public:
   virtual void addConnectionCallbacks(ConnectionCallbacks& cb) PURE;
 
   /**
-   * Register for callback everytime bytes are written to the underlying TransportSocket.
+   * Register for callback every time bytes are written to the underlying TransportSocket.
    */
   virtual void addBytesSentCallback(BytesSentCb cb) PURE;
 
@@ -141,7 +141,7 @@ public:
 
   /**
    * Disable socket reads on the connection, applying external back pressure. When reads are
-   * enabled again if there is data still in the input buffer it will be redispatched through
+   * enabled again if there is data still in the input buffer it will be re-dispatched through
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
    *
@@ -288,11 +288,6 @@ public:
    * @param timeout The timeout value in milliseconds
    */
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
-
-  /**
-   * @return std::chrono::milliseconds The delayed close timeout value.
-   */
-  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 
   /**
    * @return std::string the failure reason of the underlying transport socket, if no failure
