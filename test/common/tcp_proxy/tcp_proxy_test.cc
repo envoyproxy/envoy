@@ -52,7 +52,7 @@ namespace {
 using ::Envoy::Network::UpstreamServerName;
 
 namespace {
-Config constructConfigFromYaml(const std::string& json,
+Config constructConfigFromYaml(const std::string& yaml,
                                Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
   TestUtility::loadFromYamlAndValidate(json, tcp_proxy);
