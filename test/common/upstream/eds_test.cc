@@ -316,7 +316,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
   EXPECT_TRUE(initialized_);
 }
 
-// Validate that EDS cluster loaded from file os primary cluster
+// Validate that EDS cluster loaded from file as primary cluster
 TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
   resetClusterLoadedFromFile();
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
