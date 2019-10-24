@@ -12,7 +12,7 @@ jobs:
   - bash: |
       set -e
       sudo xcode-select --switch /Applications/Xcode_11.1.app/Contents/Developer
-    displayName: 'Select XCode 11.1'
+    displayName: 'Select Xcode 11.1'
 
   - script: ./ci/mac_ci_setup.sh
     displayName: 'Install dependencies'
