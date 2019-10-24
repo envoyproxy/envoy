@@ -113,6 +113,7 @@ public:
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;
+  Http::Http1Settings http1_settings_{};
   Http::Http2Settings http2_settings_{};
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};
