@@ -129,7 +129,9 @@ MockWorker::MockWorker() {
 
   ON_CALL(*this, stopListener(_, _))
       .WillByDefault(Invoke([](Network::ListenerConfig&, std::function<void()> completion) -> void {
-        completion();
+        if (completion != nullptr) {
+          completion();
+        }
       }));
 }
 MockWorker::~MockWorker() = default;

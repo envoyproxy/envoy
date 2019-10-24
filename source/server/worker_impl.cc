@@ -93,7 +93,9 @@ void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<v
   const uint64_t listener_tag = listener.listenerTag();
   dispatcher_->post([this, listener_tag, completion]() -> void {
     handler_->stopListeners(listener_tag);
-    completion();
+    if (completion != nullptr) {
+      completion();
+    }
   });
 }
 

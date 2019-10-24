@@ -401,7 +401,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
   for (const auto& worker : workers_) {
-    worker->stopListener(*draining_it->listener_, []() {});
+    worker->stopListener(*draining_it->listener_, nullptr);
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
@@ -579,10 +579,9 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
         worker->stopListener(listener, [this, workers_pending_stop, listener_name]() {
           if (--(*workers_pending_stop) == 0) {
             server_.dispatcher().post([this, listener_name]() {
-              for (const auto& listener : active_listeners_) {
-                if (listener->name() == listener_name) {
-                  listener->socket().close();
-                }
+              auto listener = getListenerByName(active_listeners_, listener_name);
+              if (listener != active_listeners_.end()) {
+                (*listener)->socket().close();
               }
               stats_.listener_stopped_.inc();
             });
