@@ -131,6 +131,7 @@ envoy_cc_fuzz_test(
         "//source/common/common:assert_lib",
         "//source/common/decompressor:decompressor_lib",
         "//source/common/stats:symbol_table_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
 
