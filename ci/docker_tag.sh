@@ -6,8 +6,11 @@ set -e
 
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
-if [ -n "$CIRCLE_TAG" ]
-then
+if [[ "${AZP_BRANCH}" =~ ^refs/tags/v.* ]]; then
+  CIRCLE_TAG="${AZP_BRANCH/refs\/tags\//}"
+fi
+
+if [[ -n "$CIRCLE_TAG" ]]; then
     docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
     for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do

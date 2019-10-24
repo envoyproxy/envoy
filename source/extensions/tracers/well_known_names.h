@@ -23,6 +23,8 @@ public:
   const std::string Datadog = "envoy.tracers.datadog";
   // OpenCensus tracer
   const std::string OpenCensus = "envoy.tracers.opencensus";
+  // AWS XRay tracer
+  const std::string XRay = "envoy.tracers.xray";
 };
 
 using TracerNames = ConstSingleton<TracerNameValues>;
