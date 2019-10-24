@@ -14,4 +14,5 @@ Envoy Mobile Documentation
 
     intro/intro
     start/start
+    api/api
     development/development

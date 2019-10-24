@@ -3,7 +3,7 @@
 Hello World
 ===========
 
-The "hello world" example projects start Envoy and use it to make network requests
+The "hello world" example projects start Envoy Mobile and use it to make network requests
 on a 1-second timer, displaying a collection of responses in a list.
 
 The demos and building instructions are available below in the following languages:
