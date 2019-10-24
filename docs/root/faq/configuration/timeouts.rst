@@ -92,5 +92,4 @@ TCP
 * The TCP proxy :ref:`idle_timeout
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>`
   is the amount of time that the TCP proxy will allow a connection to exist with no upstream
-  or downstream activity. This timeout currently has no default value but configuring it is
-  strongly recommended.
+  or downstream activity. The default idle timeout if not otherwise specified is *1 hour*.

@@ -326,11 +326,6 @@ public:
   // Constructs an empty StatName object.
   StatName() = default;
 
-  // Constructs a StatName object with new storage, which must be of size
-  // src.size(). This is used in the a flow where we first construct a StatName
-  // for lookup in a cache, and then on a miss need to store the data directly.
-  StatName(const StatName& src, SymbolTable::Storage memory);
-
   /**
    * Defines default hash function so StatName can be used as a key in an absl
    * hash-table without specifying a functor. See
@@ -426,14 +421,7 @@ public:
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
 
-  // Obtains new backing storage for an already existing StatName.
-  StatNameManagedStorage(StatName src, SymbolTable& table)
-      : StatNameStorage(src, table), symbol_table_(table) {}
-
   ~StatNameManagedStorage() { free(symbol_table_); }
-
-  SymbolTable& symbolTable() { return symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
 private:
   SymbolTable& symbol_table_;
