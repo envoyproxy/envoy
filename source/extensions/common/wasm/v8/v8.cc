@@ -24,11 +24,11 @@ wasm::Engine* engine() {
 }
 
 struct FuncData {
-  FuncData(std::string name) : name(std::move(name)) {}
+  FuncData(std::string name) : name_(std::move(name)) {}
 
-  std::string name;
-  wasm::own<wasm::Func> callback;
-  void* raw_func;
+  std::string name_;
+  wasm::own<wasm::Func> callback_;
+  void* raw_func_;
 };
 
 using FuncDataPtr = std::unique_ptr<FuncData>;
@@ -331,7 +331,7 @@ void V8::link(absl::string_view debug_name) {
         throw WasmVmException(
             fmt::format("Failed to load WASM module due to a missing import: {}.{}", module, name));
       }
-      auto func = it->second.get()->callback.get();
+      auto func = it->second.get()->callback_.get();
       if (!equalValTypes(import_type->func()->params(), func->type()->params()) ||
           !equalValTypes(import_type->func()->results(), func->type()->results())) {
         throw WasmVmException(fmt::format(
@@ -511,18 +511,18 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
       store_.get(), type.get(),
       [](void* data, const wasm::Val params[], wasm::Val[]) -> wasm::own<wasm::Trap> {
         auto func_data = reinterpret_cast<FuncData*>(data);
-        ENVOY_LOG(trace, "[wasm] [vm->host] {}({})", func_data->name,
+        ENVOY_LOG(trace, "[wasm] [vm->host] {}({})", func_data->name_,
                   printValues(params, std::tuple_size<std::tuple<Args...>>::value));
         auto args_tuple = convertValTypesToArgsTuple<std::tuple<Args...>>(params);
         auto args = std::tuple_cat(std::make_tuple(current_context_), args_tuple);
-        auto function = reinterpret_cast<void (*)(void*, Args...)>(func_data->raw_func);
+        auto function = reinterpret_cast<void (*)(void*, Args...)>(func_data->raw_func_);
         absl::apply(function, args);
-        ENVOY_LOG(trace, "[wasm] [vm<-host] {} return: void", func_data->name);
+        ENVOY_LOG(trace, "[wasm] [vm<-host] {} return: void", func_data->name_);
         return nullptr;
       },
       data.get());
-  data->callback = std::move(func);
-  data->raw_func = reinterpret_cast<void*>(function);
+  data->callback_ = std::move(func);
+  data->raw_func_ = reinterpret_cast<void*>(function);
   host_functions_.emplace(absl::StrCat(module_name, ".", function_name), std::move(data));
 }
 
@@ -537,19 +537,19 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
       store_.get(), type.get(),
       [](void* data, const wasm::Val params[], wasm::Val results[]) -> wasm::own<wasm::Trap> {
         auto func_data = reinterpret_cast<FuncData*>(data);
-        ENVOY_LOG(trace, "[wasm] [vm->host] {}({})", func_data->name,
+        ENVOY_LOG(trace, "[wasm] [vm->host] {}({})", func_data->name_,
                   printValues(params, sizeof...(Args)));
         auto args_tuple = convertValTypesToArgsTuple<std::tuple<Args...>>(params);
         auto args = std::tuple_cat(std::make_tuple(current_context_), args_tuple);
-        auto function = reinterpret_cast<R (*)(void*, Args...)>(func_data->raw_func);
+        auto function = reinterpret_cast<R (*)(void*, Args...)>(func_data->raw_func_);
         R rvalue = absl::apply(function, args);
         results[0] = makeVal(rvalue);
-        ENVOY_LOG(trace, "[wasm] [vm<-host] {} return: {}", func_data->name, rvalue);
+        ENVOY_LOG(trace, "[wasm] [vm<-host] {} return: {}", func_data->name_, rvalue);
         return nullptr;
       },
       data.get());
-  data->callback = std::move(func);
-  data->raw_func = reinterpret_cast<void*>(function);
+  data->callback_ = std::move(func);
+  data->raw_func_ = reinterpret_cast<void*>(function);
   host_functions_.emplace(absl::StrCat(module_name, ".", function_name), std::move(data));
 }
 
