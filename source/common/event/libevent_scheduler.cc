@@ -49,7 +49,7 @@ void LibeventScheduler::run(Dispatcher::RunType mode) {
 
 void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullptr); }
 
-void LibeventScheduler::registerOnPrepareCallback(OnPrepareCallback callback) {
+void LibeventScheduler::registerOnPrepareCallback(OnPrepareCallback&& callback) {
   callback_ = std::move(callback);
   evwatch_prepare_new(libevent_.get(), &onPrepareForCallback, this);
 }

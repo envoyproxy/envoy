@@ -50,7 +50,7 @@ public:
    * |callback| cannot be unregistered, therefore it has to be valid throughout
    * the lifetime of |this|.
    */
-  void registerOnPrepareCallback(OnPrepareCallback callback);
+  void registerOnPrepareCallback(OnPrepareCallback&& callback);
 
   /**
    * Start writing stats once thread-local storage is ready to receive them (see
