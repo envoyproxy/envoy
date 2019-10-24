@@ -246,12 +246,10 @@ public:
   /**
    * Init the singleton sink to use for all loggers.
    *
-   * @param should_escape_ whether to escape c-style escape sequences in messages logged to the fallback
-   * stderr logger
+   * @param should_escape_ whether to escape c-style escape sequences in messages logged to the
+   * fallback stderr logger
    */
-  static void initSink(bool should_escape_) {
-    sink_ = DelegatingLogSink::init(should_escape_);
-  }
+  static void initSink(bool should_escape_) { sink_ = DelegatingLogSink::init(should_escape_); }
 
   /**
    * @return the singleton sink to use for all loggers.

@@ -73,8 +73,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
                                           Logger::Logger::DEFAULT_LOG_FORMAT, "string", cmd);
   TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
-                                              "Escape c-style escape sequences in the application logs",
-                                              cmd, false);
+                                      "Escape c-style escape sequences in the application logs",
+                                      cmd, false);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,

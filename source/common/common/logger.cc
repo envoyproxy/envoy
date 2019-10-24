@@ -8,9 +8,9 @@
 
 #include "common/common/lock_guard.h"
 
-#include "spdlog/spdlog.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/strip.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Logger {
@@ -96,8 +96,8 @@ Context::Context(spdlog::level::level_enum log_level, const std::string& log_for
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock, bool should_escape)
-    : log_level_(log_level), log_format_(log_format), lock_(lock),
-      should_escape_(should_escape), save_context_(current_context) {
+    : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
+      save_context_(current_context) {
   current_context = this;
   activate();
 }
