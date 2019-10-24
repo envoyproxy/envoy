@@ -942,7 +942,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogUpstreamHost)) {
 }
 
 // Test that access log field %UPSTREAM_LOCAL_ADDRESS% is correctly logged.
-TEST_F(TcpProxyTest,DEPRECATED_FEATURE_TEST() AccessLogUpstreamLocalAddress)) {
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogUpstreamLocalAddress)) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
   raiseEventUpstreamConnected(0);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
