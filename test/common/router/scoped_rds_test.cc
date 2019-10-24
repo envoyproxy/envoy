@@ -114,7 +114,7 @@ protected:
 
     // srds subscription
     EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
-                subscriptionFromConfigSource(_, _, _, _, _))
+                subscriptionFromConfigSource(_, _, _, _))
         .Times(AnyNumber());
     // rds subscription
     EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
@@ -122,11 +122,11 @@ protected:
                     _,
                     Eq(Grpc::Common::typeUrl(
                         envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name())),
-                    _, _, _))
+                    _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](const envoy::api::v2::core::ConfigSource&, absl::string_view,
                                       Stats::Scope&,
-                                      Envoy::Config::SubscriptionCallbacks& callbacks, bool) {
+                                      Envoy::Config::SubscriptionCallbacks& callbacks) {
           auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
           rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
           EXPECT_CALL(*ret, start(_))

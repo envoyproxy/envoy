@@ -92,7 +92,7 @@ message AttributeContext {
 
     // The HTTP request headers. If multiple headers share the same key, they
     // must be merged according to the HTTP spec. All header keys must be
-    // lowercased, because HTTP header keys are case-insensitive.
+    // lower-cased, because HTTP header keys are case-insensitive.
     map<string, string> headers = 3;
 
     // The request target, as it appears in the first line of the HTTP request. This includes

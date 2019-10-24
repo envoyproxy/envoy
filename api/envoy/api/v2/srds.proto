@@ -15,7 +15,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: HTTP scoped routing configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
-//
+
 // The Scoped Routes Discovery Service (SRDS) API distributes
 // :ref:`ScopedRouteConfiguration<envoy_api_msg.ScopedRouteConfiguration>`
 // resources. Each ScopedRouteConfiguration resource represents a "routing

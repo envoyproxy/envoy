@@ -3,7 +3,7 @@ Cluster
 
 .. toctree::
   :glob:
-  :maxdepth: 1
+  :maxdepth: 2
 
   dynamic_forward_proxy/v2alpha/*
   redis/*
