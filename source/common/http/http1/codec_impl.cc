@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
@@ -15,6 +16,7 @@
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/http/http1/header_formatter.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -34,7 +36,9 @@ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Sett
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 
-StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {
+StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
+                                     HeaderKeyFormatter* header_key_formatter)
+    : connection_(connection), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -55,6 +59,14 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
 }
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
+}
+
+void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::string_view value) {
+  if (header_key_formatter_ != nullptr) {
+    encodeHeader(header_key_formatter_->format(key), value);
+  } else {
+    encodeHeader(key, value);
+  }
 }
 
 void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
@@ -81,8 +93,9 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
           return HeaderMap::Iterate::Continue;
         }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeHeader(key_to_use,
-                                                               header.value().getStringView());
+        static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
+            key_to_use, header.value().getStringView());
+
         return HeaderMap::Iterate::Continue;
       },
       this);
@@ -116,17 +129,14 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
       if (is_content_length_allowed_) {
-        encodeHeader(Headers::get().ContentLength.get().c_str(),
-                     Headers::get().ContentLength.get().size(), "0", 1);
+        encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else {
-      encodeHeader(Headers::get().TransferEncoding.get().c_str(),
-                   Headers::get().TransferEncoding.get().size(),
-                   Headers::get().TransferEncodingValues.Chunked.c_str(),
-                   Headers::get().TransferEncodingValues.Chunked.size());
+      encodeFormattedHeader(Headers::get().TransferEncoding.get(),
+                            Headers::get().TransferEncodingValues.Chunked);
       // We do not apply chunk encoding for HTTP upgrades.
       // If there is a body in a WebSocket Upgrade response, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
@@ -561,7 +571,15 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
                                            const uint32_t max_request_headers_count)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
                      max_request_headers_count),
-      callbacks_(callbacks), codec_settings_(settings) {}
+      callbacks_(callbacks), codec_settings_(settings) {
+  switch (codec_settings_.header_key_format_) {
+  case Http1Settings::HeaderKeyFormat::Default:
+    break;
+  case Http1Settings::HeaderKeyFormat::ProperCase:
+    header_key_formatter_ = std::make_unique<ProperCaseHeaderKeyFormatter>();
+    break;
+  }
+}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -661,7 +679,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_);
-    active_request_ = std::make_unique<ActiveRequest>(*this);
+    active_request_ = std::make_unique<ActiveRequest>(*this, header_key_formatter_.get());
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
   }
 }
