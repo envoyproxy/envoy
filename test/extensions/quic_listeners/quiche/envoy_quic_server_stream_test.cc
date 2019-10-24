@@ -65,7 +65,7 @@ public:
     quic_session_.Initialize();
     request_headers_.OnHeaderBlockStart();
     request_headers_.OnHeader(":authority", host_);
-    request_headers_.OnHeader(":method", "GET");
+    request_headers_.OnHeader(":method", "POST");
     request_headers_.OnHeader(":path", "/");
     request_headers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
                                       /*compressed_header_bytes=*/0);
@@ -81,9 +81,21 @@ public:
 
   void TearDown() override {
     if (quic_connection_.connected()) {
-      quic_connection_.CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                       quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+      quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
+  }
+
+  std::string bodyToStreamPayload(const std::string& body) {
+    std::string data = body;
+    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+      std::unique_ptr<char[]> data_buffer;
+      quic::HttpEncoder encoder;
+      quic::QuicByteCount data_frame_header_length =
+          encoder.SerializeDataFrameHeader(body.length(), &data_buffer);
+      quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+      data = absl::StrCat(data_frame_header, body);
+    }
+    return data;
   }
 
   size_t sendRequest(const std::string& payload, bool fin, size_t decoder_buffer_high_watermark) {
@@ -91,7 +103,7 @@ public:
         .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
           EXPECT_EQ(host_, headers->Host()->value().getStringView());
           EXPECT_EQ("/", headers->Path()->value().getStringView());
-          EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+          EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                     headers->Method()->value().getStringView());
         }));
     if (quic::VersionUsesQpack(quic_version_.transport_version)) {
@@ -110,15 +122,7 @@ public:
             quic_stream_->readDisable(true);
           }
         }));
-    std::string data = payload;
-    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
-      std::unique_ptr<char[]> data_buffer;
-      quic::HttpEncoder encoder;
-      quic::QuicByteCount data_frame_header_length =
-          encoder.SerializeDataFrameHeader(payload.length(), &data_buffer);
-      quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-      data = absl::StrCat(data_frame_header, payload);
-    }
+    std::string data = bodyToStreamPayload(payload);
     quic::QuicStreamFrame frame(stream_id_, fin, 0, data);
     quic_stream_->OnStreamFrame(frame);
     return data.length();
@@ -150,47 +154,35 @@ protected:
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerStreamTests, EnvoyQuicServerStreamTest,
                          testing::ValuesIn({true, false}));
 
-TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
-  sendRequest(request_body_, true, request_body_.size() * 2);
-  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
-}
+TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
+  quic::QuicHeaderList request_headers;
+  request_headers.OnHeaderBlockStart();
+  request_headers.OnHeader(":authority", host_);
+  request_headers.OnHeader(":method", "GET");
+  request_headers.OnHeader(":path", "/");
+  request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
+                                   /*compressed_header_bytes=*/0);
 
-TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   headers->Method()->value().getStringView());
       }));
-  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                   request_headers_);
+  quic_stream_->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
+                                   request_headers);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+}
 
-  std::string data = request_body_;
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
-    std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
-    quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-    data = absl::StrCat(data_frame_header, request_body_);
-  }
-  quic::QuicStreamFrame frame(stream_id_, false, 0, data);
-  EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .Times(testing::AtMost(2))
-      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_EQ(request_body_, buffer.toString());
-        EXPECT_FALSE(finished_reading);
-      }))
-      // Depends on QUIC version, there may be an empty STREAM_FRAME with FIN. But
-      // since there is trailers, finished_reading should always be false.
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_FALSE(finished_reading);
-        EXPECT_EQ(0, buffer.length());
-      }));
-  quic_stream_->OnStreamFrame(frame);
+TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
+  sendRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+}
 
+TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
+  sendRequest(request_body_, false, request_body_.size() * 2);
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
       .WillOnce(Invoke([](const Http::HeaderMapPtr& headers) {
         Http::LowerCaseString key1("key1");
@@ -211,7 +203,7 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                   headers->Method()->value().getStringView());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
@@ -221,27 +213,12 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   // Trailer should be delivered to HCM later after body arrives.
   quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
 
-  std::string data = request_body_;
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
-    std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
-    quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-    data = absl::StrCat(data_frame_header, request_body_);
-  }
+  std::string data = bodyToStreamPayload(request_body_);
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .Times(testing::AtMost(2))
       .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_EQ(request_body_, buffer.toString());
         EXPECT_FALSE(finished_reading);
-      }))
-      // Depends on QUIC version, there may be an empty STREAM_FRAME with FIN. But
-      // since there is trailers, finished_reading should always be false.
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_FALSE(finished_reading);
-        EXPECT_EQ(0, buffer.length());
       }));
 
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
@@ -261,15 +238,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   EXPECT_FALSE(quic_stream_->HasBytesToRead());
   // Disable reading one more time.
   quic_stream_->readDisable(true);
-  std::string second_part_request("bbb");
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
-    std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
-    quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(second_part_request.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-    second_part_request = absl::StrCat(data_frame_header, second_part_request);
-  }
+  std::string second_part_request = bodyToStreamPayload("bbb");
   // Receiving more data shouldn't push the receiving pipe line as the stream
   // should have been marked blocked.
   quic::QuicStreamFrame frame(stream_id_, false, payload_offset, second_part_request);
@@ -280,15 +249,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   quic_stream_->readDisable(false);
 
   // This data frame should also be buffered.
-  std::string last_part_request("ccc");
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
-    std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
-    quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(last_part_request.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-    last_part_request = absl::StrCat(data_frame_header, last_part_request);
-  }
+  std::string last_part_request = bodyToStreamPayload("ccc");
   quic::QuicStreamFrame frame2(stream_id_, true, payload_offset + second_part_request.length(),
                                last_part_request);
   quic_stream_->OnStreamFrame(frame2);
@@ -312,7 +273,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                   headers->Method()->value().getStringView());
       }));
   if (quic::VersionUsesQpack(quic_version_.transport_version)) {
@@ -332,27 +293,11 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         // Re-enable reading should not trigger another decodeData.
         quic_stream_->readDisable(false);
       }));
-  std::string data = payload;
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
-    std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
-    quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(payload.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-    data = absl::StrCat(data_frame_header, payload);
-  }
+  std::string data = bodyToStreamPayload(payload);
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);
   quic_stream_->OnStreamFrame(frame);
 
-  std::string last_part_request("bbb");
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
-    std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
-    quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(last_part_request.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-    last_part_request = absl::StrCat(data_frame_header, last_part_request);
-  }
+  std::string last_part_request = bodyToStreamPayload("bbb");
   quic::QuicStreamFrame frame2(stream_id_, true, data.length(), last_part_request);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool finished_reading) {

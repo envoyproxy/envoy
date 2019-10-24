@@ -436,18 +436,13 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
       quic::ENCRYPTION_FORWARD_SECURE,
       std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
   // Drive congestion control manually.
-  auto send_algorithm = new testing::StrictMock<quic::test::MockSendAlgorithm>;
+  auto send_algorithm = new testing::NiceMock<quic::test::MockSendAlgorithm>;
   quic::test::QuicConnectionPeer::SetSendAlgorithm(quic_connection_, send_algorithm);
   EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(true));
-  EXPECT_CALL(*send_algorithm, OnPacketSent(_, _, _, _, _)).Times(AnyNumber());
   EXPECT_CALL(*send_algorithm, GetCongestionWindow()).WillRepeatedly(Return(quic::kDefaultTCPMSS));
   EXPECT_CALL(*send_algorithm, PacingRate(_)).WillRepeatedly(Return(quic::QuicBandwidth::Zero()));
-  EXPECT_CALL(*send_algorithm, HasReliableBandwidthEstimate()).Times(AnyNumber());
   EXPECT_CALL(*send_algorithm, BandwidthEstimate())
       .WillRepeatedly(Return(quic::QuicBandwidth::Zero()));
-  EXPECT_CALL(*send_algorithm, InSlowStart()).Times(AnyNumber());
-  EXPECT_CALL(*send_algorithm, InRecovery()).Times(AnyNumber());
-  EXPECT_CALL(*send_algorithm, OnApplicationLimited(_)).Times(AnyNumber());
   EXPECT_CALL(*quic_connection_, SendControlFrame(_)).Times(AnyNumber());
 
   // Bump connection flow control window large enough not to interfere
@@ -520,9 +515,6 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   decoded_headers->Method()->value().getStringView());
       }));
-  EXPECT_CALL(request_decoder2, decodeData(_, true))
-      .Times(testing::AtMost(1))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) { EXPECT_EQ(0, buffer.length()); }));
   stream2->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
   stream2->encodeHeaders(response_headers, false);

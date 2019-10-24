@@ -38,6 +38,8 @@ public:
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  // Using this for purpose other than logging is not safe. Because QUIC connection id can be
+  // 18 bytes, so there might be collision when it's hashed to 8 bytes.
   uint64_t id() const override { return id_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {

@@ -17,6 +17,8 @@ class EnvoyQuicStream : public Http::StreamEncoder,
                         public Http::StreamCallbackHelper,
                         protected Logger::Loggable<Logger::Id::quic_stream> {
 public:
+  // |buffer_limit| is the high watermark of the stream send buffer, and the low
+  // watermark will be half of it.
   EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)
       : send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),

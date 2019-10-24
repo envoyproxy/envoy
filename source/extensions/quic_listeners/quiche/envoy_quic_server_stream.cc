@@ -76,8 +76,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
 
   uint64_t bytes_to_send_new = BufferedDataBytes();
   ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new,
-                      dynamic_cast<QuicFilterManagerConnectionImpl&>(*session()));
+  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
@@ -152,8 +151,13 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 
   // True if no trailer and FIN read.
   bool finished_reading = IsDoneReading();
-  bool empty_payload_with_fin = buffer->length() == 0 && finished_reading;
-  if (!empty_payload_with_fin || !end_stream_decoded_) {
+  bool empty_payload_with_fin = buffer->length() == 0 && fin_received();
+  // If this call is triggered by an empty frame with FIN which is not from peer
+  // but synthesized by stream itself upon receiving HEADERS with FIN or
+  // TRAILERS, do not deliver end of stream here. Because either decodeHeaders
+  // already delivered it or decodeTrailers will be called.
+  bool skip_decoding = empty_payload_with_fin && (end_stream_decoded_ || !finished_reading);
+  if (!skip_decoding) {
     ASSERT(decoder() != nullptr);
     decoder()->decodeData(*buffer, finished_reading);
     if (finished_reading) {
@@ -212,8 +216,7 @@ void EnvoyQuicServerStream::OnClose() {
   if (BufferedDataBytes() > 0) {
     // If the stream is closed without sending out all buffered data, regard
     // them as sent now and adjust connection buffer book keeping.
-    dynamic_cast<QuicFilterManagerConnectionImpl*>(session())->adjustBytesToSend(
-        0 - BufferedDataBytes());
+    filterManagerConnection()->adjustBytesToSend(0 - BufferedDataBytes());
   }
 }
 
@@ -224,13 +227,14 @@ void EnvoyQuicServerStream::OnCanWrite() {
   // As long as OnCanWriteNewData() is no-op, data to sent in buffer shouldn't
   // increase.
   ASSERT(buffered_data_new <= buffered_data_old);
-  maybeCheckWatermark(buffered_data_old, buffered_data_new,
-                      dynamic_cast<QuicFilterManagerConnectionImpl&>(*session()));
+  maybeCheckWatermark(buffered_data_old, buffered_data_new, *filterManagerConnection());
 }
 
 uint32_t EnvoyQuicServerStream::streamId() { return id(); }
 
-Network::Connection* EnvoyQuicServerStream::connection() {
+Network::Connection* EnvoyQuicServerStream::connection() { return filterManagerConnection(); }
+
+QuicFilterManagerConnectionImpl* EnvoyQuicServerStream::filterManagerConnection() {
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
 }
 
