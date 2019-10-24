@@ -314,8 +314,7 @@ public:
   /**
    * TODO(dereka): fully remove this method once envoy-filter-example is updated.
    */
-  virtual Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                                       FactoryContext&) {
+  virtual Network::FilterFactoryCb createFilterFactory(const Json::Object&, FactoryContext&) {
     throw EnvoyException("v1 API is unsupported");
   }
 
@@ -392,8 +391,7 @@ public:
   /**
    * TODO(dereka): fully remove this method once envoy-filter-example is updated.
    */
-  virtual Http::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                                    const std::string&,
+  virtual Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                                     FactoryContext&) {
     throw EnvoyException("v1 API is unsupported");
   }
@@ -402,7 +400,8 @@ public:
    * Create a particular http filter factory implementation. If the implementation is unable to
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
-   * @param config supplies the general Protobuf message to be marshalled into a filter-specific configuration.
+   * @param config supplies the general Protobuf message to be marshalled into a filter-specific
+   * configuration.
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
