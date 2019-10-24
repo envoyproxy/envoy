@@ -45,6 +45,9 @@ Version 1.12.0 (pending)
 * The use of :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>` for
   gRPC stats has been deprecated in favor of the dedicated :ref:`gRPC stats
   filter <config_http_filters_grpc_stats>`
+* Ext_authz filter stats `ok`, `error`, `denied`, `failure_mode_allowed` in
+  *cluster.<route target cluster>.ext_authz.* namespace is deprecated.
+  Use *http.<stat_prefix>.ext_authz.* namespace to access same counters instead.
 
 Version 1.11.2 (October 8, 2019)
 ================================
