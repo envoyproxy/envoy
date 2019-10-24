@@ -59,6 +59,9 @@ specifications.
 Much like Envoy’s use in a server-side service mesh, the goal is to push as much functionality as
 possible into the common core so as to avoid reimplementing it in every mobile application language.
 
+Furthermore, it is an explicit goal of Envoy Mobile to maintain consistent 1:1 APIs between
+the native mobile languages that it supports.
+
 Our long-term plans include evolving the `gRPC Server Reflection Protocol
 <https://github.com/grpc/grpc/blob/master/doc/server-reflection.md>`_ into a streaming reflection
 service API. This API will allow both Envoy and Envoy Mobile to fetch generic protobuf definitions
