@@ -35,7 +35,7 @@ void ZlibDecompressorImpl::init(int64_t window_bits) {
 uint64_t ZlibDecompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 int ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
-                                      Buffer::Instance& output_buffer) {
+                                     Buffer::Instance& output_buffer) {
   const uint64_t num_slices = input_buffer.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   input_buffer.getRawSlices(slices.begin(), num_slices);
@@ -69,7 +69,6 @@ bool ZlibDecompressorImpl::inflateNext() {
   if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
     return false; // This means that zlib needs more input, so stop here.
   }
-
 
   decompression_status_code_ = result;
   if (result < 0) {

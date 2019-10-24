@@ -19,7 +19,7 @@ public:
    * @return the status code from decompression. A negative integer indicates failure.
    */
   virtual int decompress(const Buffer::Instance& input_buffer,
-                          Buffer::Instance& output_buffer) PURE;
+                         Buffer::Instance& output_buffer) PURE;
 };
 
 } // namespace Decompressor

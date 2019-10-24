@@ -1,9 +1,9 @@
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
-
-#include <string>
 
 #include "test/test_common/utility.h"
 
@@ -147,11 +147,11 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
 
 TEST_F(ZlibDecompressorImplTest, UninitializedDecompression) {
   Buffer::OwnedImpl input_buffer;
-    Buffer::OwnedImpl output_buffer;
-    ZlibDecompressorImpl decompressor;
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
-    const int result = decompressor.decompress(input_buffer, output_buffer);
-    EXPECT_EQ(-2, result);
+  Buffer::OwnedImpl output_buffer;
+  ZlibDecompressorImpl decompressor;
+  TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
+  const int result = decompressor.decompress(input_buffer, output_buffer);
+  EXPECT_EQ(-2, result);
 }
 
 // Tests returning an error code when decompression fails.
