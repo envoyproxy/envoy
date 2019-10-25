@@ -353,9 +353,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
     // TODO(mattklein123): We should probably use a hash table here to lookup the tag instead of
     // iterating through the listener list.
     for (const auto& listener : parent.listeners_) {
-      if (listener.second.tcp_listener_.has_value() &&
-          listener.second.listener_->listener() != nullptr &&
+      if (listener.second.listener_->listener() != nullptr &&
           listener.second.listener_->listenerTag() == tag) {
+        // If the tag matches this must be a TCP listener.
+        ASSERT(listener.second.tcp_listener_.has_value());
         listener.second.tcp_listener_.value().get().onAcceptWorker(
             std::move(socket_to_rebalance->socket),
             listener.second.tcp_listener_.value()

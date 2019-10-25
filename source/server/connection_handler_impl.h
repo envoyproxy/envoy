@@ -230,8 +230,10 @@ private:
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
 
   struct ActiveListenerDetails {
-    ActiveTcpListenerOptRef tcp_listener_;
+    // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
+    // Reference to the listener IFF this is a TCP listener. Null otherwise.
+    ActiveTcpListenerOptRef tcp_listener_;
   };
 
   ActiveTcpListenerOptRef findActiveTcpListenerByAddress(const Network::Address::Instance& address);
