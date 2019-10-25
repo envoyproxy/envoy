@@ -575,8 +575,20 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_NE(dynamic2.data(), dynamic.data());
 }
 
+TEST_P(StatNameTest, StorageCopy) {
+  StatName a = pool_->add("stat.name");
+  StatNameStorage b_storage(a, *table_);
+  StatName b = b_storage.statName();
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a.data(), b.data());
+  b_storage.free(*table_);
+}
+
 TEST_P(StatNameTest, RecentLookups) {
   if (GetParam() == SymbolTableType::Fake) {
+    // touch these cover coverage for fake symbol tables, but they'll have no effect.
+    table_->clearRecentLookups();
+    table_->setRecentLookupCapacity(0);
     return;
   }
 

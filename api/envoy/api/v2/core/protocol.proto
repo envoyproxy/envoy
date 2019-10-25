@@ -39,6 +39,22 @@ message HttpProtocolOptions {
 }
 
 message Http1ProtocolOptions {
+  message HeaderKeyFormat {
+    message ProperCaseWords {
+    }
+
+    oneof header_format {
+      option (validate.required) = true;
+
+      // Formats the header by proper casing words: the first character and any character following
+      // a special character will be capitalized if it's an alpha character. For example,
+      // "content-type" becomes "Content-Type", and "foo$b#$are" becomes "Foo$B#$Are".
+      // Note that while this results in most headers following conventional casing, certain headers
+      // are not covered. For example, the "TE" header will be formatted as "Te".
+      ProperCaseWords proper_case_words = 1;
+    }
+  }
+
   // Handle HTTP requests with absolute URLs in the requests. These requests
   // are generally sent by clients to forward/explicit proxies. This allows clients to configure
   // envoy as their HTTP proxy. In Unix, for example, this is typically done by setting the
@@ -55,6 +71,12 @@ message Http1ProtocolOptions {
   // Envoy does not otherwise support HTTP/1.0 without a Host header.
   // This is a no-op if *accept_http_10* is not true.
   string default_host_for_http_10 = 3;
+
+  // Describes how the keys for response headers should be formatted. By default, all header keys
+  // are lower cased.
+  // [#not-implemented-hide:] Hiding until both request and response formatting has been
+  // implemented.
+  HeaderKeyFormat header_key_format = 4;
 }
 
 // [#next-free-field: 13]

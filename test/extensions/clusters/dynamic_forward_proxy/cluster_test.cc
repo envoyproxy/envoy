@@ -54,6 +54,17 @@ public:
                const Upstream::HostVector& hosts_removed) -> void {
           onMemberUpdateCb(hosts_added, hosts_removed);
         });
+
+    absl::flat_hash_map<std::string, Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr>
+        existing_hosts;
+    for (const auto& host : host_map_) {
+      existing_hosts.emplace(host.first, host.second);
+    }
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, hosts()).WillOnce(Return(existing_hosts));
+    if (!existing_hosts.empty()) {
+      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
+    }
+    cluster_->initialize([] {});
   }
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr get() override {
@@ -170,6 +181,14 @@ TEST_F(ClusterTest, InvalidLbContext) {
   ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(nullptr));
   EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_));
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+}
+
+// Verify cluster attaches to a populated cache.
+TEST_F(ClusterTest, PopulatedCache) {
+  makeTestHost("host1", "1.2.3.4");
+  makeTestHost("host2", "1.2.3.5");
+  initialize(default_yaml_config_, false);
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
 
 // Verify that using 'sni' causes a failure.

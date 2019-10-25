@@ -37,7 +37,6 @@ public:
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData : public HeaderMatcher {
     HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
-    HeaderData(const Json::Object& config);
 
     const LowerCaseString name_;
     HeaderMatchType header_match_type_;

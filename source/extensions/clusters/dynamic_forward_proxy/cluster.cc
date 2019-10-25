@@ -23,10 +23,6 @@ Cluster::Cluster(
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
       host_map_(std::make_shared<HostInfoMap>()) {
-  // TODO(mattklein123): Technically, we should support attaching to an already warmed DNS cache.
-  //                     This will require adding a hosts() or similar API to the cache and
-  //                     reading it during initialization.
-
   // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
   // support these parameters dynamically in the future. This is not an exhaustive list of
   // parameters that don't make sense but should be the most obvious ones that a user might set
@@ -41,9 +37,26 @@ Cluster::Cluster(
   }
 }
 
-void Cluster::onDnsHostAddOrUpdate(
+void Cluster::startPreInit() {
+  // If we are attaching to a pre-populated cache we need to initialize our hosts.
+  auto existing_hosts = dns_cache_->hosts();
+  if (!existing_hosts.empty()) {
+    std::shared_ptr<HostInfoMap> new_host_map;
+    std::unique_ptr<Upstream::HostVector> hosts_added;
+    for (const auto& existing_host : existing_hosts) {
+      addOrUpdateWorker(existing_host.first, existing_host.second, new_host_map, hosts_added);
+    }
+    swapAndUpdateMap(new_host_map, *hosts_added, {});
+  }
+
+  onPreInitComplete();
+}
+
+void Cluster::addOrUpdateWorker(
     const std::string& host,
-    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+    std::shared_ptr<HostInfoMap>& new_host_map,
+    std::unique_ptr<Upstream::HostVector>& hosts_added) {
   // We should never get a host with no address from the cache.
   ASSERT(host_info->address() != nullptr);
 
@@ -89,18 +102,33 @@ void Cluster::onDnsHostAddOrUpdate(
           !host_info->isIpAddress() ? host_info->resolvedHost() : "",
           std::vector<std::string>{host_info->resolvedHost()});
 
-  const auto new_host_map = std::make_shared<HostInfoMap>(*current_map);
+  if (new_host_map == nullptr) {
+    new_host_map = std::make_shared<HostInfoMap>(*current_map);
+  }
   const auto emplaced =
       new_host_map->try_emplace(host, host_info,
                                 std::make_shared<Upstream::LogicalHost>(
                                     info(), host, host_info->address(), dummy_locality_lb_endpoint_,
                                     dummy_lb_endpoint_, transport_socket_options));
-  Upstream::HostVector hosts_added;
-  hosts_added.emplace_back(emplaced.first->second.logical_host_);
+  if (hosts_added == nullptr) {
+    hosts_added = std::make_unique<Upstream::HostVector>();
+  }
+  hosts_added->emplace_back(emplaced.first->second.logical_host_);
+}
 
-  // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
-  // the host set update.
-  swapAndUpdateMap(new_host_map, hosts_added, {});
+void Cluster::onDnsHostAddOrUpdate(
+    const std::string& host,
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+  std::shared_ptr<HostInfoMap> new_host_map;
+  std::unique_ptr<Upstream::HostVector> hosts_added;
+  addOrUpdateWorker(host, host_info, new_host_map, hosts_added);
+  if (hosts_added != nullptr) {
+    ASSERT(!new_host_map->empty());
+    ASSERT(!hosts_added->empty());
+    // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
+    // the host set update.
+    swapAndUpdateMap(new_host_map, *hosts_added, {});
+  }
 }
 
 void Cluster::swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
