@@ -45,8 +45,6 @@ MockClusterInfo::MockClusterInfo()
                                                           circuit_breakers_stats_)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
-  ON_CALL(*this, maxConnectionDuration())
-      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, eds_service_name()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http2Settings()).WillByDefault(ReturnRef(http2_settings_));
