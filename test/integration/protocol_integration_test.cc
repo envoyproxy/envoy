@@ -1314,6 +1314,10 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
 // Test connection is closed after single request processed.
 TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_drain_timeout()->set_seconds(1);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1329,13 +1333,17 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
 // Test inflight request is processed correctly when timeout fires during request processing.
 TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_drain_timeout()->set_seconds(1);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1355,16 +1363,20 @@ TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
 }
 
 // Test connection is closed if no http requests were processed
 TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_drain_timeout()->set_seconds(1);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
