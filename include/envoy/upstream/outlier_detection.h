@@ -27,18 +27,18 @@ namespace Outlier {
  */
 enum class Result {
   // Local origin errors detected by Envoy.
-  LocalOriginTimeout,               // Timed out while connecting or executing a request.
-  LocalOriginConnectFailed,        // Remote host rejected the connection.
-  LocalOriginConnectSuccess,       // Successfully established a connection to upstream host.
-                                      // Use this code when there is another protocol on top of
-                                      // transport protocol. For example HTTP runs on top of tcp.
-                                      // The same for redis. It first establishes TCP and then runs
-                                      // a transaction.
+  LocalOriginTimeout,             // Timed out while connecting or executing a request.
+  LocalOriginConnectFailed,       // Remote host rejected the connection.
+  LocalOriginConnectSuccess,      // Successfully established a connection to upstream host.
+                                  // Use this code when there is another protocol on top of
+                                  // transport protocol. For example HTTP runs on top of tcp.
+                                  // The same for redis. It first establishes TCP and then runs
+                                  // a transaction.
   LocalOriginConnectSuccessFinal, // Successfully established a connection to upstream host
-                                      // Use this code when there is no other protocol on top of the
-                                      // protocol used by a filter. For example tcp_proxy filter
-                                      // serves only tcp level. There is no other protocol on top of
-                                      // tcp which the tcp_proxy filter is aware of.
+                                  // Use this code when there is no other protocol on top of the
+                                  // protocol used by a filter. For example tcp_proxy filter
+                                  // serves only tcp level. There is no other protocol on top of
+                                  // tcp which the tcp_proxy filter is aware of.
 
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.
