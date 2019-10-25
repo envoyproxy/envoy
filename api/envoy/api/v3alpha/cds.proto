@@ -449,9 +449,9 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  reserved 12, 15, 11;
+  reserved 12, 15, 11, 35;
 
-  reserved "tls_context";
+  reserved "tls_context", "extension_protocol_options";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket* in the
