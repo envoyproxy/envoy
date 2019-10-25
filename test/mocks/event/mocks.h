@@ -118,7 +118,6 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
   MOCK_METHOD0(getCurrentThreadId, Thread::ThreadId());
   MOCK_CONST_METHOD0(approximateMonotonicTime, MonotonicTime());
-  MOCK_METHOD0(updateApproximateMonotonicTime, void());
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;

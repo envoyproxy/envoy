@@ -217,14 +217,9 @@ public:
   virtual bool isThreadSafe() const PURE;
 
   /**
-   * Returns a recently cached MonotonicTime value.
+   * Returns an approximate time value.
    */
   virtual MonotonicTime approximateMonotonicTime() const PURE;
-
-  /**
-   * Updates approximate monotonic time to current value.
-   */
-  virtual void updateApproximateMonotonicTime() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;
