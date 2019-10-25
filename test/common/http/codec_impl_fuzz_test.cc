@@ -348,7 +348,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
   const Http2Settings client_http2settings{fromHttp2Settings(input.h2_settings().client())};
-  const Http1Settings client_http1settings{};
+  const Http1Settings client_http1settings;
   NiceMock<MockConnectionCallbacks> client_callbacks;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;

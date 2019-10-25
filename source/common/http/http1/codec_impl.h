@@ -205,7 +205,7 @@ protected:
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   bool handling_upgrade_{};
-  HeaderKeyFormatterPtr header_key_formatter_;
+  const HeaderKeyFormatterPtr header_key_formatter_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
