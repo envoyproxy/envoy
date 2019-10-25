@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"

@@ -25,9 +25,10 @@ static const std::string UnspecifiedValueString = "-";
 namespace {
 
 // Matches newline pattern in a StartTimeFormatter format string.
-const std::regex& getStartTimeNewlinePattern(){
-    CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
-const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "\n")};
+const std::regex& getStartTimeNewlinePattern() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
+}
+const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
@@ -219,7 +220,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 }
 
-// TODO(derekargueta): #2967 - Rewrite AccessLogformatter with parser library & formal grammar
+// TODO(derekargueta): #2967 - Rewrite AccessLogFormatter with parser library & formal grammar
 std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;

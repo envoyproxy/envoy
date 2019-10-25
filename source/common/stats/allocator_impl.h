@@ -46,7 +46,6 @@ private:
     bool operator()(const Metric* a, const Metric* b) const {
       return a->statName() == b->statName();
     }
-    bool operator()(StatName a, const Metric* b) const { return a == b->statName(); }
     bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
 

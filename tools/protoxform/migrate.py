@@ -92,6 +92,9 @@ class UpgradeVisitor(visitor.Visitor):
     for f in upgraded_proto.field:
       if f.options.deprecated:
         self._Deprecate(upgraded_proto, f)
+        # Make sure the type name is erased so it isn't picked up by protoxform
+        # when computing deps.
+        f.type_name = ""
       else:
         f.type_name = self._UpgradedType(f.type_name)
     # Upgrade nested messages.

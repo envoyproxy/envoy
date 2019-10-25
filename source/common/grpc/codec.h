@@ -34,6 +34,38 @@ public:
   void newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& output);
 };
 
+// Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
+// header:
+//
+// -----------------------------------------------------------------------
+// |R|R|R|R|R|R|R|R|C|      L     |      L     |      L     |      L     |
+// -----------------------------------------------------------------------
+//    Flag (1 byte)                Message Length (4 bytes)
+//
+// A fixed header consists of five bytes.
+// The first byte is the Flag. The last one "C" bit indicates if the message
+// is compressed or not (0 is uncompressed, 1 is compressed). The other seven
+// "R" bits are reserved for future use.
+// The next four "L" bytes represent the message length in BigEndian format.
+enum class State {
+  // Waiting for decoding the flags (1 byte) of the GRPC data frame.
+  FH_FLAG,
+  // Waiting for decoding the 1st byte of the length (4 bytes in total) of the
+  // GRPC data frame.
+  FH_LEN_0,
+  // Waiting for decoding the 2nd byte of the length (4 bytes in total) of the
+  // GRPC data frame.
+  FH_LEN_1,
+  // Waiting for decoding the 3rd byte of the length (4 bytes in total) of the
+  // GRPC data frame.
+  FH_LEN_2,
+  // Waiting for decoding the 4th byte of the length (4 bytes in total) of the
+  // GRPC data frame.
+  FH_LEN_3,
+  // Waiting for decoding the data.
+  DATA,
+};
+
 class Decoder {
 public:
   Decoder();
@@ -56,40 +88,28 @@ public:
   bool hasBufferedData() const { return state_ != State::FH_FLAG; }
 
 private:
-  // Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
-  // header:
-  //
-  // -----------------------------------------------------------------------
-  // |R|R|R|R|R|R|R|R|C|      L     |      L     |      L     |      L     |
-  // -----------------------------------------------------------------------
-  //    Flag (1 byte)                Message Length (4 bytes)
-  //
-  // A fixed header consists of five bytes.
-  // The first byte is the Flag. The last one "C" bit indicates if the message
-  // is compressed or not (0 is uncompressed, 1 is compressed). The other seven
-  // "R" bits are reserved for future use.
-  // The next four "L" bytes represent the message length in BigEndian format.
-  enum class State {
-    // Waiting for decoding the flags (1 byte) of the GRPC data frame.
-    FH_FLAG,
-    // Waiting for decoding the 1st byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FH_LEN_0,
-    // Waiting for decoding the 2nd byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FH_LEN_1,
-    // Waiting for decoding the 3rd byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FH_LEN_2,
-    // Waiting for decoding the 4th byte of the length (4 bytes in total) of the
-    // GRPC data frame.
-    FH_LEN_3,
-    // Waiting for decoding the data.
-    DATA,
-  };
-
   State state_;
   Frame frame_;
 };
+
+class FrameInspector {
+public:
+  // Decodes the given buffer with GRPC data frame and updates the frame count.
+  // Returns the increase in the frame count.
+  uint64_t decode(const Buffer::Instance& input);
+
+  // Returns the current frame count, corresponding to the request/response
+  // message count. Counter is incremented on a frame start.
+  uint64_t frameCount() const { return count_; }
+
+  // Returns the current state in the frame parsing.
+  State state() const { return state_; }
+
+private:
+  State state_{State::FH_FLAG};
+  uint32_t length_{0};
+  uint64_t count_{0};
+};
+
 } // namespace Grpc
 } // namespace Envoy

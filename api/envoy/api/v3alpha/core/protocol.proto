@@ -25,6 +25,11 @@ message HttpProtocolOptions {
   // :ref:`drain_timeout
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.drain_timeout>`.
   // Note that request based timeouts mean that HTTP/2 PINGs will not keep the connection alive.
+  // If not specified, this defaults to 1 hour. To disable idle timeouts explicitly set this to 0.
+  //
+  // .. warning::
+  //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
+  //   FIN packets, etc.
   google.protobuf.Duration idle_timeout = 1;
 
   // The maximum number of headers. If unconfigured, the default
@@ -34,6 +39,22 @@ message HttpProtocolOptions {
 }
 
 message Http1ProtocolOptions {
+  message HeaderKeyFormat {
+    message ProperCaseWords {
+    }
+
+    oneof header_format {
+      option (validate.required) = true;
+
+      // Formats the header by proper casing words: the first character and any character following
+      // a special character will be capitalized if it's an alpha character. For example,
+      // "content-type" becomes "Content-Type", and "foo$b#$are" becomes "Foo$B#$Are".
+      // Note that while this results in most headers following conventional casing, certain headers
+      // are not covered. For example, the "TE" header will be formatted as "Te".
+      ProperCaseWords proper_case_words = 1;
+    }
+  }
+
   // Handle HTTP requests with absolute URLs in the requests. These requests
   // are generally sent by clients to forward/explicit proxies. This allows clients to configure
   // envoy as their HTTP proxy. In Unix, for example, this is typically done by setting the
@@ -50,9 +71,15 @@ message Http1ProtocolOptions {
   // Envoy does not otherwise support HTTP/1.0 without a Host header.
   // This is a no-op if *accept_http_10* is not true.
   string default_host_for_http_10 = 3;
+
+  // Describes how the keys for response headers should be formatted. By default, all header keys
+  // are lower cased.
+  // [#not-implemented-hide:] Hiding until both request and response formatting has been
+  // implemented.
+  HeaderKeyFormat header_key_format = 4;
 }
 
-// [#comment:next free field: 13]
+// [#next-free-field: 13]
 message Http2ProtocolOptions {
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
@@ -150,7 +177,7 @@ message Http2ProtocolOptions {
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
   // when this option is enabled, only the offending stream is terminated.
   //
-  // See [RFC7540, sec. 8.1](https://tools.ietf.org/html/rfc7540#section-8.1) for details.
+  // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
 }
 

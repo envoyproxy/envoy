@@ -31,6 +31,7 @@ MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accum
 MockGauge::~MockGauge() = default;
 
 MockHistogram::MockHistogram() {
+  ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {
       store_->deliverHistogramToSinks(*this, value);
@@ -40,6 +41,8 @@ MockHistogram::MockHistogram() {
 MockHistogram::~MockHistogram() = default;
 
 MockParentHistogram::MockParentHistogram() {
+  ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
+  ON_CALL(*this, unit()).WillByDefault(ReturnPointee(&unit_));
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
     if (store_ != nullptr) {
       store_->deliverHistogramToSinks(*this, value);
@@ -47,7 +50,6 @@ MockParentHistogram::MockParentHistogram() {
   }));
   ON_CALL(*this, intervalStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, cumulativeStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
-  ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
 }
 MockParentHistogram::~MockParentHistogram() = default;
 
@@ -64,13 +66,15 @@ MockSink::~MockSink() = default;
 
 MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
-  ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
-    auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
-    histogram->name_ = name;
-    histogram->store_ = this;
-    histograms_.emplace_back(histogram);
-    return *histogram;
-  }));
+  ON_CALL(*this, histogram(_, _))
+      .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
+        auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
+        histogram->name_ = name;
+        histogram->unit_ = unit;
+        histogram->store_ = this;
+        histograms_.emplace_back(histogram);
+        return *histogram;
+      }));
 }
 MockStore::~MockStore() = default;
 
