@@ -88,15 +88,15 @@ public:
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
-        request_headers_{{":authority", host_}, {":method", "GET"}, {":path", "/"}} {
+        request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}} {
     quic::SetVerbosityLogThreshold(3);
     quic_stream_->setDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStream*, quic::QuicStreamId, size_t write_length,
-                                  quic::QuicStreamOffset, quic::StreamSendingState) {
-          return quic::QuicConsumedData{write_length, true};
+                                  quic::QuicStreamOffset, quic::StreamSendingState state) {
+          return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
         }));
     EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillRepeatedly(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
@@ -262,6 +262,13 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
 }
 
 TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
+  // Bump connection flow control window large enough not to cause connection
+  // level flow control blocked.
+  quic::QuicWindowUpdateFrame window_update(
+      quic::kInvalidControlFrameId,
+      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
+  quic_session_.OnWindowUpdateFrame(window_update);
+
   request_headers_.addCopy(":content-length", "32770"); // 32KB + 2 byte
   quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
   // Encode 32kB request body. first 16KB should be written out right away. The
@@ -274,12 +281,6 @@ TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
 
   EXPECT_EQ(0u, buffer.length());
   EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
-  // Bump connection flow control window large enough not to cause connection
-  // level flow control blocked.
-  quic::QuicWindowUpdateFrame window_update(
-      quic::kInvalidControlFrameId,
-      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
-  quic_session_.OnWindowUpdateFrame(window_update);
 
   // Receive a WINDOW_UPDATE frame not large enough to drain half of the send
   // buffer.
