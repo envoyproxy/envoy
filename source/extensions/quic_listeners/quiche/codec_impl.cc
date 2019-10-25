@@ -64,5 +64,23 @@ void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
   runWatermarkCallbacksForEachStream(quic_client_session_.stream_map(), false);
 }
 
+Http::Connection*
+QuicHttpClientConnectionFactory::createQuicHttpConnection(Network::Connection& connection,
+                                                          Http::ConnectionCallbacks& callbacks) {
+  return new Quic::QuicHttpClientConnectionImpl(
+      dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks);
+}
+
+Http::Connection*
+QuicHttpServerConnectionFactory::createQuicHttpConnection(Network::Connection& connection,
+                                                          Http::ConnectionCallbacks& callbacks) {
+  return new Quic::QuicHttpServerConnectionImpl(
+      dynamic_cast<Quic::EnvoyQuicServerSession&>(connection),
+      dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks));
+}
+
+REGISTER_FACTORY(QuicHttpClientConnectionFactory, Http::QuicHttpConnectionFactory);
+REGISTER_FACTORY(QuicHttpServerConnectionFactory, Http::QuicHttpConnectionFactory);
+
 } // namespace Quic
 } // namespace Envoy

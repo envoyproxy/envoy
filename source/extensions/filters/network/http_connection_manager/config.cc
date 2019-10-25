@@ -19,14 +19,14 @@
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
-
-#include "extensions/quic_listeners/quiche/codec_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -428,10 +428,10 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
-    // TODO(danzh) same as client side. This enforce dependency on QUICHE. Is there a
-    // better way to aoivd such dependency in case QUICHE breaks this extension.
-    return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
+    return std::unique_ptr<Http::ServerConnection>(dynamic_cast<Http::ServerConnection*>(
+        Config::Utility::getAndCheckFactory<Http::QuicHttpConnectionFactory>(
+            Http::QuicCodecNames::get().Server)
+            .createQuicHttpConnection(connection, callbacks)));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,

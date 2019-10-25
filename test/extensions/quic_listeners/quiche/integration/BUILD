@@ -19,6 +19,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//source/extensions/quic_listeners/quiche:codec_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_client_connection_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_client_session_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",

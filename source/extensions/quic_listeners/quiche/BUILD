@@ -112,6 +112,9 @@ envoy_cc_library(
         ":envoy_quic_client_session_lib",
         ":envoy_quic_server_session_lib",
         "//include/envoy/http:codec_interface",
+        "//include/envoy/registry",
+        "//source/common/http/http3:quic_codec_factory_lib",
+        "//source/common/http/http3:well_known_names",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )

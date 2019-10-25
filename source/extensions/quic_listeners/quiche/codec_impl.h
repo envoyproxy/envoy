@@ -1,7 +1,10 @@
 #include "envoy/http/codec.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/well_known_names.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
@@ -73,6 +76,25 @@ public:
 private:
   EnvoyQuicClientSession& quic_client_session_;
 };
+
+class QuicHttpClientConnectionFactory : public Http::QuicHttpConnectionFactory {
+public:
+  Http::Connection* createQuicHttpConnection(Network::Connection& connection,
+                                             Http::ConnectionCallbacks& callbacks) override;
+
+  std::string name() const override { return "client_codec"; }
+};
+
+class QuicHttpServerConnectionFactory : public Http::QuicHttpConnectionFactory {
+public:
+  Http::Connection* createQuicHttpConnection(Network::Connection& connection,
+                                             Http::ConnectionCallbacks& callbacks) override;
+
+  std::string name() const override { return "server_codec"; }
+};
+
+DECLARE_FACTORY(QuicHttpClientConnectionFactory);
+DECLARE_FACTORY(QuicHttpServerConnectionFactory);
 
 } // namespace Quic
 } // namespace Envoy

@@ -363,6 +363,8 @@ public:
   virtual void onUnderlyingConnectionBelowWriteBufferLowWatermark() PURE;
 };
 
+using ConnectionPtr = std::unique_ptr<Connection>;
+
 /**
  * Callbacks for downstream connection watermark limits.
  */
