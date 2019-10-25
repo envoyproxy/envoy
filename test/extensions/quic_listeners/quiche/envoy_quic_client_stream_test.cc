@@ -264,7 +264,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
 TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
   request_headers_.addCopy(":content-length", "32770"); // 32KB + 2 byte
   quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
-  // encode 32kB request body. first 16KB shoudl be written out right away. The
+  // Encode 32kB request body. first 16KB should be written out right away. The
   // rest should be buffered. The high watermark is 16KB, so this call should
   // make the send buffer reach its high watermark.
   std::string request(32 * 1024 + 1, 'a');

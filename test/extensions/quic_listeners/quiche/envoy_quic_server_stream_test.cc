@@ -283,7 +283,7 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
 
   response_headers_.addCopy(":content-length", "32770"); // 32KB + 2 byte
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
-  // encode 32kB response body. first 16KB shoudl be written out right away. The
+  // Encode 32kB response body. first 16KB should be written out right away. The
   // rest should be buffered. The high watermark is 16KB, so this call should
   // make the send buffer reach its high watermark.
   std::string response(32 * 1024 + 1, 'a');
