@@ -5,6 +5,8 @@ build \
   --define=hot_restart=disabled \
   --define=signal_trace=disabled \
   --define=tcmalloc=disabled \
+  --features=debug_prefix_map_pwd_is_dot \
+  --features=swift.cacheable_swiftmodules \
   --ios_minimum_os=10.0 \
   --ios_simulator_device="iPhone X" \
   --ios_simulator_version=13.1 \
