@@ -188,7 +188,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   // drain/destruction event, we key off of the existence of the connect timer above to determine
   // whether the client is in the ready list (connected) or the busy list (failed to connect).
   if (event == Network::ConnectionEvent::Connected) {
-    conn_connect_ms_->complete();
+    client.conn_connect_ms_->complete();
+    client.conn_connect_ms_.reset();
     processIdleClient(client, false);
   }
 }
@@ -303,7 +304,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
-  parent_.conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+  conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
       parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
