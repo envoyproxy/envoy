@@ -18,11 +18,6 @@ import "validate/validate.proto";
 // HTTP/gRPC/Mongo/Redis operation or delay proxying of TCP connections.
 // [#next-free-field: 6]
 message FaultDelay {
-  enum FaultDelayType {
-    // Unused and deprecated.
-    FIXED = 0;
-  }
-
   // Fault delays are controlled via an HTTP header (if applicable). See the
   // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
