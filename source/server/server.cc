@@ -57,7 +57,7 @@ InstanceImpl::InstanceImpl(
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields()),
-      time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
+      time_source_(time_system), restarter_(restarter), start_time_(testSource()),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? OptProcessContextRef(std::ref(*process_context))
