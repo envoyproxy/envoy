@@ -155,8 +155,8 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
     ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
     ads_cluster->set_name("ads_cluster");
-    auto* context = ads_cluster->mutable_tls_context();
-    auto* validation_context = context->mutable_common_tls_context()->mutable_validation_context();
+    envoy::api::v2::auth::UpstreamTlsContext context;
+    auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     validation_context->add_verify_subject_alt_name("foo.lyft.com");
@@ -166,6 +166,8 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
       ssl_creds->mutable_root_certs()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     }
+    ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+    ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   HttpIntegrationTest::initialize();

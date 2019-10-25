@@ -167,7 +167,12 @@ message FilterChain {
   FilterChainMatch filter_chain_match = 1;
 
   // The TLS context for this filter chain.
-  auth.DownstreamTlsContext tls_context = 2;
+  //
+  // .. attention::
+  //
+  //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
+  //   set, `transport_socket` takes priority.
+  auth.DownstreamTlsContext tls_context = 2 [deprecated = true];
 
   // A list of individual network filters that make up the filter chain for
   // connections established with the listener. Order matters as the filters are
@@ -186,7 +191,11 @@ message FilterChain {
   // [#not-implemented-hide:] filter chain metadata.
   core.Metadata metadata = 5;
 
-  // See :ref:`base.TransportSocket<envoy_api_msg_core.TransportSocket>` description.
+  // Optional custom transport socket implementation to use for downstream connections.
+  // To setup TLS, set a transport socket with name `tls` and
+  // :ref:`DownstreamTlsContext <envoy_api_msg_auth.DownstreamTlsContext>` in the `typed_config`.
+  // If no transport socket configuration is specified, new connections
+  // will be set up with plaintext.
   core.TransportSocket transport_socket = 6;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no

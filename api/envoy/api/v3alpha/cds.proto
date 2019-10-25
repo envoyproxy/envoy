@@ -7,7 +7,6 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
-import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/cluster/circuit_breaker.proto";
 import "envoy/api/v3alpha/cluster/filter.proto";
 import "envoy/api/v3alpha/cluster/outlier_detection.proto";
@@ -450,7 +449,9 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  reserved 12, 15;
+  reserved 12, 15, 11;
+
+  reserved "tls_context";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket* in the
@@ -579,16 +580,6 @@ message Cluster {
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   cluster.CircuitBreakers circuit_breakers = 10;
 
-  // The TLS configuration for connections to the upstream cluster. If no TLS
-  // configuration is specified, TLS will not be used for new connections.
-  //
-  // .. attention::
-  //
-  //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_api.v3alpha.auth.CertificateValidationContext.trusted_ca>`
-  //   to enable verification.
-  auth.UpstreamTlsContext tls_context = 11;
-
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
   core.HttpProtocolOptions common_http_protocol_options = 29;
@@ -713,6 +704,10 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
+  // To setup TLS, set a transport socket with name `tls` and
+  // :ref:`UpstreamTlsContexts <envoy_api_msg_api.v3alpha.auth.UpstreamTlsContext>` in the
+  // `typed_config`. If no transport socket configuration is specified, new connections will be set
+  // up with plaintext.
   core.TransportSocket transport_socket = 24;
 
   // The Metadata field can be used to provide additional information about the

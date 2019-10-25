@@ -128,7 +128,43 @@ per_connection_buffer_limit_bytes: 8192
   EXPECT_EQ(8192U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, TlsTransportSocket) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  transport_socket:
+    name: envoy.transport_sockets.tls
+    typed_config:
+      "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+      common_tls_context:
+        tls_certificates:
+        - certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        validation_context:
+          trusted_ca:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+          verify_subject_alt_name:
+          - localhost
+          - 127.0.0.1
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, DEPRECATED_FEATURE_TEST(TlsContext)) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
@@ -1448,11 +1484,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
     filter_chains:
     - filter_chain_match:
         destination_port: 8080
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1491,11 +1530,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1534,11 +1576,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
     filter_chains:
     - filter_chain_match:
         server_names: "server1.example.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1578,11 +1623,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
     filter_chains:
     - filter_chain_match:
         transport_protocol: "tls"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1618,11 +1666,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
     - filter_chain_match:
         application_protocols: "http/1.1"
         source_type: ANY
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1658,11 +1709,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
     filter_chains:
     - filter_chain_match:
         source_type: LOCAL
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1712,11 +1766,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
         source_prefix_ranges:
           - address_prefix: 10.0.0.1
             prefix_len: 24
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1765,11 +1822,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
         source_prefix_ranges:
           - address_prefix: 2001:0db8:85a3:0000:0000:0000:0000:0000
             prefix_len: 64
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1801,11 +1861,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
     - filter_chain_match:
         source_ports:
           - 100
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1841,26 +1904,35 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
     filter_chains:
     - filter_chain_match:
         source_type: LOCAL
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
     - filter_chain_match:
         application_protocols: "http/1.1"
         source_type: EXTERNAL
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
     - filter_chain_match:
         source_type: ANY
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1915,25 +1987,34 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     filter_chains:
     - filter_chain_match:
         # empty
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
     - filter_chain_match:
         destination_port: 8080
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
     - filter_chain_match:
         destination_port: 8081
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1992,25 +2073,34 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     filter_chains:
     - filter_chain_match:
         # empty
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
     - filter_chain_match:
         prefix_ranges: { address_prefix: 192.168.0.1, prefix_len: 32 }
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
     - filter_chain_match:
         prefix_ranges: { address_prefix: 192.168.0.0, prefix_len: 16 }
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2069,34 +2159,43 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     filter_chains:
     - filter_chain_match:
         # empty
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "server1.example.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "*.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2161,11 +2260,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
         # empty
     - filter_chain_match:
         transport_protocol: "tls"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2203,11 +2305,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
         # empty
     - filter_chain_match:
         application_protocols: ["dummy", "h2"]
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2248,11 +2353,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
         server_names: ["www.example.com", "server1.example.com"]
         transport_protocol: "tls"
         application_protocols: ["dummy", "h2"]
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2300,24 +2408,30 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "www.example.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_b"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_b"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2338,21 +2452,27 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "www.example.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2581,14 +2701,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { inline_string: ")EOF",
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { inline_string: ")EOF",
                                         absl::CEscape(cert), R"EOF(" }
-              private_key: { inline_string: ")EOF",
+                private_key: { inline_string: ")EOF",
                                         absl::CEscape(pkey), R"EOF(" }
-          validation_context:
+            validation_context:
               trusted_ca: { inline_string: ")EOF",
                                         absl::CEscape(ca), R"EOF(" }
   )EOF");
@@ -2606,11 +2729,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateK
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
-              certificate_chain: { inline_string: ")EOF",
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+                certificate_chain: { inline_string: ")EOF",
                                                                     absl::CEscape(cert), R"EOF(" }
   )EOF"),
                                                        Network::Address::IpVersion::v4);
@@ -2626,10 +2752,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2646,11 +2775,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateC
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { inline_string: "invalid" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { inline_string: "invalid" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2667,13 +2799,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidIntermediate
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { inline_string: ")EOF",
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { inline_string: ")EOF",
           absl::CEscape(leaf),
           R"EOF(\n-----BEGIN CERTIFICATE-----\nDEFINITELY_INVALID_CERTIFICATE\n-----END CERTIFICATE-----" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
   )EOF"),
       Network::Address::IpVersion::v4);
 
@@ -2686,11 +2821,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidPrivateKey) 
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
-              private_key: { inline_string: "invalid" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
+                private_key: { inline_string: "invalid" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -2703,12 +2841,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
-          validation_context:
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+            validation_context:
               trusted_ca: { inline_string: "invalid" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
@@ -3056,14 +3197,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-          validation_context:
-            trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
-            crl: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+            validation_context:
+              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+              crl: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3080,14 +3224,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-          validation_context:
-            trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
-            crl: { inline_string: ")EOF",
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+            validation_context:
+              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+              crl: { inline_string: ")EOF",
                                                                     absl::CEscape(crl), R"EOF(" }
   )EOF"),
                                                        Network::Address::IpVersion::v4);
@@ -3103,14 +3250,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, InvalidCRLInline) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-          validation_context:
-            trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
-            crl: { inline_string: "-----BEGIN X509 CRL-----\nTOTALLY_NOT_A_CRL_HERE\n-----END X509 CRL-----\n" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+            validation_context:
+              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+              crl: { inline_string: "-----BEGIN X509 CRL-----\nTOTALLY_NOT_A_CRL_HERE\n-----END X509 CRL-----\n" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3123,13 +3273,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-          validation_context:
-            crl: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+            validation_context:
+              crl: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3142,13 +3295,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-          validation_context:
-            verify_subject_alt_name: "spiffe://lyft.com/testclient"
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+            validation_context:
+              verify_subject_alt_name: "spiffe://lyft.com/testclient"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3164,13 +3320,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithNoCA) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-          validation_context:
-            allow_expired_certificate: true
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+            validation_context:
+              allow_expired_certificate: true
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3185,15 +3344,18 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
-    - tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
 
-          validation_context:
-            trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
-            allow_expired_certificate: true
+            validation_context:
+              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+              allow_expired_certificate: true
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
