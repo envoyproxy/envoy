@@ -94,8 +94,6 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
-  // Tracks resource aliases in on-demand requests since the previous DeltaDiscoveryRequest we sent.
-  std::set<std::string> requested_aliases_;
 };
 
 class DeltaSubscriptionStateFactory : public SubscriptionStateFactory {
