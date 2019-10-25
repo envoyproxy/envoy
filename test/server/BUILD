@@ -172,7 +172,7 @@ envoy_cc_test_library(
     hdrs = ["listener_manager_impl_test.h"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
-        "//source/server:listener_manager_lib",
+        "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -243,7 +243,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:filter_chain_manager_lib",
-        "//source/server:listener_manager_lib",
+        "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

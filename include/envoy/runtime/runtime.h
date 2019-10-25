@@ -248,7 +248,7 @@ public:
 
   /**
    * @return shared_ptr<const Snapshot> the current snapshot. This function may safely be called
-   *         from non-worker theads.
+   *         from non-worker threads.
    */
   virtual std::shared_ptr<const Snapshot> threadsafeSnapshot() PURE;
 
