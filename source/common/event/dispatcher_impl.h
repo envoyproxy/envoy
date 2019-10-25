@@ -74,6 +74,7 @@ public:
     return return_object;
   }
   MonotonicTime approximateMonotonicTime() const override;
+  void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
   void onFatalError() const override {
@@ -96,9 +97,6 @@ private:
   bool isThreadSafe() const override {
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
   }
-
-  // Update |approximate_monotonic_time_| from |api_.timeSource()|.
-  void updateApproximateMonotonicTime();
 
   Api::Api& api_;
   std::string stats_prefix_;

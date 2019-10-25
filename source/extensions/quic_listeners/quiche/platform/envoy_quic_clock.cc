@@ -9,8 +9,10 @@ quic::QuicTime EnvoyQuicClock::ApproximateNow() const {
 }
 
 quic::QuicTime EnvoyQuicClock::Now() const {
-  return quic::QuicTime::Zero() + quic::QuicTime::Delta::FromMicroseconds(microsecondsSinceEpoch(
-                                      dispatcher_.timeSource().monotonicTime()));
+  // Since the expensive operation of obtaining time has to be performed anyway,
+  // make Dispatcher update approximate time.
+  const_cast<Event::Dispatcher&>(dispatcher_).updateApproximateMonotonicTime();
+  return ApproximateNow();
 }
 
 quic::QuicWallTime EnvoyQuicClock::WallNow() const {

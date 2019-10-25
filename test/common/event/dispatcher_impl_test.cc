@@ -253,27 +253,47 @@ TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
   EXPECT_TRUE(dispatcher_->isThreadSafe());
 }
 
-TEST(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher = api->allocateDispatcher();
-  MonotonicTime time;
+class DispatcherMonotonicTimeTest : public testing::Test {
+protected:
+  DispatcherMonotonicTimeTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  ~DispatcherMonotonicTimeTest() override = default;
 
-  // approximateMonotonicTime is constant within one event loop run.
-  dispatcher->post([&dispatcher, &time]() {
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+  MonotonicTime time_;
+};
+
+TEST_F(DispatcherMonotonicTimeTest, UpdateApproximateMonotonicTime) {
+  dispatcher_->post([this]() {
     {
-      time = dispatcher->approximateMonotonicTime();
-      EXPECT_EQ(time, dispatcher->approximateMonotonicTime());
+      MonotonicTime time1 = dispatcher_->approximateMonotonicTime();
+      dispatcher_->updateApproximateMonotonicTime();
+      MonotonicTime time2 = dispatcher_->approximateMonotonicTime();
+      EXPECT_LT(time1, time2);
     }
   });
 
-  dispatcher->run(Dispatcher::RunType::Block);
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
 
-  // approximateMonotonicTime is increasing between event loop runs.
-  dispatcher->post([&dispatcher, &time]() {
-    { EXPECT_LT(time, dispatcher->approximateMonotonicTime()); }
+TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
+  // approximateMonotonicTime is constant within one event loop run.
+  dispatcher_->post([this]() {
+    {
+      time_ = dispatcher_->approximateMonotonicTime();
+      EXPECT_EQ(time_, dispatcher_->approximateMonotonicTime());
+    }
   });
 
-  dispatcher->run(Dispatcher::RunType::Block);
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // approximateMonotonicTime is increasing between event loop runs.
+  dispatcher_->post([this]() {
+    { EXPECT_LT(time_, dispatcher_->approximateMonotonicTime()); }
+  });
+
+  dispatcher_->run(Dispatcher::RunType::Block);
 }
 
 TEST(TimerImplTest, TimerEnabledDisabled) {
