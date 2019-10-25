@@ -138,7 +138,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
   Http::HeaderMapPtr response_headers_to_add_;
-  Http::HeaderMap* request_headers_;
+  Http::HeaderMap* request_headers_{};
 };
 
 } // namespace RateLimitFilter

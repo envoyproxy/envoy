@@ -64,6 +64,17 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   }
 }
 
+absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {
+  absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> ret;
+  for (const auto& host : primary_hosts_) {
+    // Only include hosts that have ever resolved to an address.
+    if (host.second->host_info_->address_ != nullptr) {
+      ret.emplace(host.first, host.second->host_info_);
+    }
+  }
+  return ret;
+}
+
 DnsCacheImpl::AddUpdateCallbacksHandlePtr
 DnsCacheImpl::addUpdateCallbacks(UpdateCallbacks& callbacks) {
   return std::make_unique<AddUpdateCallbacksHandleImpl>(update_callbacks_, callbacks);

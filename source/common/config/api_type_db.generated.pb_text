@@ -1314,6 +1314,22 @@ types {
   }
 }
 types {
+  key: "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat"
+  value {
+    qualified_package: "envoy.api.v2.core"
+    proto_path: "envoy/api/v2/core/protocol.proto"
+    next_version_type_name: "envoy.api.v3alpha.core.Http1ProtocolOptions.HeaderKeyFormat"
+  }
+}
+types {
+  key: "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords"
+  value {
+    qualified_package: "envoy.api.v2.core"
+    proto_path: "envoy/api/v2/core/protocol.proto"
+    next_version_type_name: "envoy.api.v3alpha.core.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords"
+  }
+}
+types {
   key: "envoy.api.v2.core.Http2ProtocolOptions"
   value {
     qualified_package: "envoy.api.v2.core"
@@ -2669,6 +2685,20 @@ types {
 }
 types {
   key: "envoy.api.v3alpha.core.Http1ProtocolOptions"
+  value {
+    qualified_package: "envoy.api.v3alpha.core"
+    proto_path: "envoy/api/v3alpha/core/protocol.proto"
+  }
+}
+types {
+  key: "envoy.api.v3alpha.core.Http1ProtocolOptions.HeaderKeyFormat"
+  value {
+    qualified_package: "envoy.api.v3alpha.core"
+    proto_path: "envoy/api/v3alpha/core/protocol.proto"
+  }
+}
+types {
+  key: "envoy.api.v3alpha.core.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords"
   value {
     qualified_package: "envoy.api.v3alpha.core"
     proto_path: "envoy/api/v3alpha/core/protocol.proto"
@@ -4231,6 +4261,20 @@ types {
   value {
     qualified_package: "envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1"
     proto_path: "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfigPerRoute"
+  value {
+    qualified_package: "envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1"
+    proto_path: "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.proto"
+  }
+}
+types {
+  key: "envoy.config.filter.http.grpc_stats.v2alpha.FilterConfig"
+  value {
+    qualified_package: "envoy.config.filter.http.grpc_stats.v2alpha"
+    proto_path: "envoy/config/filter/http/grpc_stats/v2alpha/config.proto"
   }
 }
 types {
@@ -5988,6 +6032,14 @@ types {
   }
 }
 types {
+  key: "envoy.config.trace.v2.XRayConfig"
+  value {
+    qualified_package: "envoy.config.trace.v2"
+    proto_path: "envoy/config/trace/v2/trace.proto"
+    next_version_type_name: "envoy.config.trace.v3alpha.XRayConfig"
+  }
+}
+types {
   key: "envoy.config.trace.v2.ZipkinConfig"
   value {
     qualified_package: "envoy.config.trace.v2"
@@ -6054,6 +6106,13 @@ types {
 }
 types {
   key: "envoy.config.trace.v3alpha.Tracing.Http"
+  value {
+    qualified_package: "envoy.config.trace.v3alpha"
+    proto_path: "envoy/config/trace/v3alpha/trace.proto"
+  }
+}
+types {
+  key: "envoy.config.trace.v3alpha.XRayConfig"
   value {
     qualified_package: "envoy.config.trace.v3alpha"
     proto_path: "envoy/config/trace/v3alpha/trace.proto"
