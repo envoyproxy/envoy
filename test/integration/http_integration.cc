@@ -482,9 +482,9 @@ void HttpIntegrationTest::testRouterNoop() {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("example-value", response->headers()
-                                    .get(Envoy::Http::LowerCaseString("x-additional-header"))
-                                    ->value()
-                                    .getStringView());
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 ->value()
+                                 .getStringView());
   EXPECT_EQ("text/html", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ(body, response->body());
 }
@@ -492,7 +492,7 @@ void HttpIntegrationTest::testRouterNoop() {
 void HttpIntegrationTest::testRouterSingleNoopRoute() {
   static const std::string domain("noop.example.com");
   static const std::string prefix("/");
-  //static const Http::Code status(Http::Code::OK);
+  // static const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {

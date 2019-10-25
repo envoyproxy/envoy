@@ -132,10 +132,12 @@ struct StreamInfoImpl : public StreamInfo {
   void setRouteName(absl::string_view route_name) override {
     route_name_ = std::string(route_name);
   }
-  
-  void setNoopRouteNames(std::string noop_route_names) override { noop_route_names_ = noop_route_names; }
 
-  const std::string& getNoopRouteNames() const override{ return noop_route_names_; }
+  void setNoopRouteNames(std::string noop_route_names) override {
+    noop_route_names_ = noop_route_names;
+  }
+
+  const std::string& getNoopRouteNames() const override { return noop_route_names_; }
 
   const std::string& getRouteName() const override { return route_name_; }
 

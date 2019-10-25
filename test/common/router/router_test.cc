@@ -4169,13 +4169,12 @@ TEST_F(RouterTest, NoopRoutesToStreamInfo) {
   EXPECT_CALL(callbacks_.route_->route_entry_, routeName())
       .WillRepeatedly(ReturnRef(noop_routename));
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, addRouteNameToStreamInfo())
-      .WillOnce(Return(true));
+  EXPECT_CALL(callbacks_.route_->route_entry_, addRouteNameToStreamInfo()).WillOnce(Return(true));
 
   std::string expected_routes = "noop-route-1;";
   EXPECT_CALL(callbacks_.stream_info_, setNoopRouteNames(expected_routes));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
-  
+
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -4190,8 +4189,7 @@ TEST_F(RouterTest, NoopRoutesToStreamInfo) {
                                   {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
-  Http::HeaderMapPtr response_headers(
-      new Http::TestHeaderMapImpl{{":status", "200"}});
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 

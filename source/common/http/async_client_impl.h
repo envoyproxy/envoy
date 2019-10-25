@@ -161,7 +161,7 @@ private:
 
   struct NullConfig : public Router::Config {
     Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
-                                      uint64_t, uint32_t &) const override {
+                                      uint64_t, uint32_t&) const override {
       return nullptr;
     }
 
@@ -273,9 +273,9 @@ private:
     }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
-    bool noop() const override { return false;}
+    bool noop() const override { return false; }
     static const NullHedgePolicy hedge_policy_;
-    bool addRouteNameToStreamInfo() const override { return false;}
+    bool addRouteNameToStreamInfo() const override { return false; }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;

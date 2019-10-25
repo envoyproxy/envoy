@@ -105,8 +105,8 @@ public:
     route_name_ = std::string(route_name);
   }
   const std::string& getRouteName() const override { return route_name_; }
-  void setNoopRouteNames(std::string names)  override { noop_route_names_ = names;}
-  const std::string& getNoopRouteNames() const override { return noop_route_names_;}
+  void setNoopRouteNames(std::string names) override { noop_route_names_ = names; }
+  const std::string& getNoopRouteNames() const override { return noop_route_names_; }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 

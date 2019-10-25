@@ -1302,7 +1302,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_, route_index_);
+      route =
+          snapped_route_config_->route(*request_headers_, stream_info_, stream_id_, route_index_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -2032,25 +2033,27 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() { return parent_; }
 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::clusterInfo() {
-  if ( parent_.cached_route_.has_value()) {
-      if( parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() && parent_.cached_route_.value()->routeEntry()->noop()) {
-          parent_.refreshCachedRoute();
-       }
+  if (parent_.cached_route_.has_value()) {
+    if (parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() &&
+        parent_.cached_route_.value()->routeEntry()->noop()) {
+      parent_.refreshCachedRoute();
+    }
   } else {
-     // NOTE: Refreshing route caches clusterInfo as well.
-     parent_.refreshCachedRoute();
-  } 
+    // NOTE: Refreshing route caches clusterInfo as well.
+    parent_.refreshCachedRoute();
+  }
   return parent_.cached_cluster_info_.value();
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if ( parent_.cached_route_.has_value()) {
-      if( parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() && parent_.cached_route_.value()->routeEntry()->noop()) {
-          parent_.refreshCachedRoute();
-       }
+  if (parent_.cached_route_.has_value()) {
+    if (parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() &&
+        parent_.cached_route_.value()->routeEntry()->noop()) {
+      parent_.refreshCachedRoute();
+    }
   } else {
-     parent_.refreshCachedRoute();
-  } 
+    parent_.refreshCachedRoute();
+  }
   return parent_.cached_route_.value();
 }
 

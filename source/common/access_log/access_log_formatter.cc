@@ -503,7 +503,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
       std::string noop_route_names = stream_info.getNoopRouteNames();
       return noop_route_names.empty() ? UnspecifiedValueString : noop_route_names;
     };
-   }  else {
+  } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
 }
