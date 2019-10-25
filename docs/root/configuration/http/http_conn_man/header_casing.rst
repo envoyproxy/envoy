@@ -3,7 +3,7 @@ HTTP/1.1 Header Casing
 
 When handling HTTP/1.1, Envoy will normalize the header keys to be all lowercase. While this is
 compliant with the HTTP/1.1 spec, in practice this can result in issues when migrating
-existing systems that might rely specific header casing.
+existing systems that might rely on specific header casing.
 
 To support these use cases, Envoy allows configuring a formatting scheme for the headers, which
 will have Envoy transform the header keys during serialization. To configure this formatting on
