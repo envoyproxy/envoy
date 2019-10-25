@@ -194,7 +194,8 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
-                 uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 HeaderKeyFormatterPtr&& header_key_formatter);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -204,6 +205,7 @@ protected:
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   bool handling_upgrade_{};
+  HeaderKeyFormatterPtr header_key_formatter_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -360,7 +362,6 @@ private:
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
-  HeaderKeyFormatterPtr header_key_formatter_;
 };
 
 /**
@@ -402,7 +403,6 @@ private:
   std::list<PendingResponse> pending_responses_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
-  const HeaderKeyFormatterPtr header_key_formatter_;
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
