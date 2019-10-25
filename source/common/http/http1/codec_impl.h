@@ -205,7 +205,7 @@ protected:
   bool handling_upgrade_{};
 
 private:
-  enum class HeaderParsingState { Field, Value, Done };
+  enum class HeaderParsingState { Field, Value };
 
   /**
    * Called in order to complete an in progress header decode.

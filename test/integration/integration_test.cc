@@ -319,31 +319,11 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
               HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
+TEST_P(IntegrationTest, Trailers) { testTrailers(30,30); }
+
 TEST_P(IntegrationTest, TrailersWithHttp1ToHttp2) {
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
-
-  initialize();
-
-  // For some reason could not use a typical codec client since the trailers were not being
-  // decoded, thus opting for raw tcp client.
-  auto tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("POST / HTTP/1.1\r\nHost: host\r\nTE: trailers\r\nAccept: */*\r\n\r\n");
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(5, false);
-  upstream_request_->encodeTrailers(response_trailers);
-
-  ASSERT_TRUE(upstream_request_->complete());
-
-  tcp_client->waitForData("\r\n\r\n", false);
-  std::string response = tcp_client->data();
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
-  EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
-  EXPECT_THAT(response, HasSubstr("0\r\nresponse1:trailer1\r\nresponse2:trailer2"));
-  EXPECT_THAT(response, EndsWith("\r\n\r\n"));
-  tcp_client->close();
+  testTrailers(30,30);
 }
 
 TEST_P(IntegrationTest, BadFirstline) {

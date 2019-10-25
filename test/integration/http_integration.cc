@@ -1061,16 +1061,12 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-    EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
-  }
+  EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response_size, response->body().size());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
-    EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
-  }
+  EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
