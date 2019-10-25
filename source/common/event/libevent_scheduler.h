@@ -69,7 +69,7 @@ private:
   timeval timeout_{};        // the poll timeout for the current event loop iteration, if available
   timeval prepare_time_{};   // timestamp immediately before polling
   timeval check_time_{};     // timestamp immediately after polling
-  OnPrepareCallback callback_{}; // callback to be called from onPrepareForCallback()
+  OnPrepareCallback callback_; // callback to be called from onPrepareForCallback()
 };
 
 } // namespace Event
