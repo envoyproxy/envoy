@@ -15,6 +15,7 @@ jobs:
           submodules: true
       - name: 'Run formatters'
         run: |
+          export CLANG_FORMAT=clang-format-8
           export BUILDIFIER_BIN=/usr/local/bin/buildifier
           ./tools/check_format.sh
   precommit:
