@@ -183,8 +183,6 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
-  ENVOY_LOG(trace, "encode trailers, chunk_encoding_={}, trailers.size()={}",
-            chunk_encoding_, trailers.size());
   if (chunk_encoding_) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
@@ -386,7 +384,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 }
 
 void ConnectionImpl::completeLastHeader() {
-  ENVOY_CONN_LOG(trace, "complete last header: key={} value={}", connection_,
+  ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
   if (!current_header_field_.empty()) {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
@@ -466,7 +464,10 @@ size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
 }
 
 void ConnectionImpl::onHeaderField(const char* data, size_t length) {
-  ENVOY_CONN_LOG(trace, "header field: {}", connection_, absl::string_view(data, length));
+  if (header_parsing_state_ == HeaderParsingState::Done) {
+    // Ignore trailers.
+    return;
+  }
 
   if (header_parsing_state_ == HeaderParsingState::Value) {
     completeLastHeader();
@@ -476,7 +477,10 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
-  ENVOY_CONN_LOG(trace, "header value: {}", connection_, absl::string_view(data, length));
+  if (header_parsing_state_ == HeaderParsingState::Done) {
+    // Ignore trailers.
+    return;
+  }
 
   const absl::string_view header_value = absl::string_view(data, length);
 
@@ -511,8 +515,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
-  ENVOY_CONN_LOG(trace, "on headers complete base", connection_);
-
+  ENVOY_CONN_LOG(trace, "headers complete", connection_);
   completeLastHeader();
   // Validate that the completed HeaderMap's cached byte size exists and is correct.
   // This assert iterates over the HeaderMap.
@@ -549,8 +552,8 @@ int ConnectionImpl::onHeadersCompleteBase() {
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));
-  current_header_map_ = std::make_unique<HeaderMapImpl>();
-  header_parsing_state_ = HeaderParsingState::Field;
+  current_header_map_.reset();
+  header_parsing_state_ = HeaderParsingState::Done;
 
   // Returning 2 informs http_parser to not expect a body or further data on this connection.
   return handling_upgrade_ ? 2 : rc;
@@ -575,9 +578,8 @@ void ConnectionImpl::onMessageBeginBase() {
   // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
   // in onHeadersCompleteBase
   protocol_ = Protocol::Http11;
-  if (!current_header_map_) {
-    current_header_map_ = std::make_unique<HeaderMapImpl>();
-  }
+  ASSERT(!current_header_map_);
+  current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
   onMessageBegin();
 }
