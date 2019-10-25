@@ -30,6 +30,7 @@ Version history
 * csrf: add PATCH to supported methods.
 * dns: added support for configuring :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>` to set the DNS refresh rate during failures.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
+* ext_authz: added :ref:`filter_enabled RuntimeFractionalPercent flag <config_http_filters_ext_authz_runtime>` to filter.
 * ext_authz: added tracing to the HTTP client.
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
 * grpc: added :ref:`AWS IAM grpc credentials extension <envoy_api_file_envoy/config/grpc_credential/v2alpha/aws_iam.proto>` for AWS-managed xDS.
@@ -107,7 +108,6 @@ Version history
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
 * zookeeper: parse responses and emit latency stats.
-* ext_authz: added :ref:`filter_enabled RuntimeFractionalPercent flag <config_http_filters_ext_authz_runtime>` to filter.
 
 1.11.2 (October 8, 2019)
 ========================

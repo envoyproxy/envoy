@@ -90,7 +90,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
-  if (!config_->filter_enabled()) {
+  if (!config_->filterEnabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 

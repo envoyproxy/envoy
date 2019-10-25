@@ -854,7 +854,7 @@ TEST_F(HttpFilterTest, FilterDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
-// Test that filter can be disabled via the filter_enabled field.
+// Test that filter can be enabled via the filter_enabled field.
 TEST_F(HttpFilterTest, FilterEnabled) {
   initialize(R"EOF(
   grpc_service:

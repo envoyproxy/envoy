@@ -73,7 +73,7 @@ public:
 
   Http::Code statusOnError() const { return status_on_error_; }
 
-  bool filter_enabled() {
+  bool filterEnabled() {
     if (filter_enabled_default_value_.has_value()) {
       return runtime().snapshot().featureEnabled(filter_enabled_runtime_key_,
                                                  filter_enabled_default_value_.value());
