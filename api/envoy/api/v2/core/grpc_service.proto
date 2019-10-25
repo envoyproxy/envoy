@@ -23,8 +23,8 @@ import "validate/validate.proto";
 message GrpcService {
   message EnvoyGrpc {
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
-    // in the :ref:`Cluster <envoy_api_msg_Cluster>` :ref:`tls_context
-    // <envoy_api_field_Cluster.tls_context>`.
+    // in the :ref:`Cluster <envoy_api_msg_Cluster>` :ref:`transport_socket
+    // <envoy_api_field_Cluster.transport_socket>`.
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
   }
 

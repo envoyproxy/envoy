@@ -5,7 +5,6 @@
 #include "envoy/api/v2/core/protocol.pb.validate.h"
 
 #include "common/common/fmt.h"
-#include "common/config/protocol_json.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
@@ -470,7 +469,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
-  std::string json = R"EOF(
+  const std::string json = R"EOF(
 {
     "error": {
         "code": 401,

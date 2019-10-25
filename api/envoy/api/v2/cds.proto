@@ -583,15 +583,13 @@ message Cluster {
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   cluster.CircuitBreakers circuit_breakers = 10;
 
-  // The TLS configuration for connections to the upstream cluster. If no TLS
-  // configuration is specified, TLS will not be used for new connections.
+  // The TLS configuration for connections to the upstream cluster.
   //
   // .. attention::
   //
-  //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
-  //   verification.
-  auth.UpstreamTlsContext tls_context = 11;
+  //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
+  //   set, `transport_socket` takes priority.
+  auth.UpstreamTlsContext tls_context = 11 [deprecated = true];
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
@@ -717,6 +715,10 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
+  // To setup TLS, set a transport socket with name `tls` and
+  // :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` in the `typed_config`.
+  // If no transport socket configuration is specified, new connections
+  // will be set up with plaintext.
   core.TransportSocket transport_socket = 24;
 
   // The Metadata field can be used to provide additional information about the

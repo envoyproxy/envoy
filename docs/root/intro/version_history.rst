@@ -27,10 +27,12 @@ Version history
 * config: async data access for local and remote data source.
 * config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
 * config: added stat :ref:`init_fetch_timeout <config_cluster_manager_cds>`.
+* config: tls_context in Cluster and FilterChain are deprecated in favor of transport socket. See :ref:`deprecated <deprecated>` for more information.
 * csrf: add PATCH to supported methods.
 * dns: added support for configuring :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>` to set the DNS refresh rate during failures.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
 * ext_authz: added tracing to the HTTP client.
+* ext_authz: deprecate :ref:`cluster scope stats <config_http_filters_ext_authz_stats>` in favour of filter scope stats.
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
 * grpc: added :ref:`AWS IAM grpc credentials extension <envoy_api_file_envoy/config/grpc_credential/v2alpha/aws_iam.proto>` for AWS-managed xDS.
 * grpc: added :ref:`gRPC stats filter <config_http_filters_grpc_stats>` for collecting stats about gRPC calls and streaming message counts.
@@ -95,6 +97,7 @@ Version history
 * tcp_proxy: the default :ref:`idle_timeout
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
+* thrift_proxy: add support for stripping service name from method when using the multiplexed protocol.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
   certificate validation context.

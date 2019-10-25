@@ -53,7 +53,6 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/singleton:manager_impl_lib",
