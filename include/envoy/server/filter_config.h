@@ -400,7 +400,7 @@ public:
    * Create a particular http filter factory implementation. If the implementation is unable to
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
-   * @param config supplies the general Protobuf message to be marshalled into a filter-specific
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
    * configuration.
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
