@@ -91,9 +91,6 @@ message ExtAuthz {
   // is an integral percentage out of 100. For instance, a runtime key lookup returning the
   // value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
   // HUNDRED.
-  //
-  // More information on how this can be controlled via runtime can be found :ref:`here
-  // <config_http_filters_ext_authz_runtime>`.
   api.v3alpha.core.RuntimeFractionalPercent filter_enabled = 9;
 }
 
