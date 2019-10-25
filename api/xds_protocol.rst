@@ -56,7 +56,7 @@ correspondence between an xDS API and a resource type. That is:
 
 -  LDS: :ref:`envoy.api.v2.Listener <envoy_api_msg_Listener>`
 -  RDS: :ref:`envoy.api.v2.RouteConfiguration <envoy_api_msg_RouteConfiguration>`
--  VHDS: :ref:`envoy.api.v2.Vhds <envoy_api_msg_RouteConfiguration>`
+-  VHDS: :ref:`envoy.api.v2.Vhds <envoy_api_msg_VirtualHost>`
 -  CDS: :ref:`envoy.api.v2.Cluster <envoy_api_msg_Cluster>`
 -  EDS: :ref:`envoy.api.v2.ClusterLoadAssignment <envoy_api_msg_ClusterLoadAssignment>`
 -  SDS: :ref:`envoy.api.v2.Auth.Secret <envoy_api_msg_Auth.Secret>`
