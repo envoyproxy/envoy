@@ -10,7 +10,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
