@@ -208,7 +208,10 @@ envoy_cc_library(
     name = "quic_platform_mem_slice_span_impl_lib",
     srcs = ["quic_mem_slice_span_impl.cc"],
     hdrs = ["quic_mem_slice_span_impl.h"],
-    copts = ["-Wno-unused-parameter"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": ["-Wno-unused-parameter"],
+    }),
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -223,10 +226,13 @@ envoy_cc_library(
     name = "quic_platform_mem_slice_storage_impl_lib",
     srcs = ["quic_mem_slice_storage_impl.cc"],
     hdrs = ["quic_mem_slice_storage_impl.h"],
-    copts = [
-        "-Wno-error=invalid-offsetof",
-        "-Wno-unused-parameter",
-    ],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-Wno-error=invalid-offsetof",
+            "-Wno-unused-parameter",
+        ],
+    }),
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [

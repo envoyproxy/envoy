@@ -149,31 +149,10 @@ public:
   /**
    * Link the WASM code to the host-provided functions and globals, e.g. the ABI. Prior to linking,
    * the module should be loaded and the ABI callbacks registered (see above). Linking should be
-   * done once between load() and start().
+   * done once after load().
    * @param debug_name user-provided name for use in log and error messages.
-   * @param needs_emscripten whether emscripten support should be provided (e.g.
-   * _emscripten_memcpy_bigHandler). Emscripten (http://https://emscripten.org/) is
-   * a C++ WebAssembly tool chain.
    */
-  virtual void link(absl::string_view debug_name, bool needs_emscripten) PURE;
-
-  /**
-   * Set memory layout (start of dynamic heap base, etc.) in the VM.
-   * @param stack_base the location in VM memory of the stack.
-   * @param heap_base the location in VM memory of the heap.
-   * @param heap_base_ptr the location in VM memory of a location to store the heap pointer.
-   */
-  virtual void setMemoryLayout(uint64_t stack_base, uint64_t heap_base,
-                               uint64_t heap_base_pointer) PURE;
-
-  /**
-   * Initialize globals (including calling global constructors) and call the 'start' function.
-   * Prior to calling start() the module should be load()ed, ABI callbacks should be registered
-   * (registerCallback), the module link()ed, and any exported functions should be gotten
-   * (getFunction).
-   * @param vm_context a context which represents the caller: in this case Envoy itself.
-   */
-  virtual void start(Context* vm_context) PURE;
+  virtual void link(absl::string_view debug_name) PURE;
 
   /**
    * Get size of the currently allocated memory in the VM.
@@ -230,18 +209,12 @@ public:
   virtual bool setWord(uint64_t pointer, Word data) PURE;
 
   /**
-   * Make a new intrinsic module (e.g. for Emscripten support).
-   * @param name the name of the module to make.
-   */
-  virtual void makeModule(absl::string_view name) PURE;
-
-  /**
-   * Get the contents of the user section with the given name or "" if it does not exist.
-   * @param name the name of the user section to get.
-   * @return the contents of the user section (if any). The result will be empty() if there
+   * Get the contents of the custom section with the given name or "" if it does not exist.
+   * @param name the name of the custom section to get.
+   * @return the contents of the custom section (if any). The result will be empty if there
    * is no such section.
    */
-  virtual absl::string_view getUserSection(absl::string_view name) PURE;
+  virtual absl::string_view getCustomSection(absl::string_view name) PURE;
 
   /**
    * Get typed function exported by the WASM module.
