@@ -65,6 +65,7 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
    listener_added, Counter, Total listeners added (either via static config or LDS)
    listener_modified, Counter, Total listeners modified (via LDS)
    listener_removed, Counter, Total listeners removed (via LDS)
+   listener_stopped, Counter, Total listeners stopped
    listener_create_success, Counter, Total listener objects successfully added to workers
    listener_create_failure, Counter, Total failed listener object additions to workers
    total_listeners_warming, Gauge, Number of currently warming listeners

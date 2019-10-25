@@ -229,6 +229,18 @@ struct Http1Settings {
   bool accept_http_10_{false};
   // Set a default host if no Host: header is present for HTTP/1.0 requests.`
   std::string default_host_for_http_10_;
+
+  enum class HeaderKeyFormat {
+    // By default no formatting is performed, presenting all headers in lowercase (as Envoy
+    // internals normalize everything to lowercase.)
+    Default,
+    // Performs proper casing of header keys: the first and all alpha characters following a
+    // non-alphanumeric character is capitalized.
+    ProperCase,
+  };
+
+  // How header keys should be formatted when serializing HTTP/1.1 headers.
+  HeaderKeyFormat header_key_format_;
 };
 
 /**

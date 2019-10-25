@@ -103,13 +103,6 @@ public:
       }
     }
   }
-  void iterateTags(const Metric::TagIterFn& fn) const override {
-    for (const Tag& tag : tags_) {
-      if (!fn(tag)) {
-        return;
-      }
-    }
-  }
 
   TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;

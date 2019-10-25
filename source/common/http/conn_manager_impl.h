@@ -130,7 +130,7 @@ private:
     virtual void doTrailers() PURE;
     virtual const HeaderMapPtr& trailers() PURE;
     virtual void doMetadata() PURE;
-    // TODO(soya3129): make this pure when adding impl to encodefilter.
+    // TODO(soya3129): make this pure when adding impl to encoder filter.
     virtual void handleMetadataAfterHeadersCallback() PURE;
 
     // Http::StreamFilterCallbacks
@@ -653,7 +653,7 @@ private:
    */
   void doEndStream(ActiveStream& stream);
 
-  void resetAllStreams();
+  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
   void onIdleTimeout();
   void onDrainTimeout();
   void startDrainSequence();

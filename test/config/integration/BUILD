@@ -18,6 +18,7 @@ filegroup(
         "server_xds.bootstrap.yaml",
         "server_xds.cds.with_unknown_field.yaml",
         "server_xds.cds.yaml",
+        "server_xds.eds.ads_cluster.yaml",
         "server_xds.eds.with_unknown_field.yaml",
         "server_xds.eds.yaml",
         "server_xds.lds.typed_struct.yaml",

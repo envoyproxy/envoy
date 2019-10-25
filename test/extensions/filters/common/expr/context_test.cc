@@ -257,7 +257,6 @@ TEST(Context, ConnectionAttributes) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ConnectionWrapper connection(info);
   UpstreamWrapper upstream(info);
   PeerWrapper source(info, false);
@@ -273,11 +272,9 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
-  EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
   EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*upstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   const std::string tls_version = "TLSv1";
   EXPECT_CALL(*downstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -342,13 +339,6 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(679, value.value().Int64OrDie());
-  }
-
-  {
-    auto value = upstream[CelValue::CreateString(MTLS)];
-    EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsBool());
-    EXPECT_TRUE(value.value().BoolOrDie());
   }
 
   {
