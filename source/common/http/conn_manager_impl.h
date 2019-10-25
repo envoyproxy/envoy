@@ -134,7 +134,6 @@ private:
     virtual bool canContinue() PURE;
 
     virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
-
     virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
 
     virtual bool complete() PURE;
