@@ -291,6 +291,7 @@ TEST_F(AggregateClusterTest, LBContextTest) {
   EXPECT_EQ(context.metadataMatchCriteria(), nullptr);
   EXPECT_EQ(context.downstreamHeaders(), nullptr);
   EXPECT_EQ(context.upstreamSocketOptions(), nullptr);
+  EXPECT_EQ(context.upstreamTransportSocketOptions(), nullptr);
 }
 
 } // namespace Aggregate

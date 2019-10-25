@@ -82,7 +82,7 @@ private:
 
     // Upstream::LoadBalancerBase
     Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
   private:

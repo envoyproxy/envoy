@@ -60,6 +60,9 @@ public:
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
     return context_->upstreamSocketOptions();
   }
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return context_->upstreamTransportSocketOptions();
+  }
 
 private:
   Upstream::HealthyAndDegradedLoad priority_load_;
