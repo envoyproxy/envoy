@@ -104,8 +104,11 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
                   socket_address:
                     address: www.google.com
                     port_value: 443
-        tls_context:
-          sni: www.google.com
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            sni: www.google.com
 
 
 Using the Envoy Docker Image
