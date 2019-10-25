@@ -6,7 +6,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
@@ -22,7 +21,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:config_source_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -73,7 +72,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -164,9 +163,8 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
-        "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],
 )
 
@@ -186,8 +184,8 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
-        "@envoy_api//envoy/service/discovery/v2:hds_cc",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -344,6 +342,23 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "transport_socket_matcher_test",
+    srcs = ["transport_socket_matcher_test.cc"],
+    deps = [
+        "//include/envoy/api:api_interface",
+        "//source/common/config:metadata_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/upstream:transport_socket_match_lib",
+        "//source/server:transport_socket_config_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
     deps = [
@@ -425,7 +440,7 @@ envoy_cc_test_library(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 

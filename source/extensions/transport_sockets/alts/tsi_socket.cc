@@ -22,6 +22,7 @@ TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator ha
 TsiSocket::~TsiSocket() { ASSERT(!handshaker_); }
 
 void TsiSocket::setTransportSocketCallbacks(Envoy::Network::TransportSocketCallbacks& callbacks) {
+  ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
   noop_callbacks_ = std::make_unique<NoOpTransportSocketCallbacks>(callbacks);

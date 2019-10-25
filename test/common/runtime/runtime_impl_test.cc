@@ -176,8 +176,7 @@ TEST_F(DiskLoaderImplTest, All) {
   // Valid float string followed by newlines.
   EXPECT_EQ(3.141, loader_->snapshot().getDouble("file_with_double_newlines", 1.1));
 
-  bool value;
-  const SnapshotImpl* snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
+  const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
 
   // Validate that the layer name is set properly for static layers.
   EXPECT_EQ("base", snapshot->getLayers()[0]->name());
@@ -186,14 +185,18 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ("admin", snapshot->getLayers()[3]->name());
 
   // Boolean getting.
-  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
-  EXPECT_EQ(true, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
-  EXPECT_EQ(false, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
-  EXPECT_EQ(true, value);
-  // File1 is not a boolean.
-  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
+  // Lower-case boolean specification.
+  EXPECT_EQ(true, snapshot->getBoolean("file11", false));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", true));
+  // Mixed-case boolean specification.
+  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
+  // Lower-case boolean specification with leading whitespace.
+  EXPECT_EQ(true, snapshot->getBoolean("file13", true));
+  EXPECT_EQ(true, snapshot->getBoolean("file13", false));
+  // File1 is not a boolean. Should take default.
+  EXPECT_EQ(true, snapshot->getBoolean("file1", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file1", false));
 
   // Feature defaults.
   // test_feature_true is explicitly set true in runtime_features.cc
@@ -603,19 +606,22 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
 
   // Boolean getting.
-  bool value;
-  const SnapshotImpl* snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
+  const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
 
-  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
-  EXPECT_EQ(true, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
-  EXPECT_EQ(false, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
-  EXPECT_EQ(false, value);
-  // File1 is not a boolean.
-  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
-  // Neither is blah.blah
-  EXPECT_EQ(false, snapshot->getBoolean("blah.blah", value));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", true));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", false));
+
+  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
+
+  EXPECT_EQ(false, snapshot->getBoolean("file13", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file13", false));
+
+  // Not a boolean. Expect the default.
+  EXPECT_EQ(true, snapshot->getBoolean("file1", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file1", false));
+  EXPECT_EQ(true, snapshot->getBoolean("blah.blah", true));
+  EXPECT_EQ(false, snapshot->getBoolean("blah.blah", false));
 
   // Fractional percent feature enablement
   envoy::type::FractionalPercent fractional_percent;

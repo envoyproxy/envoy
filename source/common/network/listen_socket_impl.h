@@ -50,7 +50,7 @@ protected:
   SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
       : io_handle_(std::move(io_handle)), local_address_(local_address) {}
 
-  IoHandlePtr io_handle_;
+  const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
 };

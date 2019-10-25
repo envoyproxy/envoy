@@ -79,7 +79,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else if (value == UserAgent) {
       return convertHeaderEntry(headers_.value_->UserAgent());
     } else if (value == TotalSize) {
-      return CelValue::CreateInt64(info_.bytesReceived() + headers_.value_->byteSize());
+      return CelValue::CreateInt64(info_.bytesReceived() + headers_.value_->byteSize().value());
     }
   }
   return {};
@@ -142,9 +142,6 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
         upstream_host->address()->ip() != nullptr) {
       return CelValue::CreateInt64(upstream_host->address()->ip()->port());
     }
-  } else if (value == MTLS) {
-    return CelValue::CreateBool(info_.upstreamSslConnection() != nullptr &&
-                                info_.upstreamSslConnection()->peerCertificatePresented());
   }
 
   return {};

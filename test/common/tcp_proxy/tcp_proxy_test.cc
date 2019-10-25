@@ -3,10 +3,12 @@
 #include <string>
 
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
+#include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
@@ -55,7 +57,49 @@ Config constructConfigFromJson(const Json::Object& json,
   return Config(tcp_proxy, context);
 }
 
+Config constructConfigFromV2Yaml(const std::string& yaml,
+                                 Server::Configuration::FactoryContext& context) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+  return Config(tcp_proxy, context);
+}
+
 } // namespace
+
+TEST(ConfigTest, DefaultTimeout) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::hours(1), config_obj.sharedConfig()->idleTimeout().value());
+}
+
+TEST(ConfigTest, DisabledTimeout) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+idle_timeout: 0s
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_FALSE(config_obj.sharedConfig()->idleTimeout().has_value());
+}
+
+TEST(ConfigTest, CustomTimeout) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+idle_timeout: 1s
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->idleTimeout().value());
+}
 
 TEST(ConfigTest, NoRouteConfig) {
   std::string json = R"EOF(
@@ -421,8 +465,7 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_,
-                    tcpConnPoolForCluster("fake_cluster", _, _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -433,7 +476,7 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
+      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
           .WillRepeatedly(Return(nullptr));
     }
 
@@ -1199,7 +1242,7 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1221,7 +1264,7 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _, _))
+              tcpConnPoolForCluster("filter_state_cluster", _, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1241,17 +1284,54 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _, _))
-      .WillOnce(Invoke([](const std::string& cluster, Upstream::ResourcePriority,
-                          Upstream::LoadBalancerContext*,
-                          Network::TransportSocketOptionsSharedPtr transport_socket_options)
-                           -> Tcp::ConnectionPool::Instance* {
-        EXPECT_EQ(cluster, "fake_cluster");
-        EXPECT_NE(transport_socket_options, nullptr);
-        EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
-        EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
-        return nullptr;
-      }));
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+            EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
+            return nullptr;
+          }));
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
+}
+
+// Test that the tcp proxy override ALPN from FilterState if set
+TEST_F(TcpProxyRoutingTest, ApplicationProtocols) {
+  setup();
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.filterState().setData(
+      Network::ApplicationProtocols::key(),
+      std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
+  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  // Expect filter to try to open a connection to a cluster with the transport socket options with
+  // override-application-protocol
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            Network::TransportSocketOptionsSharedPtr transport_socket_options =
+                context->upstreamTransportSocketOptions();
+            EXPECT_NE(transport_socket_options, nullptr);
+            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
+            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
+            return nullptr;
+          }));
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);

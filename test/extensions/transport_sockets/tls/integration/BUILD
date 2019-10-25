@@ -29,7 +29,7 @@ envoy_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",
-        "@envoy_api//envoy/data/tap/v2alpha:transport_cc",
+        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
     ],
 )

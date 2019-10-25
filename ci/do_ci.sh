@@ -7,7 +7,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" || "$1" == "bazel.compile_time_options" ]]; then
+        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -53,6 +53,9 @@ function cp_binary_for_image_build() {
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_"$1"
   mkdir -p "${ENVOY_SRCDIR}"/build_"$1"_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
+
+  # Copy for azp which doesn't preserve permissions, creating a tar archive
+  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
 }
 
 function bazel_binary_build() {
@@ -142,12 +145,13 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan"
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan ${TEST_TARGETS}
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
   echo "Building and testing envoy-filter-example tests..."
   pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
     //:echo2_integration_test //:envoy_binary_test
   popd
   # Also validate that integration test traffic tapping (useful when debugging etc.)
@@ -157,8 +161,9 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   TAP_TMP=/tmp/tap/
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
     --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
+    --test_env=PATH="/usr/sbin:${PATH}" \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
@@ -202,15 +207,21 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
+
+  if [[ "${TEST_TARGETS}" == "//test/..." ]]; then
+    cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+    TEST_TARGETS="@envoy//test/..."
+  fi
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static --build_tag_filters=-nofips
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
-  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
+
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
@@ -234,7 +245,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh 
+  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
@@ -308,7 +319,7 @@ elif [[ "$CI_TARGET" == "fix_spelling" ]];then
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
   echo "check_spelling_pedantic..."
-  ./tools/check_spelling_pedantic.py check
+  ./tools/check_spelling_pedantic.py --mark check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."

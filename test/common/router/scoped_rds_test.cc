@@ -6,6 +6,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/grpc_mux_impl.h"
 #include "common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"
@@ -56,6 +57,10 @@ parseHttpConnectionManagerFromYaml(const std::string& config_yaml) {
 class ScopedRoutesTestBase : public testing::Test {
 protected:
   ScopedRoutesTestBase() {
+    ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(context_init_manager_));
+    ON_CALL(factory_context_, getServerFactoryContext())
+        .WillByDefault(ReturnRef(server_factory_context_));
+
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
     route_config_provider_manager_ =
         std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
@@ -84,7 +89,11 @@ protected:
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
+  NiceMock<Init::MockManager> context_init_manager_;
+  // factory_context_ is used by srds
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  // server_factory_context_ is used by rds
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   std::unique_ptr<RouteConfigProviderManager> route_config_provider_manager_;
   std::unique_ptr<ScopedRoutesConfigProviderManager> config_provider_manager_;
 
@@ -94,16 +103,21 @@ protected:
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup() {
-    InSequence s;
+    ON_CALL(factory_context_.cluster_manager_, adsMux())
+        .WillByDefault(Return(std::make_shared<::Envoy::Config::NullGrpcMuxImpl>()));
 
+    InSequence s;
     // Since factory_context_.cluster_manager_.subscription_factory_.callbacks_ is taken by the SRDS
     // subscription. We need to return a different MockSubscription here for each RDS subscription.
     // To build the map from RDS route_config_name to the RDS subscription, we need to get the
     // route_config_name by mocking start() on the Config::Subscription.
+
+    // srds subscription
     EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
                 subscriptionFromConfigSource(_, _, _, _))
         .Times(AnyNumber());
-    EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+    // rds subscription
+    EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
                 subscriptionFromConfigSource(
                     _,
                     Eq(Grpc::Common::typeUrl(
@@ -126,11 +140,10 @@ protected:
           return ret;
         }));
 
-    ON_CALL(factory_context_.init_manager_, add(_))
-        .WillByDefault(Invoke([this](const Init::Target& target) {
-          target_handles_.push_back(target.createHandle("test"));
-        }));
-    ON_CALL(factory_context_.init_manager_, initialize(_))
+    ON_CALL(context_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+      target_handles_.push_back(target.createHandle("test"));
+    }));
+    ON_CALL(context_init_manager_, initialize(_))
         .WillByDefault(Invoke([this](const Init::Watcher& watcher) {
           for (auto& handle_ : target_handles_) {
             handle_->initialize(watcher);
@@ -265,7 +278,7 @@ key:
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
-  factory_context_.init_manager_.initialize(init_watcher_);
+  context_init_manager_.initialize(init_watcher_);
   init_watcher_.expectReady().Times(2); // SRDS and RDS "foo_routes"
   EXPECT_EQ(
       1UL,
@@ -342,7 +355,7 @@ key:
 
   // Delta API.
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(anyToResource(resources, "2"), {}, "1"));
-  factory_context_.init_manager_.initialize(init_watcher_);
+  context_init_manager_.initialize(init_watcher_);
   EXPECT_EQ(
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
@@ -430,14 +443,14 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  factory_context_.init_manager_.initialize(init_watcher_);
+  context_init_manager_.initialize(init_watcher_);
   init_watcher_.expectReady().Times(
       1); // Just SRDS, RDS "foo_routes" will initialized by the noop init-manager.
-  EXPECT_EQ(factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(), 0UL);
+  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+            0UL);
 
   // Delta API.
-  EXPECT_CALL(factory_context_.init_manager_, state())
-      .WillOnce(Return(Init::Manager::State::Initialized));
+  EXPECT_CALL(context_init_manager_, state()).WillOnce(Return(Init::Manager::State::Initialized));
   EXPECT_THROW_WITH_REGEX(
       srds_subscription_->onConfigUpdate(anyToResource(resources, "2"), {}, "2"), EnvoyException,
       ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
@@ -450,7 +463,8 @@ key:
   EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
   // Scope key "x-foo-key" points to foo_routes due to partial rejection.
   pushRdsConfig("foo_routes", "111"); // Push some real route configuration.
-  EXPECT_EQ(1UL, factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value());
+  EXPECT_EQ(1UL,
+            server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -461,7 +475,7 @@ key:
 // Tests that only one resource is provided during a config update.
 TEST_F(ScopedRdsTest, InvalidDuplicateResourceSotw) {
   setup();
-  factory_context_.init_manager_.initialize(init_watcher_);
+  context_init_manager_.initialize(init_watcher_);
   init_watcher_.expectReady().Times(0);
 
   const std::string config_yaml = R"EOF(
@@ -481,10 +495,9 @@ key:
 // Tests that only one resource is provided during a config update.
 TEST_F(ScopedRdsTest, InvalidDuplicateResourceDelta) {
   setup();
-  factory_context_.init_manager_.initialize(init_watcher_);
+  context_init_manager_.initialize(init_watcher_);
   // After the above initialize, the default init_manager should return "Initialized".
-  EXPECT_CALL(factory_context_.init_manager_, state())
-      .WillOnce(Return(Init::Manager::State::Initialized));
+  EXPECT_CALL(context_init_manager_, state()).WillOnce(Return(Init::Manager::State::Initialized));
   init_watcher_.expectReady().Times(
       1); // SRDS onConfigUpdate breaks, but first foo_routes will
           // kick start if it's initialized post-Server/LDS initialization.
@@ -531,8 +544,8 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
 // config.
 TEST_F(ScopedRdsTest, ConfigDump) {
   setup();
-  factory_context_.init_manager_.initialize(init_watcher_);
-  EXPECT_CALL(factory_context_.init_manager_, state())
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_CALL(context_init_manager_, state())
       .Times(2) // There are two SRDS pushes.
       .WillRepeatedly(Return(Init::Manager::State::Initialized));
   init_watcher_.expectReady().Times(1); // SRDS only, no RDS push.

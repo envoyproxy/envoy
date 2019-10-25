@@ -1,5 +1,6 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 
+#include "extensions/quic_listeners/quiche/envoy_quic_server_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
 
 namespace Envoy {
@@ -37,10 +38,10 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
 quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& peer_address,
     quic::QuicStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
-  auto quic_connection = std::make_unique<EnvoyQuicConnection>(
-      server_connection_id, peer_address, *helper(), *alarm_factory(), *writer(),
-      /*owns_writer=*/false, quic::Perspective::IS_SERVER, quic::ParsedQuicVersionVector{version},
-      listener_config_, listener_stats_);
+  auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
+      server_connection_id, peer_address, *helper(), *alarm_factory(), writer(),
+      /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listener_config_,
+      listener_stats_);
   auto quic_session = new EnvoyQuicServerSession(
       config(), quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_);
@@ -49,7 +50,7 @@ quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
   // point.
   // TODO(danzh): change QUIC interface to pass in self address as it is already
   // known. In this way, filter chain can be retrieved at this point. But one
-  // thing to pay attention is that if the retrival fails, connection needs to
+  // thing to pay attention is that if the retrieval fails, connection needs to
   // be closed, and it should be added to time wait list instead of session map.
   connection_handler_.incNumConnections();
   return quic_session;

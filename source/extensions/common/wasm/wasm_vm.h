@@ -24,8 +24,12 @@ struct Word {
 };
 
 // Convert Word type for use by 32-bit VMs.
-template <typename T> struct ConvertWordTypeToUint32 { using type = T; };
-template <> struct ConvertWordTypeToUint32<Word> { using type = uint32_t; };
+template <typename T> struct ConvertWordTypeToUint32 {
+  using type = T; // NOLINT(readability-identifier-naming)
+};
+template <> struct ConvertWordTypeToUint32<Word> {
+  using type = uint32_t; // NOLINT(readability-identifier-naming)
+};
 
 // Convert Word-based function types for 32-bit VMs.
 template <typename F> struct ConvertFunctionTypeWordToUint32 {};
@@ -55,13 +59,14 @@ struct WasmFuncTypeHelper {};
 
 template <size_t N, class ReturnType, class ContextType, class ParamType, class... Args>
 struct WasmFuncTypeHelper<N, ReturnType, ContextType, ParamType, ReturnType(ContextType, Args...)> {
+  // NOLINTNEXTLINE(readability-identifier-naming)
   using type = typename WasmFuncTypeHelper<N - 1, ReturnType, ContextType, ParamType,
                                            ReturnType(ContextType, Args..., ParamType)>::type;
 };
 
 template <class ReturnType, class ContextType, class ParamType, class... Args>
 struct WasmFuncTypeHelper<0, ReturnType, ContextType, ParamType, ReturnType(ContextType, Args...)> {
-  using type = ReturnType(ContextType, Args...);
+  using type = ReturnType(ContextType, Args...); // NOLINT(readability-identifier-naming)
 };
 
 template <size_t N, class ReturnType, class ContextType, class ParamType>
@@ -104,10 +109,10 @@ public:
 
   virtual ~WasmVm() = default;
   /**
-   * Return the VM identifier.
-   * @return one of WasmVmValues from well_known_names.h e.g. "envoy.wasm.vm.null".
+   * Return the runtime identifier.
+   * @return one of WasmRuntimeValues from well_known_names.h (e.g. "envoy.wasm.runtime.null").
    */
-  virtual absl::string_view vm() PURE;
+  virtual absl::string_view runtime() PURE;
 
   /**
    * Whether or not the VM implementation supports cloning. Cloning is VM system dependent.
@@ -144,31 +149,10 @@ public:
   /**
    * Link the WASM code to the host-provided functions and globals, e.g. the ABI. Prior to linking,
    * the module should be loaded and the ABI callbacks registered (see above). Linking should be
-   * done once between load() and start().
+   * done once after load().
    * @param debug_name user-provided name for use in log and error messages.
-   * @param needs_emscripten whether emscripten support should be provided (e.g.
-   * _emscripten_memcpy_bigHandler). Emscripten (http://https://emscripten.org/) is
-   * a C++ WebAssembly tool chain.
    */
-  virtual void link(absl::string_view debug_name, bool needs_emscripten) PURE;
-
-  /**
-   * Set memory layout (start of dynamic heap base, etc.) in the VM.
-   * @param stack_base the location in VM memory of the stack.
-   * @param heap_base the location in VM memory of the heap.
-   * @param heap_base_ptr the location in VM memory of a location to store the heap pointer.
-   */
-  virtual void setMemoryLayout(uint64_t stack_base, uint64_t heap_base,
-                               uint64_t heap_base_pointer) PURE;
-
-  /**
-   * Initialize globals (including calling global constructors) and call the 'start' function.
-   * Prior to calling start() the module should be load()ed, ABI callbacks should be registered
-   * (registerCallback), the module link()ed, and any exported functions should be gotten
-   * (getFunction).
-   * @param vm_context a context which represents the caller: in this case Envoy itself.
-   */
-  virtual void start(Context* vm_context) PURE;
+  virtual void link(absl::string_view debug_name) PURE;
 
   /**
    * Get size of the currently allocated memory in the VM.
@@ -225,18 +209,12 @@ public:
   virtual bool setWord(uint64_t pointer, Word data) PURE;
 
   /**
-   * Make a new intrinsic module (e.g. for Emscripten support).
-   * @param name the name of the module to make.
-   */
-  virtual void makeModule(absl::string_view name) PURE;
-
-  /**
-   * Get the contents of the user section with the given name or "" if it does not exist.
-   * @param name the name of the user section to get.
-   * @return the contents of the user section (if any). The result will be empty() if there
+   * Get the contents of the custom section with the given name or "" if it does not exist.
+   * @param name the name of the custom section to get.
+   * @return the contents of the custom section (if any). The result will be empty if there
    * is no such section.
    */
-  virtual absl::string_view getUserSection(absl::string_view name) PURE;
+  virtual absl::string_view getCustomSection(absl::string_view name) PURE;
 
   /**
    * Get typed function exported by the WASM module.
@@ -317,8 +295,8 @@ struct SaveRestoreContext {
   uint32_t saved_effective_context_id_;
 };
 
-// Create a new low-level WASM VM of the give type (e.g. "envoy.wasm.vm.wavm").
-WasmVmPtr createWasmVm(absl::string_view vm);
+// Create a new low-level WASM VM using runtime of the given type (e.g. "envoy.wasm.runtime.wavm").
+WasmVmPtr createWasmVm(absl::string_view runtime);
 
 } // namespace Wasm
 } // namespace Common

@@ -74,10 +74,12 @@ public:
             }));
   }
 
-  Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) override {
-    return Http::ConnectionPool::InstancePtr{allocateConnPool_(host, options)};
+  Http::ConnectionPool::InstancePtr allocateConnPool(
+      Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsSharedPtr& transport_socket_options) override {
+    return Http::ConnectionPool::InstancePtr{
+        allocateConnPool_(host, options, transport_socket_options)};
   }
 
   Tcp::ConnectionPool::InstancePtr
@@ -108,9 +110,10 @@ public:
 
   MOCK_METHOD1(clusterManagerFromProto_,
                ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap));
-  MOCK_METHOD2(allocateConnPool_,
+  MOCK_METHOD3(allocateConnPool_,
                Http::ConnectionPool::Instance*(HostConstSharedPtr host,
-                                               Network::ConnectionSocket::OptionsSharedPtr));
+                                               Network::ConnectionSocket::OptionsSharedPtr,
+                                               Network::TransportSocketOptionsSharedPtr));
   MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromProto_,
                std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>(

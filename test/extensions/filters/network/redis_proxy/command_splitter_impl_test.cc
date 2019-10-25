@@ -408,6 +408,7 @@ TEST_F(RedisSingleServerRequestTest, MovedRedirectionSuccess) {
   EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_)))
       .WillOnce(
           DoAll(SaveArg<0>(&host_address), SaveArg<1>(&request_copy), Return(&pool_request2)));
+  EXPECT_CALL(*conn_pool_, onRedirection());
   EXPECT_TRUE(pool_callbacks_->onRedirection(moved_response));
   EXPECT_EQ(host_address, "10.1.2.3:4000");
   EXPECT_EQ(request_copy.type(), Common::Redis::RespType::Array);
@@ -510,6 +511,7 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
             }
             return &pool_request3;
           }));
+  EXPECT_CALL(*conn_pool_, onRedirection());
   EXPECT_TRUE(pool_callbacks_->onRedirection(ask_response));
   respond();
 };
@@ -845,6 +847,7 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithMovedRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
@@ -953,6 +956,7 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
@@ -1145,6 +1149,7 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithMovedRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
@@ -1216,6 +1221,7 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithAskRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
@@ -1381,6 +1387,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithMovedRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
@@ -1451,6 +1458,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithAskRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
@@ -1492,6 +1500,7 @@ public:
   }
 
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
   InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
                          store_, "redis.foo.", time_system_, true};
 };

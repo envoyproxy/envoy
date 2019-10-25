@@ -49,6 +49,7 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                      {"content-length", "25"},
@@ -112,6 +113,7 @@ TEST_F(ReverseBridgeTest, NoGrpcRequest) {
   initialize();
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/json"}, {"content-length", "10"}});
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -159,6 +161,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                      {"content-length", "25"},
@@ -218,6 +221,7 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
                                      {"content-length", "25"},
@@ -298,6 +302,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
@@ -377,6 +382,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
@@ -450,6 +456,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
   decoder_callbacks_.is_grpc_request_ = true;
 
   {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
     Http::TestHeaderMapImpl headers(
         {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
@@ -488,6 +495,124 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage,
                                      "envoy reverse bridge: upstream responded with unsupported "
                                      "content-type application/json, status code 400"));
+}
+
+// Tests that the filter passes a GRPC request through without modification because it is disabled
+// per route.
+TEST_F(ReverseBridgeTest, FilterConfigPerRouteDisabled) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute
+      filter_config_per_route;
+  filter_config_per_route.set_disabled(true);
+  FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
+
+  ON_CALL(*decoder_callbacks_.route_,
+          perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
+      .WillByDefault(testing::Return(&filterConfigPerRoute));
+
+  EXPECT_CALL(decoder_callbacks_, route()).Times(2);
+
+  Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                   {"content-length", "25"},
+                                   {":path", "/testing.ExampleService/SendData"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  // Verify that headers are unmodified.
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "25"));
+  EXPECT_THAT(headers,
+              HeaderValueOf(Http::Headers::get().Path, "/testing.ExampleService/SendData"));
+}
+
+// Tests that a gRPC is downgraded to application/x-protobuf and upgraded back
+// to gRPC when the filter is enabled per route.
+TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute
+      filter_config_per_route;
+  filter_config_per_route.set_disabled(false);
+  FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
+
+  ON_CALL(*decoder_callbacks_.route_,
+          perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
+      .WillByDefault(testing::Return(&filterConfigPerRoute));
+
+  {
+    EXPECT_CALL(decoder_callbacks_, route()).Times(2);
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                     {"content-length", "25"},
+                                     {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+  }
+
+  {
+    // We should remove the first five bytes.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("fgh", buffer.toString());
+  }
+
+  {
+    // Subsequent calls to decodeData should do nothing.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("abcdefgh", buffer.toString());
+  }
+
+  {
+    Http::TestHeaderMapImpl trailers;
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+  }
+
+  Http::TestHeaderMapImpl headers(
+      {{":status", "200"}, {"content-length", "30"}, {"content-type", "application/x-protobuf"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "35"));
+
+  {
+    // First few calls should drain the buffer
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abc", 4);
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
+    EXPECT_EQ(0, buffer.length());
+  }
+  {
+    // First few calls should drain the buffer
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("def", 4);
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
+    EXPECT_EQ(0, buffer.length());
+  }
+  {
+    // Last call should prefix the buffer with the size and insert the gRPC status into trailers.
+    Http::TestHeaderMapImpl trailers;
+    EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("ghj", 4);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+    EXPECT_EQ(17, buffer.length());
+    EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+
+    Grpc::Decoder decoder;
+    std::vector<Grpc::Frame> frames;
+    decoder.decode(buffer, frames);
+
+    EXPECT_EQ(1, frames.size());
+    EXPECT_EQ(12, frames[0].length_);
+  }
 }
 
 } // namespace

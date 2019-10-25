@@ -25,8 +25,6 @@ def envoy_copts(repository, test = False):
         # https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
         "-D_WIN32_WINNT=0x0602",
         "-DNTDDI_VERSION=0x06020000",
-        "-DCARES_STATICLIB",
-        "-DNGHTTP2_STATICLIB",
     ]
 
     return select({
@@ -77,7 +75,7 @@ def envoy_external_dep_path(dep):
 
 def envoy_linkstatic():
     return select({
-        "@envoy//bazel:asan_build": 0,
+        "@envoy//bazel:dynamic_link_tests": 0,
         "//conditions:default": 1,
     })
 

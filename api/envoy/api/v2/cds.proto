@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 44]
+// [#next-free-field: 45]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -161,7 +161,7 @@ message Cluster {
     // Optional endpoint metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
     // will use the transport socket configuration specified here.
-    // The endpoint's metadata entry in *envoy.transport_socket* is used to match
+    // The endpoint's metadata entry in *envoy.transport_socket_match* is used to match
     // against the values specified in this field.
     google.protobuf.Struct match = 2;
 
@@ -192,6 +192,7 @@ message Cluster {
 
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
+  // [#next-free-field: 8]
   message LbSubsetConfig {
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
@@ -277,7 +278,7 @@ message Cluster {
 
     // When used with locality_weight_aware, scales the weight of each locality by the ratio
     // of hosts in the subset vs hosts in the original subset. This aims to even out the load
-    // going to an individual locality if said locality is disproportionally affected by the
+    // going to an individual locality if said locality is disproportionately affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
 
@@ -351,6 +352,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
+  // [#next-free-field: 7]
   message CommonLbConfig {
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
@@ -436,6 +438,22 @@ message Cluster {
     bool close_connections_on_host_set_change = 6;
   }
 
+  message RefreshRate {
+    // Specifies the base interval between refreshes. This parameter is required and must be greater
+    // than zero and less than
+    // :ref:`max_interval <envoy_api_field_Cluster.RefreshRate.max_interval>`.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {nanos: 1000000}
+    }];
+
+    // Specifies the maximum interval between refreshes. This parameter is optional, but must be
+    // greater than or equal to the
+    // :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`  if set. The default
+    // is 10 times the :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  }
+
   reserved 12, 15;
 
   // Configuration to use different transport sockets for different endpoints.
@@ -483,7 +501,6 @@ message Cluster {
   // *transport_socket_match* set, and still send plain text traffic to the same cluster.
   //
   // TODO(incfly): add a detailed architecture doc on intended usage.
-  // [#not-implemented-hide:]
   repeated TransportSocketMatch transport_socket_matches = 43;
 
   // Supplies the name of the cluster which must be unique across all clusters.
@@ -566,18 +583,16 @@ message Cluster {
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   cluster.CircuitBreakers circuit_breakers = 10;
 
-  // The TLS configuration for connections to the upstream cluster. If no TLS
-  // configuration is specified, TLS will not be used for new connections.
+  // The TLS configuration for connections to the upstream cluster.
   //
   // .. attention::
   //
-  //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
-  //   verification.
-  auth.UpstreamTlsContext tls_context = 11;
+  //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
+  //   set, `transport_socket` takes priority.
+  auth.UpstreamTlsContext tls_context = 11 [deprecated = true];
 
-  // Additional options when handling HTTP requests. These options will be applicable to both
-  // HTTP1 and HTTP2 requests.
+  // Additional options when handling HTTP requests upstream. These options will be applicable to
+  // both HTTP1 and HTTP2 requests.
   core.HttpProtocolOptions common_http_protocol_options = 29;
 
   // Additional options when handling HTTP1 requests.
@@ -607,12 +622,26 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
-  // rate. If this setting is not specified, the value defaults to 5000ms. For
-  // cluster types other than
+  // rate. The value configured must be at least 1ms. If this setting is not specified, the
+  // value defaults to 5000ms. For cluster types other than
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration dns_refresh_rate = 16
+      [(validate.rules).duration = {gt {nanos: 1000000}}];
+
+  // If the DNS failure refresh rate is specified and the cluster type is either
+  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // this is used as the cluster’s DNS refresh rate when requests are failing. If this setting is
+  // not specified, the failure refresh rate defaults to the DNS refresh rate. For cluster types
+  // other than :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>` and
+  // :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` this setting is
+  // ignored.
+  //
+  // Note: Currently, DNS failures and empty DNS responses are not treated differently and this
+  // configuration is applied in both situations.
+  RefreshRate dns_failure_refresh_rate = 44;
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
   // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
@@ -686,6 +715,10 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
+  // To setup TLS, set a transport socket with name `tls` and
+  // :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` in the `typed_config`.
+  // If no transport socket configuration is specified, new connections
+  // will be set up with plaintext.
   core.TransportSocket transport_socket = 24;
 
   // The Metadata field can be used to provide additional information about the
@@ -770,8 +803,6 @@ message Cluster {
 //
 // To facilitate this, the config message for the top-level LB policy may include a field of
 // type LoadBalancingPolicy that specifies the child policy.
-//
-// [#proto-status: experimental]
 message LoadBalancingPolicy {
   message Policy {
     // Required. The name of the LB policy.

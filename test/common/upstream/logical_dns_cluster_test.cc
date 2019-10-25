@@ -30,6 +30,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
@@ -154,7 +155,8 @@ protected:
     resolve_timer_->invokeCallback();
 
     // Empty should not cause any change.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+    ON_CALL(random_, random()).WillByDefault(Return(6000));
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
     dns_callback_({});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
@@ -381,6 +383,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   name: name
   type: LOGICAL_DNS
   dns_refresh_rate: 4s
+  dns_failure_refresh_rate:
+    base_interval: 7s
+    max_interval: 10s
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
@@ -396,6 +401,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   name: name
   type: LOGICAL_DNS
   dns_refresh_rate: 4s
+  dns_failure_refresh_rate:
+    base_interval: 7s
+    max_interval: 10s
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set

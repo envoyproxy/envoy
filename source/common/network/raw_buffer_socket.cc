@@ -8,6 +8,7 @@ namespace Envoy {
 namespace Network {
 
 void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) {
+  ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 }
 

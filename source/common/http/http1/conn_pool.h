@@ -32,7 +32,8 @@ class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options);
+               const Network::ConnectionSocket::OptionsSharedPtr& options,
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
   ~ConnPoolImpl() override;
 
@@ -100,6 +101,7 @@ protected:
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     StreamWrapperPtr stream_wrapper_;
     Event::TimerPtr connect_timer_;
+    Stats::TimespanPtr conn_connect_ms_;
     Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
   };
@@ -116,12 +118,12 @@ protected:
   void onUpstreamReady();
   void processIdleClient(ActiveClient& client, bool delay);
 
-  Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
   std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
 };
@@ -133,8 +135,9 @@ class ProdConnPoolImpl : public ConnPoolImpl {
 public:
   ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options)
-      : ConnPoolImpl(dispatcher, host, priority, options) {}
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
