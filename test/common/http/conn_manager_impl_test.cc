@@ -3186,10 +3186,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
   std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
-  EXPECT_CALL(route1->route_entry_, noop()).WillRepeatedly(Return(false));
+  EXPECT_CALL(route1->route_entry_, fallthru()).WillRepeatedly(Return(false));
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
-  EXPECT_CALL(route2->route_entry_, noop()).WillRepeatedly(Return(false));
+  EXPECT_CALL(route2->route_entry_, fallthru()).WillRepeatedly(Return(false));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .WillOnce(Return(route1))

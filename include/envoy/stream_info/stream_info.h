@@ -218,9 +218,15 @@ public:
    */
   virtual const std::string& getRouteName() const PURE;
 
-  virtual void setNoopRouteNames(std::string name) PURE;
+  /**sets the name of the fallthru route to streamInfo
+   * @param std::string name denotes the name of the route.
+   */
+  virtual void setFallthruRouteNames(std::string name) PURE;
 
-  virtual const std::string& getNoopRouteNames() const PURE;
+  /**
+   * @return std::string& the name of the fallthru route.
+   */
+  virtual const std::string& getFallthruRouteNames() const PURE;
 
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.

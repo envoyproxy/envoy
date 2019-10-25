@@ -94,8 +94,14 @@ public:
    */
   virtual const std::string& routeName() const PURE;
 
-  virtual bool noop() const PURE;
+  /**
+   * returns true if action specified is fallthru otherwise false
+   */
+  virtual bool fallthru() const PURE;
 
+  /**
+   * returns true if routename needs to be added for fallthru route otherwise false
+   */
   virtual bool addRouteNameToStreamInfo() const PURE;
 };
 
@@ -771,8 +777,14 @@ public:
    */
   virtual const std::string& routeName() const PURE;
 
-  virtual bool noop() const PURE;
+  /**
+   * returns true if action specified is fallthru otherwise false
+   */
+  virtual bool fallthru() const PURE;
 
+  /**
+   * returns true if routename needs to be added for fallthru route otherwise false
+   */
   virtual bool addRouteNameToStreamInfo() const PURE;
 };
 
@@ -884,11 +896,12 @@ public:
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
+   * @param route_index specifies which route index to start looing for route on.
    * @return the route or nullptr if there is no matching route for the request.
    */
   virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
-                                    uint64_t random_value, uint32_t&) const PURE;
+                                    uint64_t random_value, uint32_t& route_index) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal

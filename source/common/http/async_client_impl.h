@@ -273,7 +273,7 @@ private:
     }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
-    bool noop() const override { return false; }
+    bool fallthru() const override { return false; }
     static const NullHedgePolicy hedge_policy_;
     bool addRouteNameToStreamInfo() const override { return false; }
     static const NullRateLimitPolicy rate_limit_policy_;

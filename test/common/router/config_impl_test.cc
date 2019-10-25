@@ -2710,18 +2710,18 @@ virtual_hosts:
                   ->includeAttemptCount());
 }
 
-TEST_F(RouteMatcherTest, NoopRouteAccessLog) {
+TEST_F(RouteMatcherTest, FallthruRouteAccessLog) {
   std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
     routes:
-      - name: "route-test-noop-1"
+      - name: "route-test-fallthru-1"
         match: { path: / }
-        noop: {add_route_name_to_stream_info: true} 
-      - name: "route-test-noop-2"
+        fallthru: {add_route_name_to_stream_info: true} 
+      - name: "route-test-fallthru-2"
         match: { path: / }
-        noop: {add_route_name_to_stream_info: true} 
+        fallthru: {add_route_name_to_stream_info: true} 
       - name: "route-test"
         match: { prefix: "/"}
         route:
@@ -2733,7 +2733,7 @@ virtual_hosts:
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
-    EXPECT_EQ("route-test-noop-1",
+    EXPECT_EQ("route-test-fallthru-1",
               config.route(headers, 0, route_index)->routeEntry()->routeName());
   }
 
@@ -3681,18 +3681,18 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, NoopRoute) {
+TEST_F(RouteMatcherTest, FallthruRoute) {
   std::string yaml = R"EOF(
 virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
     routes:
-      - name: "route-test-noop-1"
+      - name: "route-test-fallthru-1"
         match: { path: / }
-        noop: {} 
-      - name: "route-test-noop-2"
+        fallthru: {} 
+      - name: "route-test-fallthru-2"
         match: { path: / }
-        noop: {} 
+        fallthru: {} 
       - name: "route-test"
         match: { prefix: "/"}
         route:
@@ -3705,14 +3705,14 @@ virtual_hosts:
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    EXPECT_EQ("route-test-noop-1",
+    EXPECT_EQ("route-test-fallthru-1",
               config.route(headers, stream_info, 0, route_index)->routeEntry()->routeName());
   }
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    EXPECT_EQ("route-test-noop-2",
+    EXPECT_EQ("route-test-fallthru-2",
               config.route(headers, stream_info, 0, route_index)->routeEntry()->routeName());
   }
 
@@ -5593,16 +5593,16 @@ virtual_hosts:
 }
 
 // Test the parsing of a direct response configuration where the response body is too large.
-TEST_F(RouteConfigurationV2, OnlyNoopRoute) {
+TEST_F(RouteConfigurationV2, OnlyFallthruRoute) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
-  - name: noop
+  - name: fallthru
     domains: [example.com]
     routes:
       - match: { prefix: "/"}
         route: { cluster: www2}
-        noop: {})EOF";
+        fallthru: {})EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW(TestConfigImpl invalid_config(parseRouteConfigurationFromV2Yaml(yaml),

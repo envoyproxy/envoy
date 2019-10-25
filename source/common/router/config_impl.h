@@ -80,7 +80,7 @@ public:
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
   const std::string& routeName() const override { return route_name_; }
-  bool noop() const override { return false; }
+  bool fallthru() const override { return false; }
   bool addRouteNameToStreamInfo() const override { return false; }
 
 private:
@@ -447,7 +447,7 @@ public:
   void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
-  bool noop() const override { return has_noop_; }
+  bool fallthru() const override { return has_fallthru_; }
   bool addRouteNameToStreamInfo() const override { return add_route_name_to_stream_info_; }
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -486,7 +486,7 @@ private:
         : parent_(parent), cluster_name_(name) {}
 
     const std::string& routeName() const override { return parent_->routeName(); }
-    bool noop() const override { return false; }
+    bool fallthru() const override { return false; }
     bool addRouteNameToStreamInfo() const override { return false; }
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -606,7 +606,7 @@ private:
     }
 
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
-    bool noop() const override { return false; }
+    bool fallthru() const override { return false; }
     bool addRouteNameToStreamInfo() const override { return false; }
 
   private:
@@ -694,7 +694,7 @@ private:
   const RouteTracingConstPtr route_tracing_;
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
-  bool has_noop_;
+  bool has_fallthru_;
   bool add_route_name_to_stream_info_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;

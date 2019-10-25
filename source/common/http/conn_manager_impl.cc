@@ -2035,7 +2035,7 @@ Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::clusterInfo() {
   if (parent_.cached_route_.has_value()) {
     if (parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() &&
-        parent_.cached_route_.value()->routeEntry()->noop()) {
+        parent_.cached_route_.value()->routeEntry()->fallthru()) {
       parent_.refreshCachedRoute();
     }
   } else {
@@ -2048,7 +2048,7 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
   if (parent_.cached_route_.has_value()) {
     if (parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() &&
-        parent_.cached_route_.value()->routeEntry()->noop()) {
+        parent_.cached_route_.value()->routeEntry()->fallthru()) {
       parent_.refreshCachedRoute();
     }
   } else {

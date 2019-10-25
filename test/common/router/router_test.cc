@@ -4125,7 +4125,7 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
 }
 
 TEST_F(RouterTest, CanaryStatusTrue) {
-  EXPECT_CALL(callbacks_.route_->route_entry_, noop())
+  EXPECT_CALL(callbacks_.route_->route_entry_, fallthru())
       .WillOnce(Return(true))
       .WillOnce(Return(false));
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
@@ -4160,19 +4160,19 @@ TEST_F(RouterTest, CanaryStatusTrue) {
                 .value());
 }
 
-TEST_F(RouterTest, NoopRoutesToStreamInfo) {
-  EXPECT_CALL(callbacks_.route_->route_entry_, noop())
+TEST_F(RouterTest, FallthruRoutesToStreamInfo) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, fallthru())
       .WillOnce(Return(true))
       .WillOnce(Return(false));
 
-  std::string noop_routename = "noop-route-1";
+  std::string fallthru_routename = "fallthru-route-1";
   EXPECT_CALL(callbacks_.route_->route_entry_, routeName())
-      .WillRepeatedly(ReturnRef(noop_routename));
+      .WillRepeatedly(ReturnRef(fallthru_routename));
 
   EXPECT_CALL(callbacks_.route_->route_entry_, addRouteNameToStreamInfo()).WillOnce(Return(true));
 
-  std::string expected_routes = "noop-route-1;";
-  EXPECT_CALL(callbacks_.stream_info_, setNoopRouteNames(expected_routes));
+  std::string expected_routes = "fallthru-route-1;";
+  EXPECT_CALL(callbacks_.stream_info_, setFallthruRouteNames(expected_routes));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
 
   NiceMock<Http::MockStreamEncoder> encoder;

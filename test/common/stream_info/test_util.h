@@ -105,8 +105,8 @@ public:
     route_name_ = std::string(route_name);
   }
   const std::string& getRouteName() const override { return route_name_; }
-  void setNoopRouteNames(std::string names) override { noop_route_names_ = names; }
-  const std::string& getNoopRouteNames() const override { return noop_route_names_; }
+  void setFallthruRouteNames(std::string names) override { fallthru_route_names_ = names; }
+  const std::string& getFallthruRouteNames() const override { return fallthru_route_names_; }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
@@ -214,7 +214,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
   std::string route_name_;
-  std::string noop_route_names_;
+  std::string fallthru_route_names_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;

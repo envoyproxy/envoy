@@ -49,7 +49,7 @@ public:
   MOCK_CONST_METHOD0(responseCode, Http::Code());
   MOCK_CONST_METHOD0(responseBody, const std::string&());
   MOCK_CONST_METHOD0(routeName, const std::string&());
-  MOCK_CONST_METHOD0(noop, bool());
+  MOCK_CONST_METHOD0(fallthru, bool());
   MOCK_CONST_METHOD0(addRouteNameToStreamInfo, bool());
 };
 
@@ -332,7 +332,7 @@ public:
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
   MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
   MOCK_CONST_METHOD0(routeName, const std::string&());
-  MOCK_CONST_METHOD0(noop, bool());
+  MOCK_CONST_METHOD0(fallthru, bool());
   MOCK_CONST_METHOD0(addRouteNameToStreamInfo, bool());
 
   std::string cluster_name_{"fake_cluster"};

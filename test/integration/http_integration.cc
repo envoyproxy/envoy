@@ -446,7 +446,7 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 }
 
-void HttpIntegrationTest::testRouterNoop() {
+void HttpIntegrationTest::testRouterFallthru() {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
   static const std::string domain("direct.example.com");
@@ -468,7 +468,7 @@ void HttpIntegrationTest::testRouterNoop() {
         virtual_host->set_name(domain);
         virtual_host->add_domains(domain);
         virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
-        virtual_host->mutable_routes(0)->mutable_noop();
+        virtual_host->mutable_routes(0)->mutable_fallthru();
         virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
         virtual_host->mutable_routes(1)->mutable_direct_response()->set_status(
             static_cast<uint32_t>(status));
@@ -489,8 +489,8 @@ void HttpIntegrationTest::testRouterNoop() {
   EXPECT_EQ(body, response->body());
 }
 
-void HttpIntegrationTest::testRouterSingleNoopRoute() {
-  static const std::string domain("noop.example.com");
+void HttpIntegrationTest::testRouterSingleFallthruRoute() {
+  static const std::string domain("fallthru.example.com");
   static const std::string prefix("/");
   // static const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
@@ -509,12 +509,12 @@ void HttpIntegrationTest::testRouterSingleNoopRoute() {
         virtual_host->set_name(domain);
         virtual_host->add_domains(domain);
         virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
-        virtual_host->mutable_routes(0)->mutable_noop();
+        virtual_host->mutable_routes(0)->mutable_fallthru();
       });
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "noop.example.com");
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "fallthru.example.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 }

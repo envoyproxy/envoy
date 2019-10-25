@@ -281,9 +281,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       decorator_(parseDecorator(route)), route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
-      has_noop_(route.has_noop()),
-      add_route_name_to_stream_info_(route.has_noop() &&
-                                     route.noop().add_route_name_to_stream_info()),
+      has_fallthru_(route.has_fallthru()),
+      add_route_name_to_stream_info_(route.has_fallthru() &&
+                                     route.fallthru().add_route_name_to_stream_info()),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
                           factory_context, validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()),
@@ -673,7 +673,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
-    if (!cluster_name_.empty() || isDirectResponse() || noop()) {
+    if (!cluster_name_.empty() || isDirectResponse() || fallthru()) {
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());

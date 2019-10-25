@@ -159,7 +159,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Route {
   reserved 6;
 
@@ -180,6 +180,9 @@ message Route {
 
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
+
+    // Return an noop action
+    Noop noop = 17;
   }
 
   // The Metadata field can be used to provide additional information
@@ -1015,6 +1018,13 @@ message DirectResponseAction {
   //   :ref:`envoy_api_msg_route.Route`, :ref:`envoy_api_msg_RouteConfiguration` or
   //   :ref:`envoy_api_msg_route.VirtualHost`.
   core.DataSource body = 2;
+}
+
+message Noop {
+  // If set to true, then when this route is hit, stream info (and hence access logs)
+  // will be populated with the name of this route. Only the NOOP routes that set this
+  // flag will be added to access logs.
+  bool add_route_name_to_stream_info = 1;
 }
 
 message Decorator {

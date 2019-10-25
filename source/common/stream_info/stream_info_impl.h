@@ -133,11 +133,11 @@ struct StreamInfoImpl : public StreamInfo {
     route_name_ = std::string(route_name);
   }
 
-  void setNoopRouteNames(std::string noop_route_names) override {
-    noop_route_names_ = noop_route_names;
+  void setFallthruRouteNames(std::string fallthru_route_names) override {
+    fallthru_route_names_ = fallthru_route_names;
   }
 
-  const std::string& getNoopRouteNames() const override { return noop_route_names_; }
+  const std::string& getFallthruRouteNames() const override { return fallthru_route_names_; }
 
   const std::string& getRouteName() const override { return route_name_; }
 
@@ -250,7 +250,7 @@ struct StreamInfoImpl : public StreamInfo {
   envoy::api::v2::core::Metadata metadata_{};
   FilterStateImpl filter_state_{};
   std::string route_name_;
-  std::string noop_route_names_;
+  std::string fallthru_route_names_;
 
 private:
   uint64_t bytes_received_{};
