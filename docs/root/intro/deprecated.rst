@@ -39,6 +39,9 @@ Version 1.12.0 (pending)
   has been deprecated in favor of the `traffic_direction` field in
   :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
   specified.
+* The `tls_context` field in :ref:`Filter chain <envoy_api_field_listener.FilterChain.tls_context>` message
+  and :ref:`Cluster <envoy_api_field_Cluster.tls_context>` message have been deprecated in favor of
+  `transport_socket` with name `envoy.transport_sockets.tls`. The latter takes priority if specified.
 * The `use_http2` field in
   :ref:`HTTP health checker <envoy_api_msg_core.HealthCheck.HttpHealthCheck>` has been deprecated in
   favor of the `codec_client_type` field.
