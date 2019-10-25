@@ -45,6 +45,7 @@ message AccessLog {
   }
 }
 
+// [#next-free-field: 12]
 message AccessLogFilter {
   oneof filter_specifier {
     option (validate.required) = true;
@@ -199,6 +200,7 @@ message ResponseFlagFilter {
         in: "URX"
         in: "SI"
         in: "IH"
+        in: "DPE"
       }
     }
   }];

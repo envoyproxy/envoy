@@ -12,10 +12,9 @@ binary program restarts. The metrics are tracked as:
 In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are passed from parent to child in an RPC protocol.
 They were previously held in shared memory, which imposed various restrictions.
-Unlike the shared memory implementation, the RPC passing *requires special indication
-in source/common/stats/stat_merger.cc when simple addition is not appropriate for
-combining two instances of a given stat*.
-
+Unlike the shared memory implementation, the RPC passing *requires a mode-bit specified
+when constructing gauges indicating whether it should be accumulated across hot-restarts*.
+    
 ## Performance and Thread Local Storage
 
 A key tenant of the Envoy architecture is high performance on machines with
@@ -80,7 +79,8 @@ followed.
 
 Stat names are replicated in several places in various forms.
 
- * Held with the stat values, in `HeapStatData`
+ * Held with the stat values, in `CounterImpl` and `GaugeImpl`, which are defined in
+   [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/allocator_impl.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -90,7 +90,7 @@ Stat names are replicated in several places in various forms.
 
 There are stat maps in `ThreadLocalStore` for capturing all stats in a scope,
 and each per-thread caches. However, they don't duplicate the stat names.
-Instead, they reference the `char*` held in the `HeapStatData` itself, and thus
+Instead, they reference the `StatName` held in the `CounterImpl` or `GaugeImpl`, and thus
 are relatively cheap; effectively those maps are all pointer-to-pointer.
 
 For this to be safe, cache lookups from locally scoped strings must use `.find`
@@ -120,36 +120,49 @@ etc, must explicitly store partial stat-names their class instances, which later
 can be composed dynamically at runtime in order to fully elaborate counters,
 gauges, etc, without taking symbol-table locks, via `SymbolTable::join()`.
 
+### `StatNamePool` and `StatNameSet`
+
+These two helper classes evolved to make it easy to deploy the symbol table API
+across the codebase.
+
+`StatNamePool` provides pooled allocation for any number of
+`StatName` objects, and is intended to be held in a data structure alongside the
+`const StatName` member variables. Most names should be established during
+process initializion or in response to xDS updates.
+
+`StatNameSet` provides some associative lookups at runtime, using two maps: a
+static map and a dynamic map.
+
 ### Current State and Strategy To Deploy Symbol Tables
 
-As of April 1, 2019, there are a fairly large number of files that directly
-lookup stats by name, e.g. via `Stats::Scope::counter(const std::string&)` in
-the request path. In most cases, this runtime lookup concatenates the scope name
-with a string literal or other request-dependent token to form the stat name, so
-it is not possible to fully memoize the stats at startup; there must be a
-runtime name lookup.
+As of September 5, 2019, the symbol table API has been integrated into the
+production code, using a temporary ["fake" symbol table
+implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h). This
+fake has enabled us to incrementally transform the codebase to pre-symbolize
+names as much as possible, avoiding contention in the hot-path.
 
-If a PR is issued that changes the underlying representation of a stat name to
-be a symbol table entry then each stat-name will need to be transformed
-whenever names are looked up, which would add CPU overhead and lock contention
-in the request-path, violating one of the principles of Envoy's [threading
-model](https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310). Before
-issuing such a PR we need to first iterate through the codebase memoizing the
-symbols that are used to form stat-names.
+There are no longer any explicit production calls to create counters
+or gauges directly from a string via `Stats::Scope::counter(const
+std::string&)`, though they are ubiquitous in tests. There is also a
+`check_format` protection against reintroducting production calls to
+`counter()`.
 
-To resolve this chicken-and-egg challenge of switching to symbol-table stat-name
-representation without suffering a temporary loss of performance, we employ a
-["fake" symbol table
-implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h).
-This implemenation uses elaborated strings as an underlying representation, but
-implements the same API as the ["real"
-implemention](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h).
-The underlying string representation means that there is minimal runtime
-overhead compared to the current state. But once all stat-allocation call-sites
-have been converted to use the abstract [SymbolTable
-API](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/symbol_table.h),
-the real implementation can be swapped in, the space savings realized, and the
-fake implementation deleted.
+However, there are still several ways to create hot-path contention
+looking up stats by name, and there is no bulletproof way to prevent it from
+occurring.
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests.
+ * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
+   made in the hot path.
+
+It is difficult to search for those scenarios in the source code or prevent them
+with a format-check, but we can determine whether symbol-table lookups are
+occurring during via an admin endpoint that shows 20 recent lookups by name, at
+`ENVOY_HOST:ADMIN_PORT/stats?recentlookups`. This works only when real symbol
+tables are enabled, via command-line option `--use-fake-symbol-table 0`.
+
+Once we are confident we've removed all hot-path symbol-table lookups, ideally
+through usage of real symbol tables in production, examining that endpoint, we
+can enable real symbol tables by default.
 
 ## Tags and Tag Extraction
 
@@ -158,3 +171,32 @@ TBD
 ## Disabling statistics by substring or regex
 
 TBD
+
+## Stats Memory Tests
+
+Regardless of the underlying data structures used to implement statistics,
+memory usage will grow with the number of hosts and clusters. When a PR is
+issued that adds new per-host or per-cluster stats, this will have a
+multiplicative effect on consumed memory. This can become significant for
+deployments with O(10k) clusters or hosts.
+
+To improve visibility for this memory growth, there are [memory-usage
+integration
+tests](https://github.com/envoyproxy/envoy/blob/master/test/integration/stats_integration_test.cc).
+
+If a PR fails the tests in that file due to unexpected memory consumption, it
+gives the author and reviewer an opportunity to consider the cost/value of the
+new stats. If the test fails because the new byte-count is lower, then all
+that's needed is to lock in the improvement by updating the expected values. If
+the new per-cluster or per-host memory consumption is higher, then we must
+decide whether the value from the added stats justify the overhead for all Envoy
+deployments. In either case, we must update the golden values and add a comment
+to the table in the test indicating the memory impact of each PR.
+
+Developers trying to can iterate through changes in these tests locally with:
+
+```bash
+  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true \
+      test/integration:stats_integration_test
+```
+

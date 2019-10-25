@@ -30,8 +30,8 @@ namespace Event {
  */
 // clang-format off
 #define ALL_DISPATCHER_STATS(HISTOGRAM)                                                            \
-  HISTOGRAM(loop_duration_us)                                                                      \
-  HISTOGRAM(poll_delay_us)
+  HISTOGRAM(loop_duration_us, Microseconds)                                                        \
+  HISTOGRAM(poll_delay_us, Microseconds)
 // clang-format on
 
 /**

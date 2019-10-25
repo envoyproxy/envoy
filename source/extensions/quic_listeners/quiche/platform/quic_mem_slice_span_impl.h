@@ -18,7 +18,7 @@ namespace quic {
 
 // Implements the interface required by
 // https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/quic_mem_slice_span.h
-// Wraps a Buffer::Instance and deliver its data with mininum number of copies.
+// Wraps a Buffer::Instance and deliver its data with minimum number of copies.
 class QuicMemSliceSpanImpl {
 public:
   QuicMemSliceSpanImpl() : buffer_(nullptr) {}

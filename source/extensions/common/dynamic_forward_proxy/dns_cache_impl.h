@@ -45,6 +45,7 @@ public:
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
+  absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;

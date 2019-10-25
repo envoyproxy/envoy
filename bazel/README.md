@@ -44,7 +44,6 @@ for how to update or override dependencies.
     sudo apt-get install \
        libtool \
        cmake \
-       clang-format-8 \
        automake \
        autoconf \
        make \
@@ -56,7 +55,18 @@ for how to update or override dependencies.
 
     On Fedora (maybe also other red hat distros), run the following:
     ```
-    dnf install cmake libtool libstdc++ ninja-build lld patch aspell-en
+    dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
+    ```
+
+    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).
+    Extract the tar.xz and run the following:
+    ```
+    bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
+    ```
+
+    This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
+    ```
+    echo "build --config=clang" >> user.bazelrc
     ```
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
@@ -65,13 +75,13 @@ for how to update or override dependencies.
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
-    XCode is also required to build Envoy on macOS.
-    Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
-    Apple LLVM version 9.1.0 (clang-902.0.30).
+    Xcode is also required to build Envoy on macOS.
+    Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
+    Apple clang version 11.0.0 (clang-1100.0.33.8).
 
     In order for bazel to be aware of the tools installed by brew, the PATH
     variable must be set for bazel builds. This can be accomplished by setting
-    this in your `$HOME/.bazelrc` file:
+    this in your `user.bazelrc` file:
 
     ```
     build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
@@ -145,10 +155,10 @@ bazel build --config=libc++ //source/exe:envoy-static
 ```
 Note: this assumes that both: clang compiler and libc++ library are installed in the system,
 and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
-include them in the search path, e.g. `export PATH=/usr/lib/llvm-8/bin:$PATH`.
+include them in the search path, e.g. `export PATH=/usr/lib/llvm-9/bin:$PATH`.
 
 You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
-might look like `sudo apt-get install libc++abi-8-dev libc++-8-dev`.
+might look like `sudo apt-get install libc++abi-9-dev libc++-9-dev`.
 
 Note: this configuration currently doesn't work with Remote Execution or Docker sandbox.
 
@@ -590,14 +600,13 @@ to run clang-format scripts on your workstation directly:
  * Type-ahead doesn't always work when waiting running a command through docker
 
 To run the tools directly, you must install the correct version of clang. This
-may change over time but as of June 2019,
-[clang+llvm-8.0.0](https://releases.llvm.org/download.html) works well. You must
+may change over time, check the version of clang in the docker image. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-8.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 

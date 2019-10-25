@@ -79,7 +79,7 @@ void SdsApi::initialize() {
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
       sds_config_,
       Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), stats_,
-      *this, /*is_delta=*/false);
+      *this);
   subscription_->start({sds_config_name_});
 }
 
