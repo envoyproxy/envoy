@@ -651,7 +651,7 @@ TEST_F(ZooKeeperFilterTest, CreateRequestPersistentSequential) {
                config_->stats().create_resp_);
 }
 
-TEST_F(ZooKeeperFilterTest, CreateRequestEphemeral) { testCreate(CreateFlags::EPHEMERAL); }
+TEST_F(ZooKeeperFilterTest, CreateRequestEphemeral) { testCreate(CreateFlags::Ephemeral); }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestEphemeralSequential) {
   testCreate(CreateFlags::EphemeralSequential);
@@ -746,7 +746,7 @@ TEST_F(ZooKeeperFilterTest, DeleteRequest) {
 TEST_F(ZooKeeperFilterTest, ExistsRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::EXISTS));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::Exists));
 
   testRequest(data,
               {{{"opname", "exists"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}}},
@@ -758,7 +758,7 @@ TEST_F(ZooKeeperFilterTest, ExistsRequest) {
 TEST_F(ZooKeeperFilterTest, GetAclRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GETACL));
+  Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GetAcl));
 
   testRequest(data, {{{"opname", "getacl"}, {"path", "/foo"}}, {{"bytes", "20"}}},
               config_->stats().getacl_rq_, 20);

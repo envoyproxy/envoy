@@ -67,12 +67,12 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
           state_ = State::FhFlag;
         } else {
           frame_.data_ = std::make_unique<Buffer::OwnedImpl>();
-          state_ = State::DATA;
+          state_ = State::Data;
         }
         mem++;
         j++;
         break;
-      case State::DATA:
+      case State::Data:
         uint64_t remain_in_buffer = slice.len_ - j;
         uint64_t remain_in_frame = frame_.length_ - frame_.data_->length();
         if (remain_in_buffer <= remain_in_frame) {
@@ -108,42 +108,42 @@ uint64_t FrameInspector::decode(const Buffer::Instance& data) {
     for (uint64_t j = 0; j < slice.len_;) {
       uint8_t c = *mem;
       switch (state_) {
-      case State::FH_FLAG:
+      case State::FhFlag:
         count_ += 1;
         delta += 1;
-        state_ = State::FH_LEN_0;
+        state_ = State::FhLen0;
         mem++;
         j++;
         break;
-      case State::FH_LEN_0:
+      case State::FhLen0:
         length_ = static_cast<uint32_t>(c) << 24;
-        state_ = State::FH_LEN_1;
+        state_ = State::FhLen1;
         mem++;
         j++;
         break;
-      case State::FH_LEN_1:
+      case State::FhLen1:
         length_ |= static_cast<uint32_t>(c) << 16;
-        state_ = State::FH_LEN_2;
+        state_ = State::FhLen2;
         mem++;
         j++;
         break;
-      case State::FH_LEN_2:
+      case State::FhLen2:
         length_ |= static_cast<uint32_t>(c) << 8;
-        state_ = State::FH_LEN_3;
+        state_ = State::FhLen3;
         mem++;
         j++;
         break;
-      case State::FH_LEN_3:
+      case State::FhLen3:
         length_ |= static_cast<uint32_t>(c);
         if (length_ == 0) {
-          state_ = State::FH_FLAG;
+          state_ = State::FhFlag;
         } else {
-          state_ = State::DATA;
+          state_ = State::Data;
         }
         mem++;
         j++;
         break;
-      case State::DATA:
+      case State::Data:
         uint64_t remain_in_buffer = slice.len_ - j;
         if (remain_in_buffer <= length_) {
           mem += remain_in_buffer;
@@ -155,7 +155,7 @@ uint64_t FrameInspector::decode(const Buffer::Instance& data) {
           length_ = 0;
         }
         if (length_ == 0) {
-          state_ = State::FH_FLAG;
+          state_ = State::FhFlag;
         }
         break;
       }

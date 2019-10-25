@@ -106,7 +106,7 @@ public:
   State state() const { return state_; }
 
 private:
-  State state_{State::FH_FLAG};
+  State state_{State::FhFlag};
   uint32_t length_{0};
   uint64_t count_{0};
 };
