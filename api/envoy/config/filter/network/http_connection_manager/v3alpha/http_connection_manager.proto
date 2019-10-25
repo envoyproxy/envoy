@@ -23,7 +23,7 @@ import "validate/validate.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 36]
+// [#next-free-field: 36]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -83,6 +83,7 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
+  // [#next-free-field: 8]
   message Tracing {
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
@@ -141,7 +142,7 @@ message HttpConnectionManager {
     bool unix_sockets = 1;
   }
 
-  // [#comment:next free field: 7]
+  // [#next-free-field: 7]
   message SetCurrentClientCertDetails {
     reserved 2;
 
@@ -337,7 +338,7 @@ message HttpConnectionManager {
   // .. NOTE::
   //    To be useful in avoiding the race condition described above, this timeout must be set
   //    to *at least* <max round trip time expected between clients and Envoy>+<100ms to account for
-  //    a reasonsable "worst" case processing time for a full iteration of Envoy's event loop>.
+  //    a reasonable "worst" case processing time for a full iteration of Envoy's event loop>.
   //
   // .. WARNING::
   //    A value of 0 will completely disable delayed close processing. When disabled, the downstream
@@ -472,6 +473,7 @@ message ScopedRouteConfigurationsList {
       [(validate.rules).repeated = {min_items: 1}];
 }
 
+// [#next-free-field: 6]
 message ScopedRoutes {
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
   // keys are matched against a set of

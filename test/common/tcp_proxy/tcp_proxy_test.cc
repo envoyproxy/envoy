@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
@@ -56,7 +57,49 @@ Config constructConfigFromJson(const Json::Object& json,
   return Config(tcp_proxy, context);
 }
 
+Config constructConfigFromV2Yaml(const std::string& yaml,
+                                 Server::Configuration::FactoryContext& context) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+  return Config(tcp_proxy, context);
+}
+
 } // namespace
+
+TEST(ConfigTest, DefaultTimeout) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::hours(1), config_obj.sharedConfig()->idleTimeout().value());
+}
+
+TEST(ConfigTest, DisabledTimeout) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+idle_timeout: 0s
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_FALSE(config_obj.sharedConfig()->idleTimeout().has_value());
+}
+
+TEST(ConfigTest, CustomTimeout) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+idle_timeout: 1s
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::seconds(1), config_obj.sharedConfig()->idleTimeout().value());
+}
 
 TEST(ConfigTest, NoRouteConfig) {
   std::string json = R"EOF(

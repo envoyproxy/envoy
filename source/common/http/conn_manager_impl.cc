@@ -63,7 +63,7 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   // match, then we must be processing a new filter for the first time. We omit this check if we're
   // the first filter, since the above check handles that case.
   //
-  // We compare against the previous filter to avoid multiple filter iterations from reseting the
+  // We compare against the previous filter to avoid multiple filter iterations from resetting the
   // pointer: If we just set latest to current, then the first onData filter iteration would
   // correctly iterate over the filters and set latest, but on subsequent onData iterations
   // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
@@ -270,7 +270,7 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
 
   // In the protocol error case, we need to reset all streams now. The connection might stick around
   // long enough for a pending stream to come back and try to encode.
-  resetAllStreams();
+  resetAllStreams(StreamInfo::ResponseFlag::DownstreamProtocolError);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
@@ -359,7 +359,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManagerImpl::resetAllStreams() {
+void ConnectionManagerImpl::resetAllStreams(
+    absl::optional<StreamInfo::ResponseFlag> response_flag) {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
     // about to close the connection and will disable further reads, it is possible that flushing
@@ -372,6 +373,9 @@ void ConnectionManagerImpl::resetAllStreams() {
     auto& stream = *streams_.front();
     stream.response_encoder_->getStream().removeCallbacks(stream);
     stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
+    if (response_flag.has_value()) {
+      stream.stream_info_.setResponseFlag(response_flag.value());
+    }
   }
 }
 
@@ -407,7 +411,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
-    resetAllStreams();
+    resetAllStreams(absl::nullopt);
   }
 }
 
@@ -1302,7 +1306,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_id_);
+      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;

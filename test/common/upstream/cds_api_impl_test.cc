@@ -32,9 +32,9 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
 protected:
-  void setup(bool is_delta = false) {
+  void setup() {
     envoy::api::v2::core::ConfigSource cds_config;
-    cds_ = CdsApiImpl::create(cds_config, is_delta, cm_, store_, validation_visitor_);
+    cds_ = CdsApiImpl::create(cds_config, cm_, store_, validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
@@ -180,7 +180,7 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
 TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
   {
     InSequence s;
-    setup(true);
+    setup();
   }
   EXPECT_CALL(initialized_, ready());
 

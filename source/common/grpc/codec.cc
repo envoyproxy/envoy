@@ -98,5 +98,71 @@ bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   return true;
 }
 
+uint64_t FrameInspector::decode(const Buffer::Instance& data) {
+  uint64_t count = data.getRawSlices(nullptr, 0);
+  STACK_ARRAY(slices, Buffer::RawSlice, count);
+  data.getRawSlices(slices.begin(), count);
+  uint64_t delta = 0;
+  for (const Buffer::RawSlice& slice : slices) {
+    uint8_t* mem = reinterpret_cast<uint8_t*>(slice.mem_);
+    for (uint64_t j = 0; j < slice.len_;) {
+      uint8_t c = *mem;
+      switch (state_) {
+      case State::FH_FLAG:
+        count_ += 1;
+        delta += 1;
+        state_ = State::FH_LEN_0;
+        mem++;
+        j++;
+        break;
+      case State::FH_LEN_0:
+        length_ = static_cast<uint32_t>(c) << 24;
+        state_ = State::FH_LEN_1;
+        mem++;
+        j++;
+        break;
+      case State::FH_LEN_1:
+        length_ |= static_cast<uint32_t>(c) << 16;
+        state_ = State::FH_LEN_2;
+        mem++;
+        j++;
+        break;
+      case State::FH_LEN_2:
+        length_ |= static_cast<uint32_t>(c) << 8;
+        state_ = State::FH_LEN_3;
+        mem++;
+        j++;
+        break;
+      case State::FH_LEN_3:
+        length_ |= static_cast<uint32_t>(c);
+        if (length_ == 0) {
+          state_ = State::FH_FLAG;
+        } else {
+          state_ = State::DATA;
+        }
+        mem++;
+        j++;
+        break;
+      case State::DATA:
+        uint64_t remain_in_buffer = slice.len_ - j;
+        if (remain_in_buffer <= length_) {
+          mem += remain_in_buffer;
+          j += remain_in_buffer;
+          length_ -= remain_in_buffer;
+        } else {
+          mem += length_;
+          j += length_;
+          length_ = 0;
+        }
+        if (length_ == 0) {
+          state_ = State::FH_FLAG;
+        }
+        break;
+      }
+    }
+  }
+  return delta;
+}
+
 } // namespace Grpc
 } // namespace Envoy

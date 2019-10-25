@@ -55,12 +55,10 @@ public:
       Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
-                         bool is_delta) override {
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(
         lds_config, server_.clusterManager(), server_.initManager(), server_.stats(),
-        server_.listenerManager(), server_.messageValidationContext().dynamicValidationVisitor(),
-        is_delta);
+        server_.listenerManager(), server_.messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -101,6 +99,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
+  COUNTER(listener_stopped)                                                                        \
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
   GAUGE(total_listeners_warming, NeverImport)
@@ -125,15 +124,15 @@ public:
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::api::v2::Listener& config, const std::string& version_info,
                            bool added_via_api) override;
-  void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta) override {
+  void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
     ASSERT(lds_api_ == nullptr);
-    lds_api_ = factory_.createLdsApi(lds_config, is_delta);
+    lds_api_ = factory_.createLdsApi(lds_config);
   }
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
   uint64_t numConnections() override;
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
-  void stopListeners() override;
+  void stopListeners(StopListenersType stop_listeners_type) override;
   void stopWorkers() override;
   Http::Context& httpContext() { return server_.httpContext(); }
 
@@ -161,6 +160,14 @@ private:
     // restart.
     stats_.total_listeners_warming_.set(warming_listeners_.size());
     stats_.total_listeners_active_.set(active_listeners_.size());
+  }
+  bool listenersStopped(const envoy::api::v2::Listener& config) {
+    // Currently all listeners in a given direction are stopped because of the way admin
+    // drain_listener functionality is implemented. This needs to be revisited, if that changes - if
+    // we support drain by listener name,for example.
+    return stop_listeners_type_ == StopListenersType::All ||
+           (stop_listeners_type_ == StopListenersType::InboundOnly &&
+            config.traffic_direction() == envoy::api::v2::core::TrafficDirection::INBOUND);
   }
 
   /**
@@ -191,6 +198,7 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
+  absl::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;

@@ -55,7 +55,7 @@ protected:
   }
 
   SocketPtr createServerSocket(bool bind) {
-    // Set IP_FREEBIND to allow sendmsg to send with nonlocal IPv6 source address.
+    // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
     return std::make_unique<NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>>(
         Network::Test::getAnyAddress(version_),
 #ifdef IP_FREEBIND
@@ -314,7 +314,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   client_socket_ = createClientSocket(false);
 
   // When the `receive` system call returns an error, we expect the `onReceiveError`
-  // callback callwed with `SyscallError` parameter.
+  // callback called with `SyscallError` parameter.
   const std::string first("first");
   const void* void_pointer = static_cast<const void*>(first.c_str());
   Buffer::RawSlice first_slice{const_cast<void*>(void_pointer), first.length()};

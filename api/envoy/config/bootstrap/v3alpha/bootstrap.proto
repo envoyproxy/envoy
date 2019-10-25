@@ -28,6 +28,7 @@ import "validate/validate.proto";
 // <config_overview_v2_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
+// [#next-free-field: 20]
 message Bootstrap {
   message StaticResources {
     // Static :ref:`Listeners <envoy_api_msg_api.v3alpha.Listener>`. These listeners are
@@ -259,6 +260,7 @@ message Runtime {
   google.protobuf.Struct base = 4;
 }
 
+// [#next-free-field: 6]
 message RuntimeLayer {
   // :ref:`Disk runtime <config_runtime_local_disk>` layer.
   message DiskLayer {

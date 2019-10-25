@@ -16,6 +16,7 @@ import "validate/validate.proto";
 
 // Delay specification is used to inject latency into the
 // HTTP/gRPC/Mongo/Redis operation or delay proxying of TCP connections.
+// [#next-free-field: 6]
 message FaultDelay {
   enum FaultDelayType {
     // Unused and deprecated.
