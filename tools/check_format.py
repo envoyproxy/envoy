@@ -8,6 +8,7 @@ import functools
 import multiprocessing
 import os
 import os.path
+import pathlib
 import re
 import subprocess
 import stat
@@ -159,22 +160,18 @@ UNOWNED_EXTENSIONS = {
 def replaceLines(path, line_xform):
   # We used to use fileinput in the older Python 2.7 script, but this doesn't do
   # inplace mode and UTF-8 in Python 3, so doing it the manual way.
-  with open(path, encoding='utf-8', mode='r') as f:
-    output_lines = [line_xform(line) for line in f]
-  with open(path, encoding='utf-8', mode='w') as f:
-    f.write(''.join(output_lines))
+  output_lines = [line_xform(line) for line in readLines(path)]
+  pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
 
 
 # Obtain all the lines in a given file.
 def readLines(path):
-  with open(path, encoding='utf-8', mode='r') as f:
-    return f.readlines()
+  return readFile(path).split('\n')
 
 
 # Read a UTF-8 encoded file as a str.
 def readFile(path):
-  with open(path, encoding='utf-8', mode='r') as f:
-    return f.read()
+  return pathlib.Path(path).read_text(encoding='utf-8')
 
 
 # lookPath searches for the given executable in all directories in PATH
