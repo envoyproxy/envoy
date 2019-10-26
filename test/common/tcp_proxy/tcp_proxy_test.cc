@@ -1334,7 +1334,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 }
 
 // Test TCP proxy use source IP to hash.
-TEST_F(TcpProxyRoutingTest, HashWithSourceIp) {
+TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(HashWithSourceIp)) {
   setup();
   initializeFilter();
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
