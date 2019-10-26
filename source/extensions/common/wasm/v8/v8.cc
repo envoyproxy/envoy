@@ -570,7 +570,7 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
   *function = [func, function_name](Context* context, Args... args) -> void {
     wasm::Val params[] = {makeVal(args)...};
     ENVOY_LOG(trace, "[host->vm] {}({})", function_name, printValues(params, sizeof...(Args)));
-    SaveRestoreContext _saved_context(context);
+    SaveRestoreContext saved_context(context);
     auto trap = func->call(params, nullptr);
     if (trap) {
       throw WasmException(
@@ -597,9 +597,9 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
   }
   *function = [func, function_name](Context* context, Args... args) -> R {
     wasm::Val params[] = {makeVal(args)...};
-    ENVOY_LOG(trace, "[host->vm] {}({})", function_name, printValues(params, sizeof...(Args)));
-    SaveRestoreContext _saved_context(context);
     wasm::Val results[1];
+    ENVOY_LOG(trace, "[host->vm] {}({})", function_name, printValues(params, sizeof...(Args)));
+    SaveRestoreContext saved_context(context);
     auto trap = func->call(params, results);
     if (trap) {
       throw WasmException(
