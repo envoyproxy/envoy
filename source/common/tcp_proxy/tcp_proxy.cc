@@ -56,7 +56,7 @@ Config::SharedConfig::SharedConfig(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)) {
+      stats_(generateStats(*stats_scope_)), hash_with_source_ip_(config.hash_with_source_ip()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {

@@ -338,6 +338,29 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   }
 }
 
+TEST(ConfigTest, HashWithSourceIpConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  hash_with_source_ip: true
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_TRUE(config_obj.sharedConfig()->hashWithSourceIp());
+}
+
+TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_FALSE(config_obj.sharedConfig()->hashWithSourceIp());
+}
+
 TEST(ConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
@@ -1151,6 +1174,7 @@ public:
     const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fallback_cluster
+    hash_with_source_ip: true
     deprecated_v1:
       routes:
       - destination_ports: 1-9999
@@ -1305,6 +1329,25 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
+}
+
+// Test TCP proxy use source IP to hash.
+TEST_F(TcpProxyRoutingTest, HashWithSourceIp) {
+  setup();
+  initializeFilter();
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            EXPECT_TRUE(context->computeHashKey().has_value());
+            return nullptr;
+          }));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222);
 
   filter_->onNewConnection();
 }

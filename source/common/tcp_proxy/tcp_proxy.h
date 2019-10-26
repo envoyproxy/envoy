@@ -74,6 +74,7 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+    bool hashWithSourceIp() const { return hash_with_source_ip_; }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -84,6 +85,7 @@ public:
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
+    const bool hash_with_source_ip_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -194,6 +196,15 @@ public:
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return config_->metadataMatchCriteria();
+  }
+
+  // Upstream::LoadBalancerContext
+  absl::optional<uint64_t> computeHashKey() override {
+    if (config_->sharedConfig()->hashWithSourceIp() && downstreamConnection() &&
+        downstreamConnection()->remoteAddress()->ip()) {
+      return HashUtil::xxHash64(downstreamConnection()->remoteAddress()->ip()->addressAsString());
+    }
+    return {};
   }
 
   const Network::Connection* downstreamConnection() const override {
