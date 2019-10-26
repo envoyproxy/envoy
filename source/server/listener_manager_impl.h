@@ -178,6 +178,15 @@ private:
   void drainListener(ListenerImplPtr&& listener);
 
   /**
+   * Stop a listener. The listener will stop accepting new connections and its socket will be
+   * closed.
+   * @param listener supplies the listener to stop.
+   * @param completion supplies the completion to be called when the socket has been closed. This
+   * completion is called on the main thread.
+   */
+  void stopListener(Network::ListenerConfig& listener, std::function<void()> completion);
+
+  /**
    * Get a listener by name. This routine is used because listeners have inherent order in static
    * configuration and especially for tests. Thus, we can't use a map.
    * @param listeners supplies the listener list to look in.

@@ -67,6 +67,9 @@ protected:
               return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
                                                                                        context);
             }));
+    ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
+      return listener_tag_++;
+    }));
 
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
@@ -217,6 +220,7 @@ protected:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
+  uint64_t listener_tag_{1};
 };
 
 } // namespace Server

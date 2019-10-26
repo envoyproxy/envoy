@@ -109,13 +109,6 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  EXPECT_THROW_WITH_REGEX(
-      Network::TcpListenSocket(
-          Network::Utility::getAddressWithPort(
-              *Network::Test::getCanonicalLoopbackAddress(GetParam()), http_port),
-          nullptr, true),
-      EnvoyException, "Address already in use");
-
   // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
@@ -136,10 +129,11 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   // Validate that the listeners have been stopped.
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 
-  Network::TcpListenSocket socket(
+  // Validate that port is closed and can be bound by other sockets.
+  EXPECT_NO_THROW(Network::TcpListenSocket(
       Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                            http_port),
-      nullptr, true);
+      nullptr, true));
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
