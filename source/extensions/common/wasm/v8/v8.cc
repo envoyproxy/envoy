@@ -447,11 +447,11 @@ absl::optional<absl::string_view> V8::getMemory(uint64_t pointer, uint64_t size)
 bool V8::getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) {
   ENVOY_LOG(trace, "getMemoryOffset({})", host_pointer);
   ASSERT(memory_ != nullptr);
-  if (static_cast<char*>(host_pointer) >= memory_->data() ||
-      static_cast<char*>(host_pointer) <= memory_->data() + memory_->data_size()) {
+  if (static_cast<byte_t*>(host_pointer) < memory_->data() ||
+      static_cast<byte_t*>(host_pointer) >= memory_->data() + memory_->data_size()) {
     return false;
   }
-  *vm_pointer = static_cast<char*>(host_pointer) - memory_->data();
+  *vm_pointer = static_cast<byte_t*>(host_pointer) - memory_->data();
   return true;
 }
 

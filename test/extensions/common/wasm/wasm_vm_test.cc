@@ -251,6 +251,11 @@ TEST_F(WasmVmTest, V8Memory) {
 
   EXPECT_FALSE(wasm_vm->setWord(1024 * 1024 /* out of bound */, 1));
   EXPECT_FALSE(wasm_vm->getWord(1024 * 1024 /* out of bound */, &word));
+
+  uint64_t offset;
+  EXPECT_FALSE(wasm_vm->getMemoryOffset(reinterpret_cast<void*>(0), &offset));
+  EXPECT_FALSE(wasm_vm->getMemoryOffset(
+      reinterpret_cast<void*>(std::numeric_limits<uint64_t>::max()), &offset));
 }
 
 } // namespace
