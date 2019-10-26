@@ -32,6 +32,14 @@ message HttpProtocolOptions {
   //   FIN packets, etc.
   google.protobuf.Duration idle_timeout = 1;
 
+  // The maximum duration of a connection. The duration is defined as a period since a connection
+  // was established. If not set, there is no max duration. When max_connection_duration is reached
+  // the connection will be closed. Drain sequence will occur prior to closing the connection if
+  // if's applicable. See :ref:`drain_timeout
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.drain_timeout>`.
+  // Note: not implemented for upstream connections.
+  google.protobuf.Duration max_connection_duration = 3;
+
   // The maximum number of headers. If unconfigured, the default
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
