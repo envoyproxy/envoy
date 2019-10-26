@@ -182,20 +182,20 @@ TEST_F(WasmVmTest, V8BadModuleFunctions) {
   wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm->link("test");
 
-  WasmCallVoid<0> func_noargs_noreturn;
-  WasmCallWord<0> func_noargs_return;
+  WasmCallVoid<1> ping;
+  WasmCallWord<3> sum;
 
-  wasm_vm->getFunction("nonexistent", &func_noargs_noreturn);
-  EXPECT_TRUE(func_noargs_noreturn == nullptr);
+  wasm_vm->getFunction("nonexistent", &ping);
+  EXPECT_TRUE(ping == nullptr);
 
-  wasm_vm->getFunction("nonexistent", &func_noargs_return);
-  EXPECT_TRUE(func_noargs_return == nullptr);
+  wasm_vm->getFunction("nonexistent", &sum);
+  EXPECT_TRUE(sum == nullptr);
 
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("ping", &func_noargs_noreturn), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("ping", &sum), WasmVmException,
                             "Bad function signature for: ping");
 
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("ping", &func_noargs_return), WasmVmException,
-                            "Bad function signature for: ping");
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("sum", &ping), WasmVmException,
+                            "Bad function signature for: sum");
 }
 
 TEST_F(WasmVmTest, V8FunctionCalls) {
