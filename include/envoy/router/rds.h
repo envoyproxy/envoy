@@ -63,7 +63,7 @@ public:
    * if VHDS isn't configured)
    */
   virtual void requestVirtualHostsUpdate(const std::string& for_domain,
-                                         std::function<void()> route_config_updated_cb) PURE;
+                                         const std::function<void()>& route_config_updated_cb) PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;

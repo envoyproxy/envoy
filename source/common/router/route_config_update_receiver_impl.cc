@@ -57,7 +57,6 @@ void RouteConfigUpdateReceiverImpl::initializeVhosts(
   }
 }
 
-// returns true if one or more virtual hosts have been removed from vhosts
 void RouteConfigUpdateReceiverImpl::removeVhosts(
     std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
@@ -66,7 +65,6 @@ void RouteConfigUpdateReceiverImpl::removeVhosts(
   }
 }
 
-// returns true if vhosts have been added or updated.
 void RouteConfigUpdateReceiverImpl::updateVhosts(
     std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {

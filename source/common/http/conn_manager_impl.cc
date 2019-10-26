@@ -482,7 +482,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    const HeaderString& host, std::function<void()> route_config_updated_cb) {
+    const HeaderString& host, const std::function<void()>& route_config_updated_cb) {
   ASSERT(!host.empty());
   auto host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
   route_config_provider_->requestVirtualHostsUpdate(host_header, route_config_updated_cb);
@@ -1360,7 +1360,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 }
 
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
-    std::function<void()> route_config_updated_cb) {
+    const std::function<void()>& route_config_updated_cb) {
   route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
                                                            route_config_updated_cb);
 }
@@ -2258,7 +2258,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
-    std::function<void()> route_config_updated_cb) {
+    const std::function<void()>& route_config_updated_cb) {
   parent_.requestRouteConfigUpdate(route_config_updated_cb);
 }
 

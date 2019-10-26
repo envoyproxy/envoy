@@ -370,7 +370,7 @@ private:
 
     void requestDataDrained();
 
-    void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb) override;
+    void requestRouteConfigUpdate(const std::function<void()>& route_config_updated_cb) override;
     bool canRequestRouteConfigUpdate() override;
     bool canResolveRouteAfterConfigUpdate() override;
 
@@ -472,7 +472,7 @@ private:
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestRouteConfigUpdate(const HeaderString&, std::function<void()>) {
+    virtual void requestRouteConfigUpdate(const HeaderString&, const std::function<void()>&) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
     virtual bool canRequestRouteConfigUpdate() { return false; }
@@ -483,7 +483,7 @@ private:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
     void requestRouteConfigUpdate(const HeaderString& host,
-                                  std::function<void()> route_config_updated_cb) override;
+                                  const std::function<void()>& route_config_updated_cb) override;
     bool canRequestRouteConfigUpdate() override;
 
   private:
@@ -614,7 +614,7 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
-    void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb);
+    void requestRouteConfigUpdate(const std::function<void()>& route_config_updated_cb);
     bool canRequestRouteConfigUpdate();
     bool canResolveRouteAfterConfigUpdate();
 

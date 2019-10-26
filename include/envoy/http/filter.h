@@ -442,7 +442,7 @@ public:
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to the worker thread.
    */
-  virtual void requestRouteConfigUpdate(std::function<void()> route_config_updated_cb) PURE;
+  virtual void requestRouteConfigUpdate(const std::function<void()>& route_config_updated_cb) PURE;
 
   /**
    *

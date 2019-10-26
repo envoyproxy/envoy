@@ -80,7 +80,9 @@ public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
 
-  void requestRouteConfigUpdate(std::function<void()>) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void requestRouteConfigUpdate(const std::function<void()>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   bool canRequestRouteConfigUpdate() override { return false; };
   bool canResolveRouteAfterConfigUpdate() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; };

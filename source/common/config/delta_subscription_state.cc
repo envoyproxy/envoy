@@ -136,19 +136,6 @@ envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInt
   request->set_type_url(type_url());
 
   if (!any_request_sent_yet_in_current_stream_) {
-    populateDiscoveryRequest(request);
-  } else {
-    populateDiscoveryRequest(request);
-  }
-
-  request.set_type_url(type_url_);
-  request.mutable_node()->MergeFrom(local_info_.node());
-  return request;
-}
-
-void DeltaSubscriptionState::populateDiscoveryRequest(
-    envoy::api::v2::DeltaDiscoveryRequest& request) {
-  if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription

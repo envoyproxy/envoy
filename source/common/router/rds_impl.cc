@@ -238,14 +238,13 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
         auto callbacks = std::dynamic_pointer_cast<ThreadLocalCallbacks>(previous)->callbacks_;
         std::vector<std::string> aliases_not_in_update;
         while (!callbacks.empty()) {
-          auto update_on_demand_callback = callbacks.front();
+          auto& update_on_demand_callback = callbacks.front();
           std::set_difference(update_on_demand_callback.aliases_.begin(),
                               update_on_demand_callback.aliases_.end(), aliases.begin(),
                               aliases.end(), std::back_inserter(aliases_not_in_update));
           if (aliases_not_in_update.empty()) {
-            callbacks.pop();
             update_on_demand_callback.cb_();
-            aliases_not_in_update.clear();
+            callbacks.pop();
           } else {
             break;
           }
@@ -263,7 +262,7 @@ void RdsRouteConfigProviderImpl::validateConfig(
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
-    const std::string& for_domain, std::function<void()> route_config_updated_cb) {
+    const std::string& for_domain, const std::function<void()>& route_config_updated_cb) {
   factory_context_.dispatcher().post(
       [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
   config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push(
