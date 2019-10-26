@@ -74,8 +74,6 @@ message Http1ProtocolOptions {
 
   // Describes how the keys for response headers should be formatted. By default, all header keys
   // are lower cased.
-  // [#not-implemented-hide:] Hiding until both request and response formatting has been
-  // implemented.
   HeaderKeyFormat header_key_format = 4;
 }
 
