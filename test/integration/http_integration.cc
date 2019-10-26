@@ -848,7 +848,8 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   if (network_backup) {
     config_helper_.addFilter(R"EOF(
   name: pause-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   }
   initialize();

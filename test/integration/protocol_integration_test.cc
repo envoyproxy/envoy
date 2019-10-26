@@ -146,7 +146,8 @@ TEST_P(ProtocolIntegrationTest, RouterRedirect) {
 TEST_P(ProtocolIntegrationTest, ComputedHealthCheck) {
   config_helper_.addFilter(R"EOF(
 name: envoy.health_check
-config:
+typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
@@ -166,7 +167,8 @@ config:
 TEST_P(ProtocolIntegrationTest, ModifyBuffer) {
   config_helper_.addFilter(R"EOF(
 name: envoy.health_check
-config:
+typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
@@ -185,7 +187,8 @@ config:
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.addFilter(R"EOF(
 name: add-trailers-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF");
   initialize();
 
@@ -500,7 +503,8 @@ TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
 // Test hitting the dynamo filter with too many request bytes to buffer. Ensure the connection
 // manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -535,7 +539,8 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 // are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   useAccessLog();
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 

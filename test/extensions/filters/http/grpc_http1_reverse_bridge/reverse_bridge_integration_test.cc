@@ -30,7 +30,8 @@ public:
     const std::string filter =
         R"EOF(
 name: envoy.filters.http.grpc_http1_reverse_bridge
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig
   content_type: application/x-protobuf
   withhold_grpc_frames: true
             )EOF";
