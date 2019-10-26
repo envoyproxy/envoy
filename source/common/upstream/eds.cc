@@ -21,6 +21,12 @@ EdsClusterImpl::EdsClusterImpl(
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
+  if (eds_config.config_source_specifier_case() ==
+      envoy::api::v2::core::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+    initialize_phase_ = InitializePhase::Primary;
+  } else {
+    initialize_phase_ = InitializePhase::Secondary;
+  }
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config,

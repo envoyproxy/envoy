@@ -143,6 +143,11 @@ public:
    * @return a handle that on destruction will de-register the callbacks.
    */
   virtual AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) PURE;
+
+  /**
+   * @return all hosts currently stored in the cache.
+   */
+  virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
