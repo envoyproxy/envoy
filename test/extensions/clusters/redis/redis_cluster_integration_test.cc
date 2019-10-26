@@ -33,7 +33,8 @@ static_resources:
     filter_chains:
       filters:
         name: envoy.redis_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
           prefix_routes:
             catch_all_route:
@@ -80,8 +81,10 @@ const std::string& testConfigWithReadPolicy() {
 
 const std::string& testConfigWithAuth() {
   CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: somepassword }}
+      typed_extension_protocol_options:
+        envoy.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: somepassword }
 )EOF");
 }
 

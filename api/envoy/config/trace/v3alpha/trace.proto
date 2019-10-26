@@ -27,6 +27,10 @@ import "validate/validate.proto";
 // tracers in the future, but right now the HTTP tracer is the only one supported.
 message Tracing {
   message Http {
+    reserved 2;
+
+    reserved "config";
+
     // The name of the HTTP trace driver to instantiate. The name must match a
     // supported HTTP trace driver. Built-in trace drivers:
     //
@@ -49,8 +53,6 @@ message Tracing {
     // [#comment: TODO(marco) when XRay is implemented, uncomment the following; - :ref:`XRayConfig
     // <envoy_api_msg_config.trace.v3alpha.XRayConfig>`]
     oneof config_type {
-      google.protobuf.Struct config = 2;
-
       google.protobuf.Any typed_config = 3;
     }
   }
