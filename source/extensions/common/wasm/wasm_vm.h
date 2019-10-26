@@ -40,6 +40,30 @@ template <typename R, typename... Args> struct ConvertFunctionTypeWordToUint32<R
       typename ConvertWordTypeToUint32<Args>::type...);
 };
 
+template <typename T> inline auto convertWordToUint32(T t) { return t; }
+template <> inline auto convertWordToUint32<Word>(Word t) { return static_cast<uint32_t>(t.u64_); }
+
+// Convert a function of the form Word(Word...) to one of the form uint32_t(uint32_t...).
+template <typename F, F* fn> struct ConvertFunctionWordToUint32 {
+  static void convertFunctionWordToUint32() {}
+};
+template <typename R, typename... Args, auto (*F)(Args...)->R>
+struct ConvertFunctionWordToUint32<R(Args...), F> {
+  static typename ConvertWordTypeToUint32<R>::type
+  convertFunctionWordToUint32(typename ConvertWordTypeToUint32<Args>::type... args) {
+    return convertWordToUint32(F(std::forward<Args>(args)...));
+  }
+};
+template <typename... Args, auto (*F)(Args...)->void>
+struct ConvertFunctionWordToUint32<void(Args...), F> {
+  static void convertFunctionWordToUint32(typename ConvertWordTypeToUint32<Args>::type... args) {
+    F(std::forward<Args>(args)...);
+  }
+};
+
+#define CONVERT_FUNCTION_WORD_TO_UINT32(_f)                                                        \
+  &ConvertFunctionWordToUint32<decltype(_f), _f>::convertFunctionWordToUint32
+
 // A wrapper for a global variable within the VM.
 template <typename T> struct Global {
   virtual ~Global() = default;
@@ -95,6 +119,7 @@ template <size_t N> using WasmCallbackWord = WasmFuncType<N, Word, void*, Word>*
 // Z = void, j = uint32_t, l = int64_t, m = uint64_t
 using WasmCallback_WWl = Word (*)(void*, Word, int64_t);
 using WasmCallback_WWm = Word (*)(void*, Word, uint64_t);
+using WasmCallback_dd = double (*)(void*, double);
 
 #define FOR_ALL_WASM_VM_IMPORTS(_f)                                                                \
   _f(WasmCallbackVoid<0>) _f(WasmCallbackVoid<1>) _f(WasmCallbackVoid<2>) _f(WasmCallbackVoid<3>)  \
@@ -102,7 +127,7 @@ using WasmCallback_WWm = Word (*)(void*, Word, uint64_t);
           _f(WasmCallbackWord<2>) _f(WasmCallbackWord<3>) _f(WasmCallbackWord<4>)                  \
               _f(WasmCallbackWord<5>) _f(WasmCallbackWord<6>) _f(WasmCallbackWord<7>)              \
                   _f(WasmCallbackWord<8>) _f(WasmCallbackWord<9>) _f(WasmCallback_WWl)             \
-                      _f(WasmCallback_WWm)
+                      _f(WasmCallback_WWm) _f(WasmCallback_dd)
 
 // Wasm VM instance. Provides the low level WASM interface.
 class WasmVm : public Logger::Loggable<Logger::Id::wasm> {

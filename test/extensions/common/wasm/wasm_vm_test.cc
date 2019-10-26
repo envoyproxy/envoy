@@ -99,12 +99,21 @@ TEST(NullVmTest, NullVmMemory) {
 
 class MockHostFunctions {
 public:
-  MOCK_CONST_METHOD0(ping, void());
+  MOCK_CONST_METHOD1(pong, void(uint32_t));
 };
 
 MockHostFunctions* g_host_functions;
 
-void ping(void*) { g_host_functions->ping(); }
+void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }
+
+// pong() with wrong number of arguments.
+void bad_pong1(void*) { return; }
+
+// pong() with wrong return type.
+Word bad_pong2(void*, Word) { return 2; }
+
+// pong() with wrong argument type.
+double bad_pong3(void*, double) { return 3; }
 
 class WasmVmTest : public testing::Test {
 public:
@@ -125,15 +134,17 @@ TEST_F(WasmVmTest, V8Code) {
 
   EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.v8");
   EXPECT_FALSE(wasm_vm->cloneable());
+  EXPECT_TRUE(wasm_vm->clone() == nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
   EXPECT_TRUE(wasm_vm->load(code, false));
+
   EXPECT_THAT(wasm_vm->getCustomSection("producers"), HasSubstr("rustc"));
   EXPECT_TRUE(wasm_vm->getCustomSection("emscripten_metadata").empty());
 }
 
-TEST_F(WasmVmTest, V8MissingHostFunction) {
+TEST_F(WasmVmTest, V8BadHostFunctions) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
@@ -142,7 +153,49 @@ TEST_F(WasmVmTest, V8MissingHostFunction) {
   EXPECT_TRUE(wasm_vm->load(code, false));
 
   EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
-                            "Failed to load WASM module due to a missing import: env.ping");
+                            "Failed to load WASM module due to a missing import: env.pong");
+
+  wasm_vm->registerCallback("env", "pong", &bad_pong1, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong1));
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
+                            "Failed to load WASM module due to an import type mismatch: env.pong, "
+                            "want: i32 -> void, but host exports: void -> void");
+
+  wasm_vm->registerCallback("env", "pong", &bad_pong2, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong2));
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
+                            "Failed to load WASM module due to an import type mismatch: env.pong, "
+                            "want: i32 -> void, but host exports: i32 -> i32");
+
+  wasm_vm->registerCallback("env", "pong", &bad_pong3, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong3));
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
+                            "Failed to load WASM module due to an import type mismatch: env.pong, "
+                            "want: i32 -> void, but host exports: f64 -> f64");
+}
+
+TEST_F(WasmVmTest, V8BadModuleFunctions) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+  ASSERT_TRUE(wasm_vm != nullptr);
+
+  auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
+  EXPECT_TRUE(wasm_vm->load(code, false));
+
+  wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
+  wasm_vm->link("test");
+
+  WasmCallVoid<0> func_noargs_noreturn;
+  WasmCallWord<0> func_noargs_return;
+
+  wasm_vm->getFunction("nonexistent", &func_noargs_noreturn);
+  EXPECT_TRUE(func_noargs_noreturn == nullptr);
+
+  wasm_vm->getFunction("nonexistent", &func_noargs_return);
+  EXPECT_TRUE(func_noargs_return == nullptr);
+
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("ping", &func_noargs_noreturn), WasmVmException,
+                            "Bad function signature for: ping");
+
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("ping", &func_noargs_return), WasmVmException,
+                            "Bad function signature for: ping");
 }
 
 TEST_F(WasmVmTest, V8FunctionCalls) {
@@ -153,13 +206,13 @@ TEST_F(WasmVmTest, V8FunctionCalls) {
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
   EXPECT_TRUE(wasm_vm->load(code, false));
 
-  wasm_vm->registerCallback("env", "ping", ping, &ping);
+  wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm->link("test");
 
-  WasmCallVoid<0> start;
-  wasm_vm->getFunction("_start", &start);
-  EXPECT_CALL(*g_host_functions, ping());
-  start(nullptr /* no context */);
+  WasmCallVoid<1> ping;
+  wasm_vm->getFunction("ping", &ping);
+  EXPECT_CALL(*g_host_functions, pong(42));
+  ping(nullptr /* no context */, 42);
 
   WasmCallWord<3> sum;
   wasm_vm->getFunction("sum", &sum);
@@ -175,7 +228,7 @@ TEST_F(WasmVmTest, V8Memory) {
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
   EXPECT_TRUE(wasm_vm->load(code, false));
 
-  wasm_vm->registerCallback("env", "ping", ping, &ping);
+  wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm->link("test");
 
   EXPECT_EQ(wasm_vm->getMemorySize(), 65536 /* stack size requested at the build-time */);

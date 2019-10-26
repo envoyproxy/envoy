@@ -1,14 +1,14 @@
 // Build using:
 // $ rustc -O -C link-arg=-S -C link-arg=-zstack-size=65536 --crate-type=cdylib --target=wasm32-unknown-unknown test_rust.rs
 
-// Import "ping" function from the host environment.
+// Import "pong" function from the host environment.
 extern "C" {
-    fn ping();
+    fn pong(value: u32);
 }
 
 #[no_mangle]
-extern "C" fn _start() {
-    unsafe { ping() }
+extern "C" fn ping(value: u32) {
+    unsafe { pong(value) }
 }
 
 #[no_mangle]

@@ -403,7 +403,7 @@ void V8::link(absl::string_view debug_name) {
                 printValTypes(export_type->func()->results()));
 
       ASSERT(export_item->func() != nullptr);
-      module_functions_.emplace(name, export_item->func()->copy());
+      module_functions_.insert_or_assign(name, export_item->func()->copy());
     } break;
 
     case wasm::EXTERN_GLOBAL: {
@@ -496,7 +496,7 @@ std::unique_ptr<Global<T>> V8::registerHostGlobalImpl(absl::string_view module_n
   auto type = wasm::GlobalType::make(wasm::ValType::make(value.kind()), wasm::CONST);
   auto global = wasm::Global::make(store_.get(), type.get(), value);
   auto proxy = std::make_unique<V8ProxyForGlobal<T>>(global.get());
-  host_globals_.emplace(absl::StrCat(module_name, ".", name), std::move(global));
+  host_globals_.insert_or_assign(absl::StrCat(module_name, ".", name), std::move(global));
   return proxy;
 }
 
@@ -523,7 +523,7 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
       data.get());
   data->callback_ = std::move(func);
   data->raw_func_ = reinterpret_cast<void*>(function);
-  host_functions_.emplace(absl::StrCat(module_name, ".", function_name), std::move(data));
+  host_functions_.insert_or_assign(absl::StrCat(module_name, ".", function_name), std::move(data));
 }
 
 template <typename R, typename... Args>
@@ -550,7 +550,7 @@ void V8::registerHostFunctionImpl(absl::string_view module_name, absl::string_vi
       data.get());
   data->callback_ = std::move(func);
   data->raw_func_ = reinterpret_cast<void*>(function);
-  host_functions_.emplace(absl::StrCat(module_name, ".", function_name), std::move(data));
+  host_functions_.insert_or_assign(absl::StrCat(module_name, ".", function_name), std::move(data));
 }
 
 template <typename... Args>
