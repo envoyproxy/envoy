@@ -10,7 +10,7 @@ namespace Common {
 namespace Wasm {
 namespace V8 {
 
-std::unique_ptr<WasmVm> createVm();
+WasmVmPtr createVm();
 
 } // namespace V8
 } // namespace Wasm
