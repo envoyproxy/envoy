@@ -467,7 +467,7 @@ bool V8::setMemory(uint64_t pointer, uint64_t size, const void* data) {
 
 bool V8::getWord(uint64_t pointer, Word* word) {
   ENVOY_LOG(trace, "getWord({})", pointer);
-  auto size = sizeof(uint32_t);
+  constexpr auto size = sizeof(uint32_t);
   if (pointer + size > memory_->data_size()) {
     return false;
   }
@@ -479,7 +479,7 @@ bool V8::getWord(uint64_t pointer, Word* word) {
 
 bool V8::setWord(uint64_t pointer, Word word) {
   ENVOY_LOG(trace, "setWord({}, {})", pointer, word.u64_);
-  auto size = sizeof(uint32_t);
+  constexpr auto size = sizeof(uint32_t);
   if (pointer + size > memory_->data_size()) {
     return false;
   }
