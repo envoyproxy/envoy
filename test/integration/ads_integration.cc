@@ -87,7 +87,8 @@ envoy::api::v2::Listener AdsIntegrationTest::buildListener(const std::string& na
       filter_chains:
         filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: {}
             codec_type: HTTP2
             rds:
@@ -110,7 +111,8 @@ envoy::api::v2::Listener AdsIntegrationTest::buildRedisListener(const std::strin
       filter_chains:
         filters:
         - name: envoy.redis_proxy
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
             settings: 
               op_timeout: 1s
             stat_prefix: {}

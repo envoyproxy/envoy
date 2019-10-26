@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package envoy.config.overload.v2alpha;
+package envoy.config.overload.v3alpha;
 
 option java_outer_classname = "OverloadProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.overload.v2alpha";
+option java_package = "io.envoyproxy.envoy.config.overload.v3alpha";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -20,6 +20,10 @@ import "validate/validate.proto";
 // when triggers related to those resources fire.
 
 message ResourceMonitor {
+  reserved 2;
+
+  reserved "config";
+
   // The name of the resource monitor to instantiate. Must match a registered
   // resource monitor type. The built-in resource monitors are:
   //
@@ -31,8 +35,6 @@ message ResourceMonitor {
 
   // Configuration for the resource monitor being instantiated.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
-
     google.protobuf.Any typed_config = 3;
   }
 }
