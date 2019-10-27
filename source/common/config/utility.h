@@ -279,11 +279,6 @@ public:
                                     Protobuf::Message& out_proto);
 
   /**
-   * Return whether v1-style JSON filter config loading is allowed via 'deprecated_v1: true'.
-   */
-  static bool allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config);
-
-  /**
    * Verify any any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
    * @param name the type of filter.
