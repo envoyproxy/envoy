@@ -135,6 +135,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_nanopb_nanopb()
     _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
+    _com_github_nodejs_llhttp()
     _com_github_tencent_rapidjson()
     _com_google_absl()
     _com_google_googletest()
@@ -408,6 +409,16 @@ def _com_github_nodejs_http_parser():
     native.bind(
         name = "http_parser",
         actual = "@com_github_nodejs_http_parser//:http_parser",
+    )
+
+def _com_github_nodejs_llhttp():
+    _repository_impl(
+        name = "com_github_nodejs_llhttp",
+        build_file = "@envoy//bazel/external:llhttp.BUILD",
+    )
+    native.bind(
+        name = "llhttp",
+        actual = "@com_github_nodejs_llhttp//:llhttp",
     )
 
 def _com_google_googletest():

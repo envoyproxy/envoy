@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_binary",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -18,7 +19,10 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = ["http_parser"],
+    external_deps = [
+        "http_parser",
+        "llhttp"
+    ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
@@ -69,5 +73,15 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
+    ],
+)
+
+
+envoy_cc_binary(
+    name = "comparison",
+    srcs = ["comparison.cc"],
+    external_deps = [
+        "http_parser",
+        "llhttp"
     ],
 )

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <http_parser.h>
+#include <llhttp.h>
 
 #include <array>
 #include <cstdint>
@@ -193,7 +193,7 @@ public:
   CodecStats& stats() { return stats_; }
 
 protected:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
+  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, llhttp_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter);
 
@@ -201,10 +201,11 @@ protected:
 
   Network::Connection& connection_;
   CodecStats stats_;
-  http_parser parser_;
+  llhttp_t parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   bool handling_upgrade_{};
+  bool seen_content_length_{false};
   const HeaderKeyFormatterPtr header_key_formatter_;
 
 private:
@@ -293,7 +294,7 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
-  static http_parser_settings settings_;
+  static llhttp_settings_s settings_;
   static const ToLowerTable& toLowerTable();
 
   HeaderMapImplPtr current_header_map_;
@@ -404,7 +405,7 @@ private:
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
 
-  // The default limit of 80 KiB is the vanilla http_parser behaviour.
+  // The default limit of 80 KiB is the vanilla llhttp behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 };
 

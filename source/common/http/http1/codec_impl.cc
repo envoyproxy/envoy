@@ -1,6 +1,7 @@
 #include "common/http/http1/codec_impl.h"
 
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -256,8 +257,8 @@ void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disa
 
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
-static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
-static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
+static constexpr char RESPONSE_PREFIX[] = "HTTP/1.1 ";
+static constexpr char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   started_response_ = true;
@@ -291,7 +292,7 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
-static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
+static constexpr char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
 void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
@@ -312,32 +313,39 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
-http_parser_settings ConnectionImpl::settings_{
-    [](http_parser* parser) -> int {
+llhttp_settings_s ConnectionImpl::settings_{
+    [](llhttp_t* parser) -> int {
+      std::cout << "on_message_begin called" << std::endl;
       static_cast<ConnectionImpl*>(parser->data)->onMessageBeginBase();
       return 0;
     },
-    [](http_parser* parser, const char* at, size_t length) -> int {
+    [](llhttp_t* parser, const char* at, size_t length) -> int {
+      std::cout << "on_url called" << std::endl;
       static_cast<ConnectionImpl*>(parser->data)->onUrl(at, length);
       return 0;
     },
     nullptr, // on_status
-    [](http_parser* parser, const char* at, size_t length) -> int {
+    [](llhttp_t* parser, const char* at, size_t length) -> int {
+      std::cout << "on_header_field called" << std::endl;
       static_cast<ConnectionImpl*>(parser->data)->onHeaderField(at, length);
       return 0;
     },
-    [](http_parser* parser, const char* at, size_t length) -> int {
+    [](llhttp_t* parser, const char* at, size_t length) -> int {
+      std::cout << "on_header_value called" << std::endl;
       static_cast<ConnectionImpl*>(parser->data)->onHeaderValue(at, length);
       return 0;
     },
-    [](http_parser* parser) -> int {
+    [](llhttp_t* parser) -> int {
+      std::cout << "on_headers_complete called" << std::endl;
       return static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase();
     },
-    [](http_parser* parser, const char* at, size_t length) -> int {
+    [](llhttp_t* parser, const char* at, size_t length) -> int {
+      std::cout << "on_body called" << std::endl;
       static_cast<ConnectionImpl*>(parser->data)->onBody(at, length);
       return 0;
     },
-    [](http_parser* parser) -> int {
+    [](llhttp_t* parser) -> int {
+      std::cout << "on_message_complete called" << std::endl;
       static_cast<ConnectionImpl*>(parser->data)->onMessageCompleteBase();
       return 0;
     },
@@ -351,7 +359,7 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               http_parser_type type, uint32_t max_headers_kb,
+                               llhttp_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
@@ -362,7 +370,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       strict_header_validation_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
-  http_parser_init(&parser_, type);
+  llhttp_init(&parser_, type, &settings_);
   parser_.data = this;
 }
 
@@ -413,14 +421,15 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   }
 
   // Always unpause before dispatch.
-  http_parser_pause(&parser_, 0);
+  llhttp_resume(&parser_);
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    uint64_t num_slices = data.getRawSlices(nullptr, 0);
+    const uint64_t num_slices = data.getRawSlices(nullptr, 0);
     STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
     data.getRawSlices(slices.begin(), num_slices);
     for (const Buffer::RawSlice& slice : slices) {
+      ENVOY_CONN_LOG(trace, "dispatching a slice of {} length", connection_, slice.len_);
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {
@@ -436,17 +445,65 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
-  ssize_t rc = http_parser_execute(&parser_, &settings_, slice, len);
-  if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
-    sendProtocolError();
-    throw CodecProtocolException("http/1.1 protocol error: " +
-                                 std::string(http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
+  /*const auto rc = */llhttp_execute(&parser_, slice, len);
+
+  // If llhttp ran into an error, llhttp_get_error_pos will return a char* to where it
+  // left off, allowing us to calculate how many bytes were read. Otherwise, we assume
+  // the entire message was parsed.
+  const char* error_pos = llhttp_get_error_pos(&parser_);
+  if (llhttp_get_errno(&parser_) == HPE_PAUSED_UPGRADE) {
+    ENVOY_CONN_LOG(trace, "resuming llhttp after upgrade", connection_);
+    llhttp_resume_after_upgrade(&parser_);
   }
 
-  return rc;
+  ENVOY_CONN_LOG(trace, "len received: {}", connection_, len);
+
+  size_t return_val;
+  if (error_pos != nullptr) {
+    const auto error_pos_len = strlen(error_pos);
+    // There's some weirdness where after the buffer has been static_cast'd to a const char*, there's
+    // possibly some extra stray noise in the char* that makes strlen inaccurate. Since we know we can
+    // only parse at most `len`, if the error_pos len is greater than the slice len, we assume to truncate
+    // it.... I'm not yet sure if this is correct....
+    if (len > strlen(error_pos)) {
+      return_val = len;
+    } else {
+      return_val = len - error_pos_len;
+    }
+    ENVOY_CONN_LOG(trace, "non-null error_pos, setting return_val to {}", connection_, return_val);
+  } else {
+    return_val = len;
+    ENVOY_CONN_LOG(trace, "null error_pos, setting return_val to {}", connection_, return_val);
+  }
+
+  // std::cout << "_index: " << parser_._index << std::endl;
+  // std::cout << "error: " << parser_.error << std::endl;
+  // std::cout << "content_length: " << parser_.content_length << std::endl;
+  // std::cout << "type: " << parser_.type << std::endl;
+  // std::cout << "method: " << parser_.method << std::endl;
+  // std::cout << "http_major: " << parser_.http_major << std::endl;
+  // std::cout << "http_minor: " << parser_.http_minor << std::endl;
+  // std::cout << "header_state: " << parser_.header_state << std::endl;
+  // std::cout << "flags: " << parser_.flags << std::endl;
+  // std::cout << "upgrade: " << parser_.flags << std::endl;
+  // std::cout << "status_code: " << parser_.status_code << std::endl;
+  // std::cout << "finish: " << parser_.finish << std::endl;
+
+  if (llhttp_get_errno(&parser_) != HPE_OK && llhttp_get_errno(&parser_) != HPE_PAUSED) {
+    sendProtocolError();
+    std::cout << llhttp_get_error_reason(&parser_) << std::endl;
+    throw CodecProtocolException("http/1.1 protocol error: " +
+                                 std::string(llhttp_errno_name(llhttp_get_errno(&parser_))));
+  }
+
+  // TODO(dereka) not sure if this is right, but presumably if rc == HPE_OK then the whole
+  // thing was read?
+  // ASSERT(rc == HPE_OK);
+  return return_val;
 }
 
 void ConnectionImpl::onHeaderField(const char* data, size_t length) {
+  ENVOY_CONN_LOG(trace, "ConnectionImpl::onHeaderField", connection_);
   if (header_parsing_state_ == HeaderParsingState::Done) {
     // Ignore trailers.
     return;
@@ -460,6 +517,7 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
+  ENVOY_CONN_LOG(trace, "ConnectionImpl::onHeaderValue", connection_);
   if (header_parsing_state_ == HeaderParsingState::Done) {
     // Ignore trailers.
     return;
@@ -472,14 +530,9 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
       error_code_ = Http::Code::BadRequest;
       sendProtocolError();
+      std::cout << "throwing because !Http::HeaderUtility::headerIsValid(header_value)" << std::endl;
       throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
     }
-  } else if (header_value.find('\0') != absl::string_view::npos) {
-    // http-parser should filter for this
-    // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
-    // have an invariant that they must not contain embedded zero characters
-    // (NUL, ASCII 0x0).
-    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
@@ -493,12 +546,13 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
+    std::cout << "throwing exception because total > (max_headers_kb_ * 1024)" << std::endl;
     throw CodecProtocolException("headers size exceeds limit");
   }
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
-  ENVOY_CONN_LOG(trace, "headers complete", connection_);
+  ENVOY_CONN_LOG(trace, "ConnectionImpl::onHeadersCompleteBase", connection_);
   completeLastHeader();
   // Validate that the completed HeaderMap's cached byte size exists and is correct.
   // This assert iterates over the HeaderMap.
@@ -519,7 +573,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
       current_header_map_->removeUpgrade();
       if (current_header_map_->Connection()) {
         const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
-        std::string new_value = StringUtil::removeTokens(
+        const std::string new_value = StringUtil::removeTokens(
             current_header_map_->Connection()->value().getStringView(), ",", tokens_to_remove, ",");
         if (new_value.empty()) {
           current_header_map_->removeConnection();
@@ -534,29 +588,32 @@ int ConnectionImpl::onHeadersCompleteBase() {
     }
   }
 
-  int rc = onHeadersComplete(std::move(current_header_map_));
+  seen_content_length_ = current_header_map_->ContentLength() != nullptr;
+
+  const int rc = onHeadersComplete(std::move(current_header_map_));
   current_header_map_.reset();
   header_parsing_state_ = HeaderParsingState::Done;
 
-  // Returning 2 informs http_parser to not expect a body or further data on this connection.
+  // Returning 2 informs llhttp to not expect a body or further data on this connection.
+  std::cout << "return of onHeadersCompleteBase: " << (handling_upgrade_ ? 2 : rc) << std::endl;
   return handling_upgrade_ ? 2 : rc;
 }
 
 void ConnectionImpl::onMessageCompleteBase() {
-  ENVOY_CONN_LOG(trace, "message complete", connection_);
+  ENVOY_CONN_LOG(trace, "ConnectionImpl::onMessageCompleteBase", connection_);
   if (handling_upgrade_) {
     // If this is an upgrade request, swallow the onMessageComplete. The
     // upgrade payload will be treated as stream body.
     ASSERT(!deferred_end_stream_headers_);
     ENVOY_CONN_LOG(trace, "Pausing parser due to upgrade.", connection_);
-    http_parser_pause(&parser_, 1);
+    llhttp_pause(&parser_);
     return;
   }
   onMessageComplete();
 }
 
 void ConnectionImpl::onMessageBeginBase() {
-  ENVOY_CONN_LOG(trace, "message begin", connection_);
+  ENVOY_CONN_LOG(trace, "ConnectionImpl::onMessageBeginBase", connection_);
   // Make sure that if HTTP/1.0 and HTTP/1.1 requests share a connection Envoy correctly sets
   // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
   // in onHeadersCompleteBase
@@ -619,6 +676,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   Utility::Url absolute_url;
   if (!absolute_url.initialize(active_request_->request_url_.getStringView())) {
     sendProtocolError();
+    std::cout << "throwing because !absolute_url.initialize(active_request_->request_url_.getStringView())" << std::endl;
     throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
   // RFC7230#5.7
@@ -639,13 +697,13 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
+    const char* method_string = llhttp_method_name(static_cast<llhttp_method>(parser_.method));
 
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
     active_request_->response_encoder_.isResponseToHeadRequest(parser_.method == HTTP_HEAD);
 
-    // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
+    // Currently, CONNECT is not supported, however; llhttp_parse_url needs to know about
     // CONNECT
     handlePath(*headers, parser_.method);
     ASSERT(active_request_->request_url_.empty());
@@ -665,7 +723,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
       // so we return control to the caller.
       if (connection_.state() != Network::Connection::State::Open) {
-        http_parser_pause(&parser_, 1);
+        llhttp_pause(&parser_);
       }
 
     } else {
@@ -716,7 +774,7 @@ void ServerConnectionImpl::onMessageComplete() {
   // Always pause the parser so that the calling code can process 1 request at a time and apply
   // back pressure. However this means that the calling code needs to detect if there is more data
   // in the buffer and dispatch it again.
-  http_parser_pause(&parser_, 1);
+  llhttp_pause(&parser_);
 }
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
@@ -759,7 +817,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stat
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
       parser_.status_code == 204 || parser_.status_code == 304 ||
-      (parser_.status_code >= 200 && parser_.content_length == 0)) {
+      (parser_.status_code >= 200 && (seen_content_length_ && parser_.content_length == 0))) {
     return true;
   } else {
     return false;
@@ -807,7 +865,7 @@ int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     }
   }
 
-  // Here we deal with cases where the response cannot have a body, but http_parser does not deal
+  // Here we deal with cases where the response cannot have a body, but llhttp does not deal
   // with it for us.
   return cannotHaveBody() ? 1 : 0;
 }
@@ -817,6 +875,7 @@ void ClientConnectionImpl::onBody(const char* data, size_t length) {
   if (!pending_responses_.empty()) {
     Buffer::OwnedImpl buffer;
     buffer.add(data, length);
+    std::cout << buffer.toString() << std::endl;
     pending_responses_.front().decoder_->decodeData(buffer, false);
   }
 }
@@ -848,6 +907,7 @@ void ClientConnectionImpl::onMessageComplete() {
       response.decoder_->decodeHeaders(std::move(deferred_end_stream_headers_), true);
       deferred_end_stream_headers_.reset();
     } else {
+      // TODO(dereka) this isn't getting hit with empty buffer b/c parser is not calling this callback
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
     }
