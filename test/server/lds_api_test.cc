@@ -320,20 +320,19 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
 
   setup();
 
-  std::string response1_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
-      "name": "listener0",
-      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 61000 } },
-      "filter_chains": [ { "filters": null } ]
-    }
-  ]
-}
+  std::string response1_yaml = R"EOF(
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Listener
+  name: listener0
+  address:
+    socket_address:
+      address: tcp://0.0.0.1
+      port_value: 61000
+  filter_chains:
+  - filters: 
   )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
 
   makeListenersAndExpectCall({"listener0"});
   expectAdd("listener0", {}, true);
@@ -341,26 +340,26 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
   std::string response2_basic = R"EOF(
-{{
-  "version_info": "1",
-  "resources": [
-    {{
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
-      "name": "listener-8080",
-      "address": {{ "socket_address": {{ "address": "tcp://0.0.0.0", "port_value": 61001 }} }},
-      "filter_chains": [ {{
-        "tls_context": {{
-           "common_tls_context": {{
-             "tls_certificates": [ {{
-               "certificate_chain": {{ "filename": "{}" }},
-               "private_key": {{ "filename": "{}" }}
-              }} ]
-            }}
-        }},
-        "filters": null }} ]
-    }}
-  ]
-}}
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Listener
+  name: listener-8080
+  address:
+    socket_address:
+      address: tcp://0.0.0.0
+      port_value: 61001
+  filter_chains:
+  - transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{}"
+            private_key:
+              filename: "{}"
+    filters:
   )EOF";
   std::string response2_json =
       fmt::format(response2_basic,

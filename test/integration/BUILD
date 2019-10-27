@@ -269,6 +269,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "header_casing_integration_test",
+    srcs = [
+        "header_casing_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "http_timeout_integration_test",
     srcs = [
         "http_timeout_integration_test.cc",
