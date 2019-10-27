@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-envoy::config::filter::http::fault::v2::HTTPFault
+inline envoy::config::filter::http::fault::v2::HTTPFault
 convertYamlStrToProtoConfig(const std::string& yaml) {
   envoy::config::filter::http::fault::v2::HTTPFault fault;
   TestUtility::loadFromYaml(yaml, fault);
