@@ -219,6 +219,11 @@ TEST_F(WasmVmTest, V8FunctionCalls) {
   Word word = sum(nullptr /* no context */, 13, 14, 15);
   EXPECT_EQ(42, word.u64_);
 
+  WasmCallWord<2> div;
+  wasm_vm->getFunction("div", &div);
+  EXPECT_THROW_WITH_MESSAGE(div(nullptr /* no context */, 42, 0), WasmException,
+                            "Function: div failed: Uncaught RuntimeError: unreachable");
+
   WasmCallVoid<0> abort;
   wasm_vm->getFunction("abort", &abort);
   EXPECT_THROW_WITH_MESSAGE(abort(nullptr /* no context */), WasmException,
