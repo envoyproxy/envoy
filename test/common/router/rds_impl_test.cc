@@ -465,6 +465,52 @@ virtual_hosts:
             route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
 }
 
+TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
+  Buffer::OwnedImpl data;
+  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+  setup();
+
+  EXPECT_FALSE(provider_->configInfo().has_value());
+
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context2;
+  ON_CALL(mock_factory_context2, getServerFactoryContext())
+      .WillByDefault(ReturnRef(server_factory_context_));
+
+  // The real init suited is associated with the provider2. In production env it is the init manager
+  // provided by listener.
+  Init::WatcherImpl real_watcher("real", []() {});
+  Init::ManagerImpl real_init_manager("real");
+  auto provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds_, mock_factory_context2, "foo_prefix", real_init_manager);
+  real_init_manager.initialize(real_watcher);
+
+  // The required RDS config is not received from RDS server yet.
+  // TODO(lambdai): will be fixed by #8523
+  EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
+  EXPECT_FALSE(provider_->configInfo().has_value());
+  EXPECT_FALSE(provider2->configInfo().has_value());
+
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
+    route_configs.Add()->PackFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+name: foo_route_config
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+)EOF"));
+
+    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+        route_configs, "1");
+
+    EXPECT_TRUE(provider_->configInfo().has_value());
+    EXPECT_TRUE(provider2->configInfo().has_value());
+    EXPECT_EQ(Init::Manager::State::Initialized, real_init_manager.state());
+  }
+}
+
 // Negative test for protoc-gen-validate constraints.
 TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
   setup();
