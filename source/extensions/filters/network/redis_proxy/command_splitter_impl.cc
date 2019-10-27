@@ -21,22 +21,6 @@ namespace {
 // "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 
-// Create an asking command request.
-const Common::Redis::RespValue& askingRequest() {
-  static Common::Redis::RespValue request;
-  static bool initialized = false;
-
-  if (!initialized) {
-    Common::Redis::RespValue asking_cmd;
-    asking_cmd.type(Common::Redis::RespType::BulkString);
-    asking_cmd.asString() = "asking";
-    request.type(Common::Redis::RespType::Array);
-    request.asArray().push_back(asking_cmd);
-    initialized = true;
-  }
-  return request;
-}
-
 /**
  * Validate the received moved/ask redirection error and the original redis request.
  * @param[in] original_request supplies the incoming request associated with the command splitter
@@ -142,7 +126,8 @@ bool SingleServerRequest::onRedirection(const Common::Redis::RespValue& value) {
   // "asking" command; this is fine since the server either responds with an OK or an error message
   // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
-      !conn_pool_->makeRequestToHost(host_address, askingRequest(), null_pool_callbacks)) {
+      !conn_pool_->makeRequestToHost(
+          host_address, Common::Redis::Utility::AskingRequest::instance(), null_pool_callbacks)) {
     return false;
   }
   handle_ = conn_pool_->makeRequestToHost(host_address, *incoming_request_, *this);
@@ -295,7 +280,8 @@ bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value
   // "asking" command; this is fine since the server either responds with an OK or an error message
   // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
-      !conn_pool->makeRequestToHost(host_address, askingRequest(), null_pool_callbacks)) {
+      !conn_pool->makeRequestToHost(host_address, Common::Redis::Utility::AskingRequest::instance(),
+                                    null_pool_callbacks)) {
     return false;
   }
 
