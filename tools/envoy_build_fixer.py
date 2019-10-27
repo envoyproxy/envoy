@@ -1,59 +1,105 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-# Enforce license headers on Envoy BUILD files (maybe more later?)
+# Enforces:
+# - License headers on Envoy BUILD files
+# - envoy_package() top-level invocation for standard Envoy package setup.
+# - Infers API dependencies from source files.
+# - Misc. cleanups: avoids redundant blank lines, removes unused loads.
+# - Maybe more later?
 
-from __future__ import print_function
-
+import functools
+import os
+import re
+import subprocess
 import sys
+import tempfile
 
-LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n'
-ENVOY_PACKAGE_STRING = ('load("//bazel:envoy_build_system.bzl", "envoy_package")\n'
-                        '\n'
-                        'envoy_package()\n')
+# Where does Buildozer live?
+BUILDOZER_PATH = os.getenv('BUILDOZER_BIN', '$GOPATH/bin/buildozer')
+
+# Canonical Envoy license.
+LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
+
+# Match any existing licenses in a BUILD file.
+OLD_LICENSES_REGEX = re.compile(r'^licenses\(.*\n+', re.MULTILINE)
+
+# Match an Envoy rule, e.g. envoy_cc_library( in a BUILD file.
+ENVOY_RULE_REGEX = re.compile(r'envoy[_\w]+\(')
+
+# Match a load() statement for the envoy_package macro.
+PACKAGE_LOAD_BLOCK_REGEX = re.compile('("envoy_package".*?\)\n)', re.DOTALL)
+
+# Match Buildozer 'print' output. Example of Buildozer print output:
+# cc_library json_transcoder_filter_lib [json_transcoder_filter.cc] (missing) (missing)
+BUILDOZER_PRINT_REGEX = re.compile(
+    '\s*([\w_]+)\s*([\w_]+)\s*[(\[](.*?)[)\]]\s* [(\[](.*?)[)\]]\s*[(\[](.*?)[)\]]')
+
+# Match API header include in Envoy source file?
+API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+
+
+class EnvoyBuildFixerError(Exception):
+  pass
+
+
+# Run Buildozer commands on a string representing a BUILD file.
+def RunBuildozer(cmds, contents):
+  with tempfile.NamedTemporaryFile(mode='w') as cmd_file:
+    # We send the BUILD contents to buildozer on stdin and receive the
+    # transformed BUILD on stdout. The commands are provided in a file.
+    cmd_input = '\n'.join('%s|-:%s' % (cmd, target) for cmd, target in cmds)
+    cmd_file.write(cmd_input)
+    cmd_file.flush()
+    r = subprocess.run([BUILDOZER_PATH, '-stdout', '-f', cmd_file.name],
+                       input=contents.encode(),
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE)
+    # Buildozer uses 3 for success but no change (0 is success and changed).
+    if r.returncode != 0 and r.returncode != 3:
+      raise EnvoyBuildFixerError('buildozer execution failed: %s' % r)
+    # Sometimes buildozer feels like returning nothing when the transform is a
+    # nop.
+    if not r.stdout:
+      return contents
+    return r.stdout.decode('utf-8')
+
+
+# Add an Apache 2 license and envoy_package() import and rule as needed.
+def FixPackageAndLicense(contents):
+  # Ensure we have an envoy_package import load if this is a real Envoy package.
+  if re.search(ENVOY_RULE_REGEX, contents):
+    contents = RunBuildozer([
+        ('new_load //bazel:envoy_build_system.bzl envoy_package', '__pkg__'),
+    ], contents)
+    # Envoy package is inserted after the load block containing the
+    # envoy_package import.
+    if 'envoy_package()' not in contents:
+      contents = re.sub(PACKAGE_LOAD_BLOCK_REGEX, r'\1\nenvoy_package()\n\n', contents)
+      if 'envoy_package()' not in contents:
+        raise EnvoyBuildFixerError('Unable to insert envoy_package()')
+  # Delete old licenses.
+  if re.search(OLD_LICENSES_REGEX, contents):
+    contents = re.sub(OLD_LICENSES_REGEX, '', contents)
+  # Add canonical Apache 2 license.
+  contents = LICENSE_STRING + contents
+  return contents
+
+
+# Remove trailing blank lines, unnecessary double blank lines.
+def FixEmptyLines(contents):
+  return re.sub('\n\s*$', '\n', re.sub('\n\n\n', '\n\n', contents))
 
 
 def FixBuild(path):
   with open(path, 'r') as f:
-    outlines = [LICENSE_STRING]
-    first = True
-    in_load = False
-    seen_ebs = False
-    seen_epkg = False
-    for line in f:
-      if line.startswith('licenses'):
-        continue
-      if first:
-        if line != '\n':
-          outlines.append('\n')
-        first = False
-      if path.startswith('./bazel/external/') or path.startswith('./bazel/toolchains/'):
-        outlines.append(line)
-        continue
-      if line.startswith('package(') and not path.endswith('bazel/BUILD') and not path.endswith(
-          'ci/prebuilt/BUILD') and not path.endswith('bazel/osx/BUILD') and not path.endswith(
-              'bazel/osx/crosstool/BUILD'):
-        continue
-      if in_load == False and line.startswith('load('):
-        in_load = True
-      if in_load:
-        if 'envoy_build_system.bzl' in line:
-          seen_ebs = True
-        if 'envoy_package' in line:
-          seen_epkg = True
-        if line.rstrip().endswith(')'):
-          in_load = None  # investigate only first load() directive
-          if seen_ebs:
-            if not seen_epkg:
-              outlines.append(line.rstrip()[:-1] + ', "envoy_package")\n')
-              outlines.append('\nenvoy_package()\n')
-              continue
-          else:
-            outlines.append(line)
-            outlines.append(ENVOY_PACKAGE_STRING)
-            continue
-      outlines.append(line)
-
-  return ''.join(outlines)
+    contents = f.read()
+  xforms = [
+      FixPackageAndLicense,
+      FixEmptyLines,
+  ]
+  for xform in xforms:
+    contents = xform(contents)
+  return contents
 
 
 if __name__ == '__main__':
