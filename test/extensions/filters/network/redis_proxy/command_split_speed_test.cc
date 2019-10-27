@@ -107,7 +107,7 @@ public:
 } // namespace Extensions
 } // namespace Envoy
 //
-//static void BM_Split_Move(benchmark::State& state) {
+// static void BM_Split_Move(benchmark::State& state) {
 //  Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
 //  Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
 //      context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
@@ -116,9 +116,9 @@ public:
 //  }
 //  //  state.counters["use_count"] = request.use_count();
 //}
-//BENCHMARK(BM_Split_Move)->Ranges({{1, 100}, {64, 8 << 14}});
+// BENCHMARK(BM_Split_Move)->Ranges({{1, 100}, {64, 8 << 14}});
 //
-//static void BM_Split_Move_Local_Variant(benchmark::State& state) {
+// static void BM_Split_Move_Local_Variant(benchmark::State& state) {
 //  Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
 //  Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
 //      context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
@@ -127,7 +127,7 @@ public:
 //  }
 //  //  state.counters["use_count"] = request.use_count();
 //}
-//BENCHMARK(BM_Split_Move_Local_Variant)->Ranges({{1, 100}, {64, 8 << 14}});
+// BENCHMARK(BM_Split_Move_Local_Variant)->Ranges({{1, 100}, {64, 8 << 14}});
 
 static void BM_Split_CompositeArray(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
