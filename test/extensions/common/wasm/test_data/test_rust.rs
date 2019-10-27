@@ -15,3 +15,8 @@ extern "C" fn ping(value: u32) {
 extern "C" fn sum(a: u32, b: u32, c: u32) -> u32 {
     a + b + c
 }
+
+#[no_mangle]
+extern "C" fn abort() {
+    std::process::abort();
+}

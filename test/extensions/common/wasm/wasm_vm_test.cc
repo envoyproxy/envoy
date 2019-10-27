@@ -218,6 +218,11 @@ TEST_F(WasmVmTest, V8FunctionCalls) {
   wasm_vm->getFunction("sum", &sum);
   Word word = sum(nullptr /* no context */, 13, 14, 15);
   EXPECT_EQ(42, word.u64_);
+
+  WasmCallVoid<0> abort;
+  wasm_vm->getFunction("abort", &abort);
+  EXPECT_THROW_WITH_MESSAGE(abort(nullptr /* no context */), WasmException,
+                            "Function: abort failed: Uncaught RuntimeError: unreachable");
 }
 
 TEST_F(WasmVmTest, V8Memory) {
