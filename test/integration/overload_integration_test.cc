@@ -18,7 +18,8 @@ protected:
           nanos: 1000000
         resource_monitors:
           - name: "envoy.resource_monitors.injected_resource"
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
               filename: "{}"
         actions:
           - name: "envoy.overload_actions.stop_accepting_requests"

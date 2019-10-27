@@ -56,8 +56,8 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
   metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
                                time_source_.systemTime().time_since_epoch())
                                .count());
-  auto* gauage_metric = metric->mutable_gauge();
-  gauage_metric->set_value(gauge.value());
+  auto* gauge_metric = metric->mutable_gauge();
+  gauge_metric->set_value(gauge.value());
 }
 
 void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_histogram) {

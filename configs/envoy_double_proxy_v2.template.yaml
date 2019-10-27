@@ -8,17 +8,20 @@
   filter_chains:
   - filter_chain_match: {}
     {% if tls %}
-    tls_context:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: certs/servercert.pem
-          private_key:
-            filename: certs/serverkey.pem
-        validation_context: {}
-        alpn_protocols:
-        - h2
-        - http/1.1
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: certs/servercert.pem
+            private_key:
+              filename: certs/serverkey.pem
+          validation_context: {}
+          alpn_protocols:
+          - h2
+          - http/1.1
     {% endif %}
     {% if proxy_proto %}
     use_proxy_proto: true
@@ -126,18 +129,21 @@ static_resources:
     # with a better solution just limit the requests
     # so we can cycle and get better spread.
     max_requests_per_connection: 25000
-    tls_context:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: certs/clientcert.pem
-          private_key:
-            filename: certs/clientkey.pem
-        validation_context:
-          trusted_ca:
-            filename: certs/cacert.pem
-          verify_subject_alt_name:
-          - front-proxy.yourcompany.net
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: certs/clientcert.pem
+            private_key:
+              filename: certs/clientkey.pem
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pem
+            verify_subject_alt_name:
+            - front-proxy.yourcompany.net
     http2_protocol_options: {}
   - name: lightstep_saas
     type: LOGICAL_DNS
@@ -154,13 +160,16 @@ static_resources:
                 port_value: 443
                 protocol: TCP
     http2_protocol_options: {}
-    tls_context:
-      common_tls_context:
-        validation_context:
-          trusted_ca:
-            filename: certs/cacert.pem
-          verify_subject_alt_name:
-          - collector-grpc.lightstep.com
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pem
+            verify_subject_alt_name:
+            - collector-grpc.lightstep.com
 flags_path: "/etc/envoy/flags"
 stats_sinks:
 - name: envoy.statsd
