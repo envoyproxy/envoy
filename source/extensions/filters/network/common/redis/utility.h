@@ -19,6 +19,24 @@ public:
   static const ReadOnlyRequest& instance();
 };
 
+class AskingRequest : public Redis::RespValue {
+public:
+  AskingRequest();
+  static const AskingRequest& instance();
+};
+
+class GetRequest : public Redis::RespValue {
+public:
+  GetRequest();
+  static const GetRequest& instance();
+};
+
+class SetRequest : public Redis::RespValue {
+public:
+  SetRequest();
+  static const SetRequest& instance();
+};
+
 } // namespace Utility
 } // namespace Redis
 } // namespace Common
