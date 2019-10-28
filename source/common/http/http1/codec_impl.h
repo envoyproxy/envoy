@@ -202,6 +202,7 @@ protected:
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
+  bool processing_trailers_{};
   bool handling_upgrade_{};
 
 private:
@@ -290,11 +291,17 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
+  /**
+   * Validates that the headers available are not too big
+   */
+  void validateHeaderMapSize();
+
   static http_parser_settings settings_;
   static const ToLowerTable& toLowerTable();
 
   HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
+  HeaderParsingState trailer_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   bool reset_stream_called_{};

@@ -386,19 +386,26 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
 void ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
+
   if (!current_header_field_.empty()) {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
     current_header_map_->addViaMove(std::move(current_header_field_),
                                     std::move(current_header_value_));
   }
+
   // Check if the number of headers exceeds the limit.
-  if (current_header_map_->size() > max_headers_count_) {
+  // TODO should we check for trailers too?
+  if (!processing_trailers_ && current_header_map_->size() > max_headers_count_) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");
   }
 
-  header_parsing_state_ = HeaderParsingState::Field;
+  if (processing_trailers_) {
+    trailer_parsing_state_ = HeaderParsingState::Field;
+  } else {
+    header_parsing_state_ = HeaderParsingState::Field;
+  }
   ASSERT(current_header_field_.empty());
   ASSERT(current_header_value_.empty());
 }
@@ -464,12 +471,14 @@ size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
 }
 
 void ConnectionImpl::onHeaderField(const char* data, size_t length) {
+  ENVOY_CONN_LOG(trace, "onHeaderField: data={}", connection_, absl::string_view(data, length));
+  // We previously already finished up the headers, these headers are
+  // now trailers
   if (header_parsing_state_ == HeaderParsingState::Done) {
-    // Ignore trailers.
-    return;
+    processing_trailers_ = true;
   }
-
-  if (header_parsing_state_ == HeaderParsingState::Value) {
+  if (header_parsing_state_ == HeaderParsingState::Value ||
+      trailer_parsing_state_ == HeaderParsingState::Value) {
     completeLastHeader();
   }
 
@@ -477,14 +486,13 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
-  if (header_parsing_state_ == HeaderParsingState::Done) {
-    // Ignore trailers.
-    return;
+  ENVOY_CONN_LOG(trace, "onHeaderValue: data={}", connection_, absl::string_view(data, length));
+  if (current_header_map_.get() == nullptr) {
+    current_header_map_ = std::make_unique<HeaderMapImpl>();
   }
-
   const absl::string_view header_value = absl::string_view(data, length);
 
-  if (strict_header_validation_) {
+  if (strict_header_validation_ && !processing_trailers_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
       error_code_ = Http::Code::BadRequest;
@@ -499,10 +507,19 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 
-  header_parsing_state_ = HeaderParsingState::Value;
+  if (processing_trailers_) {
+    trailer_parsing_state_ = HeaderParsingState::Value;
+  } else {
+    header_parsing_state_ = HeaderParsingState::Value;
+  }
   current_header_value_.append(data, length);
 
+  validateHeaderMapSize();
+}
+
+void ConnectionImpl::validateHeaderMapSize() {
   // Verify that the cached value in byte size exists.
+  ASSERT(current_header_map_.get() != nullptr, "current_header_map_ is nullptr");
   ASSERT(current_header_map_->byteSize().has_value());
   const uint32_t total = current_header_field_.size() + current_header_value_.size() +
                          current_header_map_->byteSize().value();
@@ -515,13 +532,14 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
-  ENVOY_CONN_LOG(trace, "headers complete", connection_);
+  ENVOY_CONN_LOG(trace, "onHeadersCompleteBase complete", connection_);
   completeLastHeader();
+
   // Validate that the completed HeaderMap's cached byte size exists and is correct.
   // This assert iterates over the HeaderMap.
   ASSERT(current_header_map_->byteSize().has_value() &&
          current_header_map_->byteSize() == current_header_map_->byteSizeInternal());
-  if (!(parser_.http_major == 1 && parser_.http_minor == 1)) {
+  if (!(parser_.http_major == 1 && parser_.http_minor == 1) && !processing_trailers_) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
@@ -553,7 +571,12 @@ int ConnectionImpl::onHeadersCompleteBase() {
 
   int rc = onHeadersComplete(std::move(current_header_map_));
   current_header_map_.reset();
-  header_parsing_state_ = HeaderParsingState::Done;
+
+  if (processing_trailers_) {
+    trailer_parsing_state_ = HeaderParsingState::Done;
+  } else {
+    header_parsing_state_ = HeaderParsingState::Done;
+  }
 
   // Returning 2 informs http_parser to not expect a body or further data on this connection.
   return handling_upgrade_ ? 2 : rc;
@@ -561,6 +584,15 @@ int ConnectionImpl::onHeadersCompleteBase() {
 
 void ConnectionImpl::onMessageCompleteBase() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
+
+  // http_parser calls this cb after trailers are done
+  // And since trailers will end the connection, we return after
+  // onHeadersCompleteBase()
+  if (processing_trailers_) {
+    onHeadersCompleteBase();
+    return;
+  }
+
   if (handling_upgrade_) {
     // If this is an upgrade request, swallow the onMessageComplete. The
     // upgrade payload will be treated as stream body.
@@ -581,6 +613,7 @@ void ConnectionImpl::onMessageBeginBase() {
   ASSERT(!current_header_map_);
   current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
+  trailer_parsing_state_ = HeaderParsingState::Field;
   onMessageBegin();
 }
 
@@ -660,6 +693,19 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
 }
 
 int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
+  ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
+  if (processing_trailers_) {
+    ENVOY_CONN_LOG(trace, "trailers complete size={}", connection_, headers->size());
+    active_request_->request_decoder_->decodeTrailers(std::move(headers));
+
+    // If the connection has been closed (or is closing) after decoding headers, pause the parser
+    // so we return control to the caller.
+    if (connection_.state() != Network::Connection::State::Open) {
+      http_parser_pause(&parser_, 1);
+    }
+    return 0;
+  }
+
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
@@ -812,6 +858,13 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
+  ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
+  if (processing_trailers_ && parser_.status_code != 100) {
+    ENVOY_CONN_LOG(trace, "client on headers complete", connection_);
+    pending_responses_.front().decoder_->decodeTrailers(std::move(headers));
+    return 0;
+  }
+
   headers->insertStatus().value(parser_.status_code);
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408

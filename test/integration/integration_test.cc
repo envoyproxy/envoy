@@ -319,11 +319,11 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
               HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
-TEST_P(IntegrationTest, Trailers) { testTrailers(30,30); }
+TEST_P(IntegrationTest, Trailers) { testTrailers(30, 30); }
 
 TEST_P(IntegrationTest, TrailersWithHttp1ToHttp2) {
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-  testTrailers(30,30);
+  testTrailers(30, 30);
 }
 
 TEST_P(IntegrationTest, BadFirstline) {
