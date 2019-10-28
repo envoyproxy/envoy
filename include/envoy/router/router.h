@@ -513,6 +513,7 @@ public:
   virtual ~TlsContextMatchCriteria() = default;
 
   virtual const absl::optional<bool>& presented() const PURE;
+  virtual const absl::optional<bool>& validated() const PURE;
 };
 
 using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;

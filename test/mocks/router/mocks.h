@@ -273,6 +273,7 @@ public:
 
   // Router::MockTlsContextMatchCriteria
   MOCK_CONST_METHOD0(presented, const absl::optional<bool>&());
+  MOCK_CONST_METHOD0(validated, const absl::optional<bool>&());
 };
 
 class MockPathMatchCriterion : public PathMatchCriterion {
