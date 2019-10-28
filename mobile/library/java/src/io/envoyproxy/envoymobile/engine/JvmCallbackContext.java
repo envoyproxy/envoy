@@ -7,8 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyError;
-import io.envoyproxy.envoymobile.engine.types.EnvoyErrorCode;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 class JvmCallbackContext {
@@ -148,8 +146,7 @@ class JvmCallbackContext {
           return;
         }
         String errorMessage = new String(message);
-        EnvoyError error = new EnvoyError(EnvoyErrorCode.fromInt(errorCode), errorMessage);
-        callbacks.onError(error);
+        callbacks.onError(errorCode, errorMessage);
       }
     });
   }

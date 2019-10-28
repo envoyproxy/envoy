@@ -18,8 +18,8 @@ public interface EnvoyHTTPCallbacks {
   void onHeaders(Map<String, List<String>> headers, boolean endStream);
 
   /**
-   * Called when a data frame gets received on the async HTTP stream.
-   * This callback can be invoked multiple times if the data gets streamed.
+   * Called when a data frame gets received on the async HTTP stream. This
+   * callback can be invoked multiple times if the data gets streamed.
    *
    * @param data,      the buffer of the data received.
    * @param endStream, whether the data is the last data frame.
@@ -27,16 +27,16 @@ public interface EnvoyHTTPCallbacks {
   void onData(ByteBuffer data, boolean endStream);
 
   /**
-   * Called when all metadata get received on the async HTTP stream.
-   * Note that end stream is implied when on_metadata is called.
+   * Called when all metadata get received on the async HTTP stream. Note that end
+   * stream is implied when on_metadata is called.
    *
    * @param metadata, the metadata received.
    */
   void onMetadata(Map<String, List<String>> metadata);
 
   /**
-   * Called when all trailers get received on the async HTTP stream.
-   * Note that end stream is implied when on_trailers is called.
+   * Called when all trailers get received on the async HTTP stream. Note that end
+   * stream is implied when on_trailers is called.
    *
    * @param trailers, the trailers received.
    */
@@ -45,9 +45,10 @@ public interface EnvoyHTTPCallbacks {
   /**
    * Called when the async HTTP stream has an error.
    *
-   * @param error, the error received.
+   * @param errorCode, the error code.
+   * @param message,   the error message.
    */
-  void onError(EnvoyError error);
+  void onError(int errorCode, String message);
 
   /**
    * Called when the async HTTP stream is canceled.

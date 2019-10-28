@@ -42,7 +42,7 @@ static void ios_on_exit() {
                            logLevel.UTF8String);
   } @catch (...) {
     NSLog(@"Envoy exception caught.");
-    [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyException" object:self];
+    [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];
     return 1;
   }
 }

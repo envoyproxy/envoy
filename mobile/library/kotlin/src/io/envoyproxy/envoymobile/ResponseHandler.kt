@@ -1,10 +1,8 @@
 package io.envoyproxy.envoymobile
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyError
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor;
-
 
 /**
  * Callback interface for receiving stream events.
@@ -19,7 +17,7 @@ class ResponseHandler(val executor: Executor) {
     internal var onDataClosure: (byteBuffer: ByteBuffer, endStream: Boolean) -> Unit = { _, _ -> Unit }
     internal var onMetadataClosure: (metadata: Map<String, List<String>>) -> Unit = { Unit }
     internal var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
-    internal var onErrorClosure: (error: EnvoyError) -> Unit = { Unit }
+    internal var onErrorClosure: (errorCode: Int, message: String) -> Unit = { _, _ -> Unit }
     internal var onCancelClosure: () -> Unit = { Unit }
 
     override fun getExecutor(): Executor {
@@ -43,8 +41,8 @@ class ResponseHandler(val executor: Executor) {
       onTrailersClosure(trailers)
     }
 
-    override fun onError(error: EnvoyError) {
-      onErrorClosure(error)
+    override fun onError(errorCode: Int, message: String) {
+      onErrorClosure(errorCode, message)
     }
 
     override fun onCancel() {
@@ -113,7 +111,10 @@ class ResponseHandler(val executor: Executor) {
    * @return ResponseHandler, this ResponseHandler.
    */
   fun onError(closure: (error: EnvoyError) -> Unit): ResponseHandler {
-    underlyingCallbacks.onErrorClosure = closure
+    underlyingCallbacks.onErrorClosure = { errorCode, message ->
+      closure(EnvoyError(errorCode, message))
+      Unit
+    }
     return this
   }
 

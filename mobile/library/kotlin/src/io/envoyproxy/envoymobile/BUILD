@@ -32,7 +32,7 @@ envoy_mobile_kt_library(
     srcs = [
         "EnvoyClient.kt",
         "EnvoyClientBuilder.kt",
-        "EnvoyException.kt",
+        "EnvoyError.kt",
         "EnvoyStreamEmitter.kt",
         "GRPCClient.kt",
         "GRPCRequestBuilder.kt",
