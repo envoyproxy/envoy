@@ -8,9 +8,9 @@
 
 #include "common/common/lock_guard.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/strip.h"
-#include "absl/strings/ascii.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -73,7 +73,8 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
     // Split the actual log message from the trailing whitespace.
     auto eol_it = std::find_if_not(msg_view.rbegin(), msg_view.rend(), absl::ascii_isspace);
     auto msg_leading_view = msg_view.substr(0, msg_view.rend() - eol_it);
-    auto msg_whitespace_view = msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
+    auto msg_whitespace_view =
+        msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
 
     // Escape the log message, but keep the whitespace unescaped.
     sink_->log(absl::CEscape(msg_leading_view));
