@@ -73,6 +73,8 @@ public:
     current_object_ = object;
     return return_object;
   }
+  MonotonicTime approximateMonotonicTime() const override;
+  void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
   void onFatalError() const override {
@@ -112,6 +114,7 @@ private:
   std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
+  MonotonicTime approximate_monotonic_time_;
 };
 
 } // namespace Event
