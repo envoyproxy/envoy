@@ -66,6 +66,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   lock.Release();
 
   if (should_escape_) {
+    // Order of the StripSuffix matters: It strips both `\n` and `\r\n` EOL characters
     msg_view = absl::StripSuffix(msg_view, "\n");
     msg_view = absl::StripSuffix(msg_view, "\r");
     sink_->log(absl::CEscape(msg_view));
