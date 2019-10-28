@@ -95,8 +95,8 @@ following are the command line options that Envoy supports.
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
 
    When used in conjunction with ``--log-format-escaped``, the logger can be configured
-   to log in a format that is parsable by log viewers. For example, ``"%L%m%d %T.%e %t envoy] [%t][%n]%v"``
-   enables out-of-the-box integration with Stackdriver Logging.
+   to log in a format that is parsable by log viewers. Known integrations are documented
+   in the :ref:`application logging <arch_overview_application_logs>` section.
 
    The supported format flags are (with example output):
 

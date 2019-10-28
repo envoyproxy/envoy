@@ -73,7 +73,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
     msg_view = absl::StripSuffix(msg_view, "\n");
     msg_view = absl::StripSuffix(msg_view, "\r");
     sink_->log(absl::CEscape(msg_view));
-    sink_->log("\r\n");
+    sink_->log(spdlog::details::os::default_eol);
   } else {
     sink_->log(msg_view);
   }
