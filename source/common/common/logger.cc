@@ -10,6 +10,7 @@
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/strip.h"
+#include "absl/strings/ascii.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -66,11 +67,14 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   lock.Release();
 
   if (should_escape_) {
-    // Order of the StripSuffix matters: It strips both `\n` and `\r\n` end-of-line characters
-    msg_view = absl::StripSuffix(msg_view, "\n");
-    msg_view = absl::StripSuffix(msg_view, "\r");
-    sink_->log(absl::CEscape(msg_view));
-    sink_->log(spdlog::details::os::default_eol);
+    // Split the actual log message from the trailing whitespace.
+    auto eol_it = std::find_if_not(msg_view.rbegin(), msg_view.rend(), absl::ascii_isspace);
+    auto msg_leading_view = msg_view.substr(0, msg_view.rend() - eol_it);
+    auto msg_whitespace_view = msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
+
+    // Escape the log message, but keep the whitespace unescaped.
+    sink_->log(absl::CEscape(msg_leading_view));
+    sink_->log(msg_whitespace_view);
   } else {
     sink_->log(msg_view);
   }
