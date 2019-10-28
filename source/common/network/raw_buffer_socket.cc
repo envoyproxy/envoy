@@ -12,6 +12,8 @@ void RawBufferSocket::setTransportSocketCallbacks(TransportSocketCallbacks& call
   callbacks_ = &callbacks;
 }
 
+void RawBufferSocket::clearTransportSocketCallbacks() { callbacks_ = nullptr; }
+
 IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;

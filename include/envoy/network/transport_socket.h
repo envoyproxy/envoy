@@ -94,9 +94,13 @@ public:
   /**
    * Called by connection once to initialize the transport socket callbacks that the transport
    * socket should use.
+   * TODO update docs.
    * @param callbacks supplies the callbacks instance.
    */
   virtual void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) PURE;
+
+  virtual void clearTransportSocketCallbacks() PURE;
+  virtual bool canDetach() const PURE;
 
   /**
    * @return std::string the protocol to use as selected by network level negotiation. (E.g., ALPN).

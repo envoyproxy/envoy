@@ -96,6 +96,9 @@ public:
                                  Network::Address::InstanceConstSharedPtr source_address,
                                  Network::TransportSocketPtr& transport_socket,
                                  const Network::ConnectionSocket::OptionsSharedPtr& options));
+  MOCK_METHOD2(adoptClientConnection,
+               Network::ClientConnectionPtr(Network::ConnectionSocketPtr&& socket,
+                                            Network::TransportSocketPtr&& transport_socket));
   MOCK_METHOD1(createDnsResolver,
                Network::DnsResolverSharedPtr(
                    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));

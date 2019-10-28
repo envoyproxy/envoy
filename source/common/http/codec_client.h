@@ -9,6 +9,8 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
@@ -61,6 +63,9 @@ public:
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
     connection_->addConnectionCallbacks(cb);
   }
+
+  std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> detachSockets();
+  bool canDetach() const;
 
   /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
@@ -128,7 +133,8 @@ protected:
    * @param host supplies the owning host.
    */
   CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-              Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+              Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+              bool do_connect);
 
   // Http::ConnectionCallbacks
   void onGoAway() override {
@@ -243,7 +249,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  bool do_connect);
 };
 
 } // namespace Http

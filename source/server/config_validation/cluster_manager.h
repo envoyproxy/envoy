@@ -30,7 +30,7 @@ public:
       : ProdClusterManagerFactory(admin, runtime, stats, tls, random, dns_resolver,
                                   ssl_context_manager, main_thread_dispatcher, local_info,
                                   secret_manager, validation_context, api, http_context,
-                                  log_manager, singleton_manager),
+                                  log_manager, singleton_manager, nullptr),
         time_system_(time_system) {}
 
   ClusterManagerPtr

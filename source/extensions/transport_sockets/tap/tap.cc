@@ -14,6 +14,8 @@ TapSocket::TapSocket(SocketTapConfigSharedPtr config,
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!tapper_);
   transport_socket_->setTransportSocketCallbacks(callbacks);
+  // TODO Re-creation of the tapper object causes problems as seen in ssl_integration_test.cc,
+  // unclear what is actually going on here.
   tapper_ = config_ ? config_->createPerSocketTapper(callbacks.connection()) : nullptr;
 }
 

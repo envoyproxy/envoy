@@ -37,6 +37,7 @@
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+#include "common/upstream/upstream_connection_pool_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
@@ -392,10 +393,17 @@ void InstanceImpl::initialize(const Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
 
+  upstream_connection_pool_thread_ =
+      std::make_unique<Upstream::UpstreamConnectionPoolThread>(*api_);
+  upstream_connection_pool_thread_->start();
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, access_log_manager_, *singleton_manager_);
+      messageValidationContext(), *api_, http_context_, access_log_manager_, *singleton_manager_,
+      upstream_connection_pool_thread_
+          ? &upstream_connection_pool_thread_->upstream_connection_pool()
+          : nullptr);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -570,6 +578,10 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
+
+  if (upstream_connection_pool_thread_) {
+    upstream_connection_pool_thread_->stop();
+  }
 
   if (overload_manager_) {
     overload_manager_->stop();

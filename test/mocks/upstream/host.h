@@ -131,6 +131,13 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
+  CreateConnectionData adoptConnection(Event::Dispatcher& /*dispatcher*/,
+                                       Network::ConnectionSocketPtr&& /*socket*/,
+                                       Network::TransportSocketPtr&& /*transport*/) const override {
+    ASSERT(false);
+    return {};
+  }
+
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};

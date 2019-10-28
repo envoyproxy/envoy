@@ -55,6 +55,9 @@ public:
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Envoy::Network::TransportSocketCallbacks& callbacks) override;
+  void clearTransportSocketCallbacks() override { RELEASE_ASSERT(false, "Detach not implemented"); }
+  bool canDetach() const override { return false; }
+
   std::string protocol() const override;
   absl::string_view failureReason() const override;
   bool canFlushClose() override { return handshake_complete_; }

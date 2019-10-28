@@ -96,6 +96,10 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
+  virtual CreateConnectionData adoptConnection(Event::Dispatcher& dispatcher,
+                                               Network::ConnectionSocketPtr&& socket,
+                                               Network::TransportSocketPtr&& transport) const PURE;
+
   /**
    * Create a health check connection for this host.
    * @param dispatcher supplies the owning dispatcher.
@@ -935,6 +939,20 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
+
+class UpstreamConnectionPool {
+public:
+  struct UpstreamConnectionEssence {
+    Network::ConnectionSocketPtr socket;
+    Network::TransportSocketPtr transport_socket;
+    uint64_t remaining_requests;
+  };
+  virtual ~UpstreamConnectionPool() = default;
+  virtual void OfferConnection(HostConstSharedPtr host,
+                               UpstreamConnectionEssence connection_essence) PURE;
+  virtual bool RetrieveConnection(HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                                  std::function<void(UpstreamConnectionEssence)> accept_cb) PURE;
+};
 
 } // namespace Upstream
 } // namespace Envoy

@@ -20,7 +20,7 @@ public:
   CodecClientForTest(CodecClient::Type type, Network::ClientConnectionPtr&& connection,
                      Http::ClientConnection* codec, DestroyCb destroy_cb,
                      Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
-      : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {
+      : CodecClient(type, std::move(connection), host, dispatcher, true), destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
   ~CodecClientForTest() override {

@@ -532,3 +532,15 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "upstream_connection_pool_impl_lib",
+    srcs = ["upstream_connection_pool_impl.cc"],
+    hdrs = ["upstream_connection_pool_impl.h"],
+    deps = [
+        ":upstream_lib",
+        "//include/envoy/api:api_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//source/common/common:thread_lib",
+    ],
+)

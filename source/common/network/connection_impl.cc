@@ -73,6 +73,14 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
+  if (socket_ == nullptr) {
+    // Socket was detached prior to destruction. Connection has no socket or ioHandle associated
+    // with it.
+    ASSERT(delayed_close_timer_ == nullptr,
+           "ConnectionImpl was unexpectedly torn down without being closed.");
+    return;
+  }
+
   ASSERT(!ioHandle().isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl was unexpectedly torn down without being closed.");
 
@@ -96,6 +104,7 @@ void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
+  RELEASE_ASSERT(socket_ != nullptr, "close called on a detached connection.");
   if (!ioHandle().isOpen()) {
     return;
   }
@@ -498,7 +507,6 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
 void ConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
-
   ASSERT(!connecting_);
 
   IoResult result = transport_socket_->doRead(read_buffer_);
@@ -705,6 +713,23 @@ ClientConnectionImpl::ClientConnectionImpl(
       }
     }
   }
+}
+
+ClientConnectionImpl::ClientConnectionImpl(Event::Dispatcher& dispatcher,
+                                           Network::ConnectionSocketPtr&& socket,
+                                           Network::TransportSocketPtr&& transport_socket)
+    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), true) {}
+
+std::pair<ConnectionSocketPtr, TransportSocketPtr> ClientConnectionImpl::detachSockets() {
+  ASSERT(state() == State::Open);
+  file_event_.reset();
+  transport_socket_->clearTransportSocketCallbacks();
+  return {std::move(socket_), std::move(transport_socket_)};
+}
+
+bool ClientConnectionImpl::canDetach() const {
+  // TODO if (state() != State::Open) { return false; }
+  return transport_socket_->canDetach();
 }
 
 void ClientConnectionImpl::connect() {

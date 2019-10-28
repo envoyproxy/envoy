@@ -308,6 +308,9 @@ public:
    * registered via addConnectionCallbacks().
    */
   virtual void connect() PURE;
+
+  virtual std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> detachSockets() PURE;
+  virtual bool canDetach() const { return false; }
 };
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;

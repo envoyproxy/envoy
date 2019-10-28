@@ -231,9 +231,14 @@ public:
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
+  ClientConnectionImpl(Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& socket,
+                       Network::TransportSocketPtr&& transport_socket);
 
   // Network::ClientConnection
   void connect() override;
+
+  std::pair<ConnectionSocketPtr, TransportSocketPtr> detachSockets() override;
+  bool canDetach() const override;
 };
 
 } // namespace Network

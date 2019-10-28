@@ -95,6 +95,8 @@ public:
   MockClientConnection();
   ~MockClientConnection() override;
 
+  MOCK_METHOD0(detachSockets,
+               std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr>());
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
   MOCK_METHOD1(addBytesSentCallback, void(BytesSentCb cb));

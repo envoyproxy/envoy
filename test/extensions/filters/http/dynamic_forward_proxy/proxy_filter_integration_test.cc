@@ -176,6 +176,7 @@ TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
 
   // We need to wait until the workers have gotten the new cluster update. The only way we can
   // know this currently is when the connection pools drain and terminate.
+  // TODO drain doesn't take effect quickly?
   AssertionResult result = fake_upstream_connection_->waitForDisconnect();
   RELEASE_ASSERT(result, result.message());
   fake_upstream_connection_.reset();

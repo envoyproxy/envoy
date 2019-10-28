@@ -14,7 +14,7 @@ namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
-                         Event::Dispatcher& dispatcher)
+                         Event::Dispatcher& dispatcher, bool do_connect)
     : type_(type), connection_(std::move(connection)), host_(host),
       idle_timeout_(host_->cluster().idleTimeout()) {
   if (type_ != Type::HTTP3) {
@@ -26,8 +26,11 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  ENVOY_CONN_LOG(debug, "connecting", *connection_);
-  connection_->connect();
+  // TODO Does this call to connect belong in this constructor?
+  if (do_connect) {
+    ENVOY_CONN_LOG(debug, "connecting", *connection_);
+    connection_->connect();
+  }
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
@@ -40,6 +43,18 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 }
 
 CodecClient::~CodecClient() = default;
+
+std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> CodecClient::detachSockets() {
+  ASSERT(canDetach());
+  std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> detached =
+      connection_->detachSockets();
+  // TODO deletion of the connection object here leaves the CodecClient object
+  // in a weird state, is that acceptable?
+  connection_.reset();
+  return detached;
+}
+
+bool CodecClient::canDetach() const { return connection_->canDetach(); }
 
 void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
@@ -119,11 +134,13 @@ void CodecClient::onData(Buffer::Instance& data) {
   try {
     codec_->dispatch(data);
   } catch (CodecProtocolException& e) {
-    ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, e.what());
+    // TODO move back to debug
+    ENVOY_CONN_LOG(error, "protocol error: {}", *connection_, e.what());
     close();
     protocol_error = true;
   } catch (PrematureResponseException& e) {
-    ENVOY_CONN_LOG(debug, "premature response", *connection_);
+    // TODO move back to debug
+    ENVOY_CONN_LOG(error, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
@@ -140,8 +157,8 @@ void CodecClient::onData(Buffer::Instance& data) {
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
-                                 Event::Dispatcher& dispatcher)
-    : CodecClient(type, std::move(connection), host, dispatcher) {
+                                 Event::Dispatcher& dispatcher, bool do_connect)
+    : CodecClient(type, std::move(connection), host, dispatcher, do_connect) {
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(

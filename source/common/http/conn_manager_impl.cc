@@ -172,6 +172,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
+    // TODO handle delayed close?
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
   }
 }
@@ -274,6 +275,7 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
+  // TODO handle delayed close?
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
 }
 

@@ -312,6 +312,16 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   return connection;
 }
 
+Host::CreateConnectionData
+HostImpl::adoptConnection(Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& socket,
+                          Network::TransportSocketPtr&& transport) const {
+  Network::ClientConnectionPtr connection =
+      dispatcher.adoptClientConnection(std::move(socket), std::move(transport));
+  connection->setBufferLimits(cluster_->perConnectionBufferLimitBytes());
+  cluster_->createNetworkFilterChain(*connection);
+  return {std::move(connection), shared_from_this()};
+}
+
 void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
 
 std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(

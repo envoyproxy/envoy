@@ -32,6 +32,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
+#include "common/upstream/upstream_connection_pool_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/http/admin.h"
@@ -281,6 +282,7 @@ private:
   Runtime::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
+  std::unique_ptr<Upstream::UpstreamConnectionPoolThread> upstream_connection_pool_thread_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;

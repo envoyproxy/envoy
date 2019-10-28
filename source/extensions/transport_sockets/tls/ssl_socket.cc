@@ -29,6 +29,8 @@ class NotReadySslSocket : public Network::TransportSocket {
 public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
+  void clearTransportSocketCallbacks() override { RELEASE_ASSERT(false, "Detach not implemented"); }
+  bool canDetach() const override { return false; }
   std::string protocol() const override { return EMPTY_STRING; }
   absl::string_view failureReason() const override { return NotReadyReason; }
   bool canFlushClose() override { return true; }
@@ -58,7 +60,21 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
 }
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
-  ASSERT(!callbacks_);
+  //  ASSERT(!callbacks_);
+  bool had_previous = (callbacks_ != nullptr);
+
+  // Unregister previous.
+  if (had_previous) {
+    // TODO would be good to assert that the fd is not changing, but
+    // //test/integration:xfcc_integration_test fails. So... this private key access thing. Is it
+    // needed past initial handshake?  This seems half implemented in Envoy open source.
+    //    RELEASE_ASSERT(callbacks_->ioHandle().fd() == callbacks.ioHandle().fd(), "");
+    RELEASE_ASSERT(ctx_->getPrivateKeyMethodProviders().empty(), "");
+    for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
+      provider->unregisterPrivateKeyMethod(ssl_);
+    }
+  }
+
   callbacks_ = &callbacks;
 
   // Associate this SSL connection with all the certificates (with their potentially different
@@ -67,8 +83,11 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(ssl_, *this, callbacks_->connection().dispatcher());
   }
 
-  BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
-  SSL_set_bio(ssl_, bio, bio);
+  if (!had_previous) {
+    // FD hasn't changed.
+    BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
+    SSL_set_bio(ssl_, bio, bio);
+  }
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {

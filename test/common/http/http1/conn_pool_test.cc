@@ -47,7 +47,7 @@ public:
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+                     Upstream::ResourcePriority::Default, nullptr, nullptr, nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
@@ -65,7 +65,8 @@ public:
     Event::DispatcherPtr client_dispatcher_;
   };
 
-  CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
+  CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data,
+                                   bool /*do_connect*/) override {
     // We expect to own the connection, but already have it, so just release it to prevent it from
     // getting deleted.
     data.connection_.release();
@@ -80,7 +81,6 @@ public:
     TestCodecClient& test_client = test_clients_.back();
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
-    test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     test_client.client_dispatcher_ = api_->allocateDispatcher();
     Network::ClientConnectionPtr connection{test_client.connection_};
@@ -98,6 +98,7 @@ public:
         Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
+    test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     ON_CALL(*test_client.codec_, protocol()).WillByDefault(Return(protocol));

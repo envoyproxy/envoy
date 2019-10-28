@@ -9,7 +9,8 @@
 namespace Envoy {
 namespace Network {
 
-class RawBufferSocket : public TransportSocket, protected Logger::Loggable<Logger::Id::connection> {
+class RawBufferSocket final : public TransportSocket,
+                              protected Logger::Loggable<Logger::Id::connection> {
 public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
@@ -21,6 +22,8 @@ public:
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool canDetach() const override { return true; }
+  void clearTransportSocketCallbacks() override;
 
 private:
   TransportSocketCallbacks* callbacks_{};

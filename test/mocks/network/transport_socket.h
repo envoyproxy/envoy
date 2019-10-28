@@ -18,6 +18,8 @@ public:
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
   MOCK_METHOD1(setTransportSocketCallbacks, void(TransportSocketCallbacks& callbacks));
+  MOCK_METHOD0(clearTransportSocketCallbacks, void());
+  MOCK_CONST_METHOD0(canDetach, bool());
   MOCK_CONST_METHOD0(protocol, std::string());
   MOCK_CONST_METHOD0(failureReason, absl::string_view());
   MOCK_METHOD0(canFlushClose, bool());

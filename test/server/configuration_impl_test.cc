@@ -58,7 +58,7 @@ protected:
                                  server_.sslContextManager(), server_.dispatcher(),
                                  server_.localInfo(), server_.secretManager(),
                                  server_.messageValidationContext(), *api_, server_.httpContext(),
-                                 server_.accessLogManager(), server_.singletonManager()) {}
+                                 server_.accessLogManager(), server_.singletonManager(), nullptr) {}
 
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;

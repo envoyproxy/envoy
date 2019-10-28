@@ -31,7 +31,7 @@ namespace Http1 {
 class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-               Upstream::ResourcePriority priority,
+               Upstream::ResourcePriority priority, Upstream::UpstreamConnectionPool* upstream_pool,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
@@ -84,10 +84,14 @@ protected:
   struct ActiveClient : LinkedObject<ActiveClient>,
                         public Network::ConnectionCallbacks,
                         public Event::DeferredDeletable {
-    ActiveClient(ConnPoolImpl& parent);
+    ActiveClient(ConnPoolImpl& parent, Upstream::Host::CreateConnectionData data);
+    ActiveClient(ConnPoolImpl& parent, Upstream::HostDescriptionConstSharedPtr host_description_,
+                 Network::ClientConnectionPtr client_connection, uint64_t remaining_requests);
     ~ActiveClient() override;
 
     void onConnectTimeout();
+    std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> detachSockets();
+    bool canDetach() const { return codec_client_->canDetach(); }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -110,18 +114,22 @@ protected:
 
   void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                              ConnectionPool::Callbacks& callbacks);
-  virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
+  virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data,
+                                           bool do_connect) PURE;
   void createNewConnection();
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onDownstreamReset(ActiveClient& client);
   void onResponseComplete(ActiveClient& client);
   void onUpstreamReady();
   void processIdleClient(ActiveClient& client, bool delay);
+  void adoptPooledConnection(
+      Upstream::UpstreamConnectionPool::UpstreamConnectionEssence connection_essence);
 
   Event::Dispatcher& dispatcher_;
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
   std::list<DrainedCb> drained_callbacks_;
+  Upstream::UpstreamConnectionPool* upstream_pool_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Event::TimerPtr upstream_ready_timer_;
@@ -135,12 +143,15 @@ class ProdConnPoolImpl : public ConnPoolImpl {
 public:
   ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
+                   Upstream::UpstreamConnectionPool* upstream_pool,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options) {}
+      : ConnPoolImpl(dispatcher, host, priority, upstream_pool, options, transport_socket_options) {
+  }
 
   // ConnPoolImpl
-  CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
+  CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data,
+                                   bool do_connect) override;
 };
 
 } // namespace Http1

@@ -361,7 +361,7 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::CodecClientType& type)
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_);
+                                   data.host_description_, dispatcher_, true);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -771,7 +771,7 @@ Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
                                                  std::move(data.connection_),
-                                                 data.host_description_, dispatcher_);
+                                                 data.host_description_, dispatcher_, true);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {
