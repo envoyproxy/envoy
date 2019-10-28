@@ -21,26 +21,26 @@ absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
                                         absl::string_view value) {
   if (value == TLSVersion) {
-    return CelValue::CreateString(ssl_info.tlsVersion());
+    return CelValue::CreateString(&ssl_info.tlsVersion());
   } else if (value == SubjectLocalCertificate) {
-    return CelValue::CreateString(ssl_info.subjectLocalCertificate());
+    return CelValue::CreateString(&ssl_info.subjectLocalCertificate());
   } else if (value == SubjectPeerCertificate) {
-    return CelValue::CreateString(ssl_info.subjectPeerCertificate());
+    return CelValue::CreateString(&ssl_info.subjectPeerCertificate());
   } else if (value == URISanLocalCertificate) {
     if (ssl_info.uriSanLocalCertificate().size() > 0) {
-      return CelValue::CreateString(ssl_info.uriSanLocalCertificate()[0]);
+      return CelValue::CreateString(&ssl_info.uriSanLocalCertificate()[0]);
     }
   } else if (value == URISanPeerCertificate) {
     if (ssl_info.uriSanPeerCertificate().size() > 0) {
-      return CelValue::CreateString(ssl_info.uriSanPeerCertificate()[0]);
+      return CelValue::CreateString(&ssl_info.uriSanPeerCertificate()[0]);
     }
   } else if (value == DNSSanLocalCertificate) {
     if (ssl_info.dnsSansLocalCertificate().size() > 0) {
-      return CelValue::CreateString(ssl_info.dnsSansLocalCertificate()[0]);
+      return CelValue::CreateString(&ssl_info.dnsSansLocalCertificate()[0]);
     }
   } else if (value == DNSSanPeerCertificate) {
     if (ssl_info.dnsSansPeerCertificate().size() > 0) {
-      return CelValue::CreateString(ssl_info.dnsSansPeerCertificate()[0]);
+      return CelValue::CreateString(&ssl_info.dnsSansPeerCertificate()[0]);
     }
   }
   return {};
@@ -142,7 +142,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
                                 info_.downstreamSslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
-    return CelValue::CreateString(info_.requestedServerName());
+    return CelValue::CreateString(&info_.requestedServerName());
   }
 
   auto ssl_info = info_.downstreamSslConnection();
