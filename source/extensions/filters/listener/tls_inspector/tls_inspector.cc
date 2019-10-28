@@ -112,7 +112,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
     return Network::FilterStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
@@ -151,10 +151,10 @@ ParseState Filter::onRead() {
   // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
   // that get created later.
   //
-  // The file_event_ in this class gets events everytime new data is available on the socket,
+  // The file_event_ in this class gets events every time new data is available on the socket,
   // even if previous data has not been read, which is always the case due to MSG_PEEK. When
   // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
-  // socket, so that new event is immediately signalled as readable because it is new and the socket
+  // socket, so that new event is immediately signaled as readable because it is new and the socket
   // is readable, even though no new events have occurred.
   //
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all

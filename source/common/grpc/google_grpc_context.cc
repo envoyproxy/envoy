@@ -7,7 +7,9 @@
 #include "common/common/macros.h"
 #include "common/common/thread.h"
 
+#ifdef ENVOY_GOOGLE_GRPC
 #include "grpcpp/grpcpp.h"
+#endif
 
 namespace Envoy {
 namespace Grpc {

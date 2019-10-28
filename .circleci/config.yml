@@ -5,7 +5,7 @@ executors:
     description: "A regular build executor based on ubuntu image"
     docker:
       # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
-      - image: envoyproxy/envoy-build-ubuntu@sha256:1500b75cb9bc2184a26f72f63631e926cd05d6ee628e6fd005f069d2f9756ac7
+      - image: envoyproxy/envoy-build-ubuntu@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
     resource_class: xlarge
     working_directory: /source
 
@@ -31,7 +31,7 @@ jobs:
            destination: /
    docker:
      docker:
-       - image: docker
+       - image: google/cloud-sdk
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -55,6 +55,17 @@ jobs:
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
+
+   go_control_plane_mirror:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.api
+       - add_ssh_keys:
+           fingerprints:
+             - "9d:3b:fe:7c:09:3b:ce:a9:6a:de:de:41:fb:6b:52:62"
+       - run: ci/go_mirror.sh
 
    filter_example_mirror:
      executor: ubuntu-build
@@ -130,6 +141,7 @@ workflows:
             tags:
               only: /^v.*/
       - api
+      - go_control_plane_mirror
       - filter_example_mirror
       - coverage
       - coverage_publish:

@@ -3,6 +3,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/exception.h"
@@ -555,6 +556,31 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
+TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainProperHeaders) {
+  codec_settings_.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestHeaderMapImpl headers{{":status", "200"}, {"some-header", "foo"}, {"some#header", "baz"}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 200 OK\r\nSome-Header: foo\r\nSome#Header: baz\r\nContent-Length: 0\r\n\r\n",
+            output);
+}
+
 TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith204) {
   initialize();
 
@@ -918,11 +944,12 @@ class Http1ClientConnectionImplTest : public testing::Test {
 public:
   void initialize() {
     codec_ = std::make_unique<ClientConnectionImpl>(connection_, store_, callbacks_,
-                                                    max_response_headers_count_);
+                                                    codec_settings_, max_response_headers_count_);
   }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockConnectionCallbacks> callbacks_;
+  NiceMock<Http1Settings> codec_settings_;
   std::unique_ptr<ClientConnectionImpl> codec_;
 
 protected:
@@ -942,6 +969,22 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGet) {
   TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}};
   request_encoder.encodeHeaders(headers, true);
   EXPECT_EQ("GET / HTTP/1.1\r\ncontent-length: 0\r\n\r\n", output);
+}
+
+TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
+  codec_settings_.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
+
+  initialize();
+
+  Http::MockStreamDecoder response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {"my-custom-header", "hey"}};
+  request_encoder.encodeHeaders(headers, true);
+  EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\nContent-Length: 0\r\n\r\n", output);
 }
 
 TEST_F(Http1ClientConnectionImplTest, HostHeaderTranslate) {

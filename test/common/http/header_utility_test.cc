@@ -20,17 +20,6 @@ envoy::api::v2::route::HeaderMatcher parseHeaderMatcherFromYaml(const std::strin
   return header_matcher;
 }
 
-TEST(HeaderDataConstructorTest, JsonConstructor) {
-  Json::ObjectSharedPtr json =
-      Json::Factory::loadFromString("{\"name\":\"test-header\", \"value\":\"value\"}");
-
-  HeaderUtility::HeaderData header_data = HeaderUtility::HeaderData(*json);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
-  EXPECT_EQ("value", header_data.value_);
-}
-
 TEST(HeaderDataConstructorTest, NoSpecifierSet) {
   const std::string yaml = R"EOF(
 name: test-header

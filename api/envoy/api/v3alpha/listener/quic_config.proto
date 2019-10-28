@@ -9,6 +9,8 @@ option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+// [#protodoc-title: QUIC listener Config]
+
 // Configuration specific to the QUIC protocol.
 // Next id: 4
 message QuicProtocolOptions {

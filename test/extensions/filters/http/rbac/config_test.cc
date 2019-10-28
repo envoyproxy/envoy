@@ -46,13 +46,14 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory.createRouteSpecificFilterConfig(*proto_config, context);
+      factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                              ProtobufMessage::getNullValidationVisitor());
   EXPECT_TRUE(route_config.get());
 }
 

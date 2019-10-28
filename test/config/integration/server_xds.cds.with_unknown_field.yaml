@@ -8,8 +8,10 @@ resources:
     eds_config: { path: {{ eds_json_path }} }
   lb_policy: ROUND_ROBIN
   http2_protocol_options: {}
-  extension_protocol_options:
+  typed_extension_protocol_options:
     envoy.test.dynamic_validation:
-      stat_prefix: blah
-      cluster: blah
-      foo: bar
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        stat_prefix: blah
+        cluster: blah
+        foo: bar

@@ -63,7 +63,6 @@ envoy_cc_test(
     name = "rds_impl_test",
     srcs = ["rds_impl_test.cc"],
     deps = [
-        "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
@@ -296,7 +295,6 @@ envoy_cc_test(
     srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:metadata_lib",
-        "//source/common/config:rds_json_lib",
         "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",

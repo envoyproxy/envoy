@@ -1,6 +1,7 @@
 #include <string>
 
 #include "common/http/conn_manager_utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -58,6 +59,7 @@ public:
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(maxRequestHeadersCount, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
+  MOCK_CONST_METHOD0(maxConnectionDuration, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
@@ -128,7 +130,7 @@ public:
                                                        random_, local_info_)
             ->asString();
     ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
-    ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
+    ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
     return ret;
   }
 

@@ -17,6 +17,7 @@ envoy_cc_library(
     hdrs = ["ext_authz.h"],
     deps = [
         "//include/envoy/http:codes_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -39,6 +40,7 @@ envoy_cc_library(
     deps = [
         ":ext_authz",
         "//include/envoy/registry",
+        "//include/envoy/stats:stats_macros",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//source/extensions/filters/http:well_known_names",

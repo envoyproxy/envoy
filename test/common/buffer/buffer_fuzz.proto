@@ -19,6 +19,11 @@ message Move {
   uint32 length = 2;
 }
 
+message Search {
+  string content = 1;
+  uint32 offset = 2;
+}
+
 message Action {
   uint32 target_index = 1;
   oneof action_selector {
@@ -34,6 +39,9 @@ message Action {
     Move move = 11;
     uint32 read = 12;
     google.protobuf.Empty write = 13;
+    uint32 get_raw_slices = 14;
+    Search search = 15;
+    string starts_with = 16;
   }
 }
 

@@ -16,11 +16,18 @@ import "validate/validate.proto";
 message FilterConfig {
   // The content-type to pass to the upstream when the gRPC bridge filter is applied.
   // The filter will also validate that the upstream responds with the same content type.
-  string content_type = 1 [(validate.rules).string.min_bytes = 1];
+  string content_type = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // If true, Envoy will assume that the upstream doesn't understand gRPC frames and
   // strip the gRPC frame from the request, and add it back in to the response. This will
   // hide the gRPC semantics from the upstream, allowing it to receive and respond with a
   // simple binary encoded protobuf.
   bool withhold_grpc_frames = 2;
+}
+
+// gRPC reverse bridge filter configuration per virtualhost/route/weighted-cluster level.
+message FilterConfigPerRoute {
+  // If true, disables gRPC reverse bridge filter for this particular vhost or route.
+  // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+  bool disabled = 1;
 }
