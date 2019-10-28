@@ -1,5 +1,7 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -7,7 +9,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
-#include "envoy/http/header_map.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
