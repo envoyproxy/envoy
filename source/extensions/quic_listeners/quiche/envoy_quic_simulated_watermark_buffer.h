@@ -52,9 +52,9 @@ public:
   // watermarks.
   bool isAboveHighWatermark() const { return is_full_; }
 
-  // True after the buffer goes below low watermark and hasn't come up above high
-  // watermark yet, even though the buffered data might be between high and low
-  // watermarks.
+  // True before the buffer crosses the high watermark for the first time and after the buffer goes
+  // below low watermark and hasn't come up above high watermark yet, even though the buffered data
+  // might be between high and low watermarks.
   bool isBelowLowWatermark() const { return !is_full_; }
 
 private:
