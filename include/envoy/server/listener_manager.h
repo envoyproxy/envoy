@@ -183,13 +183,13 @@ public:
   virtual void stopWorkers() PURE;
 
   /*
-   * Warn the listener manater of an impending update. This allows the listener to clear per-update
+   * Warn the listener manager of an impending update. This allows the listener to clear per-update
    * state.
    */
   virtual void beginListenerUpdate() PURE;
 
   /*
-   * Inform the listener manater that the update has completed, and informs the listener of any
+   * Inform the listener manager that the update has completed, and informs the listener of any
    * errors handled by the reload source.
    */
   using FailureStates = std::vector<std::unique_ptr<envoy::admin::v2alpha::UpdateFailureState>>;
