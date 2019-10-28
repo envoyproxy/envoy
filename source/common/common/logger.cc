@@ -59,8 +59,11 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
   absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
+
+  // This memory buffer must exist in the scope of the entire function,
+  // otherwise the string_view will refer to memory that is already free.
+  fmt::memory_buffer formatted;
   if (formatter_) {
-    fmt::memory_buffer formatted;
     formatter_->format(msg, formatted);
     msg_view = absl::string_view(formatted.data(), formatted.size());
   }
