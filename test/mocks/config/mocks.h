@@ -52,10 +52,10 @@ public:
   MockSubscriptionFactory();
   ~MockSubscriptionFactory() override;
 
-  MOCK_METHOD5(subscriptionFromConfigSource,
+  MOCK_METHOD4(subscriptionFromConfigSource,
                SubscriptionPtr(const envoy::api::v2::core::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks, bool is_delta));
+                               SubscriptionCallbacks& callbacks));
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
 
   MockSubscription* subscription_{};

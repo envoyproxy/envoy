@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -118,6 +119,19 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "symbol_table_fuzz_test",
+    srcs = ["symbol_table_fuzz_test.cc"],
+    corpus = "symbol_table_corpus",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/decompressor:decompressor_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
 

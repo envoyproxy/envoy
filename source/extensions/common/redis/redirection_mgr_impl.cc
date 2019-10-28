@@ -44,7 +44,7 @@ bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
           (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now))) {
         // last_callback_time_ms_ successfully updated without any changes since it was
         // initially read. This thread is allowed to post a call to the registered callback
-        // on the main thread. Otherwise, the thread would be ignored to prevent overtriggering
+        // on the main thread. Otherwise, the thread would be ignored to prevent over-triggering
         // cluster callbacks.
         info->redirects_count_ = 0;
         main_thread_dispatcher_.post([this, cluster_name, info]() {

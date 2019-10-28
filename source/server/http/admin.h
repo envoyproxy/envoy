@@ -113,6 +113,9 @@ public:
   bool generateRequestId() override { return false; }
   bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+    return max_connection_duration_;
+  }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
@@ -286,6 +289,9 @@ private:
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
                                  AdminStream&);
+  Http::Code handlerDrainListeners(absl::string_view path_and_query,
+                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                   AdminStream&);
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);
@@ -341,6 +347,9 @@ private:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+    envoy::api::v2::core::TrafficDirection direction() const override {
+      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
     AdminImpl& parent_;
@@ -385,6 +394,7 @@ private:
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> max_connection_duration_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;

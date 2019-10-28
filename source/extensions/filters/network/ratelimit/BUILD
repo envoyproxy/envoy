@@ -33,7 +33,6 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
