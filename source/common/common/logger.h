@@ -182,11 +182,8 @@ public:
    * must own the construction process because StderrSinkDelegate needs access to
    * the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
    * available after construction.
-   *
-   * @param should_escape whether to escape newlines in messages logged to the fallback
-   * stderr logger
    */
-  static DelegatingLogSinkPtr init(bool should_escape);
+  static DelegatingLogSinkPtr init();
 
 private:
   friend class SinkDelegate;
@@ -245,17 +242,12 @@ public:
   static spdlog::logger& getLog(Id id);
 
   /**
-   * Init the singleton sink to use for all loggers.
-   *
-   * @param should_escape_ whether to escape c-style escape sequences in messages logged to the
-   * fallback stderr logger
-   */
-  static void initSink(bool should_escape_) { sink_ = DelegatingLogSink::init(should_escape_); }
-
-  /**
    * @return the singleton sink to use for all loggers.
    */
-  static DelegatingLogSinkPtr getSink() { return sink_; }
+  static DelegatingLogSinkPtr getSink() {
+    static DelegatingLogSinkPtr sink = DelegatingLogSink::init();
+    return sink;
+  }
 
   /**
    * Sets the minimum log severity required to print messages.
@@ -285,8 +277,6 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
-
-  static DelegatingLogSinkPtr sink_;
 };
 
 /**

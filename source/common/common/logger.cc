@@ -19,10 +19,6 @@ namespace Logger {
 
 const char* Logger::DEFAULT_LOG_FORMAT = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
 
-// Ensure linker knows where to allocate the static sink
-// https://stackoverflow.com/a/9110546/4402434
-DelegatingLogSinkPtr Registry::sink_;
-
 Logger::Logger(const std::string& name) {
   logger_ = std::make_shared<spdlog::logger>(name, Registry::getSink());
   logger_->set_pattern(DEFAULT_LOG_FORMAT);
@@ -79,11 +75,10 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   }
 }
 
-DelegatingLogSinkPtr DelegatingLogSink::init(bool should_escape) {
+DelegatingLogSinkPtr DelegatingLogSink::init() {
   DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
 
   delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
-  delegating_sink->should_escape_ = should_escape;
 
   return delegating_sink;
 }
@@ -112,8 +107,8 @@ Context::~Context() {
 }
 
 void Context::activate() {
-  Registry::initSink(should_escape_);
   Registry::getSink()->setLock(lock_);
+  Registry::getSink()->set_should_escape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
 }
