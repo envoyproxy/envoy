@@ -125,3 +125,4 @@ cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
+export BUILDOZER_BIN="/usr/local/bin/buildozer"

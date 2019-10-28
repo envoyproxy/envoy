@@ -91,7 +91,12 @@ public:
         read_filter_(new Network::MockReadFilter()) {
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
+
+    // Advance time and trigger update of Dispatcher::approximateMonotonicTime()
+    // because zero QuicTime is considered uninitialized.
     time_system_.sleep(std::chrono::milliseconds(1));
+    connection_helper_.GetClock()->Now();
+
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
