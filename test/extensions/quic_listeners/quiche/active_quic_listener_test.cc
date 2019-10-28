@@ -52,11 +52,7 @@ public:
           read_filter_->callbacks_->connection().addConnectionCallbacks(
               network_connection_callbacks_);
         }}),
-        connection_handler_(*dispatcher_, "test_thread") {
-    EXPECT_CALL(listener_config_, listenerFiltersTimeout());
-    EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
-    EXPECT_CALL(listener_config_, listenerTag());
-  }
+        connection_handler_(*dispatcher_, "test_thread") {}
 
   void SetUp() override {
     listen_socket_ = std::make_unique<Network::NetworkListenSocket<
