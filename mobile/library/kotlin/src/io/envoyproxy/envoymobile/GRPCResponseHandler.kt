@@ -1,7 +1,5 @@
 package io.envoyproxy.envoymobile
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyError
-import io.envoyproxy.envoymobile.engine.types.EnvoyErrorCode
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -122,10 +120,7 @@ class GRPCResponseHandler(
         val compressionFlag = byteArray[0]
         // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501
         if (compressionFlag.compareTo(0) != 0) {
-          errorClosure(
-              EnvoyError(
-                  EnvoyErrorCode.ENVOY_UNDEFINED_ERROR,
-                  "Unable to read compressed gRPC response message"))
+          errorClosure(EnvoyError(0, "Unable to read compressed gRPC response message"))
 
           // no op the current onData and clean up
           errorClosure = { }

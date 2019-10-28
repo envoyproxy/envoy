@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
             })
             .onError((error) -> {
               recyclerView.post(
-                  () -> viewAdapter.add(new Failure("failed with error " + error.message)));
+                  () -> viewAdapter.add(new Failure("failed with error " + error.getMessage())));
               return Unit.INSTANCE;
             });
 

@@ -1,5 +1,6 @@
 import Foundation
 
+/// Error type containing information on failures reported by Envoy.
 @objcMembers
 public final class EnvoyError: NSObject, Error {
   /// Error code associated with the exception that occurred.
