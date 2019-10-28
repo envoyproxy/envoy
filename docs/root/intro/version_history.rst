@@ -27,10 +27,12 @@ Version history
 * config: async data access for local and remote data source.
 * config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
 * config: added stat :ref:`init_fetch_timeout <config_cluster_manager_cds>`.
+* config: tls_context in Cluster and FilterChain are deprecated in favor of transport socket. See :ref:`deprecated <deprecated>` for more information.
 * csrf: add PATCH to supported methods.
 * dns: added support for configuring :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>` to set the DNS refresh rate during failures.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
 * ext_authz: added tracing to the HTTP client.
+* ext_authz: deprecate :ref:`cluster scope stats <config_http_filters_ext_authz_stats>` in favour of filter scope stats.
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
 * grpc: added :ref:`AWS IAM grpc credentials extension <envoy_api_file_envoy/config/grpc_credential/v2alpha/aws_iam.proto>` for AWS-managed xDS.
 * grpc: added :ref:`gRPC stats filter <config_http_filters_grpc_stats>` for collecting stats about gRPC calls and streaming message counts.
@@ -38,6 +40,7 @@ Version history
 * grpc-json: added support for :ref:`the grpc-status-details-bin header<envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.convert_grpc_status>`.
 * header to metadata: added :ref:`PROTOBUF_VALUE <envoy_api_enum_value_config.filter.http.header_to_metadata.v2.Config.ValueType.PROTOBUF_VALUE>` and :ref:`ValueEncode <envoy_api_enum_config.filter.http.header_to_metadata.v2.Config.ValueEncode>` to support protobuf Value and Base64 encoding.
 * http: added a default one hour idle timeout to upstream and downstream connections. HTTP connections with no stream and no activity will be closed after one hour unless the default idle_timeout overridden. To disable upstream idle timeouts, set the :ref:`idle_timeout <envoy_api_field_core.HttpProtocolOptions.idle_timeout>` to zero in Cluster :ref:`http_protocol_options<envoy_api_field_Cluster.common_http_protocol_options>`. To disable downstream idle timeouts, either set :ref:`idle_timeout <envoy_api_field_core.HttpProtocolOptions.idle_timeout>` to zero in the HttpConnectionManager :ref:`common_http_protocol_options <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>` or set the deprecated :ref:`connection manager <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>` field to zero.
+* http: added the ability to format HTTP/1.1 header keys using :ref:`header_key_format <envoy_api_field_core.Http1ProtocolOptions.header_key_format>`.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 * http: changed Envoy to forward existing x-forwarded-proto from upstream trusted proxies. Guarded by `envoy.reloadable_features.trusted_forwarded_proto` which defaults true.
 * http: added the ability to configure the behavior of the server response header, via the :ref:`server_header_transformation<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.server_header_transformation>` field.
@@ -47,6 +50,7 @@ Version history
 * http: absolute URL support is now on by default. The prior behavior can be reinstated by setting :ref:`allow_absolute_url <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` to false.
 * http: support :ref:`host rewrite <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig>` in the dynamic forward proxy.
 * http: support :ref:`disabling the filter per route <envoy_api_msg_config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfigPerRoute>` in the grpc http1 reverse bridge filter.
+* http: added the ability to :ref:`configure max connection duration <envoy_api_field_core.HttpProtocolOptions.max_connection_duration>` for downstream connections.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * listeners: added :ref:`connection balancer <envoy_api_field_Listener.connection_balance_config>`
@@ -95,6 +99,7 @@ Version history
 * tcp_proxy: the default :ref:`idle_timeout
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
+* thrift_proxy: add support for stripping service name from method when using the multiplexed protocol.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
   certificate validation context.

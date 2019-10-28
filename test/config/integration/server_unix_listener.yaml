@@ -6,10 +6,12 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           http_filters:
           - name: envoy.router
-            config: {}
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
           codec_type: auto
           stat_prefix: router
           drain_timeout: 5s

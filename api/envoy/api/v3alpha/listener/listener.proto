@@ -6,7 +6,6 @@ option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
 
-import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 
@@ -20,7 +19,9 @@ import "validate/validate.proto";
 // Listener :ref:`configuration overview <config_listeners>`
 
 message Filter {
-  reserved 3;
+  reserved 3, 2;
+
+  reserved "config";
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
@@ -29,8 +30,6 @@ message Filter {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 4;
   }
 }
@@ -161,11 +160,12 @@ message FilterChainMatch {
 // various other parameters.
 // [#next-free-field: 8]
 message FilterChain {
+  reserved 2;
+
+  reserved "tls_context";
+
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;
-
-  // The TLS context for this filter chain.
-  auth.DownstreamTlsContext tls_context = 2;
 
   // A list of individual network filters that make up the filter chain for
   // connections established with the listener. Order matters as the filters are
@@ -184,7 +184,11 @@ message FilterChain {
   // [#not-implemented-hide:] filter chain metadata.
   core.Metadata metadata = 5;
 
-  // See :ref:`base.TransportSocket<envoy_api_msg_api.v3alpha.core.TransportSocket>` description.
+  // Optional custom transport socket implementation to use for downstream connections.
+  // To setup TLS, set a transport socket with name `tls` and
+  // :ref:`DownstreamTlsContext <envoy_api_msg_api.v3alpha.auth.DownstreamTlsContext>` in the
+  // `typed_config`. If no transport socket configuration is specified, new connections will be set
+  // up with plaintext.
   core.TransportSocket transport_socket = 6;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
@@ -194,6 +198,10 @@ message FilterChain {
 }
 
 message ListenerFilter {
+  reserved 2;
+
+  reserved "config";
+
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -201,8 +209,6 @@ message ListenerFilter {
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 3;
   }
 }
