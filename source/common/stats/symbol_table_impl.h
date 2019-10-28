@@ -33,8 +33,8 @@ using Symbol = uint32_t;
 /**
  * We encode the byte-size of a StatName as its first two bytes.
  */
-constexpr uint64_t StatNameSizeEncodingBytes = 2;
-constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65536
+// constexpr uint64_t StatNameSizeEncodingBytes = 2;
+// constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65536
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
@@ -104,7 +104,7 @@ public:
      * Returns the number of bytes required to represent StatName as a uint8_t
      * array, including the encoded size.
      */
-    uint64_t bytesRequired() const { return dataBytesRequired() + StatNameSizeEncodingBytes; }
+    uint64_t bytesRequired() const;
 
     /**
      * @return the number of uint8_t entries we collected while adding symbols.
@@ -119,6 +119,20 @@ public:
      * @return uint64_t the number of bytes transferred.
      */
     uint64_t moveToStorage(SymbolTable::Storage array);
+
+    static uint64_t decode(const uint8_t* encoding);
+    static uint64_t encodingSizeBytes(uint64_t number);
+
+    /**
+     * Saves the specified length into the byte array, returning the next byte.
+     * There is no guarantee that bytes will be aligned, so we can't cast to a
+     * uint16_t* and assign, but must individually copy the bytes.
+     *
+     * @param length the length in bytes to write.
+     * @param bytes the pointer into which to write the length.
+     * @return the pointer to the next byte for writing the data.
+     */
+    static uint8_t* encode(uint64_t number, uint8_t* buffer);
 
   private:
     std::vector<uint8_t> vec_;
@@ -143,22 +157,6 @@ public:
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
-
-  /**
-   * Saves the specified length into the byte array, returning the next byte.
-   * There is no guarantee that bytes will be aligned, so we can't cast to a
-   * uint16_t* and assign, but must individually copy the bytes.
-   *
-   * @param length the length in bytes to write. Must be < StatNameMaxSize.
-   * @param bytes the pointer into which to write the length.
-   * @return the pointer to the next byte for writing the data.
-   */
-  static inline uint8_t* writeLengthReturningNext(uint64_t length, uint8_t* bytes) {
-    ASSERT(length < StatNameMaxSize);
-    *bytes++ = length & 0xff;
-    *bytes++ = length >> 8;
-    return bytes;
-  }
 
   StatNameSetPtr makeSet(absl::string_view name) override;
   void forgetSet(StatNameSet& stat_name_set) override;
@@ -362,18 +360,16 @@ public:
    * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
    *                  overhead for the size itself.
    */
-  uint64_t dataSize() const {
-    if (size_and_data_ == nullptr) {
-      return 0;
-    }
-    return size_and_data_[0] | (static_cast<uint64_t>(size_and_data_[1]) << 8);
-  }
+  uint64_t dataSize() const;
 
   /**
    * @return uint64_t the number of bytes in the symbol array, including the two-byte
    *                  overhead for the size itself.
    */
-  uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
+  uint64_t size() const {
+    uint64_t sz = dataSize();
+    return sz + SymbolTableImpl::Encoding::encodingSizeBytes(sz);
+  }
 
   void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
 
@@ -384,7 +380,9 @@ public:
   /**
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
-  const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+  const uint8_t* data() const {
+    return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
+  }
 
   /**
    * @return whether this is empty.

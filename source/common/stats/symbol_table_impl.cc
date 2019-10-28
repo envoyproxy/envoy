@@ -16,6 +16,52 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
+uint64_t SymbolTableImpl::Encoding::bytesRequired() const {
+  uint64_t data_size = dataBytesRequired();
+  return data_size + encodingSizeBytes(data_size);
+}
+
+uint64_t SymbolTableImpl::Encoding::decode(const uint8_t* encoding) {
+  uint64_t size = 0;
+  for (uint32_t shift = 0; true; ++encoding, shift += 7) {
+    uint64_t uc = static_cast<uint32_t>(*encoding);
+    size |= (uc & Low7Bits) << shift;
+    if ((uc & SpilloverMask) == 0) {
+      break;
+    }
+  }
+  return size;
+}
+
+uint64_t StatName::dataSize() const {
+  if (size_and_data_ == nullptr) {
+    return 0;
+  }
+  return SymbolTableImpl::Encoding::decode(size_and_data_);
+}
+
+uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
+  uint64_t num_bytes = 0;
+  do {
+    ++num_bytes;
+    number >>= 7;
+  } while (number != 0);
+  return num_bytes;
+}
+
+// writeLengthReturningNext ?
+uint8_t* SymbolTableImpl::Encoding::encode(uint64_t number, uint8_t* bytes) {
+  do {
+    if (number < (1 << 7)) {
+      *bytes++ = number; // number <= 127 get encoded in one byte.
+    } else {
+      *bytes++ = ((number & Low7Bits) | SpilloverMask); // number >= 128 need spillover bytes.
+    }
+    number >>= 7;
+  } while (number != 0);
+  return bytes;
+}
+
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
@@ -84,12 +130,13 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
 
 uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_array) {
   const uint64_t sz = dataBytesRequired();
-  symbol_array = writeLengthReturningNext(sz, symbol_array);
+  symbol_array = encode(sz, symbol_array);
   if (sz != 0) {
     memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
   }
   vec_.clear(); // Logically transfer ownership, enabling empty assert on destruct.
-  return sz + StatNameSizeEncodingBytes;
+  return sz + SymbolTableImpl::Encoding::encodingSizeBytes(sz);
+  ;
 }
 
 SymbolTableImpl::SymbolTableImpl()
@@ -456,8 +503,9 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  auto bytes = std::make_unique<Storage>(num_bytes + StatNameSizeEncodingBytes);
-  uint8_t* p = writeLengthReturningNext(num_bytes, bytes.get());
+  auto bytes = std::make_unique<Storage>(SymbolTableImpl::Encoding::encodingSizeBytes(num_bytes) +
+                                         num_bytes);
+  uint8_t* p = SymbolTableImpl::Encoding::encode(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
     const uint64_t stat_name_bytes = stat_name.dataSize();
     memcpy(p, stat_name.data(), stat_name_bytes);

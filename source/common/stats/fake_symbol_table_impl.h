@@ -64,13 +64,10 @@ public:
     // than 256 of them.
     RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
-    // First encode all the names. The '1' here represents the number of
-    // names. The num_names * StatNameSizeEncodingBytes reserves space for the
-    // lengths of each name.
-    size_t total_size_bytes = 1 + num_names * StatNameSizeEncodingBytes;
-
+    size_t total_size_bytes = 1; /* one byte for holding the number of names */
     for (uint32_t i = 0; i < num_names; ++i) {
-      total_size_bytes += names[i].size();
+      size_t name_size = names[i].size();
+      total_size_bytes += SymbolTableImpl::Encoding::encodingSizeBytes(name_size) + name_size;
     }
 
     // Now allocate the exact number of bytes required and move the encodings
@@ -81,7 +78,7 @@ public:
     for (uint32_t i = 0; i < num_names; ++i) {
       auto& name = names[i];
       size_t sz = name.size();
-      p = SymbolTableImpl::writeLengthReturningNext(sz, p);
+      p = SymbolTableImpl::Encoding::encode(sz, p);
       if (!name.empty()) {
         memcpy(p, name.data(), sz * sizeof(uint8_t));
         p += sz;
@@ -143,8 +140,10 @@ private:
 
   StoragePtr encodeHelper(absl::string_view name) const {
     ASSERT(!absl::EndsWith(name, "."));
-    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
-    uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
+    uint64_t bytes_required =
+        SymbolTableImpl::Encoding::encodingSizeBytes(name.size()) + name.size();
+    auto bytes = std::make_unique<Storage>(bytes_required);
+    uint8_t* buffer = SymbolTableImpl::Encoding::encode(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
     return bytes;
   }
