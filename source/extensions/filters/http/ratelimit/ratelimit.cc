@@ -153,6 +153,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
+    if (response_headers_to_add_ == nullptr) {
+      response_headers_to_add_ = std::make_unique<Http::HeaderMapImpl>();
+    }
     response_headers_to_add_->insertEnvoyRateLimited().value(
         Http::Headers::get().EnvoyRateLimitedValues.True);
     break;

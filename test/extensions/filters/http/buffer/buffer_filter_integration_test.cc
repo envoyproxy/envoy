@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
+
 #include "common/protobuf/utility.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -113,18 +115,18 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
-  ProtobufWkt::Struct pfc;
-  TestUtility::loadFromJson(json_config, pfc);
+  envoy::config::filter::http::buffer::v2::BufferPerRoute buffer_per_route;
+  TestUtility::loadFromJson(json_config, buffer_per_route);
 
   return
-      [pfc](
+      [buffer_per_route](
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()
                            ->Mutable(0)
-                           ->mutable_per_filter_config();
+                           ->mutable_typed_per_filter_config();
 
-        (*config)["envoy.buffer"] = pfc;
+        (*config)["envoy.buffer"].PackFrom(buffer_per_route);
       };
 }
 

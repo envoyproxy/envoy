@@ -348,6 +348,12 @@ message CommonTlsContext {
 
 message UpstreamTlsContext {
   // Common TLS context settings.
+  //
+  // .. attention::
+  //
+  //   Server certificate verification is not enabled by default. Configure
+  //   :ref:`trusted_ca<envoy_api_field_api.v3alpha.auth.CertificateValidationContext.trusted_ca>`
+  //   to enable verification.
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.

@@ -1325,6 +1325,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
     return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           host->cluster().http1Settings(),
                                                            transport_socket_options);
   }
 }
