@@ -538,7 +538,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   // This assert iterates over the HeaderMap.
   ASSERT(current_header_map_->byteSize().has_value() &&
          current_header_map_->byteSize() == current_header_map_->byteSizeInternal());
-  if (!(parser_.http_major == 1 && parser_.http_minor == 1) && !processing_trailers_) {
+  if (!(parser_.http_major == 1 && parser_.http_minor == 1)) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
@@ -571,11 +571,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   int rc = onHeadersComplete(std::move(current_header_map_));
   current_header_map_.reset();
 
-  if (processing_trailers_) {
-    trailer_parsing_state_ = HeaderParsingState::Done;
-  } else {
-    header_parsing_state_ = HeaderParsingState::Done;
-  }
+  header_parsing_state_ = HeaderParsingState::Done;
 
   // Returning 2 informs http_parser to not expect a body or further data on this connection.
   return handling_upgrade_ ? 2 : rc;
