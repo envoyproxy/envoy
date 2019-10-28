@@ -1,6 +1,5 @@
 #include "server/server.h"
 
-#include <atomic>
 #include <csignal>
 #include <cstdint>
 #include <functional>
@@ -55,9 +54,9 @@ InstanceImpl::InstanceImpl(
     ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
-    : init_manager_(init_manager), workers_started_(false), shutdown_(false), options_(options),
-      validation_context_(options_.allowUnknownStaticFields(),
-                          !options.rejectUnknownDynamicFields()),
+    : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
+      options_(options), validation_context_(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
@@ -134,7 +133,10 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+void InstanceImpl::failHealthcheck(bool fail) {
+  live_.store(!fail);
+  server_stats_->live_.set(live_.load());
+}
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   snapped_counters_ = store.counters();
@@ -210,7 +212,7 @@ void InstanceImpl::flushStatsInternal() {
   }
 }
 
-bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
+bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,

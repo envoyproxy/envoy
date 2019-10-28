@@ -69,6 +69,7 @@ message RouteMatch {
   repeated api.v2.route.HeaderMatcher headers = 4;
 }
 
+// [#next-free-field: 6]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -95,6 +96,10 @@ message RouteAction {
   // N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
   // action with the header name ":method-name".
   repeated api.v2.route.RateLimit rate_limits = 4;
+
+  // Strip the service prefix from the method name, if there's a prefix. For
+  // example, the method call Service:method would end up being just method.
+  bool strip_service_name = 5;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the
