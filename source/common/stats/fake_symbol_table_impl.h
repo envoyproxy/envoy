@@ -78,7 +78,7 @@ public:
     for (uint32_t i = 0; i < num_names; ++i) {
       auto& name = names[i];
       size_t sz = name.size();
-      p = SymbolTableImpl::Encoding::encode(sz, p);
+      p = SymbolTableImpl::Encoding::writeEncodingReturningNext(sz, p);
       if (!name.empty()) {
         memcpy(p, name.data(), sz * sizeof(uint8_t));
         p += sz;
@@ -143,7 +143,7 @@ private:
     uint64_t bytes_required =
         SymbolTableImpl::Encoding::encodingSizeBytes(name.size()) + name.size();
     auto bytes = std::make_unique<Storage>(bytes_required);
-    uint8_t* buffer = SymbolTableImpl::Encoding::encode(name.size(), bytes.get());
+    uint8_t* buffer = SymbolTableImpl::Encoding::writeEncodingReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
     return bytes;
   }

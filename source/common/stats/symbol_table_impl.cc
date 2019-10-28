@@ -21,23 +21,23 @@ uint64_t SymbolTableImpl::Encoding::bytesRequired() const {
   return data_size + encodingSizeBytes(data_size);
 }
 
-uint64_t SymbolTableImpl::Encoding::decode(const uint8_t* encoding) {
-  uint64_t size = 0;
+uint64_t SymbolTableImpl::Encoding::decodeNumber(const uint8_t* encoding) {
+  uint64_t number = 0;
   for (uint32_t shift = 0; true; ++encoding, shift += 7) {
     uint64_t uc = static_cast<uint32_t>(*encoding);
-    size |= (uc & Low7Bits) << shift;
+    number |= (uc & Low7Bits) << shift;
     if ((uc & SpilloverMask) == 0) {
       break;
     }
   }
-  return size;
+  return number;
 }
 
 uint64_t StatName::dataSize() const {
   if (size_and_data_ == nullptr) {
     return 0;
   }
-  return SymbolTableImpl::Encoding::decode(size_and_data_);
+  return SymbolTableImpl::Encoding::decodeNumber(size_and_data_);
 }
 
 uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
@@ -50,7 +50,7 @@ uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
 }
 
 // writeLengthReturningNext ?
-uint8_t* SymbolTableImpl::Encoding::encode(uint64_t number, uint8_t* bytes) {
+uint8_t* SymbolTableImpl::Encoding::writeEncodingReturningNext(uint64_t number, uint8_t* bytes) {
   do {
     if (number < (1 << 7)) {
       *bytes++ = number; // number <= 127 get encoded in one byte.
@@ -130,7 +130,7 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
 
 uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_array) {
   const uint64_t sz = dataBytesRequired();
-  symbol_array = encode(sz, symbol_array);
+  symbol_array = writeEncodingReturningNext(sz, symbol_array);
   if (sz != 0) {
     memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
   }
@@ -505,7 +505,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   }
   auto bytes = std::make_unique<Storage>(SymbolTableImpl::Encoding::encodingSizeBytes(num_bytes) +
                                          num_bytes);
-  uint8_t* p = SymbolTableImpl::Encoding::encode(num_bytes, bytes.get());
+  uint8_t* p = SymbolTableImpl::Encoding::writeEncodingReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
     const uint64_t stat_name_bytes = stat_name.dataSize();
     memcpy(p, stat_name.data(), stat_name_bytes);

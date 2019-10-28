@@ -120,19 +120,33 @@ public:
      */
     uint64_t moveToStorage(SymbolTable::Storage array);
 
-    static uint64_t decode(const uint8_t* encoding);
+    /**
+     * @param number A number to encode in a variable length byte-array.
+     * @return The number of bytes it would take to encode the number.
+     */
     static uint64_t encodingSizeBytes(uint64_t number);
 
     /**
-     * Saves the specified length into the byte array, returning the next byte.
+     * Saves the specified number into the byte array, returning the next byte.
      * There is no guarantee that bytes will be aligned, so we can't cast to a
      * uint16_t* and assign, but must individually copy the bytes.
      *
-     * @param length the length in bytes to write.
+     * Requires that the buffer be sized to accomodate encodingSizeBytes(number).
+     *
+     * @param number the number to write.
      * @param bytes the pointer into which to write the length.
      * @return the pointer to the next byte for writing the data.
      */
-    static uint8_t* encode(uint64_t number, uint8_t* buffer);
+    static uint8_t* writeEncodingReturningNext(uint64_t number, uint8_t* buffer);
+
+    /**
+     * Decodes a byte-array containing a variable-length number.
+     *
+     * @param The encoded byte array, written previously by writeNumberReturningNext.
+     * @return The decoded number.
+     */
+    static uint64_t decodeNumber(const uint8_t* encoding);
+
 
   private:
     std::vector<uint8_t> vec_;
