@@ -267,7 +267,7 @@ private:
    * Called when the request/response is complete.
    */
   void onMessageCompleteBase();
-  virtual void onMessageComplete() PURE;
+  virtual void onMessageComplete(HeaderMapImplPtr&& trailers) PURE;
 
   /**
    * @see onResetStreamBase().
@@ -357,7 +357,7 @@ private:
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
+  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override;
   void onAboveHighWatermark() override;
@@ -397,7 +397,7 @@ private:
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
+  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override {}
   void onAboveHighWatermark() override;

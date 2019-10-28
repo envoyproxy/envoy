@@ -580,14 +580,6 @@ int ConnectionImpl::onHeadersCompleteBase() {
 void ConnectionImpl::onMessageCompleteBase() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
 
-  // http_parser calls this cb after trailers are done
-  // And since trailers will end the connection, we return after
-  // onHeadersCompleteBase()
-  if (processing_trailers_) {
-    onHeadersCompleteBase();
-    return;
-  }
-
   if (handling_upgrade_) {
     // If this is an upgrade request, swallow the onMessageComplete. The
     // upgrade payload will be treated as stream body.
@@ -596,7 +588,12 @@ void ConnectionImpl::onMessageCompleteBase() {
     http_parser_pause(&parser_, 1);
     return;
   }
-  onMessageComplete();
+
+  if (trailer_parsing_state_ == HeaderParsingState::Value) {
+    completeLastHeader();
+  }
+
+  onMessageComplete(std::move(current_header_map_));
 }
 
 void ConnectionImpl::onMessageBeginBase() {
@@ -765,7 +762,7 @@ void ServerConnectionImpl::onBody(const char* data, size_t length) {
   }
 }
 
-void ServerConnectionImpl::onMessageComplete() {
+void ServerConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
   if (active_request_) {
     Buffer::OwnedImpl buffer;
     active_request_->remote_complete_ = true;
@@ -774,6 +771,8 @@ void ServerConnectionImpl::onMessageComplete() {
       active_request_->request_decoder_->decodeHeaders(std::move(deferred_end_stream_headers_),
                                                        true);
       deferred_end_stream_headers_.reset();
+    } else if (processing_trailers_) {
+      active_request_->request_decoder_->decodeTrailers(std::move(trailers));
     } else {
       active_request_->request_decoder_->decodeData(buffer, true);
     }
@@ -893,7 +892,7 @@ void ClientConnectionImpl::onBody(const char* data, size_t length) {
   }
 }
 
-void ClientConnectionImpl::onMessageComplete() {
+void ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_100_continue_) {
     ignore_message_complete_for_100_continue_ = false;
@@ -919,6 +918,8 @@ void ClientConnectionImpl::onMessageComplete() {
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(std::move(deferred_end_stream_headers_), true);
       deferred_end_stream_headers_.reset();
+    } else if (processing_trailers_) {
+      response.decoder_->decodeTrailers(std::move(trailers));
     } else {
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
