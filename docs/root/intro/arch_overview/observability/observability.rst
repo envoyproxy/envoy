@@ -6,5 +6,4 @@ Observability
 
   statistics
   access_logging
-  application_logging
   tracing

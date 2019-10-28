@@ -1,4 +1,4 @@
-.. _arch_overview_application_logs:
+.. _config_application_logs:
 
 Application logging
 ===================
@@ -20,5 +20,6 @@ with the following :ref:`command line options <operations_cli>`:
   C-style escape sequences (such as ``\n``) will be escaped and prevent a single string
   from spanning multiple lines. This ensures each log line is structured with the glog prefix.
 * The ``--log-path`` flag **does not** need to be set, since Stackdriver can read logs from STDERR.
+* The ``--log-level`` flag can be set to control the log severity logged to Stackdriver.
 
 `Reference documentation <https://cloud.google.com/run/docs/logging#container-logs>`_ for Stackdriver on GKE.

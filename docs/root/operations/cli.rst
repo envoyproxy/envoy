@@ -96,7 +96,7 @@ following are the command line options that Envoy supports.
 
    When used in conjunction with ``--log-format-escaped``, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
-   in the :ref:`application logging <arch_overview_application_logs>` section.
+   in the :ref:`application logging configuration <config_application_logs>` section.
 
    The supported format flags are (with example output):
 
