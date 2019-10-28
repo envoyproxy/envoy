@@ -41,13 +41,14 @@ TestStreamInfo makeStreamInfo(const test::fuzz::StreamInfo& info) {
 }
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
+  // Create builder without constant folding.
+  static Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
+
   try {
     // Validate that the input has an expression.
     TestUtility::validate(input);
 
     // Create the CEL expression.
-    Protobuf::Arena arena;
-    Expr::BuilderPtr builder = Expr::createBuilder(&arena);
     Expr::ExpressionPtr expr = Expr::createExpression(*builder, input.expression());
 
     // Create the headers and stream_info to test against.
@@ -57,7 +58,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
     Http::TestHeaderMapImpl response_trailers = Fuzz::fromHeaders(input.trailers());
 
     // Evaluate the CEL expression.
-    Expr::evaluate(*expr, &arena, stream_info, &request_headers, &response_headers,
+    Protobuf::Arena arena;
+    Expr::evaluate(*expr, nullptr, stream_info, &request_headers, &response_headers,
                    &response_trailers);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
