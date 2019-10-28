@@ -394,8 +394,7 @@ void ConnectionImpl::completeLastHeader() {
   }
 
   // Check if the number of headers exceeds the limit.
-  // TODO should we check for trailers too?
-  if (!processing_trailers_ && current_header_map_->size() > max_headers_count_) {
+  if (current_header_map_->size() > max_headers_count_) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");
@@ -486,11 +485,11 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
-  ENVOY_CONN_LOG(trace, "onHeaderValue: data={}", connection_, absl::string_view(data, length));
-  if (current_header_map_.get() == nullptr) {
+  const absl::string_view header_value = absl::string_view(data, length);
+  ENVOY_CONN_LOG(trace, "onHeaderValue: data={}", connection_, header_value);
+  if (!current_header_map_) {
     current_header_map_ = std::make_unique<HeaderMapImpl>();
   }
-  const absl::string_view header_value = absl::string_view(data, length);
 
   if (strict_header_validation_ && !processing_trailers_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
@@ -859,8 +858,7 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
-  if (processing_trailers_ && parser_.status_code != 100) {
-    ENVOY_CONN_LOG(trace, "client on headers complete", connection_);
+  if (processing_trailers_) {
     pending_responses_.front().decoder_->decodeTrailers(std::move(headers));
     return 0;
   }
