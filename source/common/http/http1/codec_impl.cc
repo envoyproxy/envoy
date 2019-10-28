@@ -686,17 +686,6 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
 
 int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
-  if (processing_trailers_) {
-    ENVOY_CONN_LOG(trace, "trailers complete size={}", connection_, headers->size());
-    active_request_->request_decoder_->decodeTrailers(std::move(headers));
-
-    // If the connection has been closed (or is closing) after decoding headers, pause the parser
-    // so we return control to the caller.
-    if (connection_.state() != Network::Connection::State::Open) {
-      http_parser_pause(&parser_, 1);
-    }
-    return 0;
-  }
 
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
@@ -853,10 +842,6 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
-  if (processing_trailers_) {
-    pending_responses_.front().decoder_->decodeTrailers(std::move(headers));
-    return 0;
-  }
 
   headers->insertStatus().value(parser_.status_code);
 
