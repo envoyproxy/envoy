@@ -172,8 +172,24 @@ message TlsSessionTicketKeys {
   repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message CertificateValidationContext {
+  // Peer certificate verification mode.
+  enum TrustChainVerification {
+    // Perform default certificate verification (e.g., against CA / verification lists)
+    VERIFY_TRUST_CHAIN = 0;
+
+    // Connections where the certificate fails verification will be permitted.
+    // For HTTP connections, the certificate details will be unconditionally placed in the
+    // *x-forwarded-untrusted-client-cert* HTTP header.
+    ACCEPT_UNTRUSTED = 1;
+
+    // Connections will be permitted without certificate verification performed.
+    // For HTTP connections, the certificate details will be unconditionally placed in the
+    // *x-forwarded-untrusted-client-cert* HTTP header.
+    NOT_VERIFIED = 2;
+  }
+
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
   // for listeners). If not specified and a peer certificate is presented it will not be
@@ -284,6 +300,10 @@ message CertificateValidationContext {
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
+
+  // Certificate trust chain verification mode.
+  TrustChainVerification trust_chain_verification = 9
+      [(validate.rules).enum = {defined_only: true}];
 }
 
 // TLS context shared by both client and server TLS contexts.
