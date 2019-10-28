@@ -24,9 +24,7 @@ public:
     ENVOY_STREAM_LOG(info, "fake message", stream_);
   }
 
-  void logMessageEscapeSequences() {
-    ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test");
-  }
+  void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
 
 private:
   NiceMock<Network::MockConnection> connection_;
