@@ -128,13 +128,13 @@ public:
 
 TEST_F(FormatTest, OutputUnescaped) {
   const Envoy::ExpectedLogMessages message{{"info", "line 1 \n line 2 \t tab \\r test"}};
-  EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(message, logMessageEscapeSequences(), false);
+  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(message, logMessageEscapeSequences(), false);
 }
 
 TEST_F(FormatTest, OutputEscaped) {
   // Note this uses a raw string literal
   const Envoy::ExpectedLogMessages message{{"info", R"(line 1 \n line 2 \t tab \\r test)"}};
-  EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(message, logMessageEscapeSequences(), true);
+  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(message, logMessageEscapeSequences(), true);
 }
 
 } // namespace Envoy

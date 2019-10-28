@@ -68,9 +68,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
 // Below macros specify Envoy:: before class names so that the macro can be used outside of
 // namespace Envoy.
 
-// Alias for EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED, with escaped=false
+// Alias for EXPECT_LOG_CONTAINS_ALL_OF_HELPER, with escaped=false
 #define EXPECT_LOG_CONTAINS_ALL_OF(expected_messages, stmt)                                        \
-  EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(expected_messages, stmt, false)
+  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, false)
 
 // Validates that when stmt is executed, log messages containing substr and loglevel will be
 // emitted. Escaped=true sets the behavior to function like the --log-format-escaped CLI flag.
@@ -83,11 +83,11 @@ using ExpectedLogMessages = std::vector<StringPair>;
 //  Does NOT contain:
 //    'warning', 'Too many sendDiscoveryRequest calls for baz’
 //    'warning', 'Too man sendDiscoveryRequest calls for foo'
-#define EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(expected_messages, stmt, escaped)                       \
+#define EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, escaped)                        \
   do {                                                                                             \
     ASSERT_FALSE(expected_messages.empty()) << "Expected messages cannot be empty.";               \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::Logger::DelegatingLogSinkPtr sink_ptr = Envoy::Logger::Registry::getSink();                    \
+    Envoy::Logger::DelegatingLogSinkPtr sink_ptr = Envoy::Logger::Registry::getSink();             \
     sink_ptr->set_should_escape(escaped);                                                          \
     Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
     stmt;                                                                                          \
