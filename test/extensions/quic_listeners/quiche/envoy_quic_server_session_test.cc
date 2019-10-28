@@ -209,9 +209,6 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   decoded_headers->Method()->value().getStringView());
       }));
-  EXPECT_CALL(request_decoder, decodeData(_, true))
-      .Times(testing::AtMost(1))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) { EXPECT_EQ(0, buffer.length()); }));
   stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
@@ -479,9 +476,6 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   decoded_headers->Method()->value().getStringView());
       }));
-  EXPECT_CALL(request_decoder, decodeData(_, true))
-      .Times(testing::AtMost(1))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) { EXPECT_EQ(0, buffer.length()); }));
   stream1->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
 
@@ -547,9 +541,6 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   decoded_headers->Method()->value().getStringView());
       }));
-  EXPECT_CALL(request_decoder3, decodeData(_, true))
-      .Times(testing::AtMost(1))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) { EXPECT_EQ(0, buffer.length()); }));
   stream3->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
 
