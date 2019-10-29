@@ -13,7 +13,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
-#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/grpc/status.h"
 #include "common/http/exception.h"
@@ -382,7 +381,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 }
 
-void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& headers) {
+bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
   // Remove any headers nominated by the Connection header. The TE header
   // is sanitized and removed only if it's empty after removing unsupported values
   // See https://github.com/envoyproxy/envoy/issues/8623
@@ -390,9 +389,17 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
   const auto& connection_header_value = headers.Connection()->value();
 
   StringUtil::CaseUnorderedSet headers_to_remove{};
+  std::vector<std::string> connection_header_tokens =
+      absl::StrSplit(connection_header_value.getStringView(), ',');
+
+  // If we have 10 or more nominated headers, fail this request
+  if (connection_header_tokens.size() >= 10) {
+    ENVOY_LOG_MISC(trace, "Too many nominated headers in request");
+    return false;
+  }
 
   // Split the connection header and evaluate each nominated header
-  for (const auto& token : absl::StrSplit(connection_header_value.getStringView(), ',')) {
+  for (const auto& token : connection_header_tokens) {
 
     const absl::string_view token_sv = StringUtil::trim(token);
 
@@ -406,15 +413,34 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
     }
 
     // Build the LowerCaseString for header lookup
-    const std::string header_to_remove = std::string(token_sv.data(), token_sv.size());
+    const std::string header_to_remove = std::string(token_sv);
     const LowerCaseString lcs_header_to_remove(header_to_remove);
 
     // By default we will remove any nominated headers
     bool keep_header = false;
     StringUtil::CaseUnorderedSet tokens_to_remove{};
 
-    // Determine whether the nominated header contains unsupported values
-    HeaderEntry* nominated_header = headers.get(lcs_header_to_remove);
+    // Determine whether the nominated header contains invalid values
+    HeaderEntry* nominated_header = NULL;
+
+    if (StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().Connection.get())) {
+      // Remove the connection header from the nominated tokens if it's self nominated
+      // The connection header itself is *not removed*
+      ENVOY_LOG_MISC(trace, "Skipping self nominated header [{}]", token_sv);
+      keep_header = true;
+      headers_to_remove.emplace(token_sv);
+
+    } else if (token_sv.find(':') == 0) {
+      // Remove any pseudo headers from the Connection header if they are nominated.
+      // The pseudo headers are left intact.
+      ENVOY_LOG_MISC(trace, "Skipping nominated pseudo header [{}]", token_sv);
+      keep_header = true;
+      headers_to_remove.emplace(token_sv);
+
+    } else {
+      // Examine the value of all other nominated headers
+      nominated_header = headers.get(lcs_header_to_remove);
+    }
 
     if (nominated_header) {
       const HeaderString& nominated_header_value = nominated_header->value();
@@ -428,8 +454,7 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
                                                   Http::Headers::get().TEValues.Trailers))) {
           keep_header = true;
         } else {
-          ENVOY_LOG_TO_LOGGER(logger, trace, "Sanitizing nominated header [{}] value [{}]",
-                              token_sv, header_sv);
+          ENVOY_LOG_MISC(trace, "Sanitizing nominated header [{}] value [{}]", token_sv, header_sv);
           tokens_to_remove.emplace(header_sv);
         }
       }
@@ -451,7 +476,7 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
     }
 
     if (!keep_header) {
-      ENVOY_LOG_TO_LOGGER(logger, trace, "Removing nominated header [{}]", token_sv);
+      ENVOY_LOG_MISC(trace, "Removing nominated header [{}]", token_sv);
       headers.remove(lcs_header_to_remove);
       headers_to_remove.emplace(token_sv);
     }
@@ -468,6 +493,8 @@ void Utility::sanitizeConnectionHeader(spdlog::logger& logger, Http::HeaderMap& 
       headers.Connection()->value(new_value);
     }
   }
+
+  return true;
 }
 
 const std::string& Utility::getProtocolString(const Protocol protocol) {
@@ -651,8 +678,8 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
     //
     // We do checking for each char in the string. If the current char is included in the defined
-    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded] to
-    // the returned string one by one) started from the current index.
+    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
+    // to the returned string one by one) started from the current index.
     if (ch < ' ' || ch >= '~' || ch == '%') {
       return PercentEncoding::encode(value, i);
     }

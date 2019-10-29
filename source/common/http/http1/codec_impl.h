@@ -304,6 +304,7 @@ private:
   const uint32_t max_headers_count_;
 
   bool strict_header_validation_;
+  bool connection_header_sanitization_;
 };
 
 /**
