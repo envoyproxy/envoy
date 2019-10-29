@@ -155,9 +155,13 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
-        sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
-        strip_prefix = "zlib-1.2.11",
-        urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+        # Use the dev branch of zlib to resolve fuzz bugs and out of bound
+        # errors resulting in crashes in zlib 1.2.11.
+        # TODO(asraa): Remove when zlib > 1.2.11 is released.
+        sha256 = "155a8f8c1a753fb05b16a1b0cc0a0a9f61a78e245f9e0da483d13043b3bcbf2e",
+        strip_prefix = "zlib-79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
+        # 2019-04-14 development branch
+        urls = ["https://github.com/madler/zlib/archive/79baebe50e4d6b73ae1f8b603f0ef41300110aa3.tar.gz"],
     ),
     com_github_jbeder_yaml_cpp = dict(
         sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
