@@ -47,7 +47,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v2::HTTPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
-                                                        stream_info);
+                                                        stream_info, config_.common_config());
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {

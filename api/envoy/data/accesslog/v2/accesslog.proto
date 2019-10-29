@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
@@ -162,6 +163,9 @@ message AccessLogCommon {
   // received. Note: This is always the physical peer, even if the remote address is inferred from
   // for example the x-forwarder-for header, proxy protocol, etc.
   api.v2.core.Address downstream_direct_remote_address = 20;
+
+  // The filter state in the stream info. If they are serializable and specified in `filter_state_objects_to_log`.
+  map<string, google.protobuf.Any> filter_state_objects = 21;
 }
 
 // Flags indicating occurrences during request/response processing.

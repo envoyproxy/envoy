@@ -60,4 +60,7 @@ message CommonGrpcAccessLogConfig {
   // this limit it hit, or every time flush interval is elapsed, whichever comes first. Setting it
   // to zero effectively disables the batching. Defaults to 16384.
   google.protobuf.UInt32Value buffer_size_bytes = 4;
+
+  // Additional filter state objects to log. If the filter state object is serializable.
+  repeated string filter_state_objects_to_log = 5;
 }
