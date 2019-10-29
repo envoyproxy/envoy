@@ -31,7 +31,6 @@ envoy_cc_library(
         "//source/common/crypto:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/singleton:const_singleton",
-        "//source/extensions/common/crypto:utility_lib",
     ],
 )
 
