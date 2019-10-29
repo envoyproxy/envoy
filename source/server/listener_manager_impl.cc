@@ -345,7 +345,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     auto existing_draining_listener = std::find_if(
         draining_listeners_.cbegin(), draining_listeners_.cend(),
         [&new_listener](const DrainingListener& listener) {
-          return !listener.socket_closed_ &&
+          return listener.listener_->socket().isOpen() &&
                  *new_listener->address() == *listener.listener_->socket().localAddress();
         });
     if (existing_draining_listener != draining_listeners_.cend()) {
@@ -390,6 +390,16 @@ bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
   return false;
 }
 
+bool ListenerManagerImpl::hasListenerWithSocket(const ListenerList& list,
+                                                const Network::SocketSharedPtr& socket) {
+  for (const auto& listener : list) {
+    if (listener->getSocket() == socket) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // First add the listener to the draining list.
   std::list<DrainingListener>::iterator draining_it = draining_listeners_.emplace(
@@ -401,7 +411,22 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
-  stopListener(*draining_it->listener_, nullptr);
+  const uint64_t listener_tag = draining_it->listener_->listenerTag();
+  stopListener(*draining_it->listener_, [this, listener_tag]() {
+    for (auto& listener : draining_listeners_) {
+      if (listener.listener_->listenerTag() == listener_tag) {
+        // Handle the edge case when new listener is added for the same address as the drained
+        // one. In this case the socket is shared between both listeners so one should avoid
+        // closing it.
+        const auto& socket = listener.listener_->getSocket();
+        if (!hasListenerWithSocket(active_listeners_, socket) &&
+            !hasListenerWithSocket(warming_listeners_, socket)) {
+          // Close the socket iff it is not used anymore.
+          listener.listener_->socket().close();
+        }
+      }
+    }
+  });
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
@@ -489,6 +514,8 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 
   (*existing_warming_listener)->debugLog("warm complete. updating active listener");
   if (existing_active_listener != active_listeners_.end()) {
+    // Finish active_listeners_ transformation before calling `drainListener` as it depends on their
+    // state.
     auto listener = std::move(*existing_active_listener);
     *existing_active_listener = std::move(*existing_warming_listener);
     drainListener(std::move(listener));
@@ -533,6 +560,8 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
   if (existing_active_listener != active_listeners_.end()) {
     // Listeners in active_listeners_ are added to workers after workers start, so we drain
     // listeners only after this occurs.
+    // Finish active_listeners_ transformation before calling `drainListener` as it depends on their
+    // state.
     auto listener = std::move(*existing_active_listener);
     active_listeners_.erase(existing_active_listener);
     if (workers_started_) {
@@ -564,38 +593,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
 
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
                                        std::function<void()> callback) {
-  const uint64_t listener_tag = listener.listenerTag();
   const auto workers_pending_stop = std::make_shared<std::atomic<uint32_t>>(workers_.size());
   for (const auto& worker : workers_) {
-    worker->stopListener(listener, [this, callback, workers_pending_stop, listener_tag]() {
+    worker->stopListener(listener, [this, callback = std::move(callback), workers_pending_stop]() {
       if (--(*workers_pending_stop) == 0) {
-        server_.dispatcher().post([this, callback, listener_tag]() {
-          for (auto& listener : active_listeners_) {
-            if (listener->listenerTag() == listener_tag) {
-              listener->socket().close();
-            }
-          }
-          for (auto& listener : draining_listeners_) {
-            if (listener.listener_->listenerTag() == listener_tag) {
-              // Handle the edge case when new listener is added for the same address as the drained
-              // one. In this case the socket is shared between both listeners so one should avoid
-              // closing it.
-              bool is_used_by_active_listener = false;
-              for (auto& active_listener : active_listeners_) {
-                if (listener.listener_->getSocket() == active_listener->getSocket()) {
-                  is_used_by_active_listener = true;
-                }
-              }
-              if (!is_used_by_active_listener) {
-                listener.socket_closed_ = true;
-                listener.listener_->socket().close();
-              }
-            }
-          }
-          if (callback != nullptr) {
-            callback();
-          }
-        });
+        server_.dispatcher().post(callback);
       }
     });
   }
@@ -613,7 +615,17 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
         (*existing_warming_listener)->debugLog("removing warming listener");
         warming_listeners_.erase(existing_warming_listener);
       }
-      stopListener(listener, [this]() { stats_.listener_stopped_.inc(); });
+      // Close the socket once all workers stopped accepting its connectitons.
+      // This allows clients to fast fail instead of waiting in the accept queue.
+      const uint64_t listener_tag = listener.listenerTag();
+      stopListener(listener, [this, listener_tag]() {
+        for (auto& listener : active_listeners_) {
+          if (listener->listenerTag() == listener_tag) {
+            listener->socket().close();
+          }
+        }
+        stats_.listener_stopped_.inc();
+      });
     }
   }
 }

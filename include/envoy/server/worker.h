@@ -68,7 +68,7 @@ public:
   /**
    * Stop a listener from accepting new connections. This is used for server draining.
    * @param listener supplies the listener to stop.
-   * @param completion supplies the completion to be called when the listener has been stopped
+   * @param completion supplies the completion to be called when the listener has stopped
    * accepting new connections. This completion is called on the worker thread. No locking is
    * performed by the worker.
    */
