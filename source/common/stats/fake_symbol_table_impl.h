@@ -67,7 +67,7 @@ public:
     size_t total_size_bytes = 1; /* one byte for holding the number of names */
     for (uint32_t i = 0; i < num_names; ++i) {
       size_t name_size = names[i].size();
-      total_size_bytes += SymbolTableImpl::Encoding::encodingSizeBytes(name_size) + name_size;
+      total_size_bytes += SymbolTableImpl::Encoding::totalSizeBytes(name_size);
     }
 
     // Now allocate the exact number of bytes required and move the encodings
@@ -140,9 +140,7 @@ private:
 
   StoragePtr encodeHelper(absl::string_view name) const {
     ASSERT(!absl::EndsWith(name, "."));
-    uint64_t bytes_required =
-        SymbolTableImpl::Encoding::encodingSizeBytes(name.size()) + name.size();
-    auto bytes = std::make_unique<Storage>(bytes_required);
+    auto bytes = std::make_unique<Storage>(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
     uint8_t* buffer =
         SymbolTableImpl::Encoding::writeEncodingReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
