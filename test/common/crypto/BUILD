@@ -24,5 +24,6 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
     ],
 )

@@ -6,9 +6,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/crypto/crypto.h"
 
-#include "absl/strings/string_view.h"
-
 #include "common/singleton/threadsafe_singleton.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Common {

@@ -43,8 +43,7 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());
     if (response->body()) {
       auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-      const auto content_hash =
-          Hex::encode(crypto_util.getSha256Digest(*response->body()));
+      const auto content_hash = Hex::encode(crypto_util.getSha256Digest(*response->body()));
 
       if (content_hash_ != content_hash) {
         ENVOY_LOG(debug, "fetch remote data [uri = {}]: data is invalid", uri_.uri());
