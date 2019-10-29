@@ -63,9 +63,8 @@ void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
 void NewGrpcMuxImpl::requestAliasesResolution(const std::string& type_url,
                                               const std::set<std::string>& aliases) {
   auto sub = subscriptions_.find(type_url);
-  RELEASE_ASSERT(
-      sub != subscriptions_.end(),
-      fmt::format("Tried to resolve aliases for non-existent subscription {}.", type_url));
+  ASSERT(sub != subscriptions_.end(),
+         fmt::format("Tried to resolve aliases for non-existent subscription {}.", type_url));
 
   sub->second->sub_state_.updateSubscriptionInterest(aliases, {});
   trySendDiscoveryRequests();
