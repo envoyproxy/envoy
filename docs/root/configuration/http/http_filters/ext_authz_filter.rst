@@ -136,4 +136,4 @@ Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the
 :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>` value of the :ref:`filter_enabled
-<envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>` field.
+<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` field.

@@ -433,9 +433,8 @@ message CorsPolicy {
   oneof enabled_specifier {
     // Specifies the % of requests for which the CORS filter is enabled.
     //
-    // If specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
-    //
-    // If not specified, the filter will be enabled for all requests.
+    // If :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>` is specified, Envoy will
+    // lookup the runtime key to get the percentage of requests to filter.
     //
     // .. note::
     //
@@ -444,13 +443,12 @@ message CorsPolicy {
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
-  // Specifies the % of requests for which the CORS filter is enabled in shadow-only mode.
+  // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
+  // enforced.
   //
-  // If specified, Envoy will lookup the runtime key to get the percentage of requests for which it
-  // will evaluate and track the request's *Origin* to determine if it's valid but will not enforce
-  // any policies.
-  //
-  // If not specified, the CORS filter will not be enabled in shadow-only mode.
+  // If :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>` is specified, Envoy will
+  // lookup the runtime key to get the percentage of requests for which it will evaluate and track
+  // the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
