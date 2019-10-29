@@ -20,7 +20,7 @@ uint64_t StatName::dataSize() const {
   if (size_and_data_ == nullptr) {
     return 0;
   }
-  return SymbolTableImpl::Encoding::decodeNumber(size_and_data_);
+  return SymbolTableImpl::Encoding::decodeNumber(size_and_data_).first;
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -79,7 +79,6 @@ uint8_t* SymbolTableImpl::Encoding::writeEncodingReturningNext(uint64_t number, 
 
 void SymbolTableImpl::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   ASSERT(data_bytes_required_ == 0);
-  num_symbols_ = symbols.size();
   for (Symbol symbol : symbols) {
     data_bytes_required_ += encodingSizeBytes(symbol);
   }
@@ -91,16 +90,15 @@ void SymbolTableImpl::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   ASSERT(static_cast<uint64_t>(bytes - storage_.get()) == data_bytes_required_);
 }
 
-uint64_t SymbolTableImpl::Encoding::decodeNumber(const uint8_t* encoding) {
+std::pair<uint64_t, uint64_t> SymbolTableImpl::Encoding::decodeNumber(const uint8_t* encoding) {
   uint64_t number = 0;
-  for (uint32_t shift = 0; true; ++encoding, shift += 7) {
-    uint64_t uc = static_cast<uint32_t>(*encoding);
+  uint64_t uc = SpilloverMask;
+  const uint8_t* start = encoding;
+  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
+    uc = static_cast<uint32_t>(*encoding);
     number |= (uc & Low7Bits) << shift;
-    if ((uc & SpilloverMask) == 0) {
-      break;
-    }
   }
-  return number;
+  return std::make_pair(number, encoding - start);
 }
 
 SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
@@ -108,11 +106,10 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
   SymbolVec symbol_vec;
   symbol_vec.reserve(size);
   while (size > 0) {
-    Symbol symbol = decodeNumber(array);
-    symbol_vec.push_back(symbol);
-    uint64_t symbol_size = encodingSizeBytes(symbol); // don't recompute this!
-    array += symbol_size;
-    size -= symbol_size;
+    std::pair<uint64_t, uint64_t> symbol_consumed = decodeNumber(array);
+    symbol_vec.push_back(symbol_consumed.first);
+    size -= symbol_consumed.second;
+    array += symbol_consumed.second;
   }
   return symbol_vec;
 }

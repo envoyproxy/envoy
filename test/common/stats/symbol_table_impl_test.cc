@@ -74,7 +74,7 @@ protected:
     uint8_t buf[10];
     EXPECT_EQ(buf + num_bytes, SymbolTableImpl::Encoding::writeEncodingReturningNext(number, buf))
         << number;
-    EXPECT_EQ(number, SymbolTableImpl::Encoding::decodeNumber(buf)) << number;
+    EXPECT_EQ(number, SymbolTableImpl::Encoding::decodeNumber(buf).first) << number;
     return std::vector<uint8_t>(buf, buf + num_bytes);
   }
 

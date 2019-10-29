@@ -108,11 +108,6 @@ public:
     uint64_t dataBytesRequired() const { return data_bytes_required_; }
 
     /**
-     * @return the number of of symbols added.
-     */
-    uint64_t numSymbols() const { return num_symbols_; }
-
-    /**
      * Moves the contents of the vector into an allocated array. The array
      * must have been allocated with bytesRequired() bytes.
      *
@@ -151,13 +146,12 @@ public:
      * Decodes a byte-array containing a variable-length number.
      *
      * @param The encoded byte array, written previously by writeNumberReturningNext.
-     * @return The decoded number.
+     * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
      */
-    static uint64_t decodeNumber(const uint8_t* encoding);
+    static std::pair<uint64_t, uint64_t> decodeNumber(const uint8_t* encoding);
 
   private:
     uint64_t data_bytes_required_{0};
-    uint64_t num_symbols_{0};
     StoragePtr storage_;
   };
 
