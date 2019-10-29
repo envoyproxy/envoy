@@ -197,7 +197,7 @@ private:
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
   absl::Mutex format_mutex_; // direct absl reference to break build cycle.
-  bool should_escape_;
+  bool should_escape_{false};
 };
 
 /**
