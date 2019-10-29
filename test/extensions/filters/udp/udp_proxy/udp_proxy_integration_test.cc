@@ -92,8 +92,14 @@ public:
 
     EXPECT_EQ(5, test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
+    EXPECT_EQ(5, test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
+
+    EXPECT_EQ(6, test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
     EXPECT_EQ(6, test_server_->counter("udp.foo.downstream_sess_tx_bytes")->value());
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_tx_datagrams")->value());
+
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
     EXPECT_EQ(1, test_server_->gauge("udp.foo.downstream_sess_active")->value());
   }
