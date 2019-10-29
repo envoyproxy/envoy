@@ -162,7 +162,8 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
 
 /**
  * Wrapper for Utility::readFromSocket() which reads a single datagram into the supplied
- * UdpRecvData without worrying about the packet processor interface.
+ * UdpRecvData without worrying about the packet processor interface. The function will
+ * instantiate the buffer returned in data.
  */
 Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
                                        UdpRecvData& data);

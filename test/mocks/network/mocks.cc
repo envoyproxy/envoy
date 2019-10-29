@@ -166,7 +166,10 @@ MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
 }
 MockTransportSocketCallbacks::~MockTransportSocketCallbacks() = default;
 
-MockUdpListener::MockUdpListener() = default;
+MockUdpListener::MockUdpListener() {
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+}
+
 MockUdpListener::~MockUdpListener() { onDestroy(); }
 
 MockUdpReadFilterCallbacks::MockUdpReadFilterCallbacks() {

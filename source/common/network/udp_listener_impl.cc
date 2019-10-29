@@ -72,9 +72,9 @@ void UdpListenerImpl::handleReadCallback() {
       socket_.ioHandle(), *socket_.localAddress(), *this, time_source_, packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-    ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result->getErrorCode()),
+    ENVOY_UDP_LOG(debug, "recvmsg result {}: {}", static_cast<int>(result->getErrorCode()),
                   result->getErrorDetails());
-    cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError, result->getErrorCode());
+    cb_.onReceiveError(result->getErrorCode());
   }
 }
 

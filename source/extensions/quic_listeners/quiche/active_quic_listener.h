@@ -32,8 +32,7 @@ public:
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
   void onWriteReady(const Network::Socket& socket) override;
-  void onReceiveError(const Network::UdpListenerCallbacks::ErrorCode& /*error_code*/,
-                      Api::IoError::IoErrorCode /*err*/) override {
+  void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
     // No-op. Quic can't do anything upon listener error.
   }
 
