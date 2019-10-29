@@ -1,5 +1,4 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
@@ -317,12 +316,8 @@ def _com_github_libevent_libevent():
 def _net_zlib():
     location = REPOSITORY_LOCATIONS["net_zlib"]
 
-    # Use the dev branch of zlib to resolve fuzz bugs and out of bound
-    # errors resulting in crashes in zlib 1.2.11.
-    # TODO(asraa): Remove when zlib > 1.2.11 is released.
-    new_git_repository(
+    http_archive(
         name = "net_zlib",
-        branch = "develop",
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
