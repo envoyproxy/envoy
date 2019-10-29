@@ -615,7 +615,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
         (*existing_warming_listener)->debugLog("removing warming listener");
         warming_listeners_.erase(existing_warming_listener);
       }
-      // Close the socket once all workers stopped accepting its connectitons.
+      // Close the socket once all workers stopped accepting its connections.
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
       stopListener(listener, [this, listener_tag]() {
