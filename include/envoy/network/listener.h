@@ -16,6 +16,19 @@ namespace Network {
 
 class ActiveUdpListenerFactory;
 
+class ListenSocketFactory {
+public:
+  virtual ~ListenSocketFactory() = default;
+
+  virtual SocketSharedPtr createListenSocket() PURE;
+
+  virtual Address::SocketType socketType() const PURE;
+
+  virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
+};
+
+using ListenSocketFactorySharedPtr = std::shared_ptr<ListenSocketFactory>;
+
 /**
  * A configuration for an individual listener.
  */
@@ -35,12 +48,7 @@ public:
    */
   virtual FilterChainFactory& filterChainFactory() PURE;
 
-  /**
-   * @return Socket& the actual listen socket. The address of this socket may be
-   *         different from configured if for example the configured address binds to port zero.
-   */
-  virtual Socket& socket() PURE;
-  virtual const Socket& socket() const PURE;
+  virtual ListenSocketFactory& listenSocketFactory() const PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.

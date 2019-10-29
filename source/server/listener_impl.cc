@@ -26,14 +26,46 @@
 namespace Envoy {
 namespace Server {
 
+ListenSocketFactoryImplBase::ListenSocketFactoryImplBase(
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr& local_address,
+    Network::Address::SocketType socket_type, const Network::Socket::OptionsSharedPtr& options,
+    bool bind_to_port)
+    : factory_(factory), local_address_(local_address), socket_type_(socket_type), options_(),
+      bind_to_port_(bind_to_port) {}
+
+Network::SocketSharedPtr ListenSocketFactoryImplBase::actuallyCreateListenSocket() {
+  return factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
+}
+
+TcpListenSocketFactory::TcpListenSocketFactory(
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr& local_address,
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
+    : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Stream,
+                                  options, bind_to_port) {}
+
+Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket() {
+  if (socket_ == nullptr) {
+    socket_ = actuallyCreateListenSocket();
+  }
+  return socket_;
+}
+
+UdpListenSocketFactory::UdpListenSocketFactory(
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr& local_address,
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
+    : ListenSocketFactoryBase(factory, local_address, Network::Address::SocketType::Datagram,
+                              options, bind_to_port) {}
+
+Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket() {
+  return actuallyCreateListenSocket();
+}
+
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                            bool workers_started, uint64_t hash,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_),
-      socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
-      global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
@@ -61,7 +93,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
-  if (socket_type_ == Network::Address::SocketType::Datagram) {
+  Address::SocketType socket_type = Network::Utility::protobufAddressSocketType(config.address());
+  if (socket_type == Network::Address::SocketType::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
@@ -78,7 +111,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   if (!config.listener_filters().empty()) {
-    switch (socket_type_) {
+    switch (socket_type) {
     case Network::Address::SocketType::Datagram:
       if (config.listener_filters().size() > 1) {
         // Currently supports only 1 UDP listener
@@ -98,7 +131,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream ||
+  if (config.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
                                          !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
@@ -125,7 +158,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
-  if (socket_type_ == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Address::SocketType::Datagram) {
     return;
   }
 
@@ -292,9 +325,10 @@ Init::Manager& ListenerImpl::initManager() {
   }
 }
 
-void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
+void ListenerImpl::setListenSocketFactory(
+    const Network::ListenSocketFactorySharedPtr& socket_factory) {
   ASSERT(!socket_);
-  socket_ = socket;
+  socket_factory_ = socket_factory;
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.

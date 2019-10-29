@@ -27,9 +27,9 @@
 namespace Envoy {
 namespace Network {
 
-UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket,
+UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr&& socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
-    : BaseListenerImpl(dispatcher, socket), cb_(cb), time_source_(time_source) {
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
   file_event_ = dispatcher_.createFileEvent(
       socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -73,7 +73,7 @@ void UdpListenerImpl::handleReadCallback() {
     uint32_t old_packets_dropped = packets_dropped_;
     MonotonicTime receive_time = time_source_.monotonicTime();
     Api::IoCallUint64Result result =
-        Utility::readFromSocket(socket_, *this, receive_time, &packets_dropped_);
+        Utility::readFromSocket(*socket_, *this, receive_time, &packets_dropped_);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -118,13 +118,13 @@ void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_addres
 
 void UdpListenerImpl::handleWriteCallback() {
   ENVOY_UDP_LOG(trace, "handleWriteCallback");
-  cb_.onWriteReady(socket_);
+  cb_.onWriteReady(*socket_);
 }
 
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 
 const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
-  return socket_.localAddress();
+  return socket_->localAddress();
 }
 
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
@@ -134,7 +134,7 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
   Api::IoCallUint64Result send_result = Utility::writeToSocket(
-      socket_, slices.begin(), num_slices, send_data.local_ip_, send_data.peer_address_);
+      *socket_, slices.begin(), num_slices, send_data.local_ip_, send_data.peer_address_);
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.

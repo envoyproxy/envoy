@@ -29,7 +29,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   Network::ConnectionHandler::ActiveListenerPtr listener;
-  Network::Address::SocketType socket_type = config.socket().socketType();
+  Network::Address::SocketType socket_type = config.listenSocketFactory().socketType();
 
   if (socket_type == Network::Address::SocketType::Stream) {
     listener = std::make_unique<ActiveTcpListener>(*this, config);
@@ -41,7 +41,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   if (disable_listeners_) {
     listener->listener()->disable();
   }
-  listeners_.emplace_back(config.socket().localAddress(), std::move(listener));
+  listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(listener));
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
@@ -105,7 +105,9 @@ ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
                                                             Network::ListenerConfig& config)
     : ActiveTcpListener(
-          parent, parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort()),
+          parent,
+          parent.dispatcher_.createListener(config.listenSocketFactory().createListenSocket(),
+                                            *this, config.bindToPort()),
           config) {}
 
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
@@ -403,7 +405,10 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
                                      Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
-    : ActiveUdpListener(parent, dispatcher.createUdpListener(config.socket(), *this), config) {}
+    : ActiveUdpListener(
+          parent,
+          dispatcher.createUdpListener(config.listenSocketFactory().createListenSocket(), *this),
+          config) {}
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,

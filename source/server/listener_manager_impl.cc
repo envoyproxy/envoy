@@ -307,12 +307,12 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    new_listener->setSocket((*existing_warming_listener)->getSocket());
+    new_listener->setListenSocketFactory((*existing_warming_listener)->getListenSocketFactory());
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not. Either way we get the socket from the existing listener.
-    new_listener->setSocket((*existing_active_listener)->getSocket());
+    new_listener->setListenSocketFactory((*existing_active_listener)->getListenSocketFactory());
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -341,22 +341,20 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     // to see if there is a listener that has a socket bound to the address we are configured for.
     // This is an edge case, but may happen if a listener is removed and then added back with a same
     // or different name and intended to listen on the same address. This should work and not fail.
-    Network::SocketSharedPtr draining_listener_socket;
+    Network::ListenSocketFactorySharedPtr draining_listen_socket_factory;
     auto existing_draining_listener = std::find_if(
         draining_listeners_.cbegin(), draining_listeners_.cend(),
         [&new_listener](const DrainingListener& listener) {
           return *new_listener->address() == *listener.listener_->socket().localAddress();
         });
     if (existing_draining_listener != draining_listeners_.cend()) {
-      draining_listener_socket = existing_draining_listener->listener_->getSocket();
+      draining_listen_socket_factory =
+          existing_draining_listener->listener_->getListenSocketFactory();
     }
 
-    new_listener->setSocket(draining_listener_socket
-                                ? draining_listener_socket
-                                : factory_.createListenSocket(new_listener->address(),
-                                                              new_listener->socketType(),
-                                                              new_listener->listenSocketOptions(),
-                                                              new_listener->bindToPort()));
+    new_listener->setListenSocketFactory(
+        draining_listen_socket_factory ? draining_listen_socket_factory
+                                       : createListenSocketFactory(config.address(), new_listener));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -624,6 +622,22 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
       parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
+}
+
+Network::ListenSocketFactoryPtr
+ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
+                                               ListenerConfig* listener_config) {
+  Address::SocketType socket_type = Network::Utility::protobufAddressSocketType(proto_address);
+  switch (socket_type) {
+  case Network::SocketType::Stream:
+    return std::make_unique<TcpListenSocketFactory>(factory_, listener_config->address(),
+                                                    listener_config->listenSocketOptions(),
+                                                    listener_config->bindToPort());
+  case Network::SocketType::Datagram:
+    return std::make_unique<UdpListenSocketFactory>(factory_, listener_config->address(),
+                                                    listener_config->listenSocketOptions(),
+                                                    listener_config->bindToPort());
+  }
 }
 
 } // namespace Server
