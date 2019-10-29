@@ -83,9 +83,11 @@ message ExtAuthz {
   //
   repeated string metadata_context_namespaces = 8;
 
-  // If not specified, the filter will be enabled for all requests.
+  // Specifies if the filter is enabled.
   //
   // If specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
+  //
+  // If not specified, the filter will be enabled for all requests.
   //
   // Parsing this field is implemented such that the runtime key's data may be represented
   // as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented

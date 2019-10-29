@@ -446,28 +446,26 @@ message CorsPolicy {
   google.protobuf.BoolValue allow_credentials = 6;
 
   oneof enabled_specifier {
-    // Specifies if CORS is enabled.
+    // Specifies the % of requests for which the CORS filter is enabled.
     //
-    // More information on how this can be controlled via runtime can be found
-    // :ref:`here <cors-runtime>`.
+    // If specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
+    //
+    // If not specified, the filter will be enabled for all requests.
     //
     // .. note::
     //
-    //   This field defaults to 100/:ref:`HUNDRED
-    //   <envoy_api_enum_type.v3alpha.FractionalPercent.DenominatorType>`.
+    //   If present, this will override the
+    //   :ref:`enabled <envoy_api_field_api.v3alpha.route.CorsPolicy.enabled>` field.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
-  // Specifies if CORS policies are evaluated and tracked when filter is off but
-  // does not enforce any policies.
+  // Specifies the % of requests for which the CORS filter is enabled in shadow-only mode.
   //
-  // More information on how this can be controlled via runtime can be found
-  // :ref:`here <cors-runtime>`.
+  // If specified, Envoy will lookup the runtime key to get the percentage of requests for which it
+  // will evaluate and track the request's *Origin* to determine if it's valid but will not enforce
+  // any policies.
   //
-  // .. note::
-  //
-  //   This field defaults to 100/:ref:`HUNDRED
-  //   <envoy_api_enum_type.v3alpha.FractionalPercent.DenominatorType>`.
+  // If not specified, the CORS filter will not be enabled in shadow-only mode.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
