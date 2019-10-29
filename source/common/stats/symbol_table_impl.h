@@ -131,7 +131,7 @@ public:
      * @return The total number of bytes required for the data-block and its encoded size.
      */
     static uint64_t totalSizeBytes(uint64_t num_data_bytes) {
-      return encodingSizeBytes(num_bytes) + num_bytes;
+      return encodingSizeBytes(num_data_bytes) + num_data_bytes;
     }
 
     /**
