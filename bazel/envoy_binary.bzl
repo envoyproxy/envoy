@@ -68,6 +68,7 @@ def _envoy_linkopts():
             "-lrt",
             "-ldl",
             "-Wl,--hash-style=gnu",
+            "-pie",
         ],
     }) + _envoy_select_exported_symbols(["-Wl,-E"])
 
