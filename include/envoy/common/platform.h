@@ -13,6 +13,8 @@
 
 #include <windows.h>
 #include <winsock2.h>
+
+// These must follow afterwards
 #include <mswsock.h>
 #include <ws2tcpip.h>
 
@@ -42,9 +44,9 @@ typedef unsigned int sa_family_t;
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>   // for mode_t
+#include <sys/mman.h> // for mode_t
 #include <sys/socket.h>
-#include <sys/uio.h>    // for iovec
+#include <sys/uio.h> // for iovec
 #include <sys/un.h>
 #include <unistd.h>
 

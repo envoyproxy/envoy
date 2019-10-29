@@ -1,8 +1,9 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 
-#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/network/utility.h"
+
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
