@@ -59,8 +59,6 @@ public:
    * @param for_domain supplies the domain name that virtual hosts must match on
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to worker threads
-   * @return whether a request for a configuration update has been scheduled (returns false only
-   * if VHDS isn't configured)
    */
   virtual void requestVirtualHostsUpdate(const std::string& for_domain,
                                          const std::function<void()>& route_config_updated_cb) PURE;

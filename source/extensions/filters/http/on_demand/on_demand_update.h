@@ -11,7 +11,7 @@ class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
   OnDemandRouteUpdate() = default;
 
-  void requestRouteConfigUpdate();
+  Envoy::Http::FilterHeadersStatus requestRouteConfigUpdate();
 
   void onRouteConfigUpdateCompletion();
 
@@ -27,13 +27,8 @@ public:
   void onDestroy() override {}
 
 private:
-  // FilterReturn is used to capture what the return code should be to the filter chain.
-  // if this filter is either in the middle of calling the service or the result is denied then
-  // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
-  enum class FilterReturn { ContinueDecoding, StopDecoding };
-
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  FilterReturn filter_return_{FilterReturn::ContinueDecoding};
+  Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
 };
 
 } // namespace OnDemand

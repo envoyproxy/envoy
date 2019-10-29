@@ -175,7 +175,7 @@ struct UpdateOnDemandCallback {
 };
 
 struct ThreadLocalCallbacks : public ThreadLocal::ThreadLocalObject {
-  std::queue<UpdateOnDemandCallback> callbacks_;
+  std::list<UpdateOnDemandCallback> callbacks_;
 };
 
 /**

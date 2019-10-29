@@ -9,23 +9,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
-void OnDemandRouteUpdate::requestRouteConfigUpdate() {
+Http::FilterHeadersStatus OnDemandRouteUpdate::requestRouteConfigUpdate() {
   if (callbacks_->route() != nullptr || !callbacks_->canRequestRouteConfigUpdate()) {
-    filter_return_ = FilterReturn::ContinueDecoding;
+    return Http::FilterHeadersStatus::Continue;
   } else {
     callbacks_->requestRouteConfigUpdate([this]() -> void { onRouteConfigUpdateCompletion(); });
-    filter_return_ = FilterReturn::StopDecoding;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 }
 
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::HeaderMap&, bool) {
-  requestRouteConfigUpdate();
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterHeadersStatus::StopIteration
-                                                      : Http::FilterHeadersStatus::Continue;
+  filter_iteration_state_ = requestRouteConfigUpdate();
+  return filter_iteration_state_;
 }
 
 Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool) {
-  return filter_return_ == FilterReturn::StopDecoding
+  return filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration
              ? Http::FilterDataStatus::StopIterationAndWatermark
              : Http::FilterDataStatus::Continue;
 }
@@ -42,7 +41,7 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 // has been propagated to workers, at which point the request processing is restarted from the
 // beginning.
 void OnDemandRouteUpdate::onRouteConfigUpdateCompletion() {
-  filter_return_ = FilterReturn::ContinueDecoding;
+  filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
   if (callbacks_->canResolveRouteAfterConfigUpdate() && // route can be resolved after an on-demand
                                                         // VHDS update

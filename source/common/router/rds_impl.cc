@@ -229,24 +229,22 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   }
 
   // Notifies connections that RouteConfiguration update has been propagated.
-  // Callbacks processing is performed in FIFO order and stops when the alias(es) used in the VHDS
-  // update request do not match the aliases in the update response. The assumption is the response
-  // to a request is not going to arrive before all requests before it have been responded to.
+  // Callbacks processing is performed in FIFO order. The callback is skipped if alias(es) used in
+  // the VHDS update request do not match the aliases in the update response
   config_update_callbacks_->runOnAllThreads(
       [aliases](ThreadLocal::ThreadLocalObjectSharedPtr previous)
           -> ThreadLocal::ThreadLocalObjectSharedPtr {
         auto callbacks = std::dynamic_pointer_cast<ThreadLocalCallbacks>(previous)->callbacks_;
         std::vector<std::string> aliases_not_in_update;
-        while (!callbacks.empty()) {
-          auto& update_on_demand_callback = callbacks.front();
-          std::set_difference(update_on_demand_callback.aliases_.begin(),
-                              update_on_demand_callback.aliases_.end(), aliases.begin(),
+        for (auto it = callbacks.begin(); it != callbacks.end();) {
+          std::set_difference(it->aliases_.begin(), it->aliases_.end(), aliases.begin(),
                               aliases.end(), std::back_inserter(aliases_not_in_update));
           if (aliases_not_in_update.empty()) {
-            update_on_demand_callback.cb_();
-            callbacks.pop();
+            it->cb_();
+            it = callbacks.erase(it);
           } else {
-            break;
+            it++;
+            aliases_not_in_update.clear();
           }
         }
         return previous;
@@ -265,7 +263,7 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, const std::function<void()>& route_config_updated_cb) {
   factory_context_.dispatcher().post(
       [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
-  config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push(
+  config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push_back(
       {{for_domain}, route_config_updated_cb});
 }
 

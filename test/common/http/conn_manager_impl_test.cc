@@ -3340,7 +3340,6 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
       .WillOnce(Return(route1))
       .WillOnce(Return(route2))
-      .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -4750,7 +4749,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
               getRouteConfig(_))
-      .Times(3)
+      .Times(2)
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -4778,8 +4777,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
               getRouteConfig(_))
-      .Times(4)
-      .WillOnce(Return(nullptr))
+      .Times(3)
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))        // refreshCachedRoute first time.
       .WillOnce(Return(route_config_)); // triggered by callbacks_->route(), SRDS now updated.

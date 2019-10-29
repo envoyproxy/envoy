@@ -2099,7 +2099,7 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value() || parent_.cached_route_.value() == nullptr) {
+  if (!parent_.cached_route_.has_value()) {
     parent_.refreshCachedRoute();
   }
 
