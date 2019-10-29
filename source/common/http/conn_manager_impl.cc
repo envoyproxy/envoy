@@ -484,7 +484,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     const HeaderString& host, const std::function<void()>& route_config_updated_cb) {
   ASSERT(!host.empty());
-  auto host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
+  auto& host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
   route_config_provider_->requestVirtualHostsUpdate(host_header, route_config_updated_cb);
 }
 

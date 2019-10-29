@@ -45,7 +45,12 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
 }
 
 void VhdsSubscription::updateOnDemand(const std::set<std::string>& aliases) {
-  subscription_->requestAliasResolution(aliases);
+  std::set<std::string> with_route_config_name_prefix;
+  // Prefix each of the aliases with route_config_name, management server expects this.
+  for(auto& alias: aliases) {
+    with_route_config_name_prefix.emplace(config_update_info_->routeConfigName() + "/" + alias);
+  }
+  subscription_->requestAliasResolution(with_route_config_name_prefix);
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
