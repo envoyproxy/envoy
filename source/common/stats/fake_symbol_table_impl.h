@@ -143,7 +143,8 @@ private:
     uint64_t bytes_required =
         SymbolTableImpl::Encoding::encodingSizeBytes(name.size()) + name.size();
     auto bytes = std::make_unique<Storage>(bytes_required);
-    uint8_t* buffer = SymbolTableImpl::Encoding::writeEncodingReturningNext(name.size(), bytes.get());
+    uint8_t* buffer =
+        SymbolTableImpl::Encoding::writeEncodingReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
     return bytes;
   }

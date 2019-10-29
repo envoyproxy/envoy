@@ -30,12 +30,6 @@ namespace Stats {
 /** A Symbol represents a string-token with a small index. */
 using Symbol = uint32_t;
 
-/**
- * We encode the byte-size of a StatName as its first two bytes.
- */
-// constexpr uint64_t StatNameSizeEncodingBytes = 2;
-// constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65536
-
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
 
@@ -93,7 +87,7 @@ public:
      *
      * @param symbol the symbol to encode.
      */
-    void addSymbol(Symbol symbol);
+    void addSymbols(const std::vector<Symbol>& symbols);
 
     /**
      * Decodes a uint8_t array into a SymbolVec.
@@ -104,21 +98,27 @@ public:
      * Returns the number of bytes required to represent StatName as a uint8_t
      * array, including the encoded size.
      */
-    uint64_t bytesRequired() const;
+    uint64_t bytesRequired() const {
+      return data_bytes_required_ + encodingSizeBytes(num_symbols_);
+    }
 
     /**
      * @return the number of uint8_t entries we collected while adding symbols.
      */
-    uint64_t dataBytesRequired() const { return vec_.size(); }
+    uint64_t dataBytesRequired() const { return data_bytes_required_; }
+
+    /**
+     * @return the number of of symbols added.
+     */
+    uint64_t numSymbols() const { return num_symbols_; }
 
     /**
      * Moves the contents of the vector into an allocated array. The array
      * must have been allocated with bytesRequired() bytes.
      *
      * @param array destination memory to receive the encoded bytes.
-     * @return uint64_t the number of bytes transferred.
      */
-    uint64_t moveToStorage(SymbolTable::Storage array);
+    void moveToStorage(SymbolTable::Storage array);
 
     /**
      * @param number A number to encode in a variable length byte-array.
@@ -131,7 +131,7 @@ public:
      * There is no guarantee that bytes will be aligned, so we can't cast to a
      * uint16_t* and assign, but must individually copy the bytes.
      *
-     * Requires that the buffer be sized to accomodate encodingSizeBytes(number).
+     * Requires that the buffer be sized to accommodate encodingSizeBytes(number).
      *
      * @param number the number to write.
      * @param bytes the pointer into which to write the length.
@@ -147,9 +147,10 @@ public:
      */
     static uint64_t decodeNumber(const uint8_t* encoding);
 
-
   private:
-    std::vector<uint8_t> vec_;
+    uint64_t data_bytes_required_{0};
+    uint64_t num_symbols_{0};
+    StoragePtr storage_;
   };
 
   SymbolTableImpl();
