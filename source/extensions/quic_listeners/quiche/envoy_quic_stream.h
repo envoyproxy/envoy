@@ -93,7 +93,7 @@ protected:
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
   bool end_stream_decoded_{false};
-  int32_t read_disable_counter_{0};
+  uint32_t read_disable_counter_{0u};
   // If true, switchStreamBlockState() should be deferred till this variable
   // becomes false.
   bool in_decode_data_callstack_{false};
