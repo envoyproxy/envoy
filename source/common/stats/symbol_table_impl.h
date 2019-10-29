@@ -99,7 +99,7 @@ public:
      * array, including the encoded size.
      */
     uint64_t bytesRequired() const {
-      return data_bytes_required_ + encodingSizeBytes(num_symbols_);
+      return data_bytes_required_ + encodingSizeBytes(data_bytes_required_);
     }
 
     /**

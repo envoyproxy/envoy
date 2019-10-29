@@ -107,16 +107,18 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
                                                    uint64_t size) {
   SymbolVec symbol_vec;
   symbol_vec.reserve(size);
-  for (; size > 0; --size) {
+  while (size > 0) {
     Symbol symbol = decodeNumber(array);
     symbol_vec.push_back(symbol);
-    array += encodingSizeBytes(symbol); // don't recompute this!
+    uint64_t symbol_size = encodingSizeBytes(symbol); // don't recompute this!
+    array += symbol_size;
+    size -= symbol_size;
   }
   return symbol_vec;
 }
 
 void SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_array) {
-  symbol_array = writeEncodingReturningNext(num_symbols_, symbol_array);
+  symbol_array = writeEncodingReturningNext(data_bytes_required_, symbol_array);
   if (data_bytes_required_ != 0) {
     memcpy(symbol_array, storage_.get(), data_bytes_required_);
   }

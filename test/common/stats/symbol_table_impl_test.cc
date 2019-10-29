@@ -139,6 +139,14 @@ TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
   }
 }
 
+TEST_P(StatNameTest, TwoHundredTwoLevel) {
+  for (int i = 0; i < 200; ++i) {
+    const std::string stat_name = absl::StrCat("symbol_", i);
+    EXPECT_EQ(stat_name, encodeDecode(stat_name));
+  }
+  EXPECT_EQ("http.foo", encodeDecode("http.foo"));
+}
+
 TEST_P(StatNameTest, TestLongSymbolName) {
   std::string long_name(100000, 'a');
   EXPECT_EQ(long_name, encodeDecode(long_name));
