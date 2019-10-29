@@ -2,7 +2,6 @@
 
 #include "extensions/filters/http/dynamo/dynamo_stats.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
@@ -15,7 +14,6 @@ namespace Dynamo {
 namespace {
 
 TEST(DynamoStats, PartitionIdStatString) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(true);
   Stats::IsolatedStoreImpl store;
   auto build_partition_string =
       [&store](const std::string& stat_prefix, const std::string& table_name,
