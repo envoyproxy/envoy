@@ -485,22 +485,18 @@ message CorsPolicy {
 
     // Specifies the % of requests for which the CORS filter is enabled.
     //
-    // If :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>` is specified, Envoy will
-    // lookup the runtime key to get the percentage of requests to filter.
-    //
-    // .. note::
-    //
-    //   If present, this will override the
-    //   :ref:`enabled <envoy_api_field_route.CorsPolicy.enabled>` field.
+    // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
+    // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
   // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
   // enforced.
+  // This is intended to be used when ``filter_enabled`` is off.
   //
-  // If :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>` is specified, Envoy will
-  // lookup the runtime key to get the percentage of requests for which it will evaluate and track
-  // the request's *Origin* to determine if it's valid but will not enforce any policies.
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
+  // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
