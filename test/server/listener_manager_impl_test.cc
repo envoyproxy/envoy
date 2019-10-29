@@ -902,7 +902,67 @@ filter_chains:
   EXPECT_CALL(*listener_baz_update1, onDestroy());
 }
 
-TEST_F(ListenerManagerImplTest, AddDrainingListener) {
+TEST_F(ListenerManagerImplTest, AddReusableDrainingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener directly into active.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  Network::Address::InstanceConstSharedPtr local_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 1234));
+  ON_CALL(*listener_factory_.socket_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  worker_->callAddCompletion(true);
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Remove foo into draining.
+  std::function<void()> stop_completion;
+  EXPECT_CALL(*worker_, stopListener(_, _))
+      .WillOnce(Invoke(
+          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
+            ASSERT_TRUE(completion != nullptr);
+            stop_completion = std::move(completion);
+          }));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(1, 0, 1, 0, 0, 1);
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(1, 0, 1, 0, 0, 1);
+
+  // Add foo again. We should use the socket from draining.
+  ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  worker_->callAddCompletion(true);
+  checkStats(2, 0, 1, 0, 1, 1);
+
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0);
+  stop_completion();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+  checkStats(2, 0, 1, 0, 1, 0);
+
+  EXPECT_CALL(*listener_foo2, onDestroy());
+}
+
+TEST_F(ListenerManagerImplTest, AddClosedDrainingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -932,6 +992,7 @@ filter_chains:
 
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(1, 0, 1, 0, 0, 1);
@@ -941,6 +1002,7 @@ filter_chains:
 
   // Add foo again. We should use the socket from draining.
   ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);

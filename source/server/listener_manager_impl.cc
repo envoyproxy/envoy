@@ -345,7 +345,8 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     auto existing_draining_listener = std::find_if(
         draining_listeners_.cbegin(), draining_listeners_.cend(),
         [&new_listener](const DrainingListener& listener) {
-          return *new_listener->address() == *listener.listener_->socket().localAddress();
+          return !listener.socket_closed_ &&
+                 *new_listener->address() == *listener.listener_->socket().localAddress();
         });
     if (existing_draining_listener != draining_listeners_.cend()) {
       draining_listener_socket = existing_draining_listener->listener_->getSocket();
@@ -576,7 +577,19 @@ void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
           }
           for (auto& listener : draining_listeners_) {
             if (listener.listener_->listenerTag() == listener_tag) {
-              listener.listener_->socket().close();
+              // Handle the edge case when new listener is added for the same address as the drained
+              // one. In this case the socket is shared between both listeners so one should avoid
+              // closing it.
+              bool is_used_by_active_listener = false;
+              for (auto& active_listener : active_listeners_) {
+                if (listener.listener_->getSocket() == active_listener->getSocket()) {
+                  is_used_by_active_listener = true;
+                }
+              }
+              if (!is_used_by_active_listener) {
+                listener.socket_closed_ = true;
+                listener.listener_->socket().close();
+              }
             }
           }
           if (callback != nullptr) {

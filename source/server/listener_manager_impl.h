@@ -144,9 +144,11 @@ private:
 
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
-        : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
+        : listener_(std::move(listener)), socket_closed_(false),
+          workers_pending_removal_(workers_pending_removal) {}
 
     ListenerImplPtr listener_;
+    bool socket_closed_;
     uint64_t workers_pending_removal_;
   };
 
