@@ -7,7 +7,8 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           drain_timeout: 5s
           route_config:
             virtual_hosts:
@@ -41,13 +42,16 @@ static_resources:
           stat_prefix: router
           http_filters:
           - name: envoy.health_check
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
               pass_through_mode: false
           - name: envoy.router
-            config: {}
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
           access_log:
           - name: envoy.file_access_log
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
               path: /dev/null
             filter:
               or_filter:
@@ -71,7 +75,8 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.redis_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           settings:
             op_timeout: 0.4s
           stat_prefix: redis
@@ -125,7 +130,8 @@ cluster_manager: {}
 flags_path: "/invalid_flags"
 stats_sinks:
 - name: envoy.statsd
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     address:
       socket_address:
         address: {{ ip_loopback_address }}

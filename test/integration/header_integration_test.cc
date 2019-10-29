@@ -268,7 +268,7 @@ public:
           TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
           envoy::config::filter::http::router::v2::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-          TestUtility::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
+          hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
 
           const bool append = mode == HeaderMode::Append;
 
