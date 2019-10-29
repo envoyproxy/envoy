@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "common/protobuf/protobuf.h"
@@ -8,6 +9,15 @@
 
 namespace Envoy {
 namespace ProtobufMessage {
+
+/**
+ * Exception class for reporting validation errors due to the presence of unknown
+ * fields in a protobuf
+ */
+class UnknownProtoFieldException : public EnvoyException {
+public:
+  UnknownProtoFieldException(const std::string& message) : EnvoyException(message) {}
+};
 
 /**
  * Visitor interface for a Protobuf::Message. The methods of ValidationVisitor are invoked to

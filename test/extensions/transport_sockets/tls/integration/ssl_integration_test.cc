@@ -363,7 +363,7 @@ public:
     envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
-    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
+    transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   void setupDownstreamTap(envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -378,7 +378,7 @@ public:
     envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
         createTapConfig(ssl_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
+    transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   envoy::config::transport_socket::tap::v2alpha::Tap
