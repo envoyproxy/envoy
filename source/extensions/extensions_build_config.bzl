@@ -94,6 +94,12 @@ EXTENSIONS = {
     "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
+    # UDP filters fixfifx include in loaded extensions
+    #
+
+    "envoy.filters.udp.udp_proxy":                      "//source/extensions/filters/udp/udp_proxy:config",
+
+    #
     # Resource monitors
     #
 

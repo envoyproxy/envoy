@@ -260,6 +260,9 @@ void InstanceImpl::initialize(const Options& options,
   ENVOY_LOG(
       info, "  filters.network: {}",
       Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::allFactoryNames());
+  ENVOY_LOG(info, "  filters.udp: {}",
+            Registry::FactoryRegistry<
+                Configuration::NamedUdpListenerFilterConfigFactory>::allFactoryNames());
   ENVOY_LOG(info, "  stat_sinks: {}",
             Registry::FactoryRegistry<Configuration::StatsSinkFactory>::allFactoryNames());
   ENVOY_LOG(info, "  tracers: {}",
@@ -270,6 +273,8 @@ void InstanceImpl::initialize(const Options& options,
   ENVOY_LOG(info, "  transport_sockets.upstream: {}",
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
+  ENVOY_LOG(info, "  udp_listeners: {}",
+            Registry::FactoryRegistry<ActiveUdpListenerConfigFactory>::allFactoryNames());
 
   // Enable the selected buffer implementation (old libevent evbuffer version or new native
   // version) early in the initialization, before any buffers can be created.

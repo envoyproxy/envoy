@@ -368,6 +368,9 @@ protected:
 
   bool enable_half_close_{false};
 
+  // Whether the default created fake upstreams are UDP listeners.
+  bool udp_fake_upstream_{false};
+
   // True if test will use a fixed RNG value.
   bool deterministic_{};
 

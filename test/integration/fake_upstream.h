@@ -29,6 +29,8 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "server/active_raw_udp_listener_config.h"
+
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
@@ -526,7 +528,7 @@ public:
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-               bool enable_half_close = false);
+               bool enable_half_close = false, bool udp_fake_upstream = false);
 
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
@@ -560,6 +562,15 @@ public:
                         FakeHttpConnectionPtr& connection,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  // Waits for 1 UDP datagram to be received.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  // Send a UDP datagram on the fake upstream thread.
+  void sendUdpDatagram(const std::string& buffer, const Network::Address::Instance& peer);
+
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
     return filter_chain_.get();
@@ -570,7 +581,7 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
-  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+  void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
@@ -589,9 +600,23 @@ private:
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
                Event::TestTimeSystem& time_system, bool enable_half_close);
 
+  class FakeUpstreamUdpFilter : public Network::UdpListenerReadFilter {
+  public:
+    FakeUpstreamUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
+        : UdpListenerReadFilter(callbacks), parent_(parent) {}
+
+    // Network::UdpListenerReadFilter
+    void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
+
+  private:
+    FakeUpstream& parent_;
+  };
+
   class FakeListener : public Network::ListenerConfig {
   public:
-    FakeListener(FakeUpstream& parent) : parent_(parent), name_("fake_upstream") {}
+    FakeListener(FakeUpstream& parent)
+        : parent_(parent), name_("fake_upstream"),
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()) {}
 
   private:
     // Network::ListenerConfig
@@ -609,7 +634,9 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::api::v2::core::TrafficDirection direction() const override {
       return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
@@ -618,10 +645,12 @@ private:
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
+    const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   };
 
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void onRecvDatagram(Network::UdpRecvData& data);
 
   Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
@@ -629,7 +658,7 @@ private:
   // main test thread.
   Thread::MutexBasicLockable lock_;
   Thread::ThreadPtr thread_;
-  Thread::CondVar new_connection_event_;
+  Thread::CondVar upstream_event_;
   Api::ApiPtr api_;
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
@@ -644,6 +673,7 @@ private:
   const bool enable_half_close_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
+  std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;
