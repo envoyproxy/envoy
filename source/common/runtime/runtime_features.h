@@ -56,5 +56,21 @@ private:
   Runtime::Loader& runtime_;
 };
 
+// Helper class for runtime-derived fractional percent flags.
+class FractionalPercent {
+public:
+  FractionalPercent(const envoy::api::v2::core::RuntimeFractionalPercent fractional_percent_proto,
+                    Runtime::Loader& runtime)
+      : runtime_key_(fractional_percent_proto.runtime_key()),
+        default_value_(fractional_percent_proto.default_value()), runtime_(runtime) {}
+
+  bool enabled() const { return runtime_.snapshot().featureEnabled(runtime_key_, default_value_); }
+
+private:
+  const std::string runtime_key_;
+  const envoy::type::FractionalPercent default_value_;
+  Runtime::Loader& runtime_;
+};
+
 } // namespace Runtime
 } // namespace Envoy
