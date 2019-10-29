@@ -43,7 +43,9 @@ message VirtualHost {
     ALL = 2;
   }
 
-  reserved 9;
+  reserved 9, 12;
+
+  reserved "per_filter_config";
 
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -117,13 +119,6 @@ message VirtualHost {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 12;
-
-  // The per_filter_config field can be used to provide virtual host-specific
-  // configurations for filters. The key should match the filter name, such as
-  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
-  // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
-  // for if and how it is utilized.
   map<string, google.protobuf.Any> typed_per_filter_config = 15;
 
   // Decides whether the :ref:`x-envoy-attempt-count
@@ -161,7 +156,9 @@ message VirtualHost {
 //   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
 // [#next-free-field: 17]
 message Route {
-  reserved 6;
+  reserved 6, 8;
+
+  reserved "per_filter_config";
 
   // Name for the route.
   string name = 14;
@@ -191,13 +188,6 @@ message Route {
 
   // Decorator for the matched route.
   Decorator decorator = 5;
-
-  // The per_filter_config field can be used to provide route-specific
-  // configurations for filters. The key should match the filter name, such as
-  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
-  // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
-  // if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 8;
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -251,7 +241,9 @@ message Route {
 message WeightedCluster {
   // [#next-free-field: 11]
   message ClusterWeight {
-    reserved 7;
+    reserved 7, 8;
+
+    reserved "per_filter_config";
 
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
@@ -298,13 +290,6 @@ message WeightedCluster {
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
     repeated string response_headers_to_remove = 6;
-
-    // The per_filter_config field can be used to provide weighted cluster-specific
-    // configurations for filters. The key should match the filter name, such as
-    // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
-    // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
-    // for if and how it is utilized.
-    map<string, google.protobuf.Struct> per_filter_config = 8;
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -820,21 +805,25 @@ message RouteAction {
 // [#next-free-field: 11]
 message RetryPolicy {
   message RetryPriority {
+    reserved 2;
+
+    reserved "config";
+
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct config = 2;
-
       google.protobuf.Any typed_config = 3;
     }
   }
 
   message RetryHostPredicate {
+    reserved 2;
+
+    reserved "config";
+
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct config = 2;
-
       google.protobuf.Any typed_config = 3;
     }
   }
