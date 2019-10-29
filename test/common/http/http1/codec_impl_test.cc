@@ -1225,6 +1225,23 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
   codec_->dispatch(websocket_payload);
 }
 
+TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithNoBody) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "HEAD"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Send upgrade headers. Make sure we avoid the deferred_end_stream_headers_ optimization.
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
+  codec_->dispatch(response);
+}
+
 // Same data as above, but make sure directDispatch immediately hands off any
 // outstanding data.
 TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {

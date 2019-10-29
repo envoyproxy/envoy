@@ -801,7 +801,8 @@ int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
       // Swallow the spurious onMessageComplete and continue processing.
       ignore_message_complete_for_100_continue_ = true;
       pending_responses_.front().decoder_->decode100ContinueHeaders(std::move(headers));
-    } else if (cannotHaveBody()) {
+      // Avoid deferred_end_stream_headers_ optimization when handling upgrades.
+    } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = std::move(headers);
     } else {
       pending_responses_.front().decoder_->decodeHeaders(std::move(headers), false);
