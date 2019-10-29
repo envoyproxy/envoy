@@ -127,6 +127,14 @@ public:
     static uint64_t encodingSizeBytes(uint64_t number);
 
     /**
+     * @param num_data_bytes The number of bytes in a data-block.
+     * @return The total number of bytes required for the data-block and its encoded size.
+     */
+    static uint64_t totalSizeBytes(uint64_t num_data_bytes) {
+      return encodingSizeBytes(num_bytes) + num_bytes;
+    }
+
+    /**
      * Saves the specified number into the byte array, returning the next byte.
      * There is no guarantee that bytes will be aligned, so we can't cast to a
      * uint16_t* and assign, but must individually copy the bytes.
@@ -381,10 +389,7 @@ public:
    * @return uint64_t the number of bytes in the symbol array, including the two-byte
    *                  overhead for the size itself.
    */
-  uint64_t size() const {
-    uint64_t sz = dataSize();
-    return sz + SymbolTableImpl::Encoding::encodingSizeBytes(sz);
-  }
+  uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
   void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
 

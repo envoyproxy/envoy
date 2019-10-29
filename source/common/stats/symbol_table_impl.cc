@@ -23,15 +23,6 @@ uint64_t StatName::dataSize() const {
   return SymbolTableImpl::Encoding::decodeNumber(size_and_data_);
 }
 
-uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
-  uint64_t num_bytes = 0;
-  do {
-    ++num_bytes;
-    number >>= 7;
-  } while (number != 0);
-  return num_bytes;
-}
-
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
@@ -56,6 +47,15 @@ SymbolTableImpl::Encoding::~Encoding() {
   // Verifies that moveToStorage() was called on this encoding. Failure
   // to call moveToStorage() will result in leaks symbols.
   ASSERT(storage_ == nullptr);
+}
+
+uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
+  uint64_t num_bytes = 0;
+  do {
+    ++num_bytes;
+    number >>= 7;
+  } while (number != 0);
+  return num_bytes;
 }
 
 uint8_t* SymbolTableImpl::Encoding::writeEncodingReturningNext(uint64_t number, uint8_t* bytes) {
@@ -485,7 +485,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  auto bytes = std::make_unique<Storage>(Encoding::encodingSizeBytes(num_bytes) + num_bytes);
+  auto bytes = std::make_unique<Storage>(Encoding::totalSizeBytes(num_bytes));
   uint8_t* p = SymbolTableImpl::Encoding::writeEncodingReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
     const uint64_t stat_name_bytes = stat_name.dataSize();
