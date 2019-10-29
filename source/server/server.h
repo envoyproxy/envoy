@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -155,10 +156,6 @@ public:
   Stats::Scope& scope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
-  // TODO(lambdai): remove messageValidationVisitor from ServerFactoryContext
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
@@ -264,6 +261,7 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   bool workers_started_;
+  std::atomic<bool> live_;
   bool shutdown_;
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;

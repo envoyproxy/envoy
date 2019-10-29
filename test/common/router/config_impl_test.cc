@@ -2833,10 +2833,12 @@ TEST_F(RouteMatcherTest, RetryVirtualHostLevel) {
 name: RetryVirtualHostLevel
 virtual_hosts:
 - domains: [www.lyft.com]
+  per_request_buffer_limit_bytes: 8
   name: www
   retry_policy: {num_retries: 3, per_try_timeout: 1s, retry_on: '5xx,gateway-error,connect-failure,reset'}
   routes:
   - match: {prefix: /foo}
+    per_request_buffer_limit_bytes: 7
     route:
       cluster: www
       retry_policy: {retry_on: connect-failure}
@@ -2863,6 +2865,9 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->retryShadowBufferLimit());
 
   // Virtual Host level retry policy kicks in.
   EXPECT_EQ(std::chrono::milliseconds(1000),
@@ -2895,6 +2900,9 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
+                    ->retryShadowBufferLimit());
 }
 
 TEST_F(RouteMatcherTest, GrpcRetry) {
@@ -3431,12 +3439,18 @@ virtual_hosts:
   EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
+/**
+ * @brief  Generate headers for testing
+ * @param ssl set true to insert "x-forwarded-proto: https", else "x-forwarded-proto: http"
+ * @param internal nullopt for no such "x-envoy-internal" header, or explicit "true/false"
+ * @return Http::TestHeaderMapImpl
+ */
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
-                                                  bool ssl, bool internal) {
+                                                  bool ssl, absl::optional<bool> internal) {
   Http::TestHeaderMapImpl headers{
       {":authority", host}, {":path", path}, {"x-forwarded-proto", ssl ? "https" : "http"}};
-  if (internal) {
-    headers.addCopy("x-envoy-internal", "true");
+  if (internal.has_value()) {
+    headers.addCopy("x-envoy-internal", internal.value() ? "true" : "false");
   }
 
   return headers;
@@ -3644,6 +3658,12 @@ virtual_hosts:
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, false);
+    EXPECT_EQ("https://api.lyft.com/foo",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "api.lyft.com", "/foo", false, absl::nullopt /* no x-envoy-internal header */);
     EXPECT_EQ("https://api.lyft.com/foo",
               config.route(headers, 0)->directResponseEntry()->newPath(headers));
   }
@@ -6218,7 +6238,7 @@ public:
       registered_default_factory_;
 };
 
-TEST_F(PerFilterConfigsTest, TypedConfigFilterError) {
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(TypedConfigFilterError)) {
   {
     const std::string yaml = R"EOF(
 name: foo
@@ -6260,9 +6280,8 @@ virtual_hosts:
   }
 }
 
-TEST_F(PerFilterConfigsTest, UnknownFilter) {
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(UnknownFilterStruct)) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6273,13 +6292,13 @@ virtual_hosts:
     per_filter_config: { unknown.filter: {} }
 )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
-  }
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+}
 
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, UnknownFilterAny) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6292,17 +6311,15 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.Timestamp
 )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
-  }
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
 }
 
 // Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
 // error.
-TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(DefaultFilterImplementationStruct)) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6313,11 +6330,11 @@ virtual_hosts:
     per_filter_config: { test.default.filter: { seconds: 123} }
 )EOF";
 
-    checkNoPerFilterConfig(yaml);
-  }
+  checkNoPerFilterConfig(yaml);
+}
 
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAny) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6332,11 +6349,10 @@ virtual_hosts:
           seconds: 123
 )EOF";
 
-    checkNoPerFilterConfig(yaml);
-  }
+  checkNoPerFilterConfig(yaml);
 }
 
-TEST_F(PerFilterConfigsTest, RouteLocalConfig) {
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(RouteLocalConfig)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -6376,7 +6392,7 @@ virtual_hosts:
   checkEach(yaml, 123, 123, 456);
 }
 
-TEST_F(PerFilterConfigsTest, WeightedClusterConfig) {
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -6396,7 +6412,35 @@ virtual_hosts:
   checkEach(yaml, 789, 789, 1011);
 }
 
-TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughConfig) {
+TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+                typed_per_filter_config:
+                  test.filter:
+                    "@type": type.googleapis.com/google.protobuf.Timestamp
+                    value:
+                      seconds: 789
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 1011
+)EOF";
+
+  checkEach(yaml, 789, 789, 1011);
+}
+
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterFallthroughConfig)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -6411,6 +6455,34 @@ virtual_hosts:
                 weight: 100
         per_filter_config: { test.filter: { seconds: 1213 } }
     per_filter_config: { test.filter: { seconds: 1415 } }
+)EOF";
+
+  checkEach(yaml, 1213, 1213, 1415);
+}
+
+TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 1213
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 1415
 )EOF";
 
   checkEach(yaml, 1213, 1213, 1415);

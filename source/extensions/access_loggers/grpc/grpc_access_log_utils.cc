@@ -35,7 +35,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x20000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x40000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -110,6 +110,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders)) {
     common_access_log.mutable_response_flags()->set_invalid_envoy_request_headers(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError)) {
+    common_access_log.mutable_response_flags()->set_downstream_protocol_error(true);
   }
 }
 

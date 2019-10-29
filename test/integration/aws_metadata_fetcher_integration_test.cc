@@ -21,11 +21,13 @@ public:
     filter_chains:
       filters:
         name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
           http_filters:
             - name: envoy.fault
-              config:
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
                 delay:
                   fixed_delay:
                     seconds: {}

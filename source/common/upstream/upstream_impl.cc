@@ -22,7 +22,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/config/protocol_json.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -591,7 +590,7 @@ public:
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), random_(c.random()),
         runtime_(runtime), singleton_manager_(c.singletonManager()), tls_(c.threadLocal()),
-        validation_visitor_(c.messageValidationVisitor()), api_(c.api()) {}
+        api_(c.api()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -603,9 +602,6 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return validation_visitor_;
-  }
   Api::Api& api() override { return api_; }
 
 private:
@@ -618,7 +614,6 @@ private:
   Envoy::Runtime::Loader& runtime_;
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
 
@@ -643,6 +638,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
+      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),
@@ -742,8 +738,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   // TODO(htuch): Remove this temporary workaround when we have
-  // https://github.com/lyft/protoc-gen-validate/issues/97 resolved. This just provides early
-  // validation of sanity of fields that we should catch at config ingestion.
+  // https://github.com/envoyproxy/protoc-gen-validate/issues/97 resolved. This just provides
+  // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
 
   // Create upstream filter factories

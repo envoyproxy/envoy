@@ -63,7 +63,7 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   // match, then we must be processing a new filter for the first time. We omit this check if we're
   // the first filter, since the above check handles that case.
   //
-  // We compare against the previous filter to avoid multiple filter iterations from reseting the
+  // We compare against the previous filter to avoid multiple filter iterations from resetting the
   // pointer: If we just set latest to current, then the first onData filter iteration would
   // correctly iterate over the filters and set latest, but on subsequent onData iterations
   // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
@@ -138,6 +138,12 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
+  }
+
+  if (config_.maxConnectionDuration()) {
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onConnectionDurationTimeout(); });
+    connection_duration_timer_->enableTimer(config_.maxConnectionDuration().value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_.delayedCloseTimeout());
@@ -270,7 +276,7 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
 
   // In the protocol error case, we need to reset all streams now. The connection might stick around
   // long enough for a pending stream to come back and try to encode.
-  resetAllStreams();
+  resetAllStreams(StreamInfo::ResponseFlag::DownstreamProtocolError);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
@@ -359,7 +365,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManagerImpl::resetAllStreams() {
+void ConnectionManagerImpl::resetAllStreams(
+    absl::optional<StreamInfo::ResponseFlag> response_flag) {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
     // about to close the connection and will disable further reads, it is possible that flushing
@@ -372,6 +379,9 @@ void ConnectionManagerImpl::resetAllStreams() {
     auto& stream = *streams_.front();
     stream.response_encoder_->getStream().removeCallbacks(stream);
     stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
+    if (response_flag.has_value()) {
+      stream.stream_info_.setResponseFlag(response_flag.value());
+    }
   }
 }
 
@@ -391,6 +401,11 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       connection_idle_timer_.reset();
     }
 
+    if (connection_duration_timer_) {
+      connection_duration_timer_->disableTimer();
+      connection_duration_timer_.reset();
+    }
+
     if (drain_timer_) {
       drain_timer_->disableTimer();
       drain_timer_.reset();
@@ -407,7 +422,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
-    resetAllStreams();
+    resetAllStreams(absl::nullopt);
   }
 }
 
@@ -422,6 +437,17 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    startDrainSequence();
+  }
+}
+
+void ConnectionManagerImpl::onConnectionDurationTimeout() {
+  ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
+  stats_.named_.downstream_cx_max_duration_reached_.inc();
+  if (!codec_) {
+    // Attempt to write out buffered data one last time and issue a local close if successful.
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();

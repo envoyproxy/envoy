@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Quic {
 
-// QUIC specific UdpListenerCallbacks implemention which delegates incoming
+// QUIC specific UdpListenerCallbacks implementation which delegates incoming
 // packets, write signals and listener errors to QuicDispatcher.
 class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            public Server::ConnectionHandlerImpl::ActiveListenerImplBase,

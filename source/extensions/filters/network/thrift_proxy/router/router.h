@@ -37,6 +37,11 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the route.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+
+  /**
+   * @return bool should the service name prefix be stripped from the method.
+   */
+  virtual bool stripServiceName() const PURE;
 };
 
 /**

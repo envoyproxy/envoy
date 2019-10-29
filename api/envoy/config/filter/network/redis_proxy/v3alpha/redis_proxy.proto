@@ -199,8 +199,8 @@ message RedisProxy {
   //
   // When using the above routes, the following prefixes would be sent to:
   //
-  // * 'get abc:users' would retrive the key 'abc:users' from cluster_b.
-  // * 'get ab:users' would retrive the key 'ab:users' from cluster_a.
+  // * 'get abc:users' would retrieve the key 'abc:users' from cluster_b.
+  // * 'get ab:users' would retrieve the key 'ab:users' from cluster_a.
   // * 'get z:users' would return a NoUpstreamHost error. A :ref:`catch-all
   //   route<envoy_api_field_config.filter.network.redis_proxy.v3alpha.RedisProxy.PrefixRoutes.catch_all_route>`
   //   would have retrieved the key from that cluster instead.
@@ -225,7 +225,7 @@ message RedisProxy {
 // :ref:`extension_protocol_options<envoy_api_field_api.v3alpha.Cluster.extension_protocol_options>`,
 // keyed by the name `envoy.redis_proxy`.
 message RedisProtocolOptions {
-  // Upstream server password as defined by the `requirepass directive
+  // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.
   api.v3alpha.core.DataSource auth_password = 1;
 }

@@ -9,22 +9,25 @@
       port_value: {{port_value}}
   filter_chains:
   {% if tls %}
-  - tls_context:
-      common_tls_context:
-        alpn_protocols: h2,http/1.1
-        tls_certificates:
-        - certificate_chain:
-            filename: certs/servercert.pem
-          private_key:
-            filename: certs/serverkey.pem
-        {% if kwargs.get('pin_double_proxy_client', False) %}
-        validation_context:
-          trusted_ca:
-            filename: certs/cacert.pm
-          #This should be the hash of the /etc/envoy/envoy-double-proxy.pem cert used in the
-          #double proxy configuration.
-          verify_certificate_hash: "0000000000000000000000000000000000000000000000000000000000000000"
-        {% endif %}
+  - transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        common_tls_context:
+          alpn_protocols: h2,http/1.1
+          tls_certificates:
+          - certificate_chain:
+              filename: certs/servercert.pem
+            private_key:
+              filename: certs/serverkey.pem
+          {% if kwargs.get('pin_double_proxy_client', False) %}
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pm
+            #This should be the hash of the /etc/envoy/envoy-double-proxy.pem cert used in the
+            #double proxy configuration.
+            verify_certificate_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+          {% endif %}
     {%if proxy_proto%}
     use_proxy_proto: true
     {%endif%}
