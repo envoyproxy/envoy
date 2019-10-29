@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/platform.h"
+
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
@@ -26,14 +28,6 @@
 #include "google/protobuf/util/type_resolver.h"
 #include "google/protobuf/util/type_resolver_util.h"
 #include "google/protobuf/wrappers.pb.h"
-
-#ifdef WIN32
-// one of the above headers includes <windows.h>, so undef some interfering symbols
-#undef TRUE
-#undef DELETE
-#undef ERROR
-#undef GetMessage
-#endif
 
 namespace Envoy {
 

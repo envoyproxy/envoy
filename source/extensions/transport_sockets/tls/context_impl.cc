@@ -1,13 +1,12 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 
-#include <netinet/in.h>
-
 #include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"

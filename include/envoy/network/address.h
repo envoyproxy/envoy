@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <array>
@@ -9,6 +8,7 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
 

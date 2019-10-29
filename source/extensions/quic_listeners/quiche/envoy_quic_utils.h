@@ -1,8 +1,20 @@
+#include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
+
+#pragma GCC diagnostic push
+
+// QUICHE allows unused parameters.
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+// QUICHE uses offsetof().
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+
+#include "quiche/quic/core/quic_types.h"
+
+#pragma GCC diagnostic pop
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_error_codes.h"

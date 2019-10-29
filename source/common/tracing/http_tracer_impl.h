@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -10,13 +11,6 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
-
-#ifdef WIN32
-// <windows.h> defines macros for ERROR and TRUE, so we need to undef them in
-// case it's been included above
-#undef ERROR
-#undef TRUE
-#endif
 
 namespace Envoy {
 namespace Tracing {

@@ -1,14 +1,12 @@
 #include "common/network/dns_impl.h"
 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
+
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
