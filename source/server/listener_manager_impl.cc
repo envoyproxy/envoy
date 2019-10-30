@@ -595,7 +595,7 @@ void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
                                        std::function<void()> callback) {
   const auto workers_pending_stop = std::make_shared<std::atomic<uint32_t>>(workers_.size());
   for (const auto& worker : workers_) {
-    worker->stopListener(listener, [this, callback = std::move(callback), workers_pending_stop]() {
+    worker->stopListener(listener, [this, callback, workers_pending_stop]() {
       if (--(*workers_pending_stop) == 0) {
         server_.dispatcher().post(callback);
       }
