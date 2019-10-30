@@ -1,7 +1,7 @@
 .. _best_practices_edge:
 
-Configuring Envoy for the edge
-==============================
+Configuring Envoy as an edge proxy
+==================================
 
 Envoy is a production-ready edge proxy, and performs well in that role, however,
 the default settings are tailored for the service mesh use case, and some values
