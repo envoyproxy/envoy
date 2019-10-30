@@ -43,7 +43,7 @@ void validateIpv6Supported(const std::string& address) {
   }
 }
 
-// Construsts a readable string with the embedded nulls in the abstract path replaced with '@'.
+// Constructs a readable string with the embedded nulls in the abstract path replaced with '@'.
 std::string friendlyNameFromAbstractPath(absl::string_view path) {
   std::string friendly_name(path.data(), path.size());
   std::replace(friendly_name.begin(), friendly_name.end(), '\0', '@');
