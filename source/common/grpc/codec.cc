@@ -54,6 +54,7 @@ void Decoder::frameDataEnd() {
   output_->push_back(std::move(frame_));
   frame_.flags_ = 0;
   frame_.length_ = 0;
+  frame_.data_ = nullptr;
 }
 
 uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
