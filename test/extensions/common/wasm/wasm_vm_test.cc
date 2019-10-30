@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -95,11 +96,14 @@ TEST(NullVmTest, NullVmMemory) {
 class MockHostFunctions {
 public:
   MOCK_CONST_METHOD1(pong, void(uint32_t));
+  MOCK_CONST_METHOD0(random, uint32_t());
 };
 
 MockHostFunctions* g_host_functions;
 
 void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }
+
+Word random(void*) { return Word(g_host_functions->random()); }
 
 // pong() with wrong number of arguments.
 void bad_pong1(void*) { return; }
@@ -147,6 +151,7 @@ TEST_F(WasmVmTest, V8BadHostFunctions) {
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
   EXPECT_TRUE(wasm_vm->load(code, false));
 
+  wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
                             "Failed to load WASM module due to a missing import: env.pong");
 
@@ -175,6 +180,7 @@ TEST_F(WasmVmTest, V8BadModuleFunctions) {
   EXPECT_TRUE(wasm_vm->load(code, false));
 
   wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
+  wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   wasm_vm->link("test");
 
   WasmCallVoid<1> ping;
@@ -202,6 +208,7 @@ TEST_F(WasmVmTest, V8FunctionCalls) {
   EXPECT_TRUE(wasm_vm->load(code, false));
 
   wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
+  wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   wasm_vm->link("test");
 
   WasmCallVoid<1> ping;
@@ -209,10 +216,15 @@ TEST_F(WasmVmTest, V8FunctionCalls) {
   EXPECT_CALL(*g_host_functions, pong(42));
   ping(nullptr /* no context */, 42);
 
+  WasmCallWord<1> lucky;
+  wasm_vm->getFunction("lucky", &lucky);
+  EXPECT_CALL(*g_host_functions, random()).WillRepeatedly(Return(42));
+  EXPECT_EQ(0, lucky(nullptr /* no context */, 1).u64_);
+  EXPECT_EQ(1, lucky(nullptr /* no context */, 42).u64_);
+
   WasmCallWord<3> sum;
   wasm_vm->getFunction("sum", &sum);
-  Word word = sum(nullptr /* no context */, 13, 14, 15);
-  EXPECT_EQ(42, word.u64_);
+  EXPECT_EQ(42, sum(nullptr /* no context */, 13, 14, 15).u64_);
 
   WasmCallWord<2> div;
   wasm_vm->getFunction("div", &div);
@@ -234,6 +246,7 @@ TEST_F(WasmVmTest, V8Memory) {
   EXPECT_TRUE(wasm_vm->load(code, false));
 
   wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
+  wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   wasm_vm->link("test");
 
   EXPECT_EQ(wasm_vm->getMemorySize(), 65536 /* stack size requested at the build-time */);

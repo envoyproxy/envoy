@@ -1,14 +1,20 @@
 // Build using:
 // $ rustc -C lto -C opt-level=3 -C panic=abort -C link-arg=-S -C link-arg=-zstack-size=32768 --crate-type cdylib --target wasm32-unknown-unknown test_rust.rs
 
-// Import "pong" function from the host environment.
+// Import functions exported from the host environment.
 extern "C" {
     fn pong(value: u32);
+    fn random() -> u32;
 }
 
 #[no_mangle]
 extern "C" fn ping(value: u32) {
     unsafe { pong(value) }
+}
+
+#[no_mangle]
+extern "C" fn lucky(number: u32) -> bool {
+    unsafe { number == random() }
 }
 
 #[no_mangle]
