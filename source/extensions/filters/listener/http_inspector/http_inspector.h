@@ -1,5 +1,7 @@
 #pragma once
 
+#include <http_parser.h>
+
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
@@ -68,6 +70,8 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  void onMessageComplete() { message_complete_ = true; }
+
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
 
@@ -82,6 +86,10 @@ private:
   Network::ListenerFilterCallbacks* cb_{nullptr};
   Event::FileEventPtr file_event_;
   absl::string_view protocol_;
+  http_parser parser_;
+  static http_parser_settings settings_;
+  uint32_t read_{0};
+  bool message_complete_{false};
 
   // Use static thread_local to avoid allocating buffer over and over again.
   static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
