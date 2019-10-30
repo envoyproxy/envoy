@@ -15,7 +15,7 @@ function fix {
   exit 1
 }
 
-# If any of check fails, run fix function above.
+# If any of the checks fail, run the fix function above.
 trap fix ERR
 
 ci/do_ci.sh check_format
