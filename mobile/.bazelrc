@@ -33,8 +33,14 @@ build:fat --ios_multi_cpus=i386,x86_64,armv7,arm64 --fat_apk_cpu=x86,x86_64,arme
 
 # TODO: Enable `--copt -ggdb3`. Issues were encountered previously with this:
 # https://github.com/lyft/envoy-mobile/pull/155#issuecomment-507461500
-build:release \
-  --linkopt=-s \
+build:release-common \
   --copt=-O2 \
+  --linkopt=-s
+
+build:release-ios \
   --apple_bitcode=embedded \
+  --config=release-common \
   --copt=-fembed-bitcode
+
+build:release-android \
+  --config=release-common
