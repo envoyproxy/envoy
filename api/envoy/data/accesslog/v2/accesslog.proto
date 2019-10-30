@@ -164,7 +164,8 @@ message AccessLogCommon {
   // for example the x-forwarder-for header, proxy protocol, etc.
   api.v2.core.Address downstream_direct_remote_address = 20;
 
-  // The filter state in the stream info. If they are serializable and specified in `filter_state_objects_to_log`.
+  // The filter state in the stream info. If they are serializable and specified in
+  // `filter_state_objects_to_log`.
   map<string, google.protobuf.Any> filter_state_objects = 21;
 }
 
