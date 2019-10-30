@@ -34,6 +34,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;
+  NiceMock<Tracing::MockSpan> parent_span_;
 };
 
 // tests rule that is just match no requires.
@@ -43,10 +44,10 @@ TEST_F(AllVerifierTest, TestAllAllow) {
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(2);
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer a"}};
-  context_ = Verifier::createContext(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   headers = Http::TestHeaderMapImpl{};
-  context_ = Verifier::createContext(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
 
@@ -69,7 +70,7 @@ TEST_F(AllVerifierTest, TestAllowFailed) {
       {"b", "Prefix " + std::string(NonExistKidToken)},
       {"c", "Prefix "},
   };
-  context_ = Verifier::createContext(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("a"));
   EXPECT_TRUE(headers.has("b"));
