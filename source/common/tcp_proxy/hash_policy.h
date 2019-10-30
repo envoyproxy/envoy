@@ -2,6 +2,7 @@
 
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/network/hash_policy.h"
+
 #include "common/common/hash.h"
 
 namespace Envoy {

@@ -100,7 +100,7 @@ message TcpProxy {
     // algorithms.
     message SourceIp {
     }
-    
+
     oneof policy_specifier {
       option (validate.required) = true;
 

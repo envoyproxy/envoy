@@ -1,4 +1,5 @@
 #include "common/tcp_proxy/hash_policy.h"
+
 #include "envoy/common/exception.h"
 
 namespace Envoy {

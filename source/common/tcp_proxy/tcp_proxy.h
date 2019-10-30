@@ -25,8 +25,8 @@
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
-#include "common/tcp_proxy/hash_policy.h"
 #include "common/stream_info/stream_info_impl.h"
+#include "common/tcp_proxy/hash_policy.h"
 #include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
