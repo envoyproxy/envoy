@@ -55,6 +55,7 @@ Version history
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * listeners: added :ref:`connection balancer <envoy_api_field_Listener.connection_balance_config>`
   configuration for TCP listeners.
+* listeners: close the listening socket as part of draining stage as soon as workers stop accepting its connections.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
 * lua: extended `dynamicMetadata:set()` to allow setting complex values
 * metrics_service: added support for flushing histogram buckets.
