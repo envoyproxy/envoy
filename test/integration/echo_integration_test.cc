@@ -49,16 +49,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
 TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
   std::string response;
-  std::unique_ptr<RawConnectionDriver> connection;
-  connection = std::make_unique<RawConnectionDriver>(
+  RawConnectionDriver connection(
       lookupPort("listener_0"), buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-        connection->close();
+        connection.close();
       },
       version_);
 
-  connection->run();
+  connection.run();
   EXPECT_EQ("hello", response);
 }
 
@@ -100,15 +99,14 @@ filter_chains:
 
   Buffer::OwnedImpl buffer("hello");
   std::string response;
-  std::unique_ptr<RawConnectionDriver> connection;
-  connection = std::make_unique<RawConnectionDriver>(
+  RawConnectionDriver connection(
       new_listener_port, buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-        connection->close();
+        connection.close();
       },
       version_);
-  connection->run();
+  connection.run();
   EXPECT_EQ("hello", response);
 
   // Remove the listener.
