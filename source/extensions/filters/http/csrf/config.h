@@ -26,7 +26,8 @@ private:
                                     Server::Configuration::FactoryContext& context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace Csrf

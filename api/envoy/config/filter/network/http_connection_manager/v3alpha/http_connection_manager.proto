@@ -11,7 +11,6 @@ import "envoy/api/v3alpha/core/protocol.proto";
 import "envoy/api/v3alpha/rds.proto";
 import "envoy/api/v3alpha/srds.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
-import "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -24,7 +23,7 @@ import "validate/validate.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 36]
+// [#next-free-field: 36]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -41,6 +40,11 @@ message HttpConnectionManager {
     // (Envoy does not require HTTP/2 to take place over TLS or to use ALPN.
     // Prior knowledge is allowed).
     HTTP2 = 2;
+
+    // [#not-implemented-hide:] QUIC implementation is not production ready yet. Use this enum with
+    // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
+    // to distinguish HTTP1 and HTTP2 traffic.
+    HTTP3 = 3;
   }
 
   enum ServerHeaderTransformation {
@@ -79,6 +83,7 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
+  // [#next-free-field: 8]
   message Tracing {
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
@@ -137,7 +142,7 @@ message HttpConnectionManager {
     bool unix_sockets = 1;
   }
 
-  // [#comment:next free field: 7]
+  // [#next-free-field: 7]
   message SetCurrentClientCertDetails {
     reserved 2;
 
@@ -333,7 +338,7 @@ message HttpConnectionManager {
   // .. NOTE::
   //    To be useful in avoiding the race condition described above, this timeout must be set
   //    to *at least* <max round trip time expected between clients and Envoy>+<100ms to account for
-  //    a reasonsable "worst" case processing time for a full iteration of Envoy's event loop>.
+  //    a reasonable "worst" case processing time for a full iteration of Envoy's event loop>.
   //
   // .. WARNING::
   //    A value of 0 will completely disable delayed close processing. When disabled, the downstream
@@ -468,6 +473,7 @@ message ScopedRouteConfigurationsList {
       [(validate.rules).repeated = {min_items: 1}];
 }
 
+// [#next-free-field: 6]
 message ScopedRoutes {
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
   // keys are matched against a set of
@@ -583,7 +589,9 @@ message ScopedRds {
 }
 
 message HttpFilter {
-  reserved 3;
+  reserved 3, 2;
+
+  reserved "config";
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_http_filters>`.
@@ -592,8 +600,6 @@ message HttpFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 4;
   }
 }

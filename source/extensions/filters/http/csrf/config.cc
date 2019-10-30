@@ -23,7 +23,7 @@ Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoTyped(
 Router::RouteSpecificFilterConfigConstSharedPtr
 CsrfFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const Csrf::CsrfPolicy>(policy, context.runtime());
 }
 

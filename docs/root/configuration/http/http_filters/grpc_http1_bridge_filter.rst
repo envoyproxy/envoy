@@ -36,6 +36,12 @@ normal gRPC requests over HTTP/2.
 
 More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
 
+.. attention::
+
+   Note that statistics are also collected by the dedicated :ref:`gRPC stats filter
+   <config_http_filters_grpc_stats>`. The use of this filter for gRPC telemetry
+   has been deprecated.
+
 Statistics
 ----------
 

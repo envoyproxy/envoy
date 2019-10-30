@@ -19,7 +19,8 @@ public:
   const std::string upstream_rate_limit_config_ =
       R"EOF(
 name: envoy.fault
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
   response_rate_limit:
     fixed_limit:
       limit_kbps: 1
@@ -30,7 +31,8 @@ config:
   const std::string header_fault_config_ =
       R"EOF(
 name: envoy.fault
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
   delay:
     header_delay: {}
     percentage:
@@ -54,7 +56,8 @@ TEST_P(FaultIntegrationTestAllProtocols, NoFault) {
   const std::string filter_config =
       R"EOF(
 name: envoy.fault
-config: {}
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
 )EOF";
 
   initializeFilter(filter_config);

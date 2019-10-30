@@ -1,6 +1,7 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,6 +24,10 @@ ProxyFilterConfig::ProxyFilterConfig(
     : dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
       cluster_manager_(cluster_manager) {}
+
+ProxyPerRouteConfig::ProxyPerRouteConfig(
+    const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig& config)
+    : host_rewrite_(config.host_rewrite()) {}
 
 void ProxyFilter::onDestroy() {
   // Make sure we destroy any active cache load handle in case we are getting reset and deferred
@@ -60,6 +65,16 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
           .resolve(envoy::api::v2::core::Metadata())
           .factory_.implementsSecureTransport()) {
     default_port = 443;
+  }
+
+  // Check for per route filter config.
+  const auto* config = route_entry->mostSpecificPerFilterConfigTyped<ProxyPerRouteConfig>(
+      HttpFilterNames::get().DynamicForwardProxy);
+  if (config != nullptr) {
+    const auto& host_rewrite = config->hostRewrite();
+    if (!host_rewrite.empty()) {
+      headers.Host()->value(host_rewrite);
+    }
   }
 
   // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded ports.

@@ -586,8 +586,8 @@ public:
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   GAUGE(version, NeverImport)                                                                      \
-  HISTOGRAM(upstream_cx_connect_ms)                                                                \
-  HISTOGRAM(upstream_cx_length_ms)
+  HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
@@ -691,6 +691,12 @@ public:
    * @return uint64_t features supported by the cluster. @see Features.
    */
   virtual uint64_t features() const PURE;
+
+  /**
+   * @return const Http::Http1Settings& for HTTP/1.1 connections created on behalf of this cluster.
+   *         @see Http::Http1Settings.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
 
   /**
    * @return const Http::Http2Settings& for HTTP/2 connections created on behalf of this cluster.

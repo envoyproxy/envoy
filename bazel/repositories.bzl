@@ -160,6 +160,9 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
 
+    # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
+    _org_llvm_releases_compiler_rt()
+
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
@@ -283,10 +286,6 @@ def _com_github_google_libprotobuf_mutator():
         name = "com_github_google_libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
     )
-    native.bind(
-        name = "libprotobuf_mutator",
-        actual = "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
-    )
 
 def _com_github_jbeder_yaml_cpp():
     location = REPOSITORY_LOCATIONS["com_github_jbeder_yaml_cpp"]
@@ -316,13 +315,10 @@ def _com_github_libevent_libevent():
 
 def _net_zlib():
     location = REPOSITORY_LOCATIONS["net_zlib"]
+
     http_archive(
         name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
-        # The patch is only needed due to https://github.com/madler/zlib/pull/420
-        # TODO(htuch): remove this when zlib #420 merges.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
         **location
     )
     native.bind(
@@ -642,6 +638,12 @@ def _com_googlesource_quiche():
     native.bind(
         name = "quiche_quic_platform_base",
         actual = "@com_googlesource_quiche//:quic_platform_base",
+    )
+
+def _org_llvm_releases_compiler_rt():
+    _repository_impl(
+        name = "org_llvm_releases_compiler_rt",
+        build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
 def _com_github_grpc_grpc():

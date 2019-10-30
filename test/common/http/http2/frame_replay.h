@@ -52,16 +52,16 @@ class CodecFrameInjector {
 public:
   CodecFrameInjector(const std::string& injector_name);
 
-  void write(const Frame& frame);
+  // Writes the data using the Http::Connection's nghttp2 session.
+  void write(const Frame& frame, Http::Connection& connection);
 
   Http2Settings settings_;
-  std::unique_ptr<Http::Connection> connection_;
   Stats::IsolatedStoreImpl stats_store_;
   const std::string injector_name_;
 };
 
-// Wrapper for HTTP/2 client codec supporting injection of frames and expecting on
-// the behaviors of callbacks and the request decoder.
+// Holds mock and environment placeholders for an HTTP/2 client codec. Sets up expectations for
+// the behavior of callbacks and the request decoder.
 class ClientCodecFrameInjector : public CodecFrameInjector {
 public:
   ClientCodecFrameInjector();
@@ -73,15 +73,14 @@ public:
   MockStreamCallbacks client_stream_callbacks_;
 };
 
-// Wrapper for HTTP/2 server codec supporting injection of frames and expecting on
-// the behaviors of callbacks and the request decoder.
+// Holds mock and environment placeholders for an HTTP/2 server codec. Sets up expectations for
+// the behavior of callbacks and the request decoder.
 class ServerCodecFrameInjector : public CodecFrameInjector {
 public:
   ServerCodecFrameInjector();
 
   ::testing::NiceMock<Network::MockConnection> server_connection_;
   MockServerConnectionCallbacks server_callbacks_;
-  std::unique_ptr<TestServerConnectionImpl> server_;
   MockStreamDecoder request_decoder_;
   MockStreamCallbacks server_stream_callbacks_;
 };
