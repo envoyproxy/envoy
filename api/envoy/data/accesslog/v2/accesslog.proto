@@ -67,7 +67,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message AccessLogCommon {
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.

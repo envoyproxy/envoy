@@ -42,6 +42,7 @@ message TcpGrpcAccessLogConfig {
 }
 
 // Common configuration for gRPC access logs.
+// [#next-free-field: 6]
 message CommonGrpcAccessLogConfig {
   // The friendly name of the access log to be returned in :ref:`StreamAccessLogsMessage.Identifier
   // <envoy_api_msg_service.accesslog.v2.StreamAccessLogsMessage.Identifier>`. This allows the
