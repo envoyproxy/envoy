@@ -17,7 +17,10 @@ namespace Common {
 namespace Redis {
 
 /**
- * All RESP types as defined here: https://redis.io/topics/protocol
+ * All RESP types as defined here: https://redis.io/topics/protocol with the exception of
+ * CompositeArray. CompositeArray is an internal type that behaves like an Array type. Its first
+ * element is a SimpleString or BulkString and the rest of the elements are portion of another
+ * Array. This is created for performance.
  */
 enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray };
 
@@ -48,6 +51,9 @@ public:
    */
   std::string toString() const;
 
+  /**
+   * Holds the data for CompositeArray RespType
+   */
   class CompositeArray {
   public:
     CompositeArray() = default;

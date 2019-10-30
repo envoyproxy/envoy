@@ -9,8 +9,6 @@
 
 #include "extensions/filters/network/common/redis/codec.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -88,7 +86,6 @@ public:
 
 private:
   void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);
-  ;
   void encodeCompositeArray(const RespValue::CompositeArray& array, Buffer::Instance& out);
   void encodeBulkString(const std::string& string, Buffer::Instance& out);
   void encodeError(const std::string& string, Buffer::Instance& out);

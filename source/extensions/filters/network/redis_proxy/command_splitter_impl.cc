@@ -358,12 +358,12 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    // ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set->toString());
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
       pending_request.conn_pool_ = route->upstream();
       Common::Redis::RespValue single_set(base_request,
                                           Common::Redis::Utility::SetRequest::instance(), i, i + 1);
+      ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set.toString());
       pending_request.handle_ = makeRequest(route, "set", base_request->asArray()[i].asString(),
                                             single_set, pending_request);
     }
@@ -489,7 +489,6 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
   }
 }
 
-// TODO: remove
 void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
   Common::Redis::RespValue::CompositeArray single_fragment(
       incoming_request_, incoming_request_->asArray()[0], index + 1, index + 1);

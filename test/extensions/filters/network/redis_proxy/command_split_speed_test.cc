@@ -25,25 +25,6 @@ namespace RedisProxy {
 
 class CommandSplitSpeedTest {
 public:
-  Common::Redis::RespValuePtr makeBulkStringArray(uint64_t batch_size, uint64_t key_size,
-                                                  uint64_t value_size) {
-    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-    std::vector<Common::Redis::RespValue> values(batch_size * 2 + 1);
-    values[0].type(Common::Redis::RespType::BulkString);
-    values[0].asString() = "mset";
-    for (uint64_t i = 1; i < batch_size * 2 + 1; i += 2) {
-      values[i].type(Common::Redis::RespType::BulkString);
-      values[i].asString() = std::string(key_size, 'k');
-      values[i + 1].type(Common::Redis::RespType::BulkString);
-      values[i + 1].asString() = std::string(value_size, 'v');
-    }
-
-    request->type(Common::Redis::RespType::Array);
-    request->asArray().swap(values);
-
-    return request;
-  }
-
   Common::Redis::RespValueSharedPtr
   makeSharedBulkStringArray(uint64_t batch_size, uint64_t key_size, uint64_t value_size) {
     Common::Redis::RespValueSharedPtr request{new Common::Redis::RespValue()};
@@ -61,22 +42,6 @@ public:
     request->asArray().swap(values);
 
     return request;
-  }
-  using ValueOrPointer = absl::variant<Common::Redis::RespValue, Common::Redis::RespValueSharedPtr>;
-
-  void move(const Common::Redis::RespValueSharedPtr& request) {
-    for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
-      auto single_set = std::make_shared<Common::Redis::RespValue>(
-          request, Common::Redis::Utility::SetRequest::instance(), i, i + 2);
-    }
-  }
-
-  void moveLocalVariant(Common::Redis::RespValueSharedPtr& request) {
-    for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
-      Common::Redis::RespValue single_set(request, Common::Redis::Utility::SetRequest::instance(),
-                                          i, i + 1);
-      ValueOrPointer variant(single_set);
-    }
   }
 
   void createLocalCompositeArray(Common::Redis::RespValueSharedPtr& request) {
@@ -106,28 +71,6 @@ public:
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-//
-// static void BM_Split_Move(benchmark::State& state) {
-//  Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
-//  Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
-//      context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
-//  for (auto _ : state) {
-//    context.move(request);
-//  }
-//  //  state.counters["use_count"] = request.use_count();
-//}
-// BENCHMARK(BM_Split_Move)->Ranges({{1, 100}, {64, 8 << 14}});
-//
-// static void BM_Split_Move_Local_Variant(benchmark::State& state) {
-//  Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
-//  Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
-//      context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
-//  for (auto _ : state) {
-//    context.moveLocalVariant(request);
-//  }
-//  //  state.counters["use_count"] = request.use_count();
-//}
-// BENCHMARK(BM_Split_Move_Local_Variant)->Ranges({{1, 100}, {64, 8 << 14}});
 
 static void BM_Split_CompositeArray(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
@@ -136,7 +79,6 @@ static void BM_Split_CompositeArray(benchmark::State& state) {
   for (auto _ : state) {
     context.createLocalCompositeArray(request);
   }
-  //  state.counters["use_count"] = request.use_count();
 }
 BENCHMARK(BM_Split_CompositeArray)->Ranges({{1, 100}, {64, 8 << 14}});
 
@@ -147,8 +89,6 @@ static void BM_Split_Copy(benchmark::State& state) {
   for (auto _ : state) {
     context.copy(request);
   }
-
-  //  state.counters["use_count"] = request.use_count();
 }
 BENCHMARK(BM_Split_Copy)->Ranges({{1, 100}, {64, 8 << 14}});
 
