@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - master
-    paths:
-      - 'library/common/**'
-      - 'library/java/**'
-      - 'library/kotlin/**'
-      - 'envoy/**'
 
 jobs:
   master_aar_dist:
