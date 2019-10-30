@@ -174,10 +174,6 @@ parseRequestHeader(absl::string_view param_str) {
                                      param_str));
   }
   param_str = param_str.substr(1, param_str.size() - 2); // trim parens
-  if (param_str.empty()) {
-    throw EnvoyException(formatPerRequestStateParseException(param_str));
-  }
-
   Http::LowerCaseString param{std::string(param_str)};
   return [param](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
     return stream_info.getRequestHeader(param);
