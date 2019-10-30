@@ -3,4 +3,3 @@
 
 # bazel keywords in bazel/cc_configure.bzl
 overriden
-pathname
