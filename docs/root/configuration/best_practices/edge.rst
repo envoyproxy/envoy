@@ -57,7 +57,9 @@ The following is a YAML example of the above recommendation.
   static_resources:
     listeners:
     - address:
-        socket_address: { address: 127.0.0.1, port_value: 443 }
+        socket_address:
+          address: 0.0.0.0
+          port_value: 443
       listener_filters:
       - name: "envoy.listener.tls_inspector"
         typed_config: {}
