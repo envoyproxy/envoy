@@ -10,7 +10,6 @@
 #include "envoy/network/connection.h"
 
 #include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
 #include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
@@ -171,7 +170,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // actually write the zero length buffer out.
   if (data.length() > 0) {
     if (chunk_encoding_) {
-      connection_.buffer().add(fmt::format("{:x}\r\n", data.length()));
+      connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));
     }
 
     connection_.buffer().move(data);
@@ -733,8 +732,8 @@ void ServerConnectionImpl::sendProtocolError() {
   // to look more like HTTP/2 to higher layers.
   if (!active_request_ || !active_request_->response_encoder_.startedResponse()) {
     Buffer::OwnedImpl bad_request_response(
-        fmt::format("HTTP/1.1 {} {}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-                    std::to_string(enumToInt(error_code_)), CodeUtility::toString(error_code_)));
+        absl::StrCat("HTTP/1.1 ", error_code_, " ", CodeUtility::toString(error_code_),
+                     "\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"));
 
     connection_.write(bad_request_response, false);
   }
