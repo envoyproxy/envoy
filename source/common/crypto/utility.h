@@ -29,12 +29,14 @@ struct VerificationOutput {
 
 class Utility {
 public:
+  virtual ~Utility() = default;
+
   /**
    * Computes the SHA-256 digest of a buffer.
    * @param buffer the buffer.
    * @return a vector of bytes for the computed digest.
    */
-  std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer);
+  virtual std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) PURE;
 
   /**
    * Computes the SHA-256 HMAC for a given key and message.
@@ -42,7 +44,7 @@ public:
    * @param message message data for the HMAC function.
    * @return a vector of bytes for the computed HMAC.
    */
-  std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string_view message);
+  virtual std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string_view message) PURE;
 
   /**
    * Verify cryptographic signatures.
@@ -53,19 +55,20 @@ public:
    * @return If the result_ is true, the error_message_ is empty; otherwise,
    * the error_message_ stores the error message
    */
-  const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& key,
+  virtual const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& key,
                                            const std::vector<uint8_t>& signature,
-                                           const std::vector<uint8_t>& text);
+                                           const std::vector<uint8_t>& text) PURE;
 
   /**
    * Import public key.
    * @param key key string
    * @return pointer to EVP_PKEY public key
    */
-  CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key);
+  virtual CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) PURE;
 };
 
-using UtilitySingleton = ThreadSafeSingleton<Utility>;
+using UtilitySingleton = InjectableSingleton<Utility>;
+using ScopedUtilitySingleton = ScopedInjectableLoader<Utility>;
 
 } // namespace Crypto
 } // namespace Common
