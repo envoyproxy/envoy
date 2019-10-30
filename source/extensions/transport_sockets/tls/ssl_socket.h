@@ -94,8 +94,8 @@ public:
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
-  void clearTransportSocketCallbacks() override { RELEASE_ASSERT(false, "Detach not implemented"); }
-  bool canDetach() const override { return false; }
+  void clearTransportSocketCallbacks() override;
+  bool canDetach() const override;
   std::string protocol() const override;
   absl::string_view failureReason() const override;
   bool canFlushClose() override { return state_ == SocketState::HandshakeComplete; }
@@ -132,6 +132,7 @@ private:
 
   SSL* ssl_;
   Ssl::ConnectionInfoConstSharedPtr info_;
+  bool ssl_bio_socket_initialized_{};
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

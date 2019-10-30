@@ -60,21 +60,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
 }
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
-  //  ASSERT(!callbacks_);
-  bool had_previous = (callbacks_ != nullptr);
-
-  // Unregister previous.
-  if (had_previous) {
-    // TODO would be good to assert that the fd is not changing, but
-    // //test/integration:xfcc_integration_test fails. So... this private key access thing. Is it
-    // needed past initial handshake?  This seems half implemented in Envoy open source.
-    //    RELEASE_ASSERT(callbacks_->ioHandle().fd() == callbacks.ioHandle().fd(), "");
-    RELEASE_ASSERT(ctx_->getPrivateKeyMethodProviders().empty(), "");
-    for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
-      provider->unregisterPrivateKeyMethod(ssl_);
-    }
-  }
-
+  ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
   // Associate this SSL connection with all the certificates (with their potentially different
@@ -83,11 +69,25 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(ssl_, *this, callbacks_->connection().dispatcher());
   }
 
-  if (!had_previous) {
-    // FD hasn't changed.
+  // Create SSL BIO the first time this method is called.
+  if (!ssl_bio_socket_initialized_) {
+    ssl_bio_socket_initialized_ = true;
     BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
     SSL_set_bio(ssl_, bio, bio);
   }
+}
+
+void SslSocket::clearTransportSocketCallbacks() {
+  ASSERT(canDetach());
+  callbacks_ = nullptr;
+}
+
+bool SslSocket::canDetach() const {
+  // Private key method providers have references to the connection's
+  // dispatcher.  For that reason, we currently do not support changing the
+  // dispatcher associated with the transport socket if private key method
+  // providers are in use.
+  return ctx_->getPrivateKeyMethodProviders().empty();
 }
 
 SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
