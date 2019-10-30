@@ -31,6 +31,7 @@ Version history
 * csrf: add PATCH to supported methods.
 * dns: added support for configuring :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>` to set the DNS refresh rate during failures.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
+* ext_authz: added :ref:`filter_enabled RuntimeFractionalPercent flag <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` to filter.
 * ext_authz: added tracing to the HTTP client.
 * ext_authz: deprecate :ref:`cluster scope stats <config_http_filters_ext_authz_stats>` in favour of filter scope stats.
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
