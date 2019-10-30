@@ -101,7 +101,8 @@ TEST_P(LuaIntegrationTest, RequestAndResponse) {
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: envoy.lua
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:logTrace("log test")
@@ -220,7 +221,8 @@ TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: envoy.lua
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -277,7 +279,8 @@ TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: envoy.lua
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -326,7 +329,8 @@ TEST_P(LuaIntegrationTest, ChangeRoute) {
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: envoy.lua
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:headers():remove(":path")
@@ -359,7 +363,8 @@ TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: envoy.lua
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:streamInfo():dynamicMetadata()
@@ -394,7 +399,8 @@ TEST_P(LuaIntegrationTest, SignatureVerification) {
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: envoy.lua
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function string.fromhex(str)
       return (str:gsub('..', function (cc)

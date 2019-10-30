@@ -117,7 +117,7 @@ message VirtualHost {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 12;
+  map<string, google.protobuf.Struct> per_filter_config = 12 [deprecated = true];
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -197,7 +197,7 @@ message Route {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 8;
+  map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -303,7 +303,7 @@ message WeightedCluster {
     // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
-    map<string, google.protobuf.Struct> per_filter_config = 8;
+    map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -869,7 +869,7 @@ message RetryPolicy {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
       google.protobuf.Any typed_config = 3;
     }
@@ -879,7 +879,7 @@ message RetryPolicy {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
       google.protobuf.Any typed_config = 3;
     }

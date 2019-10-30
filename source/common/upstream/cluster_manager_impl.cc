@@ -1326,8 +1326,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   } else {
     // TODO: fix nighthawk call to ProdConnPoolImpl's constructor.
     // https://github.com/envoyproxy/nighthawk/blob/master/source/client/benchmark_client_impl.h
-    return std::make_unique<Http::Http1::ProdConnPoolImpl>(
-        dispatcher, host, priority, upstream_connection_pool_, options, transport_socket_options);
+    return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, upstream_connection_pool_, options,
+                                                           host->cluster().http1Settings(),
+                                                           transport_socket_options);
   }
 }
 

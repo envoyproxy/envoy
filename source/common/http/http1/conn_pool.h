@@ -6,6 +6,7 @@
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
@@ -33,6 +34,7 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority, Upstream::UpstreamConnectionPool* upstream_pool,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
+               const Http::Http1Settings& settings,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
   ~ConnPoolImpl() override;
@@ -134,6 +136,7 @@ protected:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
+  const Http1Settings settings_;
 };
 
 /**
@@ -145,9 +148,9 @@ public:
                    Upstream::ResourcePriority priority,
                    Upstream::UpstreamConnectionPool* upstream_pool,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Http::Http1Settings& settings,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-      : ConnPoolImpl(dispatcher, host, priority, upstream_pool, options, transport_socket_options) {
-  }
+      : ConnPoolImpl(dispatcher, host, priority, upstream_pool, options, settings, transport_socket_options) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data,

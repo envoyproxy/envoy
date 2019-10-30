@@ -80,7 +80,7 @@ message GrpcService {
         string name = 1;
 
         oneof config_type {
-          google.protobuf.Struct config = 2;
+          google.protobuf.Struct config = 2 [deprecated = true];
 
           google.protobuf.Any typed_config = 3;
         }

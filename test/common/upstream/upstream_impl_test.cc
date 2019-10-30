@@ -253,8 +253,12 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
         max_requests: 3
         max_retries: 4
     max_requests_per_connection: 3
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL
     http2_protocol_options:
       hpack_table_size: 0
+    http_protocol_options:
+      header_key_format:
+        proper_case_words: {}
     hosts:
     - { socket_address: { address: localhost1, port_value: 11001 }}
     - { socket_address: { address: localhost2, port_value: 11002 }}
@@ -289,6 +293,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
+  EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
+            cluster.info()->http1Settings().header_key_format_);
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());

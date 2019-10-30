@@ -234,6 +234,10 @@ message AsyncDataSource {
 // empty, a default transport socket implementation and configuration will be
 // chosen based on the platform and existence of tls_context.
 message TransportSocket {
+  reserved 2;
+
+  reserved "config";
+
   // The name of the transport socket to instantiate. The name must match a supported transport
   // socket implementation.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -241,8 +245,6 @@ message TransportSocket {
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 3;
   }
 }

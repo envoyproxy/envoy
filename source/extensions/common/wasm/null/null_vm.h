@@ -32,7 +32,6 @@ struct NullVm : public WasmVm {
   void link(absl::string_view debug_name) override;
   uint64_t getMemorySize() override;
   absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) override;
-  bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) override;
   bool setMemory(uint64_t pointer, uint64_t size, const void* data) override;
   bool setWord(uint64_t pointer, Word data) override;
   bool getWord(uint64_t pointer, Word* data) override;
@@ -51,15 +50,6 @@ struct NullVm : public WasmVm {
                         typename ConvertFunctionTypeWordToUint32<_T>::type) override{};
   FOR_ALL_WASM_VM_IMPORTS(_REGISTER_CALLBACK)
 #undef _REGISTER_CALLBACK
-
-  // NullVm does not advertise code as emscripten so this will not get called.
-  std::unique_ptr<Global<double>> makeGlobal(absl::string_view, absl::string_view,
-                                             double) override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  };
-  std::unique_ptr<Global<Word>> makeGlobal(absl::string_view, absl::string_view, Word) override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  };
 
   std::string plugin_name_;
   std::unique_ptr<NullVmPlugin> plugin_;

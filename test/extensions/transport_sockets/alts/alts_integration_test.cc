@@ -51,7 +51,7 @@ public:
         alts_config.add_peer_service_accounts(server_peer_identity_);
       }
       alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
-      TestUtility::jsonConvert(alts_config, *transport_socket->mutable_config());
+      transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
