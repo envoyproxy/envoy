@@ -2,7 +2,7 @@ MySQL filter example
 ====================
 
 In this example, we show how the [MySQL
-filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/network_filters/mysql_proxy_filter)
+filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/mysql_proxy_filter)
 can be used with the Envoy proxy. The Envoy proxy [configuration](./envoy.yaml)
 includes a MySQL filter that parses queries and collects MySQL-specific
 metrics.

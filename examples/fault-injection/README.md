@@ -2,8 +2,8 @@ Envoy fault injection example
 =============================
 
 This simple example demonstrates [Envoy's fault injection
-capability](https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/fault_filter) using [Envoy's runtime
-support](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime) to control the feature.
+capability](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter) using [Envoy's runtime
+support](https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime) to control the feature.
 
 ## Usage
 ```

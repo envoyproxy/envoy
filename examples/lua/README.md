@@ -3,7 +3,7 @@ proxy. The Envoy proxy [configuration](./envoy.yaml) includes a lua
 filter that contains two functions namely
 `envoy_on_request(request_handle)` and
 `envoy_on_response(response_handle)` as documented
-[here](https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/lua_filter).
+[here](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/lua_filter).
 
 
 
