@@ -96,7 +96,7 @@ TEST_F(HttpInspectorTest, InlineReadInspectHttp10) {
       "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
-      "15000\r\ncontent-length: 0\r\n";
+      "15000\r\ncontent-length: 0\r\n\r\n";
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
         ASSERT(length >= header.size());
@@ -140,7 +140,7 @@ TEST_F(HttpInspectorTest, InspectHttp10) {
       "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
-      "15000\r\ncontent-length: 0\r\n";
+      "15000\r\ncontent-length: 0\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -163,7 +163,7 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
       "GET /anything HTTP/1.1\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
-      "15000\r\ncontent-length: 0\r\n";
+      "15000\r\ncontent-length: 0\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -180,7 +180,7 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
   EXPECT_EQ(1, cfg_->stats().http11_found_.value());
 }
 
-TEST_F(HttpInspectorTest, InspectHttp11WithNonEmtpyRequestBody) {
+TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
   init();
   const absl::string_view header =
       "GET /anything HTTP/1.1\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
@@ -209,7 +209,7 @@ TEST_F(HttpInspectorTest, InspectHttp11InvalidContentLength) {
       "GET /anything HTTP/1.1\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
-      "15000\r\ncontent-length: 3\r\n\r\nfooo";
+      "15000\r\ncontent-length: 2\r\n\r\nfoo";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -251,7 +251,7 @@ TEST_F(HttpInspectorTest, InspectHttp11NoContentLength) {
 
 TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
   init();
-  const absl::string_view header = "GET  /anything  HTTP/1.1\r\n";
+  const absl::string_view header = "GET  /anything  HTTP/1.1\r\n\r\n";
   //                                   ^^         ^^
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -271,7 +271,7 @@ TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
 
 TEST_F(HttpInspectorTest, InvalidHttpMethod) {
   init();
-  const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
+  const absl::string_view header = "BAD /anything HTTP/1.1";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -288,7 +288,7 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
   init();
-  const absl::string_view header = "BAD /anything HTTP/1.1";
+  const absl::string_view header = "BAD /anything HTTP/1.1\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -305,7 +305,7 @@ TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
 
 TEST_F(HttpInspectorTest, OldHttpProtocol) {
   init();
-  const absl::string_view header = "GET /anything HTTP/0.9\r\n";
+  const absl::string_view header = "GET /anything HTTP/0.9\r\n\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -323,7 +323,7 @@ TEST_F(HttpInspectorTest, OldHttpProtocol) {
 
 TEST_F(HttpInspectorTest, InvalidRequestLine) {
   init();
-  const absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine\r\n";
+  const absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -472,7 +472,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
 TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
   init();
 
-  const absl::string_view data = "GET /anything HTTP/1.0";
+  const absl::string_view data = "GET /anything HTTP/1.0\r\n\r\n";
   {
     InSequence s;
 
@@ -542,7 +542,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 
   init();
 
-  const std::string valid_header = "GET /index HTTP/1.1\r";
+  const std::string valid_header = "GET /index HTTP/1.1";
   //  offset:                       0         10
   const std::string truncate_header = valid_header.substr(0, 14).append("\r");
 

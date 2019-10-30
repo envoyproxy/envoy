@@ -124,6 +124,8 @@ ParseState Filter::onRead() {
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
     return ParseState::Error;
+  } else if (read_ != 0 && read_ == result.rc_) {
+    return ParseState::Error;
   }
 
   const auto parse_state =
@@ -156,17 +158,17 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     ssize_t rc =
         http_parser_execute(&parser_, &settings_, data.data() + read_, data.length() - read_);
     ENVOY_LOG(trace,
-              "http inspector: http_parser parsed {} chars, error code: {}, parser state: {}", rc,
-              HTTP_PARSER_ERRNO(&parser_), parser_.state);
+              "http inspector: http_parser parsed {} chars, error code: {}, parser state: {}, "
+              "message complete: {}",
+              rc, HTTP_PARSER_ERRNO(&parser_), parser_.state, message_complete_);
 
     // Errors in parsing HTTP.
     if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
       return ParseState::Error;
     }
 
-    // state 18 is the s_start_req. When the header is parsed, the http_parser will reset the state
-    // to s_start_req. state 42 is s_req_http_end
-    if ((parser_.state == 18 && message_complete_) || parser_.state >= 42) {
+    // When the header is parsed, the http_parser will reset the state to s_start_req.
+    if (message_complete_) {
       if (parser_.http_major == 1 && parser_.http_minor == 1) {
         protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
       } else {
