@@ -87,13 +87,6 @@ message ExtAuthz {
   // Envoy will lookup the runtime key to get the percentage of requests to filter.
   //
   // If this field is not specified, the filter will be enabled for all requests.
-  //
-  // Parsing this field is implemented such that the runtime key's data may be represented
-  // as a :ref:`FractionalPercent <envoy_api_msg_type.v3alpha.FractionalPercent>` proto represented
-  // as JSON/YAML and may also be represented as an integer with the assumption that the value
-  // is an integral percentage out of 100. For instance, a runtime key lookup returning the
-  // value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
-  // HUNDRED.
   api.v3alpha.core.RuntimeFractionalPercent filter_enabled = 9;
 }
 

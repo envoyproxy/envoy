@@ -433,6 +433,9 @@ message CorsPolicy {
   oneof enabled_specifier {
     // Specifies the % of requests for which the CORS filter is enabled.
     //
+    // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
+    // filter will be enabled for 100% of the requests.
+    //
     // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.RuntimeFractionalPercent filter_enabled = 9;
@@ -440,7 +443,9 @@ message CorsPolicy {
 
   // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
   // enforced.
-  // This is intended to be used when ``filter_enabled`` is off.
+  //
+  // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
+  // fields have to explicitly disable the filter in order for this setting to take effect.
   //
   // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
@@ -490,16 +495,6 @@ message RouteAction {
     // For some fraction N/D, a random number in the range [0,D) is selected. If the
     // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
-    //
-    // .. note::
-    //
-    //   Parsing this field is implemented such that the runtime key's data may be represented
-    //   as a :ref:`FractionalPercent <envoy_api_msg_type.v3alpha.FractionalPercent>` proto
-    //   represented as JSON/YAML and may also be represented as an integer with the assumption that
-    //   the value is an integral percentage out of 100. For instance, a runtime key lookup
-    //   returning the value "42" would parse as a `FractionalPercent` whose numerator is 42 and
-    //   denominator is HUNDRED. This is behaviour is different to that of the deprecated
-    //   `runtime_key` field, where the implicit denominator is 10000.
     core.RuntimeFractionalPercent runtime_fraction = 3;
   }
 
