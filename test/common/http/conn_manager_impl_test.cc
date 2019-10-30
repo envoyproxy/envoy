@@ -270,6 +270,7 @@ public:
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
   }
@@ -5006,13 +5007,6 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   route_config_provider2_.reset();
   // Only scoped route config provider valid.
   EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
-
-#if !defined(NDEBUG)
-  EXPECT_CALL(*scoped_route_config_provider2_, getConfig()).WillRepeatedly(Return(nullptr));
-  // ASSERT failure when SRDS provider returns a nullptr.
-  EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),
-                     "Scoped rds provider returns null for scoped routes config.");
-#endif // !defined(NDEBUG)
 }
 
 } // namespace Http
