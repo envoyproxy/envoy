@@ -353,6 +353,16 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%FILTER_STATE(KEY):Z%
+  HTTP
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+
+  TCP
+    Same as HTTP, the filter state is from connection instead of a L7 request.
+
 %REQUESTED_SERVER_NAME%
   HTTP
     String value set on ssl connection socket for Server Name Indication (SNI)

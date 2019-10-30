@@ -62,6 +62,8 @@ message CommonGrpcAccessLogConfig {
   // to zero effectively disables the batching. Defaults to 16384.
   google.protobuf.UInt32Value buffer_size_bytes = 4;
 
-  // Additional filter state objects to log. If the filter state object is serializable.
+  // Additional filter state objects to log in :ref:`filter_state_objects
+  // <envoy_api_field_data.accesslog.v3alpha.AccessLogCommon.filter_state_objects>`.
+  // Logger will call `FilterState::Object::seralizeAsProto` to serialize the filter state object.
   repeated string filter_state_objects_to_log = 5;
 }
