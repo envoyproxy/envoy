@@ -72,11 +72,6 @@ TEST(NullVmTest, NullVmMemory) {
   EXPECT_EQ(m.size(), d.size());
   EXPECT_FALSE(wasm_vm->getMemory(0 /* nullptr */, 1 /* size */).has_value());
 
-  uint64_t offset;
-  char l;
-  EXPECT_TRUE(wasm_vm->getMemoryOffset(&l, &offset));
-  EXPECT_EQ(offset, reinterpret_cast<uint64_t>(&l));
-
   char c;
   char z = 'z';
   EXPECT_TRUE(wasm_vm->setMemory(reinterpret_cast<uint64_t>(&c), 1, &z));
@@ -261,11 +256,6 @@ TEST_F(WasmVmTest, V8Memory) {
 
   EXPECT_FALSE(wasm_vm->setWord(1024 * 1024 /* out of bound */, 1));
   EXPECT_FALSE(wasm_vm->getWord(1024 * 1024 /* out of bound */, &word));
-
-  uint64_t offset;
-  EXPECT_FALSE(wasm_vm->getMemoryOffset(reinterpret_cast<void*>(0), &offset));
-  EXPECT_FALSE(wasm_vm->getMemoryOffset(
-      reinterpret_cast<void*>(std::numeric_limits<uint64_t>::max()), &offset));
 }
 
 } // namespace

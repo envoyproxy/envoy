@@ -50,19 +50,9 @@ public:
 
   uint64_t getMemorySize() override;
   absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) override;
-  bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) override;
   bool setMemory(uint64_t pointer, uint64_t size, const void* data) override;
   bool getWord(uint64_t pointer, Word* word) override;
   bool setWord(uint64_t pointer, Word word) override;
-
-#define _REGISTER_HOST_GLOBAL(T)                                                                   \
-  std::unique_ptr<Global<T>> makeGlobal(absl::string_view module_name, absl::string_view name,     \
-                                        T initial_value) override {                                \
-    return registerHostGlobalImpl(module_name, name, initial_value);                               \
-  };
-  _REGISTER_HOST_GLOBAL(Word);
-  _REGISTER_HOST_GLOBAL(double);
-#undef _REGISTER_HOST_GLOBAL
 
 #define _REGISTER_HOST_FUNCTION(T)                                                                 \
   void registerCallback(absl::string_view module_name, absl::string_view function_name, T,         \
@@ -80,10 +70,6 @@ public:
 #undef _GET_MODULE_FUNCTION
 
 private:
-  template <typename T>
-  std::unique_ptr<Global<T>> registerHostGlobalImpl(absl::string_view module_name,
-                                                    absl::string_view name, T initial_value);
-
   template <typename... Args>
   void registerHostFunctionImpl(absl::string_view module_name, absl::string_view function_name,
                                 void (*function)(void*, Args...));
@@ -107,7 +93,6 @@ private:
   wasm::own<wasm::Memory> memory_;
   wasm::own<wasm::Table> table_;
 
-  absl::flat_hash_map<std::string, wasm::own<wasm::Global>> host_globals_;
   absl::flat_hash_map<std::string, FuncDataPtr> host_functions_;
   absl::flat_hash_map<std::string, wasm::own<wasm::Func>> module_functions_;
 };
@@ -228,15 +213,6 @@ template <> constexpr auto convertArgToValKind<uint64_t>() { return wasm::I64; }
 template <> constexpr auto convertArgToValKind<float>() { return wasm::F32; };
 template <> constexpr auto convertArgToValKind<double>() { return wasm::F64; };
 
-template <typename T> struct V8ProxyForGlobal : Global<T> {
-  V8ProxyForGlobal(wasm::Global* value) : global_(value) {}
-
-  T get() override { return global_->get().get<typename ConvertWordTypeToUint32<T>::type>(); };
-  void set(const T& value) override { global_->set(makeVal(static_cast<T>(value))); };
-
-  wasm::Global* global_;
-};
-
 template <typename T, std::size_t... I>
 constexpr auto convertArgsTupleToValTypesImpl(absl::index_sequence<I...>) {
   return wasm::ownvec<wasm::ValType>::make(
@@ -345,15 +321,12 @@ void V8::link(absl::string_view debug_name) {
     } break;
 
     case wasm::EXTERN_GLOBAL: {
+      // TODO(PiotrSikora): add support when/if needed.
       ENVOY_LOG(trace, "link(), export host global: {}.{} ({})", module, name,
                 printValKind(import_type->global()->content()->kind()));
 
-      auto it = host_globals_.find(absl::StrCat(module, ".", name));
-      if (it == host_globals_.end()) {
-        throw WasmVmException(
-            fmt::format("Failed to load WASM module due to a missing import: {}.{}", module, name));
-      }
-      imports.push_back(it->second.get());
+      throw WasmVmException(
+          fmt::format("Failed to load WASM module due to a missing import: {}.{}", module, name));
     } break;
 
     case wasm::EXTERN_MEMORY: {
@@ -444,17 +417,6 @@ absl::optional<absl::string_view> V8::getMemory(uint64_t pointer, uint64_t size)
   return absl::string_view(memory_->data() + pointer, size);
 }
 
-bool V8::getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) {
-  ENVOY_LOG(trace, "getMemoryOffset({})", host_pointer);
-  ASSERT(memory_ != nullptr);
-  if (static_cast<byte_t*>(host_pointer) < memory_->data() ||
-      static_cast<byte_t*>(host_pointer) >= memory_->data() + memory_->data_size()) {
-    return false;
-  }
-  *vm_pointer = static_cast<byte_t*>(host_pointer) - memory_->data();
-  return true;
-}
-
 bool V8::setMemory(uint64_t pointer, uint64_t size, const void* data) {
   ENVOY_LOG(trace, "setMemory({}, {})", pointer, size);
   ASSERT(memory_ != nullptr);
@@ -486,18 +448,6 @@ bool V8::setWord(uint64_t pointer, Word word) {
   uint32_t word32 = word.u32();
   ::memcpy(memory_->data() + pointer, &word32, size);
   return true;
-}
-
-template <typename T>
-std::unique_ptr<Global<T>> V8::registerHostGlobalImpl(absl::string_view module_name,
-                                                      absl::string_view name, T initial_value) {
-  ENVOY_LOG(trace, "registerHostGlobal(\"{}.{}\", {})", module_name, name, initial_value);
-  auto value = makeVal(initial_value);
-  auto type = wasm::GlobalType::make(wasm::ValType::make(value.kind()), wasm::CONST);
-  auto global = wasm::Global::make(store_.get(), type.get(), value);
-  auto proxy = std::make_unique<V8ProxyForGlobal<T>>(global.get());
-  host_globals_.insert_or_assign(absl::StrCat(module_name, ".", name), std::move(global));
-  return proxy;
 }
 
 template <typename... Args>
