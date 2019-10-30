@@ -18,6 +18,7 @@ HTTP proxies should additionally configure:
 * :ref:`use_remote_address <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
   to true (to avoid consuming HTTP headers from external clients, see :ref:`HTTP header sanitizing <config_http_conn_man_header_sanitizing>`
   for details),
+* :ref:`connection and stream timeouts <faq_configuration_timeouts>`,
 * :ref:`HTTP/2 maximum concurrent streams limit <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>` to 100,
 * :ref:`HTTP/2 initial stream window size limit <envoy_api_field_core.Http2ProtocolOptions.initial_stream_window_size>` to 64 KiB,
 * :ref:`HTTP/2 initial connection window size limit <envoy_api_field_core.Http2ProtocolOptions.initial_connection_window_size>` to 1 MiB.
@@ -68,11 +69,13 @@ The following is a YAML example of the above recommendation.
             stat_prefix: ingress_http
             use_remote_address: true
             common_http_protocol_options:
-              idle_timeout: 840s
+              idle_timeout: 3600s # 1 hour
             http2_protocol_options:
               max_concurrent_streams: 100
               initial_stream_window_size: 65536 # 64 KiB
               initial_connection_window_size: 1048576 # 1 MiB
+            stream_idle_timeout: 300s # 5 mins
+            request_timeout: 300s # 5 mins
             route_config:
               virtual_hosts:
               - name: default
