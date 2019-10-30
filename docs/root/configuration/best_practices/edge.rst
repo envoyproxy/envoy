@@ -3,9 +3,9 @@
 Configuring Envoy as an edge proxy
 ==================================
 
-Envoy is a production-ready edge proxy, and performs well in that role, however,
-the default settings are tailored for the service mesh use case, and some values
-need to be adjusted when using Envoy as an edge proxy.
+Envoy is a production-ready edge proxy, however, the default settings are tailored
+for the service mesh use case, and some values need to be adjusted when using Envoy
+as an edge proxy.
 
 TCP proxies should configure: :ref:`overload_manager <config_overload_manager>`,
 :ref:`listener buffer limits <envoy_api_field_Listener.per_connection_buffer_limit_bytes>` to 32 KiB
