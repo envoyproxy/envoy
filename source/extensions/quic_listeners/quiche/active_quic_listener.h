@@ -31,6 +31,7 @@ public:
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
+  void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(const Network::UdpListenerCallbacks::ErrorCode& /*error_code*/,
                       Api::IoError::IoErrorCode /*err*/) override {

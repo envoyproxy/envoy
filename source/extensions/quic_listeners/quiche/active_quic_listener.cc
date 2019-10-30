@@ -10,6 +10,10 @@
 namespace Envoy {
 namespace Quic {
 
+namespace {
+const size_t kNumSessionsToCreatePerEpoll = 16;
+}
+
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::ListenerConfig& listener_config,
@@ -76,6 +80,10 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
+}
+
+void ActiveQuicListener::onReadReady() {
+  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerEpoll);
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {

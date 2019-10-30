@@ -138,6 +138,8 @@ public:
 
   void onData(UdpRecvData& data) override { onData_(data); }
 
+  void onReadReady() override { onReadReady_(); }
+
   void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
 
   void onReceiveError(const ErrorCode& err_code, Api::IoError::IoErrorCode err) override {
@@ -145,6 +147,8 @@ public:
   }
 
   MOCK_METHOD1(onData_, void(UdpRecvData& data));
+
+  MOCK_METHOD0(onReadReady_, void());
 
   MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
 

@@ -173,6 +173,8 @@ public:
    */
   virtual void onData(UdpRecvData& data) PURE;
 
+  virtual void onReadReady() PURE;
+
   /**
    * Called when the underlying socket is ready for write.
    *

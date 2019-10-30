@@ -68,6 +68,7 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
+  cb_.onReadReady();
   do {
     uint32_t old_packets_dropped = packets_dropped_;
     MonotonicTime receive_time = time_source_.monotonicTime();
