@@ -103,10 +103,10 @@ class QueryMessage : public virtual Message {
 public:
   struct Flags {
     // clang-format off
-    static constexpr int32_t TailableCursor  = 0x1 << 1;
-    static constexpr int32_t NoCursorTimeout = 0x1 << 4;
-    static constexpr int32_t AwaitData       = 0x1 << 5;
-    static constexpr int32_t Exhaust         = 0x1 << 6;
+    static const int32_t TailableCursor  = 0x1 << 1;
+    static const int32_t NoCursorTimeout = 0x1 << 4;
+    static const int32_t AwaitData       = 0x1 << 5;
+    static const int32_t Exhaust         = 0x1 << 6;
     // clang-format on
   };
 

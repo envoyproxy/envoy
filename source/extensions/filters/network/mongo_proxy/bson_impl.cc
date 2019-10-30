@@ -33,7 +33,7 @@ uint8_t BufferHelper::removeByte(Buffer::Instance& data) {
   }
 
   void* mem = data.linearize(sizeof(uint8_t));
-  const uint8_t ret = *reinterpret_cast<uint8_t*>(mem);
+  uint8_t ret = *reinterpret_cast<uint8_t*>(mem);
   data.drain(sizeof(uint8_t));
   return ret;
 }
@@ -50,7 +50,7 @@ void BufferHelper::removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_
 
 std::string BufferHelper::removeCString(Buffer::Instance& data) {
   char end = '\0';
-  const ssize_t index = data.search(&end, sizeof(end), 0);
+  ssize_t index = data.search(&end, sizeof(end), 0);
   if (index == -1) {
     throw EnvoyException("invalid CString");
   }
@@ -77,7 +77,7 @@ double BufferHelper::removeDouble(Buffer::Instance& data) {
 }
 
 int32_t BufferHelper::removeInt32(Buffer::Instance& data) {
-  const int32_t ret = peekInt32(data);
+  int32_t ret = peekInt32(data);
   data.drain(sizeof(int32_t));
   return ret;
 }
@@ -95,20 +95,20 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
 }
 
 std::string BufferHelper::removeString(Buffer::Instance& data) {
-  const int32_t length = removeInt32(data);
+  int32_t length = removeInt32(data);
   if (static_cast<uint32_t>(length) > data.length()) {
     throw EnvoyException("invalid buffer size");
   }
 
   char* start = reinterpret_cast<char*>(data.linearize(length));
-  const std::string ret(start);
+  std::string ret(start);
   data.drain(length);
   return ret;
 }
 
 std::string BufferHelper::removeBinary(Buffer::Instance& data) {
   // Read out the subtype but do not store it for now.
-  const int32_t length = removeInt32(data);
+  int32_t length = removeInt32(data);
   removeByte(data);
   if (static_cast<uint32_t>(length) > data.length()) {
     throw EnvoyException("invalid buffer size");

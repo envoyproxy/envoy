@@ -66,7 +66,7 @@ public:
     Host = 38,
   };
 
-  enum class ResponseStatus { UNKNOWN, Ok, NotFound };
+  enum class ResponseStatus { Unknown, Ok, NotFound };
 
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = nullptr);

@@ -24,7 +24,7 @@ void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& o
 Decoder::Decoder() : state_(State::FhFlag) {}
 
 bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
-  const uint64_t count = input.getRawSlices(nullptr, 0);
+  uint64_t count = input.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, count);
   input.getRawSlices(slices.begin(), count);
   for (const Buffer::RawSlice& slice : slices) {

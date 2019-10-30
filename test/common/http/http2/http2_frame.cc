@@ -49,7 +49,7 @@ uint32_t Http2Frame::payloadSize() const {
 Http2Frame::ResponseStatus Http2Frame::responseStatus() const {
   if (empty() || Type::Headers != type() || size() <= HeaderSize ||
       ((data_[HeaderSize] & 0x80) == 0)) {
-    return ResponseStatus::UNKNOWN;
+    return ResponseStatus::Unknown;
   }
   // See https://tools.ietf.org/html/rfc7541#appendix-A for header values
   switch (static_cast<StaticHeaderIndex>(data_[HeaderSize] & 0x7f)) {
@@ -60,7 +60,7 @@ Http2Frame::ResponseStatus Http2Frame::responseStatus() const {
   default:
     break;
   }
-  return ResponseStatus::UNKNOWN;
+  return ResponseStatus::Unknown;
 }
 
 void Http2Frame::buildHeader(Type type, uint32_t payload_size, uint8_t flags, uint32_t stream_id) {
