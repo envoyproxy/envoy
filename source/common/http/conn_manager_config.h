@@ -232,9 +232,9 @@ public:
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
-
   /**
-   * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl has no route config.
+   * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl
+   * has no route config.
    */
   virtual bool isRoutable() const PURE;
 
