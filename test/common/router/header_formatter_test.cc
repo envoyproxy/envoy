@@ -737,6 +737,11 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Expected format PER_REQUEST_STATE(<data_name>), "
         "actual format PER_REQUEST_STATE no parens"}},
 
+      {"%REQ no parens%",
+       {},
+       {"Invalid header configuration. Expected format REQ(<header-name>), "
+        "actual format REQno parens"}},
+
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
        {},

@@ -13,7 +13,6 @@
 #include "common/json/json_loader.h"
 #include "common/stream_info/utility.h"
 
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 
@@ -169,8 +168,10 @@ parsePerRequestStateField(absl::string_view param_str) {
 std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
 parseRequestHeader(absl::string_view param_str) {
   param_str = StringUtil::trim(param_str);
-  if (param_str.empty() || param_str.front() != '(' || param_str.back() != ')') {
-    throw EnvoyException(formatPerRequestStateParseException(param_str));
+  if (param_str.size() <= 2 || param_str.front() != '(' || param_str.back() != ')') {
+    throw EnvoyException(fmt::format("Invalid header configuration. Expected format "
+                                     "REQ(<header-name>), actual format REQ{}",
+                                     param_str));
   }
   param_str = param_str.substr(1, param_str.size() - 2); // trim parens
   if (param_str.empty()) {

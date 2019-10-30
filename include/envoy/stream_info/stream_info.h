@@ -7,6 +7,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
@@ -19,11 +20,6 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-
-namespace Http {
-class HeaderMap;
-class LowerCaseString;
-} // namespace Http
 
 namespace Router {
 class RouteEntry;
@@ -501,12 +497,12 @@ public:
   virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
-   * @param request headers.
+   * @param headers request headers.
    */
   virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
 
   /**
-   * @param request header name.
+   * @param name request header name.
    * @return request header value.
    */
   virtual std::string getRequestHeader(const Http::LowerCaseString& name) const PURE;
