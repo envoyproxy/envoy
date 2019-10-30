@@ -342,12 +342,13 @@ TEST(ConfigTest, HashWithSourceIpConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
   cluster: foo
-  hash_with_source_ip: true
+  hash_policy:
+  - source_ip: {}
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
-  EXPECT_TRUE(config_obj.sharedConfig()->hashWithSourceIp());
+  EXPECT_NE(nullptr, config_obj.hashPolicy());
 }
 
 TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
@@ -358,7 +359,20 @@ TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
-  EXPECT_FALSE(config_obj.sharedConfig()->hashWithSourceIp());
+  EXPECT_EQ(nullptr, config_obj.hashPolicy());
+}
+
+TEST(ConfigTest, UnknownHashPolicy) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  hash_policy:
+  - source_ip: {}
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(nullptr, config_obj.hashPolicy());
 }
 
 TEST(ConfigTest, AccessLogConfig) {
@@ -1174,7 +1188,6 @@ public:
     const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fallback_cluster
-    hash_with_source_ip: true
     deprecated_v1:
       routes:
       - destination_ports: 1-9999
@@ -1333,8 +1346,39 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   filter_->onNewConnection();
 }
 
+class TcpProxyHashingTest : public testing::Test {
+public:
+  TcpProxyHashingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    hash_policy:
+    - source_ip: {}
+    )EOF";
+
+    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  }
+
+  void initializeFilter() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  ConfigSharedPtr config_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  std::unique_ptr<Filter> filter_;
+};
+
 // Test TCP proxy use source IP to hash.
-TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(HashWithSourceIp)) {
+TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
   setup();
   initializeFilter();
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))

@@ -25,6 +25,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
+#include "common/tcp_proxy/hash_policy.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 
@@ -74,7 +75,6 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
-    bool hashWithSourceIp() const { return hash_with_source_ip_; }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -85,7 +85,6 @@ public:
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
-    const bool hash_with_source_ip_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -115,6 +114,7 @@ public:
   const Router::MetadataMatchCriteria* metadataMatchCriteria() {
     return cluster_metadata_match_criteria_.get();
   }
+  const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
   struct Route {
@@ -151,6 +151,7 @@ private:
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Runtime::RandomGenerator& random_generator_;
+  std::unique_ptr<const HashPolicyImpl> hash_policy_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -200,10 +201,12 @@ public:
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override {
-    if (config_->sharedConfig()->hashWithSourceIp() && downstreamConnection() &&
-        downstreamConnection()->remoteAddress()->ip()) {
-      return HashUtil::xxHash64(downstreamConnection()->remoteAddress()->ip()->addressAsString());
+    auto hash_policy = config_->hashPolicy();
+    if (hash_policy) {
+      return hash_policy->generateHash(downstreamConnection()->remoteAddress().get(),
+                                       downstreamConnection()->localAddress().get());
     }
+
     return {};
   }
 

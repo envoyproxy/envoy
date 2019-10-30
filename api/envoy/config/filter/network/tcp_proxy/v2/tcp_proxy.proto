@@ -149,7 +149,20 @@ message TcpProxy {
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
 
-  // Optional configuration for TCP proxy hash. The source IP will be used to compute the hash used
-  // by hash-based load balancing algorithms.
-  bool hash_with_source_ip = 11;
+  // Specifies the TCP proxy's hashing policy
+  message HashPolicy {
+    // The source IP will be used to compute the hash used by hash-based load balancing
+    // algorithms.
+    message SourceIp {
+    }
+
+    oneof policy_specifier {
+      option (validate.required) = true;
+
+      SourceIp source_ip = 1;
+    }
+  }
+
+  // Optional configuration for TCP proxy hash policy.
+  repeated HashPolicy hash_policy = 11;
 }
