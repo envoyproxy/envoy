@@ -8,6 +8,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
@@ -80,7 +81,7 @@ private:
   // The HTTP request headers
   Http::HeaderMap* headers_{};
   // The active span for the request
-  Tracing::Span* parent_span_;
+  Tracing::Span* parent_span_{&Tracing::NullSpan::instance()};
   // the callback function to set payload
   SetPayloadCallback set_payload_cb_;
   // The on_done function.
