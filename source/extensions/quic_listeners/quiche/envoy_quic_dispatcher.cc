@@ -34,7 +34,7 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
   // TODO(danzh) Ideally we should use the negotiated value from upstream which is not accessible
   // for now. 512MB is way to large, but the actual bytes buffered should be bound by the negotiated
   // upstream flow control window.
-  SetQuicFlag(FLAGS_quic_buffered_data_threshold, 2 * DEFAULT_INITIAL_STREAM_WINDOW_SIZE); // 512MB
+  SetQuicFlag(FLAGS_quic_buffered_data_threshold, 2 * Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE); // 512MB
 }
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
