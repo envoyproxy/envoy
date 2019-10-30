@@ -309,8 +309,16 @@ public:
    */
   virtual void connect() PURE;
 
-  virtual std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> detachSockets() PURE;
+  /**
+   * @return true iff this client connection instance supports detachSockets().
+   */
   virtual bool canDetach() const { return false; }
+
+  /**
+   * Detach the ConnectionSocket and TransportSocket associated with this client connection so they can be transferred to a different ClientConnection object, possibly in a different thread.  This method can only be called if canDetach returns true.
+   * @return ConnectionSocket and TransportSocket that used to be associated with this client connection.  Ownership of these objects is transferred to the caller.
+   */
+  virtual std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> detachSockets() PURE;
 };
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;

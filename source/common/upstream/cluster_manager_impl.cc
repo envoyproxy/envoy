@@ -1324,7 +1324,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
-    // TODO:
+    // TODO: fix nighthawk call to ProdConnPoolImpl's constructor.
     // https://github.com/envoyproxy/nighthawk/blob/master/source/client/benchmark_client_impl.h
     return std::make_unique<Http::Http1::ProdConnPoolImpl>(
         dispatcher, host, priority, upstream_connection_pool_, options, transport_socket_options);

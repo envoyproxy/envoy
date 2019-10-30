@@ -252,7 +252,9 @@ void ConnPoolImpl::onUpstreamReady() {
     while (!ready_clients_.empty()) {
       ActiveClient& client = *ready_clients_.front();
       if (!client.canDetach()) {
-        // TODO should not happen eventually.
+        // TODO do this transfer in a more elegant way.  Perhaps have delay
+        // reuse clients in a separate list and go through some process to move
+        // them to either ready_clients_ or upstream_pool_.
         break;
       }
       std::pair<Network::ConnectionSocketPtr, Network::TransportSocketPtr> connection_essence =
@@ -390,6 +392,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent,
                                          Network::ClientConnectionPtr client_connection,
                                          uint64_t remaining_requests)
     : parent_(parent), remaining_requests_(remaining_requests) {
+  // TODO Dedup constructor code.
   real_host_description_ = host_description;
   Upstream::Host::CreateConnectionData data{std::move(client_connection), host_description};
   codec_client_ = parent_.createCodecClient(data, false);

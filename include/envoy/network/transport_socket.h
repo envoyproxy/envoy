@@ -99,7 +99,16 @@ public:
    */
   virtual void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) PURE;
 
+  /**
+   * Clears the callbacks associated with this transport socket in preparation
+   * for transferring ownership of the transport socket object, possibly across
+   * threads.  Only supported if canDetach() returns true.
+   */
   virtual void clearTransportSocketCallbacks() PURE;
+
+  /**
+   * @return true iff clearTransportSocketCallbacks is supported for this socket type.
+   */
   virtual bool canDetach() const PURE;
 
   /**

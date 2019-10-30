@@ -99,6 +99,12 @@ public:
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
+  /**
+   * Creates an instance of Envoy's Network::ClientConnection from an existing connected socket.
+   * @param socket supplies the existing connected client socket.
+   * @param transport_socket supplies a transport socket to be used by the connection.
+   * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
+   */
   virtual Network::ClientConnectionPtr
   adoptClientConnection(Network::ConnectionSocketPtr&& socket,
                         Network::TransportSocketPtr&& transport_socket) PURE;

@@ -96,6 +96,18 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
+  /**
+   * Adopt an existing established connection to this host and associate it with the provided dispatcher.
+   * @param dispatcher supplies the owning dispatcher.
+   * @param socket supplies the connection socket to adopt.
+   * @param transport supplies the transport socket to adopt.
+   * @return TODO fix comment below, seems like the condition about logical hosts may not be implemented yet by adoptConnection.
+   *         the connection data which includes the raw network connection as well as the *real*
+   *         host that backs it. The reason why a 2nd host is returned is that some hosts are
+   *         logical and wrap multiple real network destinations. In this case, a different host
+   *         will be returned along with the connection vs. the host the method was called on.
+   *         If it matters, callers should not assume that the returned host will be the same.
+   */
   virtual CreateConnectionData adoptConnection(Event::Dispatcher& dispatcher,
                                                Network::ConnectionSocketPtr&& socket,
                                                Network::TransportSocketPtr&& transport) const PURE;
@@ -940,16 +952,34 @@ public:
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
 
+/**
+ * A pool of upstream connections that all serving threads can offer or retrieve upstream connections from by Host.
+ */
 class UpstreamConnectionPool {
 public:
+  /**
+   * Sockets and additional information about the upstream connection being transferred.
+   */
   struct UpstreamConnectionEssence {
     Network::ConnectionSocketPtr socket;
     Network::TransportSocketPtr transport_socket;
     uint64_t remaining_requests;
   };
   virtual ~UpstreamConnectionPool() = default;
+  /**
+   * Transfer a connection from a serving thread's connection pool to the global shared connection pool.
+   * @param host supplies the host associated with the connection.
+   * @param connection_essence supplies the sockets associated with the upstream connection being transferred.
+   */
   virtual void OfferConnection(HostConstSharedPtr host,
                                UpstreamConnectionEssence connection_essence) PURE;
+  /**
+   * Transfer a connection from the global shared connection pool to a serving thread.
+   * @param host supplies the host associated with the desired connection.
+   * @param dispatcher supplies the dispatcher associated with the serving thread's event loop which will accept the connection.
+   * @param accept_cb supplies the callback to invoke in the serving thread to take ownership of the retried connection_essence, if any, or handle the retrieve failure.
+   * #return true if the asychronous operation to retrieve a connection was started, or false if the retrieve operation is rejected because there are no available connections in the pool.
+   */
   virtual bool RetrieveConnection(HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                                   std::function<void(UpstreamConnectionEssence)> accept_cb) PURE;
 };

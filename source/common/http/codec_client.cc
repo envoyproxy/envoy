@@ -26,7 +26,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  // TODO Does this call to connect belong in this constructor?
+  // TODO Does this connect call  belong in the constructor?
   if (do_connect) {
     ENVOY_CONN_LOG(debug, "connecting", *connection_);
     connection_->connect();
