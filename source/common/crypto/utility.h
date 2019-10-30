@@ -44,7 +44,8 @@ public:
    * @param message message data for the HMAC function.
    * @return a vector of bytes for the computed HMAC.
    */
-  virtual std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string_view message) PURE;
+  virtual std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key,
+                                             absl::string_view message) PURE;
 
   /**
    * Verify cryptographic signatures.
@@ -56,8 +57,8 @@ public:
    * the error_message_ stores the error message
    */
   virtual const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& key,
-                                           const std::vector<uint8_t>& signature,
-                                           const std::vector<uint8_t>& text) PURE;
+                                                   const std::vector<uint8_t>& signature,
+                                                   const std::vector<uint8_t>& text) PURE;
 
   /**
    * Import public key.

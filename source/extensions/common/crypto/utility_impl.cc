@@ -31,7 +31,7 @@ std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer
 }
 
 std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
-                                            absl::string_view message) {
+                                                absl::string_view message) {
   std::vector<uint8_t> hmac(SHA256_DIGEST_LENGTH);
   const auto ret =
       HMAC(EVP_sha256(), key.data(), key.size(), reinterpret_cast<const uint8_t*>(message.data()),
@@ -41,8 +41,8 @@ std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
 }
 
 const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, CryptoObject& key,
-                                                  const std::vector<uint8_t>& signature,
-                                                  const std::vector<uint8_t>& text) {
+                                                      const std::vector<uint8_t>& signature,
+                                                      const std::vector<uint8_t>& text) {
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 

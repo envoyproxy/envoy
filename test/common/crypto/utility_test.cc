@@ -43,7 +43,8 @@ TEST(UtilityTest, TestSha256DigestGrowingBuffer) {
 
 TEST(UtilityTest, TestSha256Hmac) {
   const std::string key = "key";
-  auto hmac = UtilitySingleton::get().getSha256Hmac(std::vector<uint8_t>(key.begin(), key.end()), "test data");
+  auto hmac = UtilitySingleton::get().getSha256Hmac(std::vector<uint8_t>(key.begin(), key.end()),
+                                                    "test data");
   EXPECT_EQ("087d9eb992628854842ca4dbf790f8164c80355c1e78b72789d830334927a84c", Hex::encode(hmac));
 }
 
