@@ -39,6 +39,7 @@ build:release-common \
 
 build:release-ios \
   --apple_bitcode=embedded \
+  --config=ios \
   --config=release-common \
   --copt=-fembed-bitcode
 
