@@ -1,6 +1,4 @@
-In this example, we show how a [Redis filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/network_filters/redis_proxy_filter) can be used with the Envoy proxy. The Envoy proxy [configuration](./envoy.yaml) includes a redis filter that routes egress requests to redis server.
-
-
+In this example, we show how a [Redis filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/redis_proxy_filter) can be used with the Envoy proxy. The Envoy proxy [configuration](./envoy.yaml) includes a redis filter that routes egress requests to redis server.
 
 # Usage
 1. `docker-compose pull`
