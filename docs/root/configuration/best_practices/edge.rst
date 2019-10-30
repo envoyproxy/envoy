@@ -9,6 +9,7 @@ as an edge proxy.
 
 TCP proxies should configure:
 
+* restrict access to the admin endpoint,
 * :ref:`overload_manager <config_overload_manager>`,
 * :ref:`listener buffer limits <envoy_api_field_Listener.per_connection_buffer_limit_bytes>` to 32 KiB,
 * :ref:`cluster buffer limits <envoy_api_field_Cluster.per_connection_buffer_limit_bytes>` to 32 KiB.
@@ -45,6 +46,13 @@ The following is a YAML example of the above recommendation.
       - name: "envoy.resource_monitors.fixed_heap"
         threshold:
           value: 0.98
+
+  admin:
+    access_log_path: "/var/log/envoy_admin.log"
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 9090
 
   static_resources:
     listeners:
