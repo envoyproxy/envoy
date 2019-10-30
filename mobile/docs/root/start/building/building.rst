@@ -51,7 +51,7 @@ Android AAR
 Envoy Mobile can be compiled into an ``.aar`` file for use with Android apps.
 This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
 
-``./bazelw build android_dist --config=android --config=release # omit release for development``
+``./bazelw build android_dist --config=android --config=release-android # omit release for development``
 
 Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`dist/envoy.aar <dist>`.
 
@@ -61,7 +61,7 @@ The ``envoy_mobile_android`` Bazel rule defined in the :repo:`dist BUILD file <d
 an example of how this artifact may be used.
 
 When building the artifact for release (usage outside of development), be sure to include the
-``--config=release`` option.
+``--config=release-android`` option.
 
 For a demo of a working app using this artifact, see the :ref:`hello_world` example.
 
@@ -74,7 +74,7 @@ iOS static framework
 Envoy Mobile supports being compiled into a ``.framework`` for consumption by iOS apps.
 This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
 
-``./bazelw build ios_dist --config=ios --config=release # omit release for development``
+``./bazelw build ios_dist --config=ios --config=release-ios # omit release for development``
 
 Upon completion of the build, you'll see a ``Envoy.framework`` directory at
 :repo:`dist/Envoy.framework <dist>`.
@@ -85,7 +85,7 @@ The ``envoy_mobile_ios`` Bazel rule defined in the :repo:`dist BUILD file <dist/
 example of how this artifact may be used.
 
 When building the artifact for release (usage outside of development), be sure to include the
-``--config=release`` option in addition to ``--config=ios`` and a list of architectures for which
+``--config=release-ios`` option in addition to ``--config=ios`` and a list of architectures for which
 you wish to build using ``--ios_multi_cpus=...``.
 
 For a demo of a working app using this artifact, see the :ref:`hello_world` example.
