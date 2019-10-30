@@ -1,6 +1,5 @@
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/network/client_ssl_auth/config.h"

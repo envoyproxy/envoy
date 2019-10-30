@@ -114,6 +114,9 @@ public:
   // Set the idle timeout on downstream connections through the HttpConnectionManager.
   void setDownstreamHttpIdleTimeout(std::chrono::milliseconds idle_timeout);
 
+  // Set the max connection duration for downstream connections through the HttpConnectionManager.
+  void setDownstreamMaxConnectionDuration(std::chrono::milliseconds max_connection_duration);
+
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 

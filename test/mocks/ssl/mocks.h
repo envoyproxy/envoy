@@ -38,17 +38,17 @@ public:
   ~MockConnectionInfo() override;
 
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
-  MOCK_CONST_METHOD0(uriSanLocalCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(uriSanLocalCertificate, absl::Span<const std::string>());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, const std::string&());
   MOCK_CONST_METHOD0(serialNumberPeerCertificate, const std::string&());
   MOCK_CONST_METHOD0(issuerPeerCertificate, const std::string&());
   MOCK_CONST_METHOD0(subjectPeerCertificate, const std::string&());
-  MOCK_CONST_METHOD0(uriSanPeerCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(uriSanPeerCertificate, absl::Span<const std::string>());
   MOCK_CONST_METHOD0(subjectLocalCertificate, const std::string&());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, const std::string&());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificateChain, const std::string&());
-  MOCK_CONST_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
-  MOCK_CONST_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(dnsSansPeerCertificate, absl::Span<const std::string>());
+  MOCK_CONST_METHOD0(dnsSansLocalCertificate, absl::Span<const std::string>());
   MOCK_CONST_METHOD0(validFromPeerCertificate, absl::optional<SystemTime>());
   MOCK_CONST_METHOD0(expirationPeerCertificate, absl::optional<SystemTime>());
   MOCK_CONST_METHOD0(sessionId, const std::string&());

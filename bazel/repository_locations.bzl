@@ -9,17 +9,17 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.0/bazel-gazelle-v0.19.0.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "a1e273b6159ae858f53046f5bab9678cffa82a72f0bf0c0a9e4af8fddb91209c",
-        strip_prefix = "bazel-toolchains-0.29.6",
+        sha256 = "1e16833a9f0e32b292568c0dfee7bd48133c2038605757d3a430551394310006",
+        strip_prefix = "bazel-toolchains-1.1.0",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/0.29.6/bazel-toolchains-0.29.6.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.29.6.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/1.1.0/bazel-toolchains-1.1.0.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/1.1.0.tar.gz",
         ],
     ),
     envoy_build_tools = dict(
-        sha256 = "7cae08267737c77e92958b9b04b3da88cc2ce5a6ee9c572236688a1fa5f873f0",
-        strip_prefix = "envoy-build-tools-57c24964ee4965e1c35509f3f099d5ad172bd10a",
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/57c24964ee4965e1c35509f3f099d5ad172bd10a.tar.gz"],
+        sha256 = "d0f88bef8bd7f76c3684407977f5673f3d06a6c50d4ddaffb8f0e7df6b0ef69e",
+        strip_prefix = "envoy-build-tools-a6b28555badcb18d6be924c8fc1bea49971656b8",
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/a6b28555badcb18d6be924c8fc1bea49971656b8.tar.gz"],
     ),
     boringssl = dict(
         sha256 = "891352824e0f7977bc0c291b8c65076e3ed23630334841b93f346f12d4484b06",
@@ -155,9 +155,13 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
-        sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
-        strip_prefix = "zlib-1.2.11",
-        urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+        # Use the dev branch of zlib to resolve fuzz bugs and out of bound
+        # errors resulting in crashes in zlib 1.2.11.
+        # TODO(asraa): Remove when zlib > 1.2.11 is released.
+        sha256 = "155a8f8c1a753fb05b16a1b0cc0a0a9f61a78e245f9e0da483d13043b3bcbf2e",
+        strip_prefix = "zlib-79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
+        # 2019-04-14 development branch
+        urls = ["https://github.com/madler/zlib/archive/79baebe50e4d6b73ae1f8b603f0ef41300110aa3.tar.gz"],
     ),
     com_github_jbeder_yaml_cpp = dict(
         sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
@@ -170,10 +174,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "b42ad9d286e267b265080e97bacb99c27bce39db93a6c34be9575ddd9a3edd7a",
-        strip_prefix = "jwt_verify_lib-945805866007edb9d2760915abaa672ed8b7da86",
-        # 2019-10-07
-        urls = ["https://github.com/google/jwt_verify_lib/archive/945805866007edb9d2760915abaa672ed8b7da86.tar.gz"],
+        sha256 = "480ff74bcdea9e177a803feb8f797c76abd38a80ec27d93b64f4d56e7cfd28a1",
+        strip_prefix = "jwt_verify_lib-9f10e2d60d42edeb6662e185707a7d6a4ebc5604",
+        # 2019-10-24
+        urls = ["https://github.com/google/jwt_verify_lib/archive/9f10e2d60d42edeb6662e185707a7d6a4ebc5604.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -269,10 +273,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz"],
     ),
     com_google_cel_cpp = dict(
-        sha256 = "f027c551d57d38fb9f0b5e4f21a2b0b8663987119e23b1fd8dfcc7588e9a2350",
-        strip_prefix = "cel-cpp-d9d02b20ab85da2444dbdd03410bac6822141364",
-        # 2019-08-15
-        urls = ["https://github.com/google/cel-cpp/archive/d9d02b20ab85da2444dbdd03410bac6822141364.tar.gz"],
+        sha256 = "e21d11be5eca677fe79839d310ceffb2f950d9d03f7682af8c0d311e573a1302",
+        strip_prefix = "cel-cpp-d85f82972c2def6db9c90f3d9a23f56a0ac3caff",
+        # 2019-10-23
+        urls = ["https://github.com/google/cel-cpp/archive/d85f82972c2def6db9c90f3d9a23f56a0ac3caff.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
         sha256 = "b0382aa7369f373a0148218f2df5a6afd6bfa884ce4da2dfb576b979989e615e",
