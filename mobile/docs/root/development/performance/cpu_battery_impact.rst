@@ -82,7 +82,7 @@ Both apps were run (one at a time) on a physical device (iPhone 6s iOS 12.2.x) w
 
 Reproducing the Envoy example app:
 
-1. Build the library using ``bazel build ios_dist --config=ios --config=fat``
+1. Build the library using ``bazel build ios_dist --config=ios --ios_multi_cpus=armv7,arm64``
 2. Copy ``./dist/Envoy.framework`` to the example's :tree:`source directory <2f27581/examples/objective-c/xcode_variant/EnvoyObjc/EnvoyObjc>`
 3. Build/run the example app
 

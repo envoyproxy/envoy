@@ -5,7 +5,7 @@
         "p" : "--config=ios"
       },
       "BazelBuildOptionsRelease" : {
-        "p" : "--config=ios --config=fat"
+        "p" : "--config=release-ios --ios_multi_cpus=i386,x86_64,armv7,arm64"
       },
       "IncludeBuildSources" : {
         "p" : "YES"
