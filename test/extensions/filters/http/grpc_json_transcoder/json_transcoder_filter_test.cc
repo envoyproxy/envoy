@@ -1,6 +1,5 @@
 #include <fstream>
 #include <functional>
-#include <iostream>
 
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
@@ -415,8 +414,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
 
-  Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
-                                           {":status", "200"}, {"grpc-status", "1024"}};
+  Http::TestHeaderMapImpl response_headers{
+      {"content-type", "application/grpc"}, {":status", "200"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
@@ -432,7 +431,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
             filter_.encodeData(*response_data, false));
 
   std::string response_json = response_data->toString();
-  
+
   EXPECT_EQ("{\"id\":\"20\",\"theme\":\"Children\"}", response_json);
 
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}, {"grpc-message", ""}};
@@ -743,7 +742,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
 
 class GrpcJsonTranscoderFilterConvertGrpcStatusTestBase : public GrpcJsonTranscoderFilterTest {
 public:
-  GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config)
+  GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(
+      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config)
       : GrpcJsonTranscoderFilterTest(proto_config) {}
 
   void SetUp() override {
@@ -761,7 +761,8 @@ public:
   }
 };
 
-class GrpcJsonTranscoderFilterConvertGrpcStatusTest : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
+class GrpcJsonTranscoderFilterConvertGrpcStatusTest
+    : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
 public:
   GrpcJsonTranscoderFilterConvertGrpcStatusTest()
       : GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(makeProtoConfig()) {}
@@ -774,7 +775,8 @@ private:
   }
 };
 
-class GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
+class GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest
+    : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
 public:
   GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest()
       : GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(makeProtoConfig()) {}
@@ -877,15 +879,14 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrail
   EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
 }
 
-TEST_F(GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest, TranscodingInvalidGrpcStatusFromTrailer) {
+TEST_F(GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest,
+       TranscodingInvalidGrpcStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
-  Http::TestHeaderMapImpl response_trailers{
-      {"grpc-status", "1024"},
-      {"grpc-message", "message"}};
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "1024"}, {"grpc-message", "message"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ("503", response_headers.get_(":status"));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
