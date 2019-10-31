@@ -288,6 +288,14 @@ message SocketOption {
 
 // Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
 // specified via a runtime key.
+//
+// .. note::
+//
+//   Parsing of the runtime key's data is implemented such that it may be represented as a
+//   :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented as JSON/YAML
+//   and may also be represented as an integer with the assumption that the value is an integral
+//   percentage out of 100. For instance, a runtime key lookup returning the value "42" would parse
+//   as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.
 message RuntimeFractionalPercent {
   // Default value if the runtime value's for the numerator/denominator keys are not available.
   type.FractionalPercent default_value = 1 [(validate.rules).message = {required: true}];

@@ -28,6 +28,17 @@ std::string RespValue::toString() const {
     }
     return ret + "]";
   }
+  case RespType::CompositeArray: {
+    std::string ret = "[";
+    uint64_t i = 0;
+    for (const RespValue& value : asCompositeArray()) {
+      ret += value.toString();
+      if (++i != asCompositeArray().size()) {
+        ret += ", ";
+      }
+    }
+    return ret + "]";
+  }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error:
@@ -73,11 +84,25 @@ int64_t RespValue::asInteger() const {
   return integer_;
 }
 
+RespValue::CompositeArray& RespValue::asCompositeArray() {
+  ASSERT(type_ == RespType::CompositeArray);
+  return composite_array_;
+}
+
+const RespValue::CompositeArray& RespValue::asCompositeArray() const {
+  ASSERT(type_ == RespType::CompositeArray);
+  return composite_array_;
+}
+
 void RespValue::cleanup() {
   // Need to manually delete because of the union.
   switch (type_) {
   case RespType::Array: {
     array_.~vector<RespValue>();
+    break;
+  }
+  case RespType::CompositeArray: {
+    composite_array_.~CompositeArray();
     break;
   }
   case RespType::SimpleString:
@@ -103,6 +128,10 @@ void RespValue::type(RespType type) {
     new (&array_) std::vector<RespValue>();
     break;
   }
+  case RespType::CompositeArray: {
+    new (&composite_array_) CompositeArray();
+    break;
+  }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
@@ -117,20 +146,49 @@ void RespValue::type(RespType type) {
 }
 
 RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
-  this->type(other.type());
+  type(other.type());
   switch (type_) {
   case RespType::Array: {
-    this->asArray() = other.asArray();
+    asArray() = other.asArray();
+    break;
+  }
+  case RespType::CompositeArray: {
+    asCompositeArray() = other.asCompositeArray();
     break;
   }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    this->asString() = other.asString();
+    asString() = other.asString();
     break;
   }
   case RespType::Integer: {
-    this->asInteger() = other.asInteger();
+    asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+}
+
+RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
+  switch (type_) {
+  case RespType::Array: {
+    new (&array_) std::vector<RespValue>(std::move(other.array_));
+    break;
+  }
+  case RespType::CompositeArray: {
+    new (&composite_array_) CompositeArray(std::move(other.composite_array_));
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    new (&string_) std::string(std::move(other.string_));
+    break;
+  }
+  case RespType::Integer: {
+    integer_ = other.integer_;
     break;
   }
   case RespType::Null:
@@ -142,20 +200,55 @@ RespValue& RespValue::operator=(const RespValue& other) {
   if (&other == this) {
     return *this;
   }
-  this->type(other.type());
+  type(other.type());
   switch (type_) {
   case RespType::Array: {
-    this->asArray() = other.asArray();
+    asArray() = other.asArray();
+    break;
+  }
+  case RespType::CompositeArray: {
+    asCompositeArray() = other.asCompositeArray();
     break;
   }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    this->asString() = other.asString();
+    asString() = other.asString();
     break;
   }
   case RespType::Integer: {
-    this->asInteger() = other.asInteger();
+    asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+  return *this;
+}
+
+RespValue& RespValue::operator=(RespValue&& other) noexcept {
+  if (&other == this) {
+    return *this;
+  }
+
+  type(other.type());
+  switch (type_) {
+  case RespType::Array: {
+    array_ = std::move(other.array_);
+    break;
+  }
+  case RespType::CompositeArray: {
+    composite_array_ = std::move(other.composite_array_);
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    string_ = std::move(other.string_);
+    break;
+  }
+  case RespType::Integer: {
+    integer_ = other.integer_;
     break;
   }
   case RespType::Null:
@@ -172,17 +265,21 @@ bool RespValue::operator==(const RespValue& other) const {
 
   switch (type_) {
   case RespType::Array: {
-    result = (this->asArray() == other.asArray());
+    result = (asArray() == other.asArray());
+    break;
+  }
+  case RespType::CompositeArray: {
+    result = (asCompositeArray() == other.asCompositeArray());
     break;
   }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    result = (this->asString() == other.asString());
+    result = (asString() == other.asString());
     break;
   }
   case RespType::Integer: {
-    result = (this->asInteger() == other.asInteger());
+    result = (asInteger() == other.asInteger());
     break;
   }
   case RespType::Null: {
@@ -191,6 +288,42 @@ bool RespValue::operator==(const RespValue& other) const {
   }
   }
   return result;
+}
+
+uint64_t RespValue::CompositeArray::size() const {
+  return (command_ && base_array_) ? end_ - start_ + 2 : 0;
+}
+
+bool RespValue::CompositeArray::operator==(const RespValue::CompositeArray& other) const {
+  return base_array_ == other.base_array_ && command_ == other.command_ && start_ == other.start_ &&
+         end_ == other.end_;
+}
+
+const RespValue& RespValue::CompositeArray::CompositeArrayConstIterator::operator*() {
+  return first_ ? *command_ : array_[index_];
+}
+
+RespValue::CompositeArray::CompositeArrayConstIterator&
+RespValue::CompositeArray::CompositeArrayConstIterator::operator++() {
+  if (first_) {
+    first_ = false;
+  } else {
+    ++index_;
+  }
+  return *this;
+}
+
+bool RespValue::CompositeArray::CompositeArrayConstIterator::operator!=(
+    const CompositeArrayConstIterator& rhs) const {
+  return command_ != (rhs.command_) || &array_ != &(rhs.array_) || index_ != rhs.index_ ||
+         first_ != rhs.first_;
+}
+
+const RespValue::CompositeArray::CompositeArrayConstIterator&
+RespValue::CompositeArray::CompositeArrayConstIterator::empty() {
+  static const RespValue::CompositeArray::CompositeArrayConstIterator* instance =
+      new RespValue::CompositeArray::CompositeArrayConstIterator(nullptr, {}, 0, false);
+  return *instance;
 }
 
 void DecoderImpl::decode(Buffer::Instance& data) {
@@ -422,6 +555,10 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     encodeArray(value.asArray(), out);
     break;
   }
+  case RespType::CompositeArray: {
+    encodeCompositeArray(value.asCompositeArray(), out);
+    break;
+  }
   case RespType::SimpleString: {
     encodeSimpleString(value.asString(), out);
     break;
@@ -448,7 +585,7 @@ void EncoderImpl::encodeArray(const std::vector<RespValue>& array, Buffer::Insta
   char buffer[32];
   char* current = buffer;
   *current++ = '*';
-  current += StringUtil::itoa(current, 31, array.size());
+  current += StringUtil::itoa(current, 21, array.size());
   *current++ = '\r';
   *current++ = '\n';
   out.add(buffer, current - buffer);
@@ -458,11 +595,25 @@ void EncoderImpl::encodeArray(const std::vector<RespValue>& array, Buffer::Insta
   }
 }
 
+void EncoderImpl::encodeCompositeArray(const RespValue::CompositeArray& composite_array,
+                                       Buffer::Instance& out) {
+  char buffer[32];
+  char* current = buffer;
+  *current++ = '*';
+  current += StringUtil::itoa(current, 21, composite_array.size());
+  *current++ = '\r';
+  *current++ = '\n';
+  out.add(buffer, current - buffer);
+  for (const RespValue& value : composite_array) {
+    encode(value, out);
+  }
+}
+
 void EncoderImpl::encodeBulkString(const std::string& string, Buffer::Instance& out) {
   char buffer[32];
   char* current = buffer;
   *current++ = '$';
-  current += StringUtil::itoa(current, 31, string.size());
+  current += StringUtil::itoa(current, 21, string.size());
   *current++ = '\r';
   *current++ = '\n';
   out.add(buffer, current - buffer);
@@ -481,7 +632,7 @@ void EncoderImpl::encodeInteger(int64_t integer, Buffer::Instance& out) {
   char* current = buffer;
   *current++ = ':';
   if (integer >= 0) {
-    current += StringUtil::itoa(current, 31, integer);
+    current += StringUtil::itoa(current, 21, integer);
   } else {
     *current++ = '-';
     // By adding 1 (and later correcting) we ensure that we remain within the int64_t
