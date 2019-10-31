@@ -28,6 +28,7 @@ public:
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
 
 private:
   const std::string upstream_content_type_;
