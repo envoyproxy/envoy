@@ -89,7 +89,7 @@ TagNameValues::TagNameValues() {
   addRegex(RATELIMIT_PREFIX, R"(^ratelimit\.((.*?)\.)\w+?$)");
 
   // cluster.(<cluster_name>.)*
-  addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
+  addRe2(CLUSTER_NAME,  "^cluster\\.(([^\\.]+)\\.).*");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
   addRegex(HTTP_CONN_MANAGER_PREFIX, R"(^listener(?=\.).*?\.http\.((.*?)\.))", ".http.");
@@ -116,7 +116,12 @@ TagNameValues::TagNameValues() {
 
 void TagNameValues::addRegex(const std::string& name, const std::string& regex,
                              const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor(name, regex, substr));
+  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, false});
+}
+
+void TagNameValues::addRe2(const std::string& name, const std::string& regex,
+                           const std::string& substr) {
+  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, true});
 }
 
 } // namespace Config

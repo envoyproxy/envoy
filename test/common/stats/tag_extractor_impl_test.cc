@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Stats {
 
 TEST(TagExtractorTest, TwoSubexpressions) {
-  TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
+  TagExtractorStdRegexImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
   EXPECT_EQ("cluster_name", tag_extractor.name());
   std::string name = "cluster.test_cluster.upstream_cx_total";
   std::vector<Tag> tags;
@@ -42,6 +42,12 @@ TEST(TagExtractorTest, RE2Variants) {
   ASSERT_TRUE(re2::RE2::FullMatch("cluster.test_cluster.upstream_cx_total", alternate_re, &match1));
   EXPECT_EQ("test_cluster", std::string(match1));
 
+  re2::RE2 alternate_re2("^cluster\\.(([^\\.]+)\\.).*");
+  ASSERT_TRUE(re2::RE2::FullMatch("cluster.test_cluster.upstream_cx_total", alternate_re2,
+                                  &match1, &match2));
+  EXPECT_EQ("test_cluster.", std::string(match1));
+  EXPECT_EQ("test_cluster", std::string(match2));
+
   std::regex sr("^cluster\\.((.*?)\\.)");
   std::match_results<absl::string_view::iterator> smatch;
   ASSERT_TRUE(std::regex_search("cluster.test_cluster.upstream_cx_total", smatch, sr));
@@ -51,7 +57,7 @@ TEST(TagExtractorTest, RE2Variants) {
 }
 
 TEST(TagExtractorTest, SingleSubexpression) {
-  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)");
+  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)");
   std::string name = "listener.80.downstream_cx_total";
   std::vector<Tag> tags;
   IntervalSetImpl<size_t> remove_characters;
@@ -64,24 +70,24 @@ TEST(TagExtractorTest, SingleSubexpression) {
 }
 
 TEST(TagExtractorTest, substrMismatch) {
-  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.", ".foo.");
+  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.", ".foo.");
   EXPECT_TRUE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
   EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
 }
 
 TEST(TagExtractorTest, noSubstrMismatch) {
-  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.");
+  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.");
   EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
   EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
 }
 
 TEST(TagExtractorTest, EmptyName) {
-  EXPECT_THROW_WITH_MESSAGE(TagExtractorImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"),
+  EXPECT_THROW_WITH_MESSAGE(TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"),
                             EnvoyException, "tag_name cannot be empty");
 }
 
 TEST(TagExtractorTest, BadRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("cluster_name", "+invalid"),
+  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid"),
                           EnvoyException, "Invalid regex '\\+invalid':");
 }
 
@@ -373,7 +379,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
-    tag_extractor = TagExtractorImpl::createTagExtractor("foo", regex);
+    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex);
     return tag_extractor->prefixToken();
   };
 
@@ -388,7 +394,7 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 }
 
 TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("no such default tag", ""),
+  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("no such default tag", ""),
                           EnvoyException, "^No regex specified for tag specifier and no default");
 }
 

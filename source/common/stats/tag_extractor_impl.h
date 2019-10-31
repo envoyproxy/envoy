@@ -8,6 +8,8 @@
 
 #include "absl/strings/string_view.h"
 
+#include "re2/re2.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -23,13 +25,11 @@ public:
    * @return TagExtractorPtr newly constructed TagExtractor.
    */
   static TagExtractorPtr createTagExtractor(const std::string& name, const std::string& regex,
-                                            const std::string& substr = "");
+                                            const std::string& substr = "", bool is_re2 = false);
 
   TagExtractorImpl(const std::string& name, const std::string& regex,
                    const std::string& substr = "");
   std::string name() const override { return name_; }
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
   absl::string_view prefixToken() const override { return prefix_; }
 
   /**
@@ -39,7 +39,7 @@ public:
    */
   bool substrMismatch(absl::string_view stat_name) const;
 
-private:
+protected:
   /**
    * Examines a regex string, looking for the pattern: ^alphanumerics_with_underscores\.
    * Returns "alphanumerics_with_underscores" if that pattern is found, empty-string otherwise.
@@ -50,7 +50,30 @@ private:
   const std::string name_;
   const std::string prefix_;
   const std::string substr_;
+};
+
+class TagExtractorStdRegexImpl : public TagExtractorImpl {
+ public:
+  TagExtractorStdRegexImpl(const std::string& name, const std::string regex,
+                           const std::string& substr = "");
+
+  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
+
+ private:
   const std::regex regex_;
+};
+
+class TagExtractorRe2Impl : public TagExtractorImpl {
+ public:
+  TagExtractorRe2Impl(const std::string& name, const std::string regex,
+                      const std::string& substr = "");
+
+  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
+
+ private:
+  re2::RE2 regex_;
 };
 
 } // namespace Stats
