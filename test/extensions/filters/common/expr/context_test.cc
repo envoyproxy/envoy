@@ -195,6 +195,9 @@ TEST(Context, ResponseAttributes) {
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
+  ON_CALL(stream_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+        .WillByDefault(Return(true));
+  ON_CALL(stream_info, hasResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
 
   {
     auto value = response[CelValue::CreateString(Undefined)];
@@ -249,6 +252,12 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(header.has_value());
     ASSERT_TRUE(header.value().IsString());
     EXPECT_EQ("b", header.value().StringOrDie().value());
+  }
+  {
+    auto value = response[CelValue::CreateString(Flags)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("UT,FI", value.value().StringOrDie().value());
   }
 }
 

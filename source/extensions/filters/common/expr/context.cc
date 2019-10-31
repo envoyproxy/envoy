@@ -2,6 +2,7 @@
 
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
+#include "common/stream_info/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -129,7 +130,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateMap(&headers_);
   } else if (value == Trailers) {
     return CelValue::CreateMap(&trailers_);
-  } else if (value == Flag) {
+  } else if (value == Flags) {
     return CelValue::CreateString(StreamInfo::ResponseFlagUtils::toShortString(info_));
   }
   return {};

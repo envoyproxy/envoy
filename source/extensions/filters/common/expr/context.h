@@ -34,7 +34,7 @@ constexpr absl::string_view Duration = "duration";
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view Trailers = "trailers";
-constexpr absl::string_view Flag = "flag";
+constexpr absl::string_view Flags = "flags";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
