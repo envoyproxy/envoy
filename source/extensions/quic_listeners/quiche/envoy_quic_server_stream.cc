@@ -56,15 +56,14 @@ void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& head
 
 void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
-  // QUICHE guarantees to take all the headers. This could cause inifit data to
-  // be bufferred on headers stream in Google QUIC implementation because
+  // QUICHE guarantees to take all the headers. This could cause infinite data to
+  // be buffered on headers stream in Google QUIC implementation because
   // headers stream doesn't have upper bound for its send buffer. But in IETF
   // QUIC implementation this is safe as headers are sent on data stream which
   // is bounded by max concurrent streams limited.
-  // Same vulnerability exists in crypto stream which can inifinitly buffer data
+  // Same vulnerability exists in crypto stream which can infinitely buffer data
   // if handshake implementation goes wrong.
-  // TODO(danzh) Modify QUICHE to have an upper bound for header stream send
-  // buffer.
+  // TODO(#8826) Modify QUICHE to have an upper bound for header stream send buffer.
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
 }
