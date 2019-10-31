@@ -565,13 +565,13 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
       return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
     }));
 
-    for (size_t i = 1; i <= data.length(); i++) {
+    for (size_t i = 1; i <= 2; i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= data.size());
                 memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(i), 0};
+                return Api::SysCallSizeResult{ssize_t(Config::MAX_INSPECT_SIZE / (3 - i)), 0};
               }));
     }
   }
