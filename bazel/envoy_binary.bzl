@@ -69,6 +69,9 @@ def _envoy_linkopts():
             "-ldl",
             "-Wl,--hash-style=gnu",
         ],
+    }) + select({
+        "@envoy//bazel:boringssl_fips": [],
+        "//conditions:default": ["-pie"],
     }) + _envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_deps():

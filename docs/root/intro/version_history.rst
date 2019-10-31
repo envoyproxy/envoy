@@ -15,6 +15,7 @@ Version history
    :http:post:`/stats/recentlookups/disable`, and :http:post:`/stats/recentlookups/enable` endpoints.
 * api: added ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` option to omit the node identifier from the subsequent discovery requests on the same stream.
 * buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
+* build: official released binary is now PIE so it can be run with ASLR.
 * config: added support for :ref:`delta xDS <arch_overview_dynamic_config_delta>` (including ADS) delivery
 * config: enforcing that terminal filters (e.g. HttpConnectionManager for L4, router for L7) be the last in their respective filter chains.
 * config: added access log :ref:`extension filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`.
