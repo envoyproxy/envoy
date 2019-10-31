@@ -650,7 +650,7 @@ def _org_llvm_releases_compiler_rt():
 def _fuzzit_linux():
     _repository_impl(
         name = "fuzzit_linux",
-        build_file_content = "exports_files([\"fuzzit\"])"
+        build_file_content = "exports_files([\"fuzzit\"])",
     )
 
 def _com_github_grpc_grpc():
