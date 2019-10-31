@@ -75,5 +75,11 @@ CheckOptions:
   - key:             readability-identifier-naming.PrivateMemberSuffix
     value:           '_'
 
+  - key:             readability-identifier-naming.StructCase
+    value:           'CamelCase'
+
   - key:             readability-identifier-naming.TypeAliasCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.UnionCase
     value:           'CamelCase'

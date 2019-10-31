@@ -32,6 +32,7 @@ public:
 
 private:
   void refresh();
+  void configRejected(const EnvoyException& e, const std::string& message);
 
   bool started_{};
   const std::string path_;

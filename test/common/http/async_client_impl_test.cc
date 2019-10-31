@@ -83,6 +83,7 @@ public:
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
   Tracing::MockSpan parent_span_;
+  const std::string child_span_name_{"Test Child Span Name"};
 };
 
 TEST_F(AsyncClientImplTest, BasicStream) {
@@ -185,6 +186,44 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   expectSuccess(200);
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  client_.send(std::move(message_), callbacks_, options);
+
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(*child_span, finishSpan());
+
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
+TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
+  Buffer::Instance& data = *message_->body();
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
+  expectSuccess(200);
+
+  AsyncClient::RequestOptions options =
+      AsyncClient::RequestOptions().setParentSpan(parent_span_).setChildSpanName(child_span_name_);
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,

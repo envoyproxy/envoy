@@ -83,7 +83,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
   corrections.
 * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-  "1.6.0". Also remove the "Pending" tag from the top of the [release notes](docs/root/intro/version_history.rst)
+  "1.6.0". Also remove the "Pending" tags and add dates to the top of the [release notes](docs/root/intro/version_history.rst)
   and [deprecated log](docs/root/intro/deprecated.rst). Get a review and merge.
 * **Wait for tests to pass on
   [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**

@@ -68,17 +68,12 @@ public:
   /**
    * Stop a listener from accepting new connections. This is used for server draining.
    * @param listener supplies the listener to stop.
-   * TODO(mattklein123): We might consider adding a completion here in the future to tell us when
-   * all connections are gone. This would allow us to remove the listener more quickly depending on
-   * drain speed.
+   * @param completion supplies the completion to be called when the listener has stopped
+   * accepting new connections. This completion is called on the worker thread. No locking is
+   * performed by the worker.
    */
-  virtual void stopListener(Network::ListenerConfig& listener) PURE;
-
-  /**
-   * Stop all listeners from accepting new connections. This is used for server draining.
-   * TODO(mattklein123): Same comment about the addition of a completion as stopListener().
-   */
-  virtual void stopListeners() PURE;
+  virtual void stopListener(Network::ListenerConfig& listener,
+                            std::function<void()> completion) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

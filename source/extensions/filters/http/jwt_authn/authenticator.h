@@ -35,8 +35,9 @@ public:
 
   // Verify if headers satisfies the JWT requirements. Can be limited to single provider with
   // extract_param.
-  virtual void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-                      SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) PURE;
+  virtual void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+                      std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
+                      AuthenticatorCallback callback) PURE;
 
   // Called when the object is about to be destroyed.
   virtual void onDestroy() PURE;
