@@ -181,8 +181,8 @@ message Route {
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
 
-    // Return an noop action
-    Noop noop = 17;
+    // Return an fallthru action
+    Fallthru fallthru = 17;
   }
 
   // The Metadata field can be used to provide additional information
@@ -1020,10 +1020,10 @@ message DirectResponseAction {
   core.DataSource body = 2;
 }
 
-message Noop {
+message Fallthru {
   // If set to true, then when this route is hit, stream info (and hence access logs)
-  // will be populated with the name of this route. Only the NOOP routes that set this
-  // flag will be added to access logs.
+  // will be populated with the name of this route. Only the NOOP routes that set this flag will be
+  // added to access logs.
   bool add_route_name_to_stream_info = 1;
 }
 
