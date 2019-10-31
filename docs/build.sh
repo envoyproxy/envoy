@@ -50,6 +50,9 @@ pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 # files still.
 rm -rf bazel-bin/external/envoy_api
 
+# This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
+BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
+
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
   --action_env=ENVOY_BLOB_SHA --host_force_python=PY3
