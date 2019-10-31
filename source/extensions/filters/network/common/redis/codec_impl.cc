@@ -156,10 +156,6 @@ RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
     asCompositeArray() = other.asCompositeArray();
     break;
   }
-  case RespType::CompositeArray: {
-    this->asCompositeArray() = other.asCompositeArray();
-    break;
-  }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
@@ -168,31 +164,6 @@ RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
   }
   case RespType::Integer: {
     asInteger() = other.asInteger();
-    break;
-  }
-  case RespType::Null:
-    break;
-  }
-}
-
-RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
-  switch (type_) {
-  case RespType::Array: {
-    new (&array_) std::vector<RespValue>(std::move(other.array_));
-    break;
-  }
-  case RespType::CompositeArray: {
-    new (&composite_array_) CompositeArray(std::move(other.composite_array_));
-    break;
-  }
-  case RespType::SimpleString:
-  case RespType::BulkString:
-  case RespType::Error: {
-    new (&string_) std::string(std::move(other.string_));
-    break;
-  }
-  case RespType::Integer: {
-    integer_ = other.integer_;
     break;
   }
   case RespType::Null:
@@ -270,41 +241,6 @@ RespValue& RespValue::operator=(RespValue&& other) noexcept {
     composite_array_ = std::move(other.composite_array_);
     break;
   }
-  case RespType::CompositeArray: {
-    this->asCompositeArray() = other.asCompositeArray();
-    break;
-  }
-  case RespType::SimpleString:
-  case RespType::BulkString:
-  case RespType::Error: {
-    string_ = std::move(other.string_);
-    break;
-  }
-  case RespType::Integer: {
-    integer_ = other.integer_;
-    break;
-  }
-  case RespType::Null:
-    break;
-  }
-  return *this;
-}
-
-RespValue& RespValue::operator=(RespValue&& other) noexcept {
-  if (&other == this) {
-    return *this;
-  }
-
-  type(other.type());
-  switch (type_) {
-  case RespType::Array: {
-    array_ = std::move(other.array_);
-    break;
-  }
-  case RespType::CompositeArray: {
-    composite_array_ = std::move(other.composite_array_);
-    break;
-  }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
@@ -334,10 +270,6 @@ bool RespValue::operator==(const RespValue& other) const {
   }
   case RespType::CompositeArray: {
     result = (asCompositeArray() == other.asCompositeArray());
-    break;
-  }
-  case RespType::CompositeArray: {
-    result = (this->asCompositeArray() == other.asCompositeArray());
     break;
   }
   case RespType::SimpleString:

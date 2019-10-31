@@ -8,6 +8,7 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Utility {
+
 Redis::RespValue makeAuthCommand(const std::string& password) {
   std::vector<NetworkFilters::Common::Redis::RespValue> values(2);
   values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);

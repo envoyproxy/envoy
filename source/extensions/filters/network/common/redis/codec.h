@@ -133,9 +133,6 @@ public:
   RespType type() const { return type_; }
   void type(RespType type);
 
-protected:
-  RespType type_{};
-
 private:
   union {
     std::vector<RespValue> array_;
@@ -145,6 +142,8 @@ private:
   };
 
   void cleanup();
+
+  RespType type_{};
 };
 
 using RespValuePtr = std::unique_ptr<RespValue>;
