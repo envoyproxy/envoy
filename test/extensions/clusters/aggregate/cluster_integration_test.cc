@@ -65,7 +65,7 @@ static_resources:
         - cluster_1
         - cluster_2
   listeners:
-    name: http
+  - name: http
     address:
       socket_address:
         address: 127.0.0.1
@@ -73,7 +73,8 @@ static_resources:
     filter_chains:
       filters:
         name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.router
