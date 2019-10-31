@@ -450,7 +450,8 @@ TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
         // Configure just enough of an upstream access log to reference the upstream headers.
         const std::string yaml_string = R"EOF(
 name: envoy.router
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
     name: envoy.http_grpc_access_log
     filter:
