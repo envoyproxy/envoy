@@ -16,10 +16,10 @@ import "validate/validate.proto";
 
 // CSRF filter config.
 message CsrfPolicy {
-  // Specifies if CSRF is enabled.
+  // Specifies the % of requests for which the CSRF filter is enabled.
   //
-  // More information on how this can be controlled via runtime can be found
-  // :ref:`here <csrf-runtime>`.
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests to filter.
   //
   // .. note::
   //
@@ -29,15 +29,13 @@ message CsrfPolicy {
       [(validate.rules).message = {required: true}];
 
   // Specifies that CSRF policies will be evaluated and tracked, but not enforced.
-  // This is intended to be used when filter_enabled is off.
   //
-  // More information on how this can be controlled via runtime can be found
-  // :ref:`here <csrf-runtime>`.
+  // This is intended to be used when ``filter_enabled`` is off and will be ignored otherwise.
   //
-  // .. note::
-  //
-  //   This field defaults to 100/:ref:`HUNDRED
-  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
+  // and track the request's *Origin* and *Destination* to determine if it's valid, but will not
+  // enforce any policies.
   api.v2.core.RuntimeFractionalPercent shadow_enabled = 2;
 
   // Specifies additional source origins that will be allowed in addition to

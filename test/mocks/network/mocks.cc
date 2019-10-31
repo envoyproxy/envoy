@@ -127,6 +127,10 @@ MockListenSocket::MockListenSocket()
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(*this, close()).WillByDefault(Invoke([this]() { socket_is_open_ = false; }));
+  ON_CALL(testing::Const(*this), isOpen()).WillByDefault(Invoke([this]() {
+    return socket_is_open_;
+  }));
 }
 
 MockSocketOption::MockSocketOption() {

@@ -431,28 +431,25 @@ message CorsPolicy {
   google.protobuf.BoolValue allow_credentials = 6;
 
   oneof enabled_specifier {
-    // Specifies if CORS is enabled.
+    // Specifies the % of requests for which the CORS filter is enabled.
     //
-    // More information on how this can be controlled via runtime can be found
-    // :ref:`here <cors-runtime>`.
+    // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
+    // filter will be enabled for 100% of the requests.
     //
-    // .. note::
-    //
-    //   This field defaults to 100/:ref:`HUNDRED
-    //   <envoy_api_enum_type.v3alpha.FractionalPercent.DenominatorType>`.
+    // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
+    // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
-  // Specifies if CORS policies are evaluated and tracked when filter is off but
-  // does not enforce any policies.
+  // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
+  // enforced.
   //
-  // More information on how this can be controlled via runtime can be found
-  // :ref:`here <cors-runtime>`.
+  // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
+  // fields have to explicitly disable the filter in order for this setting to take effect.
   //
-  // .. note::
-  //
-  //   This field defaults to 100/:ref:`HUNDRED
-  //   <envoy_api_enum_type.v3alpha.FractionalPercent.DenominatorType>`.
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
+  // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
@@ -498,16 +495,6 @@ message RouteAction {
     // For some fraction N/D, a random number in the range [0,D) is selected. If the
     // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
-    //
-    // .. note::
-    //
-    //   Parsing this field is implemented such that the runtime key's data may be represented
-    //   as a :ref:`FractionalPercent <envoy_api_msg_type.v3alpha.FractionalPercent>` proto
-    //   represented as JSON/YAML and may also be represented as an integer with the assumption that
-    //   the value is an integral percentage out of 100. For instance, a runtime key lookup
-    //   returning the value "42" would parse as a `FractionalPercent` whose numerator is 42 and
-    //   denominator is HUNDRED. This is behaviour is different to that of the deprecated
-    //   `runtime_key` field, where the implicit denominator is 10000.
     core.RuntimeFractionalPercent runtime_fraction = 3;
   }
 

@@ -15,14 +15,7 @@ jobs:
   pool:
     vmImage: 'Ubuntu 16.04'
   steps:
-  - script: |
-      ci/run_envoy_docker.sh '
-        set -e
-        ci/do_ci.sh check_format
-        ci/do_ci.sh check_repositories
-        ci/do_ci.sh check_spelling
-        ci/do_ci.sh check_spelling_pedantic
-      '
+  - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -30,6 +23,12 @@ jobs:
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
     displayName: "Run check format scripts"
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
+      artifactName: format
+    condition: failed()
 
 - job: bazel
   dependsOn: ["format"]
