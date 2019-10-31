@@ -27,7 +27,6 @@ thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config) {
   http_parser_init(&parser_, HTTP_REQUEST);
-  parser_.data = this;
 }
 
 http_parser_settings Filter::settings_{
@@ -160,7 +159,6 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
       if (parser_.state != s_req_http_end_) {
         return ParseState::Error;
       } else {
-
         if (parser_.http_major == 1 && parser_.http_minor == 1) {
           protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
         } else {
