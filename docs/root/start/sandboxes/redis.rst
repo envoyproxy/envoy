@@ -33,8 +33,8 @@ Terminal 1
 
       Name                   Command               State                             Ports
   ------------------------------------------------------------------------------------------------------------------
-  redis_proxy_1   /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
-  redis_redis_1   docker-entrypoint.sh redis ...   Up      0.0.0.0:6379->6379/tcp
+  redis_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
+  redis_redis_1   docker-entrypoint.sh redis       Up      0.0.0.0:6379->6379/tcp
 
 **Step 3: Issue Redis commands**
 

@@ -35,9 +35,9 @@ Terminal 1
   $ docker-compose up --build -d
   $ docker-compose ps
 
-          Name                     Command               State                            Ports
+      Name                     Command               State                            Ports
   --------------------------------------------------------------------------------------------------------------------
-  lua_proxy_1         /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+  lua_proxy_1         /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
   lua_web_service_1   node ./index.js                  Up      0.0.0.0:8080->80/tcp
 
 **Step 3: Send a request to the service**
