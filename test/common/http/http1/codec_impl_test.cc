@@ -713,7 +713,7 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponseWithTrailers) {
   response_encoder->encodeTrailers(trailers);
 
   EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
-            "World\r\n0\r\nfoo:bar\r\nfoo:baz\r\n\r\n",
+            "World\r\n0\r\nfoo: bar\r\nfoo: baz\r\n\r\n",
             output);
 }
 
