@@ -15,22 +15,19 @@
 namespace Envoy {
 namespace Upstream {
 
-// TODO(fredlas) the is_delta argument can be removed upon delta+SotW ADS Envoy code unification. It
-// is only actually needed to choose the grpc_method, which is irrelevant if ADS is used.
-CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
                              ClusterManager& cm, Stats::Scope& scope,
                              ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, is_delta, cm, scope, validation_visitor)};
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
-                       ClusterManager& cm, Stats::Scope& scope,
-                       ProtobufMessage::ValidationVisitor& validation_visitor)
+CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
+                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
       cds_config, Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      *scope_, *this, is_delta);
+      *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

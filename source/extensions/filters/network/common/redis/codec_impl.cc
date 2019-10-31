@@ -146,10 +146,14 @@ void RespValue::type(RespType type) {
 }
 
 RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
-  this->type(other.type());
+  type(other.type());
   switch (type_) {
   case RespType::Array: {
-    this->asArray() = other.asArray();
+    asArray() = other.asArray();
+    break;
+  }
+  case RespType::CompositeArray: {
+    asCompositeArray() = other.asCompositeArray();
     break;
   }
   case RespType::CompositeArray: {
@@ -159,11 +163,36 @@ RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    this->asString() = other.asString();
+    asString() = other.asString();
     break;
   }
   case RespType::Integer: {
-    this->asInteger() = other.asInteger();
+    asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+}
+
+RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
+  switch (type_) {
+  case RespType::Array: {
+    new (&array_) std::vector<RespValue>(std::move(other.array_));
+    break;
+  }
+  case RespType::CompositeArray: {
+    new (&composite_array_) CompositeArray(std::move(other.composite_array_));
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    new (&string_) std::string(std::move(other.string_));
+    break;
+  }
+  case RespType::Integer: {
+    integer_ = other.integer_;
     break;
   }
   case RespType::Null:
@@ -200,10 +229,45 @@ RespValue& RespValue::operator=(const RespValue& other) {
   if (&other == this) {
     return *this;
   }
-  this->type(other.type());
+  type(other.type());
   switch (type_) {
   case RespType::Array: {
-    this->asArray() = other.asArray();
+    asArray() = other.asArray();
+    break;
+  }
+  case RespType::CompositeArray: {
+    asCompositeArray() = other.asCompositeArray();
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    asString() = other.asString();
+    break;
+  }
+  case RespType::Integer: {
+    asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+  return *this;
+}
+
+RespValue& RespValue::operator=(RespValue&& other) noexcept {
+  if (&other == this) {
+    return *this;
+  }
+
+  type(other.type());
+  switch (type_) {
+  case RespType::Array: {
+    array_ = std::move(other.array_);
+    break;
+  }
+  case RespType::CompositeArray: {
+    composite_array_ = std::move(other.composite_array_);
     break;
   }
   case RespType::CompositeArray: {
@@ -213,11 +277,11 @@ RespValue& RespValue::operator=(const RespValue& other) {
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    this->asString() = other.asString();
+    string_ = std::move(other.string_);
     break;
   }
   case RespType::Integer: {
-    this->asInteger() = other.asInteger();
+    integer_ = other.integer_;
     break;
   }
   case RespType::Null:
@@ -265,7 +329,11 @@ bool RespValue::operator==(const RespValue& other) const {
 
   switch (type_) {
   case RespType::Array: {
-    result = (this->asArray() == other.asArray());
+    result = (asArray() == other.asArray());
+    break;
+  }
+  case RespType::CompositeArray: {
+    result = (asCompositeArray() == other.asCompositeArray());
     break;
   }
   case RespType::CompositeArray: {
@@ -275,11 +343,11 @@ bool RespValue::operator==(const RespValue& other) const {
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    result = (this->asString() == other.asString());
+    result = (asString() == other.asString());
     break;
   }
   case RespType::Integer: {
-    result = (this->asInteger() == other.asInteger());
+    result = (asInteger() == other.asInteger());
     break;
   }
   case RespType::Null: {

@@ -8,7 +8,7 @@ PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
 # Config json path
 PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config
 
-TESTS=("ContentType" "ClusterHeader" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "TestRoutes" "Weighted")
+TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "TestRoutes" "Weighted")
 
 # Testing expected matches
 for t in "${TESTS[@]}"
@@ -18,7 +18,6 @@ done
 
 # Testing coverage flag passes
 COVERAGE_CMD="${PATH_BIN} ${PATH_CONFIG}/Redirect.yaml ${PATH_CONFIG}/Redirect.golden.json --details -f "
-TEST_OUTPUT=$($COVERAGE_CMD "1.0")
 COVERAGE_OUTPUT=$($COVERAGE_CMD "1.0" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
 if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: "* ]] ; then
   exit 1
@@ -32,6 +31,12 @@ fi
 
 COMP_COVERAGE_CMD="${PATH_BIN} ${PATH_CONFIG}/ComprehensiveRoutes.yaml ${PATH_CONFIG}/ComprehensiveRoutes.golden.json --details -f "
 COVERAGE_OUTPUT=$($COMP_COVERAGE_CMD "100" "--covall" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
+if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: 100%"* ]] ; then
+  exit 1
+fi
+
+DIRECT_RESPONSE_COVERAGE_CMD="${PATH_BIN} ${PATH_CONFIG}/DirectResponse.yaml ${PATH_CONFIG}/DirectResponse.golden.json --details -f "
+COVERAGE_OUTPUT=$($DIRECT_RESPONSE_COVERAGE_CMD "100" "--covall" 2>&1) || echo "${DIRECT_RESPONSE_COVERAGE_CMD:-no-output}"
 if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: 100%"* ]] ; then
   exit 1
 fi

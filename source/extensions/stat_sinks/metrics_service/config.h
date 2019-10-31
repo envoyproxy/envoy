@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/registry/registry.h"
 #include "envoy/server/instance.h"
 
 #include "server/configuration_impl.h"
@@ -22,6 +23,8 @@ public:
 
   std::string name() override;
 };
+
+DECLARE_FACTORY(MetricsServiceSinkFactory);
 
 } // namespace MetricsService
 } // namespace StatSinks

@@ -611,6 +611,9 @@ private:
     const std::string& name() const override { return name_; }
     Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    envoy::api::v2::core::TrafficDirection direction() const override {
+      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    }
 
     FakeUpstream& parent_;
     const std::string name_;

@@ -65,8 +65,9 @@ CompiledMatcherPtr Utility::parseStdRegexAsCompiledMatcher(const std::string& re
 }
 
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {
-  // TODO(zuercher): In the future, PGV (https://github.com/lyft/protoc-gen-validate) annotations
-  // may allow us to remove this in favor of direct validation of regular expressions.
+  // TODO(zuercher): In the future, PGV (https://github.com/envoyproxy/protoc-gen-validate)
+  // annotations may allow us to remove this in favor of direct validation of regular
+  // expressions.
   try {
     return std::regex(regex, flags);
   } catch (const std::regex_error& e) {

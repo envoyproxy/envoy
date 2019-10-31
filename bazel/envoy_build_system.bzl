@@ -61,13 +61,14 @@ def envoy_cmake_external(
         cache_entries = {},
         debug_cache_entries = {},
         cmake_options = ["-GNinja"],
-        make_commands = ["ninja", "ninja install"],
+        make_commands = ["ninja -v", "ninja -v install"],
         lib_source = "",
         postfix_script = "",
         static_libraries = [],
         copy_pdb = False,
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
+        generate_crosstool_file = False,
         **kwargs):
     cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
     cache_entries_debug = dict(cache_entries)
@@ -98,9 +99,10 @@ def envoy_cmake_external(
             "//conditions:default": cache_entries_debug,
         }),
         cmake_options = cmake_options,
+        # TODO(lizan): Make this always true
         generate_crosstool_file = select({
             "@envoy//bazel:windows_x86_64": True,
-            "//conditions:default": False,
+            "//conditions:default": generate_crosstool_file,
         }),
         lib_source = lib_source,
         make_commands = make_commands,

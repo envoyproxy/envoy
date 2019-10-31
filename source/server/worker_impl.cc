@@ -88,15 +88,15 @@ void WorkerImpl::stop() {
   }
 }
 
-void WorkerImpl::stopListener(Network::ListenerConfig& listener) {
+void WorkerImpl::stopListener(Network::ListenerConfig& listener, std::function<void()> completion) {
   ASSERT(thread_);
   const uint64_t listener_tag = listener.listenerTag();
-  dispatcher_->post([this, listener_tag]() -> void { handler_->stopListeners(listener_tag); });
-}
-
-void WorkerImpl::stopListeners() {
-  ASSERT(thread_);
-  dispatcher_->post([this]() -> void { handler_->stopListeners(); });
+  dispatcher_->post([this, listener_tag, completion]() -> void {
+    handler_->stopListeners(listener_tag);
+    if (completion != nullptr) {
+      completion();
+    }
+  });
 }
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {

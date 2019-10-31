@@ -206,7 +206,8 @@ TEST_F(RedisRespValueTest, CompositeArrayTest) {
   EXPECT_FALSE(value1 == value3);
   EXPECT_TRUE(value1 == value4);
 
-  RespValue value5 = value1;
+  RespValue value5;
+  value5 = value1;
   EXPECT_TRUE(value1 == value5);
 
   RespValue empty;

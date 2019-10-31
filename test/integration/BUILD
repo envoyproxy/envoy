@@ -26,6 +26,7 @@ envoy_cc_test_library(
         "ads_integration.h",
     ],
     data = [
+        "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
     deps = [
@@ -264,6 +265,16 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/upstream:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "header_casing_integration_test",
+    srcs = [
+        "header_casing_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
     ],
 )
 
