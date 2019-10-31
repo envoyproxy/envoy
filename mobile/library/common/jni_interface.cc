@@ -291,7 +291,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     JNIEnv* env, jclass, jlong stream_handle, jobject j_context, jboolean buffer_for_retry) {
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmCallbackContext, "onHeaders", "(JZ)V");
+
   // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref
   jobject retained_context = env->NewGlobalRef(j_context);
   envoy_http_callbacks native_callbacks = {jvm_on_headers,  jvm_on_data,  jvm_on_metadata,
