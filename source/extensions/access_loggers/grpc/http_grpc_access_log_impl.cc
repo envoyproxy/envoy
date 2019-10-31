@@ -98,6 +98,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
     request_properties->set_original_path(
         std::string(request_headers.EnvoyOriginalPath()->value().getStringView()));
   }
+  ASSERT(request_headers.byteSize().has_value());
   request_properties->set_request_headers_bytes(request_headers.byteSize().value());
   request_properties->set_request_body_bytes(stream_info.bytesReceived());
   if (request_headers.Method() != nullptr) {
@@ -126,6 +127,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
   if (stream_info.responseCodeDetails()) {
     response_properties->set_response_code_details(stream_info.responseCodeDetails().value());
   }
+  ASSERT(response_headers.byteSize().has_value());
   response_properties->set_response_headers_bytes(response_headers.byteSize().value());
   response_properties->set_response_body_bytes(stream_info.bytesSent());
   if (!response_headers_to_log_.empty()) {
