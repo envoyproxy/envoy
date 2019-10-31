@@ -31,21 +31,7 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config) {
 }
 
 http_parser_settings Filter::settings_{
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    [](http_parser* parser) -> int {
-      // The body was skipped and http_parser will call on_message_complete and reset the state to
-      // the start state.
-      static_cast<Filter*>(parser->data)->onMessageComplete();
-      return 0;
-    }, // on_message_complete
-    nullptr,
-    nullptr,
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 };
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -124,8 +110,6 @@ ParseState Filter::onRead() {
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
     return ParseState::Error;
-  } else if (read_ != 0 && read_ == result.rc_) {
-    return ParseState::Error;
   }
 
   const auto parse_state =
@@ -155,29 +139,49 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     protocol_ = "HTTP/2";
     return ParseState::Done;
   } else {
-    ssize_t rc =
-        http_parser_execute(&parser_, &settings_, data.data() + read_, data.length() - read_);
-    ENVOY_LOG(trace,
-              "http inspector: http_parser parsed {} chars, error code: {}, parser state: {}, "
-              "message complete: {}",
-              rc, HTTP_PARSER_ERRNO(&parser_), parser_.state, message_complete_);
+    const size_t pos = data.find_first_of("\r\n");
+    if (pos != absl::string_view::npos) {
+      // Detect CR or LF. It is likely this is the request line.
+      const absl::string_view request_line = data.substr(0, pos);
 
-    // Errors in parsing HTTP.
-    if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
-      return ParseState::Error;
-    }
+      http_parser_init(&parser_, HTTP_REQUEST);
+      ssize_t rc =
+          http_parser_execute(&parser_, &settings_, request_line.data(), request_line.length());
+      ENVOY_LOG(trace,
+                "http inspector: http_parser parsed {} chars, error code: {}, parser state: {}", rc,
+                HTTP_PARSER_ERRNO(&parser_), parser_.state);
 
-    // When the header is parsed, the http_parser will reset the state to s_start_req.
-    if (message_complete_) {
-      if (parser_.http_major == 1 && parser_.http_minor == 1) {
-        protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
-      } else {
-        // Set other HTTP protocols to HTTP/1.0
-        protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
+      // Errors in parsing HTTP.
+      if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+        return ParseState::Error;
       }
-      return ParseState::Done;
+
+      // If the line is request line, the state should be s_req_http_end.
+      if (parser_.state != s_req_http_end_) {
+        return ParseState::Error;
+      } else {
+
+        if (parser_.http_major == 1 && parser_.http_minor == 1) {
+          protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
+        } else {
+          // Set other HTTP protocols to HTTP/1.0
+          protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
+        }
+        return ParseState::Done;
+      }
     } else {
-      return ParseState::Continue;
+      ssize_t rc =
+          http_parser_execute(&parser_, &settings_, data.data() + read_, data.length() - read_);
+      ENVOY_LOG(trace,
+                "http inspector: http_parser parsed {} chars, error code: {}, parser state: {}", rc,
+                HTTP_PARSER_ERRNO(&parser_), parser_.state);
+
+      // Errors in parsing HTTP.
+      if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+        return ParseState::Error;
+      } else {
+        return ParseState::Continue;
+      }
     }
   }
 }

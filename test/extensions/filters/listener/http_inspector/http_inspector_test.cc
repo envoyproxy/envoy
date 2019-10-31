@@ -203,52 +203,6 @@ TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
   EXPECT_EQ(1, cfg_->stats().http11_found_.value());
 }
 
-TEST_F(HttpInspectorTest, InspectHttp11InvalidContentLength) {
-  init();
-  const absl::string_view header =
-      "GET /anything HTTP/1.1\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
-      "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
-      "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
-      "15000\r\ncontent-length: 2\r\n\r\nfoo";
-
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-      }));
-
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
-
-  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  EXPECT_CALL(cb_, continueFilterChain(true));
-  file_event_callback_(Event::FileReadyType::Read);
-  EXPECT_EQ(0, cfg_->stats().http11_found_.value());
-}
-
-TEST_F(HttpInspectorTest, InspectHttp11NoContentLength) {
-  init();
-  const absl::string_view header =
-      "GET /anything HTTP/1.1\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
-      "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
-      "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
-      "15000\r\n\r\nfooo";
-
-  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-      }));
-
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
-
-  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  EXPECT_CALL(cb_, continueFilterChain(true));
-  file_event_callback_(Event::FileReadyType::Read);
-  EXPECT_EQ(0, cfg_->stats().http11_found_.value());
-}
-
 TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
   init();
   const absl::string_view header = "GET  /anything  HTTP/1.1\r\n\r\n";
@@ -288,7 +242,7 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
   init();
-  const absl::string_view header = "BAD /anything HTTP/1.1\r\n\r\n";
+  const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -305,7 +259,7 @@ TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
 
 TEST_F(HttpInspectorTest, OldHttpProtocol) {
   init();
-  const absl::string_view header = "GET /anything HTTP/0.9\r\n\r\n";
+  const absl::string_view header = "GET /anything HTTP/0.9\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -323,7 +277,7 @@ TEST_F(HttpInspectorTest, OldHttpProtocol) {
 
 TEST_F(HttpInspectorTest, InvalidRequestLine) {
   init();
-  const absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine";
+  const absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -395,7 +349,6 @@ TEST_F(HttpInspectorTest, ReadError) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
-
   init();
   const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2c")};
 
@@ -436,7 +389,6 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
-
   init();
   const std::string header = "505249202a20485454502f322e300d0a0d0c";
   const std::vector<uint8_t> data = Hex::decode(header);
@@ -471,8 +423,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
   init();
-
-  const absl::string_view data = "GET /anything HTTP/1.0\r\n\r\n";
+  const absl::string_view data = "GET /anything HTTP/1.0\r";
   {
     InSequence s;
 
@@ -504,12 +455,9 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
-
   init();
-
   const absl::string_view data = "GE";
   bool end_stream = false;
-
   {
     InSequence s;
 
@@ -538,14 +486,44 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
     file_event_callback_(Event::FileReadyType::Read);
   }
 }
-TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 
+TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
   init();
+  const absl::string_view data = "X";
+  {
+    InSequence s;
 
-  const std::string valid_header = "GET /index HTTP/1.1";
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.length(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+  }
+
+  bool got_continue = false;
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
+    got_continue = true;
+  }));
+  while (!got_continue) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+}
+
+TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
+  init();
+  const std::string valid_header = "GET /index HTTP/1.1\r";
   //  offset:                       0         10
   const std::string truncate_header = valid_header.substr(0, 14).append("\r");
-
   {
     InSequence s;
 
@@ -573,6 +551,77 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+}
+
+TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
+  init();
+  absl::string_view method = "GET", http = "/index HTTP/1.0\r";
+  std::string spaces(Config::MAX_INSPECT_SIZE - method.length() - http.length(), ' ');
+  const std::string data = absl::StrCat(method, spaces, http);
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.length(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+  }
+
+  bool got_continue = false;
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("http/1.0")};
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
+    got_continue = true;
+  }));
+  while (!got_continue) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+}
+
+TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
+  init();
+  absl::string_view request = "GET /index HTTP/1.0\rfield: ";
+  //                           0                  20
+  std::string value(Config::MAX_INSPECT_SIZE - request.length(), 'a');
+  const std::string data = absl::StrCat(request, value);
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= 20; i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+  }
+
+  bool got_continue = false;
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("http/1.0")};
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
+    got_continue = true;
+  }));
+  while (!got_continue) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
 
 } // namespace
