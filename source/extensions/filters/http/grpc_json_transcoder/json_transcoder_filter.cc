@@ -486,15 +486,20 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   // so there is no need to copy headers from one to the other.
   bool is_trailers_only_response = response_headers_ == &trailers;
 
+  // If grpc-status is greater than Grpc::Status::MaximumValid, that is not invalid because if may
+  // be user defined grpc-status. so that must handled as 200 OK
+  bool grpc_status_greater_maximum = grpc_status.value() > Grpc::Status::MaximumValid;
+
   if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
-    if (!is_trailers_only_response) {
-      response_headers_->insertGrpcStatus().value(Grpc::Status::InvalidCode);
-    }
   } else {
-    response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+    if (grpc_status_greater_maximum) {
+      response_headers_->Status()->value(200);
+    } else {
+      response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+    }
     if (!is_trailers_only_response) {
-      response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+      response_headers_->insertGrpcStatus().value(grpc_status_greater_maximum ? grpc_status.value() : enumToInt(grpc_status.value()));
     }
   }
 

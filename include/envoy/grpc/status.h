@@ -48,7 +48,7 @@ public:
 
     // This is a non-GRPC error code, indicating the status code in gRPC headers
     // was invalid.
-    InvalidCode = MaximumValid + 1,
+    InvalidCode = -1,
   };
 };
 

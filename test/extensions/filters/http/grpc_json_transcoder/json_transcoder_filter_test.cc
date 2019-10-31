@@ -414,8 +414,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
 
-  Http::TestHeaderMapImpl response_headers{
-      {"content-type", "application/grpc"}, {":status", "200"}};
+  Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                           {":status", "200"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
@@ -775,10 +775,10 @@ private:
   }
 };
 
-class GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest
+class GrpcJsonTranscoderFilterConvertGreaterMaximumValidGrpcStatusTest
     : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
 public:
-  GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest()
+  GrpcJsonTranscoderFilterConvertGreaterMaximumValidGrpcStatusTest()
       : GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(makeProtoConfig()) {}
 
 private:
@@ -879,7 +879,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrail
   EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
 }
 
-TEST_F(GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterConvertGreaterMaximumValidGrpcStatusTest,
        TranscodingInvalidGrpcStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
@@ -888,9 +888,9 @@ TEST_F(GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest,
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "1024"}, {"grpc-message", "message"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ("503", response_headers.get_(":status"));
+  EXPECT_EQ("200", response_headers.get_(":status"));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
-  EXPECT_EQ("17", response_headers.get_("grpc-status"));
+  EXPECT_EQ("1024", response_headers.get_("grpc-status"));
   EXPECT_TRUE(response_headers.has("grpc-message"));
 }
 
