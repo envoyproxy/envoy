@@ -31,6 +31,7 @@ public:
       io_handle_->close();
     }
   }
+  bool isOpen() const override { return io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();

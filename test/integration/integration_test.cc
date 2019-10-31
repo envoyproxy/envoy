@@ -6,6 +6,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "test/integration/autonomous_upstream.h"
@@ -96,7 +97,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  uint32_t http_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(http_port);
   Http::TestHeaderMapImpl request_headers{{":method", "HEAD"},
                                           {":path", "/test/long/url"},
                                           {":scheme", "http"},
@@ -126,6 +128,12 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   // Validate that the listeners have been stopped.
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+
+  // Validate that port is closed and can be bound by other sockets.
+  EXPECT_NO_THROW(Network::TcpListenSocket(
+      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                           http_port),
+      nullptr, true));
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {

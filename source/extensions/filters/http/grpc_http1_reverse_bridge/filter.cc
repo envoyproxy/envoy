@@ -1,5 +1,7 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -37,8 +39,20 @@ Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
   }
 }
 
+std::string badContentTypeMessage(const Http::HeaderMap& headers) {
+  if (headers.ContentType() != nullptr) {
+    return fmt::format(
+        "envoy reverse bridge: upstream responded with unsupported content-type {}, status code {}",
+        headers.ContentType()->value().getStringView(), headers.Status()->value().getStringView());
+  } else {
+    return fmt::format(
+        "envoy reverse bridge: upstream responded with no content-type header, status code {}",
+        headers.Status()->value().getStringView());
+  }
+}
+
 void adjustContentLength(Http::HeaderMap& headers,
-                         std::function<uint64_t(uint64_t value)> adjustment) {
+                         const std::function<uint64_t(uint64_t value)>& adjustment) {
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
@@ -116,16 +130,15 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
 
     // If the response from upstream does not have the correct content-type,
     // perform an early return with a useful error message in grpc-message.
-    if (content_type->value().getStringView() != upstream_content_type_) {
-      const auto grpc_message = fmt::format("envoy reverse bridge: upstream responded with "
-                                            "unsupported content-type {}, status code {}",
-                                            content_type->value().getStringView(),
-                                            headers.Status()->value().getStringView());
-
-      headers.insertGrpcMessage().value(grpc_message);
+    if (content_type == nullptr ||
+        content_type->value().getStringView() != upstream_content_type_) {
+      headers.insertGrpcMessage().value(badContentTypeMessage(headers));
       headers.insertGrpcStatus().value(Envoy::Grpc::Status::GrpcStatus::Unknown);
       headers.insertStatus().value(enumToInt(Http::Code::OK));
-      content_type->value(content_type_);
+
+      if (content_type != nullptr) {
+        content_type->value(content_type_);
+      }
 
       decoder_callbacks_->streamInfo().setResponseCodeDetails(
           RcDetails::get().GrpcBridgeFailedContentType);

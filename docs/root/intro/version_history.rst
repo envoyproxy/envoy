@@ -15,6 +15,7 @@ Version history
    :http:post:`/stats/recentlookups/disable`, and :http:post:`/stats/recentlookups/enable` endpoints.
 * api: added ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` option to omit the node identifier from the subsequent discovery requests on the same stream.
 * buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
+* build: official released binary is now PIE so it can be run with ASLR.
 * config: added support for :ref:`delta xDS <arch_overview_dynamic_config_delta>` (including ADS) delivery
 * config: enforcing that terminal filters (e.g. HttpConnectionManager for L4, router for L7) be the last in their respective filter chains.
 * config: added access log :ref:`extension filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`.
@@ -31,6 +32,7 @@ Version history
 * csrf: add PATCH to supported methods.
 * dns: added support for configuring :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>` to set the DNS refresh rate during failures.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
+* ext_authz: added :ref:`filter_enabled RuntimeFractionalPercent flag <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` to filter.
 * ext_authz: added tracing to the HTTP client.
 * ext_authz: deprecate :ref:`cluster scope stats <config_http_filters_ext_authz_stats>` in favour of filter scope stats.
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
@@ -55,6 +57,7 @@ Version history
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * listeners: added :ref:`connection balancer <envoy_api_field_Listener.connection_balance_config>`
   configuration for TCP listeners.
+* listeners: close the listening socket as part of draining stage as soon as workers stop accepting its connections.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
 * lua: extended `dynamicMetadata:set()` to allow setting complex values
 * metrics_service: added support for flushing histogram buckets.

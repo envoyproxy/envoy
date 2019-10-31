@@ -40,7 +40,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   if (!verifier) {
     onComplete(Status::Ok);
   } else {
-    context_ = Verifier::createContext(headers, this);
+    context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
     verifier->verify(context_);
   }
 
