@@ -7,6 +7,7 @@
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
+#include "envoy/registry/extensions_registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
@@ -286,3 +287,5 @@ AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLo
 
 } // namespace AccessLog
 } // namespace Envoy
+
+REGISTER_EXTENSION_FACTORY(Envoy::Server::Configuration::AccessLogInstanceFactory, "access_logger");
