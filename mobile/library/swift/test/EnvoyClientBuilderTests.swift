@@ -6,6 +6,8 @@ private let kMockTemplate = """
 mock_template:
 - name: mock
   domain: {{ domain }}
+  stats_domain: {{ stats_domain }}
+  device_os: {{ device_os }}
   connect_timeout: {{ connect_timeout_seconds }}s
   dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
   stats_flush_interval: {{ stats_flush_interval_seconds }}s
@@ -67,8 +69,65 @@ final class EnvoyClientBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingStatsDomainAddsToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual("stats.foo.com", config.statsDomain)
+      expectation.fulfill()
+    }
+
+    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+      .addEngineType(MockEnvoyEngine.self)
+      .addStatsDomain("stats.foo.com")
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testAddingConnectTimeoutSecondsAddsToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual(12345, config.connectTimeoutSeconds)
+      expectation.fulfill()
+    }
+
+    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+      .addEngineType(MockEnvoyEngine.self)
+      .addConnectTimeoutSeconds(12345)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testAddingDNSRefreshSecondsAddsToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual(23, config.dnsRefreshSeconds)
+      expectation.fulfill()
+    }
+
+    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+      .addEngineType(MockEnvoyEngine.self)
+      .addDNSRefreshSeconds(23)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
+  func testAddingStatsFlushSecondsAddsToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual(42, config.statsFlushSeconds)
+      expectation.fulfill()
+    }
+
+    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+      .addEngineType(MockEnvoyEngine.self)
+      .addStatsFlushSeconds(42)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testResolvesYAMLWithIndividuallySetValues() throws {
     let config = EnvoyConfiguration(domain: "api.foo.com",
+                                    statsDomain: "stats.foo.com",
                                     connectTimeoutSeconds: 200,
                                     dnsRefreshSeconds: 300,
                                     statsFlushSeconds: 400)
@@ -78,13 +137,16 @@ final class EnvoyClientBuilderTests: XCTestCase {
     }
 
     XCTAssertTrue(resolvedYAML.contains("domain: api.foo.com"))
+    XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.foo.com"))
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
     XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 300s"))
     XCTAssertTrue(resolvedYAML.contains("stats_flush_interval: 400s"))
+    XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
     let config = EnvoyConfiguration(domain: "api.foo.com",
+                                    statsDomain: "stats.foo.com",
                                     connectTimeoutSeconds: 200,
                                     dnsRefreshSeconds: 300,
                                     statsFlushSeconds: 400)

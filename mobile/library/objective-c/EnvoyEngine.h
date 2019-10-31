@@ -127,6 +127,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 @interface EnvoyConfiguration : NSObject
 
 @property (nonatomic, strong) NSString *domain;
+@property (nonatomic, strong) NSString *statsDomain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
@@ -135,6 +136,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  Create a new instance of the configuration.
  */
 - (instancetype)initWithDomain:(NSString *)domain
+                   statsDomain:(NSString *)statsDomain
          connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
              dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
              statsFlushSeconds:(UInt32)statsFlushSeconds;

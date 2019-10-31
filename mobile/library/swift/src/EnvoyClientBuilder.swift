@@ -12,6 +12,7 @@ public final class EnvoyClientBuilder: NSObject {
     case domain(String)
   }
 
+  private var statsDomain: String = "0.0.0.0"
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsRefreshSeconds: UInt32 = 60
   private var statsFlushSeconds: UInt32 = 60
@@ -32,6 +33,16 @@ public final class EnvoyClientBuilder: NSObject {
   /// - parameter yaml: Contents of a YAML file to use for configuration.
   public init(yaml: String) {
     self.base = .yaml(yaml)
+  }
+
+  /// Add a stats domain for Envoy to flush stats to.
+  ///
+  /// - parameter statsDomain: the domain to use.
+  ///
+  /// - returns: This builder.
+  public func addStatsDomain(_ statsDomain: String) -> EnvoyClientBuilder {
+    self.statsDomain = statsDomain
+    return self
   }
 
   /// Add a log level to use with Envoy.
@@ -90,6 +101,7 @@ public final class EnvoyClientBuilder: NSObject {
       return EnvoyClient(configYAML: yaml, logLevel: self.logLevel, engine: engine)
     case .domain(let domain):
       let config = EnvoyConfiguration(domain: domain,
+                                      statsDomain: self.statsDomain,
                                       connectTimeoutSeconds: self.connectTimeoutSeconds,
                                       dnsRefreshSeconds: self.dnsRefreshSeconds,
                                       statsFlushSeconds: self.statsFlushSeconds)
