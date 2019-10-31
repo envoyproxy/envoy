@@ -69,13 +69,6 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_initialize(JNIEnv* env,
   return ares_library_init_android(connectivity_manager);
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_isAresInitialized(JNIEnv* env,
-                                                                          jclass // class
-) {
-  return ares_library_android_initialized() == ARES_SUCCESS;
-}
-
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_setPreferredNetwork(JNIEnv* env,
                                                                             jclass, // class
