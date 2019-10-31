@@ -181,7 +181,8 @@ message Route {
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
 
-    // Return an fallthru action
+    // if action is specified as fallthru, then router will look for the next route for which action
+    // is not failure
     Fallthru fallthru = 17;
   }
 
@@ -1021,9 +1022,8 @@ message DirectResponseAction {
 }
 
 message Fallthru {
-  // If set to true, then when this route is hit, stream info (and hence access logs)
-  // will be populated with the name of this route. Only the NOOP routes that set this flag will be
-  // added to access logs.
+  // If this flag is set to 1 then route name (if exists for the route) for fallthru routes will be
+  // aded in access logs default flag value is 0 access log field is FALLTHRU_ROUTE_NAME
   bool add_route_name_to_stream_info = 1;
 }
 
