@@ -31,15 +31,15 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
   file_event_ = dispatcher_.createFileEvent(
-      socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
+      socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   ASSERT(file_event_);
 
-  if (!Network::Socket::applyOptions(socket.options(), socket,
+  if (!Network::Socket::applyOptions(socket_->options(), *socket_,
                                      envoy::api::v2::core::SocketOption::STATE_BOUND)) {
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
-                                              socket.localAddress()->asString()));
+                                              socket_->localAddress()->asString()));
   }
 }
 

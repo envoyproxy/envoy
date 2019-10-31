@@ -75,10 +75,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createUdpListenerFilterFactoryList_(filters, context);
   }
+
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               Network::Address::SocketType socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
+
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
@@ -184,6 +186,10 @@ private:
    * @param name supplies the name to search for.
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
+
+  Network::ListenSocketFactorySharedPtr
+  createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
+                            ListenerImpl& listener);
 
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;

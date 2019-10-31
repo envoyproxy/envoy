@@ -20,7 +20,7 @@ class ListenSocketFactory {
 public:
   virtual ~ListenSocketFactory() = default;
 
-  virtual SocketSharedPtr createListenSocket() PURE;
+  virtual SocketSharedPtr createListenSocket(std::string listener_name) PURE;
 
   virtual Address::SocketType socketType() const PURE;
 
@@ -48,7 +48,7 @@ public:
    */
   virtual FilterChainFactory& filterChainFactory() PURE;
 
-  virtual ListenSocketFactory& listenSocketFactory() const PURE;
+  virtual ListenSocketFactorySharedPtr& listenSocketFactory() PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.

@@ -27,37 +27,57 @@ namespace Envoy {
 namespace Server {
 
 ListenSocketFactoryImplBase::ListenSocketFactoryImplBase(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr& local_address,
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::SocketType socket_type, const Network::Socket::OptionsSharedPtr& options,
     bool bind_to_port)
-    : factory_(factory), local_address_(local_address), socket_type_(socket_type), options_(),
-      bind_to_port_(bind_to_port) {}
+    : factory_(factory), local_address_(local_address), socket_type_(socket_type),
+      options_(options), bind_to_port_(bind_to_port) {}
 
-Network::SocketSharedPtr ListenSocketFactoryImplBase::actuallyCreateListenSocket() {
-  return factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
+Network::SocketSharedPtr
+ListenSocketFactoryImplBase::createListenSocketAndApplyOptions(std::string listener_name) {
+  Network::SocketSharedPtr socket =
+      factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
+  // Binding is done.
+  if (options_ != nullptr) {
+    bool ok = Network::Socket::applyOptions(options_, *socket,
+                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
+    const std::string message =
+        fmt::format("{}: Setting socket options {}", listener_name, ok ? "succeeded" : "failed");
+    if (!ok) {
+      ENVOY_LOG(warn, "{}", message);
+      throw EnvoyException(message);
+    } else {
+      ENVOY_LOG(debug, "{}", message);
+    }
+
+    // Add the options to the socket_ so that STATE_LISTENING options can be
+    // set in the worker after listen()/evconnlistener_new() is called.
+    socket->addOptions(options_);
+  }
+  return socket;
 }
 
 TcpListenSocketFactory::TcpListenSocketFactory(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr& local_address,
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Stream,
                                   options, bind_to_port) {}
 
-Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket() {
+Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket(std::string listener_name) {
   if (socket_ == nullptr) {
-    socket_ = actuallyCreateListenSocket();
+    socket_ = createListenSocketAndApplyOptions(listener_name);
   }
   return socket_;
 }
 
 UdpListenSocketFactory::UdpListenSocketFactory(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr& local_address,
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-    : ListenSocketFactoryBase(factory, local_address, Network::Address::SocketType::Datagram,
-                              options, bind_to_port) {}
+    : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Datagram,
+                                  options, bind_to_port) {}
 
-Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket() {
-  return actuallyCreateListenSocket();
+Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket(std::string listener_name) {
+  return createListenSocketAndApplyOptions(listener_name);
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
@@ -93,7 +113,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
-  Address::SocketType socket_type = Network::Utility::protobufAddressSocketType(config.address());
+  Network::Address::SocketType socket_type =
+      Network::Utility::protobufAddressSocketType(config.address());
   if (socket_type == Network::Address::SocketType::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
@@ -325,28 +346,9 @@ Init::Manager& ListenerImpl::initManager() {
   }
 }
 
-void ListenerImpl::setListenSocketFactory(
-    const Network::ListenSocketFactorySharedPtr& socket_factory) {
-  ASSERT(!socket_);
+void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory) {
+  ASSERT(!socket_factory_);
   socket_factory_ = socket_factory;
-  // Server config validation sets nullptr sockets.
-  if (socket_ && listen_socket_options_) {
-    // 'pre_bind = false' as bind() is never done after this.
-    bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
-    const std::string message =
-        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
-    if (!ok) {
-      ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
-    } else {
-      ENVOY_LOG(debug, "{}", message);
-    }
-
-    // Add the options to the socket_ so that STATE_LISTENING options can be
-    // set in the worker after listen()/evconnlistener_new() is called.
-    socket_->addOptions(listen_socket_options_);
-  }
 }
 
 } // namespace Server

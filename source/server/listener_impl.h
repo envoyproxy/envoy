@@ -19,21 +19,22 @@ namespace Server {
 
 class ListenerManagerImpl;
 
-class ListenSocketFactoryImplBase : public Network::ListenSocketFactory {
+class ListenSocketFactoryImplBase : public Network::ListenSocketFactory,
+                                    protected Logger::Loggable<Logger::Id::config> {
 public:
   ListenSocketFactoryImplBase(ListenerComponentFactory& factory,
-                              Network::Address::InstanceConstSharedPtr& local_address,
+                              Network::Address::InstanceConstSharedPtr local_address,
                               Network::Address::SocketType socket_type,
                               const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
-  Network::Address::SocketType socketType() override { return socket_type_; }
+  Network::Address::SocketType socketType() const override { return socket_type_; }
 
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
 
 protected:
-  Network::SocketSharedPtr actuallyCreateListenSocket();
+  Network::SocketSharedPtr createListenSocketAndApplyOptions(std::string listener_name);
 
 private:
   ListenerComponentFactory& factory_;
@@ -46,11 +47,11 @@ private:
 class TcpListenSocketFactory : public ListenSocketFactoryImplBase {
 public:
   TcpListenSocketFactory(ListenerComponentFactory& factory,
-                         Network::Address::InstanceConstSharedPtr& local_address,
+                         Network::Address::InstanceConstSharedPtr local_address,
                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
   // If |socket_| is nullptr, create a new socket for it. Otherwise, always return |socket_|.
-  Network::SocketSharedPtr createListenSocket() override;
+  Network::SocketSharedPtr createListenSocket(std::string listener_name) override;
 
 private:
   Network::SocketSharedPtr socket_;
@@ -59,10 +60,10 @@ private:
 class UdpListenSocketFactory : public ListenSocketFactoryImplBase {
 public:
   UdpListenSocketFactory(ListenerComponentFactory& factory,
-                         Network::Address::InstanceConstSharedPtr& local_address,
+                         Network::Address::InstanceConstSharedPtr local_address,
                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
-  Network::SocketSharedPtr createListenSocket() override;
+  Network::SocketSharedPtr createListenSocket(std::string listener_name) override;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -112,13 +113,11 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
-  Network::Address::SocketType socketType() const { return socket_type_; }
   const envoy::api::v2::Listener& config() { return config_; }
-  const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
-  void setListenSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
+  void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() { return version_info_; }
@@ -126,9 +125,7 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  const Network::ListenSocketFactory& listenSocketFactory() const override {
-    return *socket_factory_;
-  }
+  Network::ListenSocketFactorySharedPtr& listenSocketFactory() override { return socket_factory_; }
   bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;

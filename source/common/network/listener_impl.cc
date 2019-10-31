@@ -69,7 +69,7 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr&& 
                            ListenerCallbacks& cb, bool bind_to_port)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), listener_(nullptr) {
   if (bind_to_port) {
-    setupServerSocket(dispatcher, socket);
+    setupServerSocket(dispatcher, *socket_);
   }
 }
 
