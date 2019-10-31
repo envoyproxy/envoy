@@ -68,7 +68,7 @@ public:
     }
 
     const RespValue* command() const { return command_; }
-    const std::shared_ptr<RespValue> baseArray() const { return base_array_; }
+    const std::shared_ptr<RespValue>& baseArray() const { return base_array_; }
 
     bool operator==(const CompositeArray& other) const;
 

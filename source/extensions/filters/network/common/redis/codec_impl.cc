@@ -146,24 +146,24 @@ void RespValue::type(RespType type) {
 }
 
 RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
-  this->type(other.type());
+  type(other.type());
   switch (type_) {
   case RespType::Array: {
-    this->asArray() = other.asArray();
+    asArray() = other.asArray();
     break;
   }
   case RespType::CompositeArray: {
-    this->asCompositeArray() = other.asCompositeArray();
+    asCompositeArray() = other.asCompositeArray();
     break;
   }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    this->asString() = other.asString();
+    asString() = other.asString();
     break;
   }
   case RespType::Integer: {
-    this->asInteger() = other.asInteger();
+    asInteger() = other.asInteger();
     break;
   }
   case RespType::Null:
@@ -200,24 +200,24 @@ RespValue& RespValue::operator=(const RespValue& other) {
   if (&other == this) {
     return *this;
   }
-  this->type(other.type());
+  type(other.type());
   switch (type_) {
   case RespType::Array: {
-    this->asArray() = other.asArray();
+    asArray() = other.asArray();
     break;
   }
   case RespType::CompositeArray: {
-    this->asCompositeArray() = other.asCompositeArray();
+    asCompositeArray() = other.asCompositeArray();
     break;
   }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    this->asString() = other.asString();
+    asString() = other.asString();
     break;
   }
   case RespType::Integer: {
-    this->asInteger() = other.asInteger();
+    asInteger() = other.asInteger();
     break;
   }
   case RespType::Null:
@@ -265,21 +265,21 @@ bool RespValue::operator==(const RespValue& other) const {
 
   switch (type_) {
   case RespType::Array: {
-    result = (this->asArray() == other.asArray());
+    result = (asArray() == other.asArray());
     break;
   }
   case RespType::CompositeArray: {
-    result = (this->asCompositeArray() == other.asCompositeArray());
+    result = (asCompositeArray() == other.asCompositeArray());
     break;
   }
   case RespType::SimpleString:
   case RespType::BulkString:
   case RespType::Error: {
-    result = (this->asString() == other.asString());
+    result = (asString() == other.asString());
     break;
   }
   case RespType::Integer: {
-    result = (this->asInteger() == other.asInteger());
+    result = (asInteger() == other.asInteger());
     break;
   }
   case RespType::Null: {
