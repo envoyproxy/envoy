@@ -182,7 +182,7 @@ message Route {
     DirectResponseAction direct_response = 7;
 
     // if action is specified as fallthru, then router will look for the next route for which action
-    // is not failure
+    // is not fallthru
     Fallthru fallthru = 17;
   }
 
