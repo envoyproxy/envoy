@@ -24,7 +24,7 @@ private:
   const EVP_MD* getHashFunction(absl::string_view name);
 };
 
-std::unique_ptr<Crypto::ScopedUtilitySingleton> utility_ =
+static std::unique_ptr<Crypto::ScopedUtilitySingleton> utility_ =
     std::make_unique<Crypto::ScopedUtilitySingleton>(std::make_unique<Crypto::UtilityImpl>());
 
 } // namespace Crypto
