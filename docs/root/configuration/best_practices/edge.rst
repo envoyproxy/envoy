@@ -84,15 +84,17 @@ The following is a YAML example of the above recommendation.
               max_concurrent_streams: 100
               initial_stream_window_size: 65536 # 64 KiB
               initial_connection_window_size: 1048576 # 1 MiB
-            stream_idle_timeout: 300s # 5 mins
-            request_timeout: 300s # 5 mins
+            stream_idle_timeout: 300s # 5 mins, must be disabled for long-lived and streaming requests
+            request_timeout: 300s # 5 mins, must be disabled for long-lived and streaming requests
             route_config:
               virtual_hosts:
               - name: default
                 domains: "*"
                 routes:
                 - match: { prefix: "/" }
-                  route: { cluster: service_foo }
+                  route:
+                    cluster: service_foo
+                    idle_timeout: 15s # must be disabled for long-lived and streaming requests
     clusters:
       name: service_foo
       connect_timeout: 15s
