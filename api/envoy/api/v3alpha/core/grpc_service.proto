@@ -77,11 +77,13 @@ message GrpcService {
       }
 
       message MetadataCredentialsFromPlugin {
+        reserved 2;
+
+        reserved "config";
+
         string name = 1;
 
         oneof config_type {
-          google.protobuf.Struct config = 2;
-
           google.protobuf.Any typed_config = 3;
         }
       }

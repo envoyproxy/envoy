@@ -152,7 +152,7 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   echo "Building and testing envoy-filter-example tests..."
   pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
-    //:echo2_integration_test //:envoy_binary_test
+    //:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test
   popd
   # Also validate that integration test traffic tapping (useful when debugging etc.)
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
@@ -178,7 +178,7 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   echo "Building and testing envoy-filter-example tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \
-    //:echo2_integration_test //:envoy_binary_test
+    //:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test
   exit 0
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   setup_clang_toolchain

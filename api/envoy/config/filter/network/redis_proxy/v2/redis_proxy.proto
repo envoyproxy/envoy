@@ -124,13 +124,6 @@ message RedisProxy {
         //
         // If specified, Envoy will lookup the runtime key to get the percentage of requests to the
         // mirror.
-        //
-        // Parsing this field is implemented such that the runtime key's data may be represented
-        // as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
-        // as JSON/YAML and may also be represented as an integer with the assumption that the value
-        // is an integral percentage out of 100. For instance, a runtime key lookup returning the
-        // value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
-        // HUNDRED.
         api.v2.core.RuntimeFractionalPercent runtime_fraction = 2;
 
         // Set this to TRUE to only mirror write commands, this is effectively replicating the

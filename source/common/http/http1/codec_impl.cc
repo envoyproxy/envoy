@@ -10,7 +10,6 @@
 #include "envoy/network/connection.h"
 
 #include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
 #include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
@@ -31,6 +30,13 @@ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Sett
                          Http::Headers::get().ConnectionValues.Http2Settings);
 }
 
+HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
+  if (settings.header_key_format_ == Http1Settings::HeaderKeyFormat::ProperCase) {
+    return std::make_unique<ProperCaseHeaderKeyFormatter>();
+  }
+
+  return nullptr;
+}
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
@@ -164,7 +170,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // actually write the zero length buffer out.
   if (data.length() > 0) {
     if (chunk_encoding_) {
-      connection_.buffer().add(fmt::format("{:x}\r\n", data.length()));
+      connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));
     }
 
     connection_.buffer().move(data);
@@ -346,8 +352,10 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                http_parser_type type, uint32_t max_headers_kb,
-                               const uint32_t max_headers_count)
+                               const uint32_t max_headers_count,
+                               HeaderKeyFormatterPtr&& header_key_formatter)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
+      header_key_formatter_(std::move(header_key_formatter)),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
@@ -570,16 +578,8 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
                                            Http1Settings settings, uint32_t max_request_headers_kb,
                                            const uint32_t max_request_headers_count)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
-                     max_request_headers_count),
-      callbacks_(callbacks), codec_settings_(settings) {
-  switch (codec_settings_.header_key_format_) {
-  case Http1Settings::HeaderKeyFormat::Default:
-    break;
-  case Http1Settings::HeaderKeyFormat::ProperCase:
-    header_key_formatter_ = std::make_unique<ProperCaseHeaderKeyFormatter>();
-    break;
-  }
-}
+                     max_request_headers_count, formatter(settings)),
+      callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -732,8 +732,8 @@ void ServerConnectionImpl::sendProtocolError() {
   // to look more like HTTP/2 to higher layers.
   if (!active_request_ || !active_request_->response_encoder_.startedResponse()) {
     Buffer::OwnedImpl bad_request_response(
-        fmt::format("HTTP/1.1 {} {}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-                    std::to_string(enumToInt(error_code_)), CodeUtility::toString(error_code_)));
+        absl::StrCat("HTTP/1.1 ", error_code_, " ", CodeUtility::toString(error_code_),
+                     "\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"));
 
     connection_.write(bad_request_response, false);
   }
@@ -751,10 +751,10 @@ void ServerConnectionImpl::onBelowLowWatermark() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                                           ConnectionCallbacks&,
+                                           ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count) {}
+                     max_response_headers_count, formatter(settings)) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
@@ -775,7 +775,7 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   // reusing this connection. This is done when the final pipeline response is received.
   ASSERT(connection_.readEnabled());
 
-  request_encoder_ = std::make_unique<RequestStreamEncoderImpl>(*this);
+  request_encoder_ = std::make_unique<RequestStreamEncoderImpl>(*this, header_key_formatter_.get());
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
 }

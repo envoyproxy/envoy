@@ -1,24 +1,21 @@
-# Borrowed from
-# https://github.com/bazelbuild/rules_go/blob/master/proto/toolchain.bzl. This
-# does some magic munging to remove workspace prefixes from output paths to
-# convert path as understood by Bazel into paths as understood by protoc.
-def _proto_path(proto):
-    """
-    The proto path is not really a file path
-    It's the path to the proto that was seen when the descriptor file was generated.
-    """
-    path = proto.path
-    root = proto.root.path
-    ws = proto.owner.workspace_root
-    if path.startswith(root):
-        path = path[len(root):]
-    if path.startswith("/"):
-        path = path[1:]
-    if path.startswith(ws):
-        path = path[len(ws):]
-    if path.startswith("/"):
-        path = path[1:]
-    return path
+# Borrowed from https://github.com/grpc/grpc-java/blob/v1.24.1/java_grpc_library.bzl#L61
+def _path_ignoring_repository(f):
+    # Bazel creates a _virtual_imports directory in case the .proto source files
+    # need to be accessed at a path that's different from their source path:
+    # https://github.com/bazelbuild/bazel/blob/0.27.1/src/main/java/com/google/devtools/build/lib/rules/proto/ProtoCommon.java#L289
+    #
+    # In that case, the import path of the .proto file is the path relative to
+    # the virtual imports directory of the rule in question.
+    virtual_imports = "/_virtual_imports/"
+    if virtual_imports in f.path:
+        return f.path.split(virtual_imports)[1].split("/", 1)[1]
+    elif len(f.owner.workspace_root) == 0:
+        # |f| is in the main repository
+        return f.short_path
+    else:
+        # If |f| is a generated file, it will have "bazel-out/*/genfiles" prefix
+        # before "external/workspace", so we need to add the starting index of "external/workspace"
+        return f.path[f.path.find(f.owner.workspace_root) + len(f.owner.workspace_root) + 1:]
 
 def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     # Compute output files from the current proto_library node's dependencies.
@@ -36,18 +33,13 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     # extractions. See https://github.com/bazelbuild/bazel/issues/3971.
     import_paths = []
     for f in target[ProtoInfo].transitive_sources.to_list():
-        if f.root.path:
-            import_path = f.root.path + "/" + f.owner.workspace_root
-        else:
-            import_path = f.owner.workspace_root
-        if import_path:
-            import_paths += [import_path]
+        import_paths += ["{}={}".format(_path_ignoring_repository(f), f.path)]
 
     # The outputs live in the ctx.label's package root. We add some additional
     # path information to match with protoc's notion of path relative locations.
     outputs = []
     for output_suffix in output_suffixes:
-        outputs += [ctx.actions.declare_file(ctx.label.name + "/" + _proto_path(f) +
+        outputs += [ctx.actions.declare_file(ctx.label.name + "/" + _path_ignoring_repository(f) +
                                              output_suffix) for f in proto_sources]
 
     # Create the protoc command-line args.
@@ -56,7 +48,7 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     args = ["-I./" + ctx.label.workspace_root]
     args += ["-I" + import_path for import_path in import_paths]
     args += ["--plugin=protoc-gen-api_proto_plugin=" + ctx.executable._api_proto_plugin.path, "--api_proto_plugin_out=" + output_path]
-    args += [_proto_path(src) for src in target[ProtoInfo].direct_sources]
+    args += [src.path for src in target[ProtoInfo].direct_sources]
     ctx.actions.run(
         executable = ctx.executable._protoc,
         arguments = args,
