@@ -668,7 +668,7 @@ TEST_F(FileUtilsTest, ReadFileContents) {
 }
 
 TEST_F(QuicPlatformTest, PickUnsedPort) {
-  int port = QuicPickUnusedPortOrDie();
+  int port = QuicPickServerPortForTestsOrDie();
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
   for (auto ip_version : supported_versions) {
@@ -694,7 +694,7 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
       .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
+  EXPECT_DEATH_LOG_TO_STDERR(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {

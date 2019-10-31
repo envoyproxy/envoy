@@ -143,9 +143,8 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
   std::string data = request_body_;
   if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
     std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
+        quic::HttpEncoder::SerializeDataFrameHeader(request_body_.length(), &data_buffer);
     quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
     data = absl::StrCat(data_frame_header, request_body_);
   }
@@ -167,9 +166,8 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   std::string data = request_body_;
   if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
     std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
+        quic::HttpEncoder::SerializeDataFrameHeader(request_body_.length(), &data_buffer);
     quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
     data = absl::StrCat(data_frame_header, request_body_);
   }
@@ -199,7 +197,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
 }
 
 TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     return;
   }
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
@@ -218,9 +216,8 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   std::string data = request_body_;
   if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
     std::unique_ptr<char[]> data_buffer;
-    quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
-        encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
+        quic::HttpEncoder::SerializeDataFrameHeader(request_body_.length(), &data_buffer);
     quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
     data = absl::StrCat(data_frame_header, request_body_);
   }
