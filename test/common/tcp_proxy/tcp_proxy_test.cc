@@ -362,19 +362,6 @@ TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
   EXPECT_EQ(nullptr, config_obj.hashPolicy());
 }
 
-TEST(ConfigTest, UnknownHashPolicy) {
-  const std::string yaml = R"EOF(
-  stat_prefix: name
-  cluster: foo
-  hash_policy:
-  - source_ip: {}
-)EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
-  EXPECT_EQ(nullptr, config_obj.hashPolicy());
-}
-
 TEST(ConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();

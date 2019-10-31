@@ -1,20 +1,18 @@
 #pragma once
 
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/network/hash_policy.h"
+#include "envoy/type/hash_policy.pb.h"
 
 #include "common/common/hash.h"
 
 namespace Envoy {
-namespace TcpProxy {
+namespace Network {
 /**
  * Implementation of HashPolicy that reads from the proto TCP proxy config.
  */
 class HashPolicyImpl : public Network::HashPolicy {
 public:
-  explicit HashPolicyImpl(
-      absl::Span<const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::HashPolicy* const>
-          hash_policy);
+  explicit HashPolicyImpl(absl::Span<const envoy::type::HashPolicy* const> hash_policy);
 
   // Network::HashPolicy
   absl::optional<uint64_t>
@@ -34,5 +32,5 @@ public:
 private:
   std::vector<HashMethodPtr> hash_impls_;
 };
-} // namespace TcpProxy
+} // namespace Network
 } // namespace Envoy

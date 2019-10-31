@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.tcp_proxy.v2";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
+import "envoy/type/hash_policy.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -149,20 +150,6 @@ message TcpProxy {
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
 
-  // Specifies the TCP proxy's hashing policy
-  message HashPolicy {
-    // The source IP will be used to compute the hash used by hash-based load balancing
-    // algorithms.
-    message SourceIp {
-    }
-
-    oneof policy_specifier {
-      option (validate.required) = true;
-
-      SourceIp source_ip = 1;
-    }
-  }
-
   // Optional configuration for TCP proxy hash policy.
-  repeated HashPolicy hash_policy = 11;
+  repeated type.HashPolicy hash_policy = 11;
 }

@@ -120,7 +120,7 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   }
 
   if (!config.hash_policy().empty()) {
-    hash_policy_ = std::make_unique<HashPolicyImpl>(config.hash_policy());
+    hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
   }
 }
 

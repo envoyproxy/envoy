@@ -1,9 +1,11 @@
-#include "common/tcp_proxy/hash_policy.h"
+#include "common/network/hash_policy.h"
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
-namespace TcpProxy {
+namespace Network {
 
 class SourceIpHashMethod : public HashPolicyImpl::HashMethod {
 public:
@@ -18,19 +20,16 @@ public:
   }
 };
 
-HashPolicyImpl::HashPolicyImpl(
-    absl::Span<const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::HashPolicy* const>
-        hash_policies) {
+HashPolicyImpl::HashPolicyImpl(absl::Span<const envoy::type::HashPolicy* const> hash_policies) {
   hash_impls_.reserve(hash_policies.size());
 
   for (auto* hash_policy : hash_policies) {
     switch (hash_policy->policy_specifier_case()) {
-    case envoy::config::filter::network::tcp_proxy::v2::TcpProxy::HashPolicy::kSourceIp:
+    case envoy::type::HashPolicy::kSourceIp:
       hash_impls_.emplace_back(new SourceIpHashMethod());
       break;
     default:
-      throw EnvoyException(
-          absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
   }
 }
@@ -51,5 +50,5 @@ HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
   return hash;
 }
 
-} // namespace TcpProxy
+} // namespace Network
 } // namespace Envoy

@@ -24,9 +24,9 @@
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
+#include "common/network/hash_policy.h"
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
-#include "common/tcp_proxy/hash_policy.h"
 #include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
@@ -151,7 +151,7 @@ private:
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Runtime::RandomGenerator& random_generator_;
-  std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

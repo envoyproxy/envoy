@@ -9,22 +9,10 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "hash_policy_lib",
-    srcs = ["hash_policy.cc"],
-    hdrs = ["hash_policy.h"],
-    deps = [
-        "//include/envoy/network:hash_policy_interface",
-        "//source/common/common:hash_lib",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "tcp_proxy",
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
     deps = [
-        ":hash_policy_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
@@ -48,6 +36,7 @@ envoy_cc_library(
         "//source/common/network:application_protocol_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
+        "//source/common/network:hash_policy_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:upstream_server_name_lib",
         "//source/common/network:utility_lib",
