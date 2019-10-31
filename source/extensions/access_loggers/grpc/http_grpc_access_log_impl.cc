@@ -98,8 +98,9 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
     request_properties->set_original_path(
         std::string(request_headers.EnvoyOriginalPath()->value().getStringView()));
   }
-  ASSERT(request_headers.byteSize().has_value());
-  request_properties->set_request_headers_bytes(request_headers.byteSize().value());
+  // TODO(asraa): This causes a manual iteration over the request_headers. Instead, refresh the byte
+  // size of this HeaderMap outside the loggers and use byteSize().
+  request_properties->set_request_headers_bytes(request_headers.byteSizeInternal());
   request_properties->set_request_body_bytes(stream_info.bytesReceived());
   if (request_headers.Method() != nullptr) {
     envoy::api::v2::core::RequestMethod method =
