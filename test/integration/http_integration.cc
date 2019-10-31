@@ -959,8 +959,8 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
-    // Expect a stream reset when the size of the trailers is larger than the maximum
-    // limit.
+      // Expect a stream reset when the size of the trailers is larger than the maximum
+      // limit.
       response->waitForReset();
       codec_client_->close();
       EXPECT_FALSE(response->complete());

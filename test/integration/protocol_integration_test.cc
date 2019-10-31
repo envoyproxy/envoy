@@ -1233,8 +1233,8 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  //addDecodedData gets called twice in decodeTrailers and decodeData since we
-  //added is_first_trigger
+  // addDecodedData gets called twice in decodeTrailers and decodeData since we
+  // added is_first_trigger
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, response->body().size());
 }
 
