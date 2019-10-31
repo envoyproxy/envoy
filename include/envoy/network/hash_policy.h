@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Network {
 /**
- * TCP proxy hash policy.
+ * Hash policy for transport layer protocol.
  */
 class HashPolicy {
 public:
