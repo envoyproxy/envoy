@@ -103,6 +103,10 @@ const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {
   }
 }
 
+// Register the crypto utility singleton.
+static Crypto::ScopedUtilitySingleton* utility_ =
+    new Crypto::ScopedUtilitySingleton(std::make_unique<Crypto::UtilityImpl>());
+
 } // namespace Crypto
 } // namespace Common
 } // namespace Envoy
