@@ -104,6 +104,5 @@ The following is a YAML example of the above recommendation.
           address: 127.0.0.1
           port_value: 8080
       http2_protocol_options:
-        max_concurrent_streams: 100
         initial_stream_window_size: 65536 # 64 KiB
         initial_connection_window_size: 1048576 # 1 MiB
