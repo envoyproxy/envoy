@@ -81,6 +81,7 @@ public:
 
   // Dummy method
   void close() override {}
+  bool isOpen() const override { return false; }
   Network::Address::SocketType socketType() const override {
     return Network::Address::SocketType::Stream;
   }

@@ -61,7 +61,7 @@ def envoy_cmake_external(
         cache_entries = {},
         debug_cache_entries = {},
         cmake_options = ["-GNinja"],
-        make_commands = ["ninja", "ninja install"],
+        make_commands = ["ninja -v", "ninja -v install"],
         lib_source = "",
         postfix_script = "",
         static_libraries = [],
