@@ -11,11 +11,13 @@
 
 #include "gtest/gtest.h"
 
+#include "re2/re2.h"
+
 namespace Envoy {
 namespace Stats {
 
 TEST(TagExtractorTest, TwoSubexpressions) {
-  TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
+  TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.*?)\\.)");
   EXPECT_EQ("cluster_name", tag_extractor.name());
   std::string name = "cluster.test_cluster.upstream_cx_total";
   std::vector<Tag> tags;
@@ -26,6 +28,26 @@ TEST(TagExtractorTest, TwoSubexpressions) {
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("test_cluster", tags.at(0).value_);
   EXPECT_EQ("cluster_name", tags.at(0).name_);
+}
+
+TEST(TagExtractorTest, TwoSubexpressionsRE2) {
+  re2::RE2 re("^cluster\\.((.*?)\\.)");
+  re2::StringPiece match1, match2;
+  ASSERT_TRUE(re2::RE2::PartialMatch("cluster.test_cluster.upstream_cx_total", re, &match1,
+                                     &match2));
+  EXPECT_EQ("test_cluster.", std::string(match1));
+  EXPECT_EQ("test_cluster", std::string(match2));
+
+  re2::RE2 alternate_re("^cluster\\.([^\\.]+)\\..*");
+  ASSERT_TRUE(re2::RE2::FullMatch("cluster.test_cluster.upstream_cx_total", alternate_re, &match1));
+  EXPECT_EQ("test_cluster", std::string(match1));
+
+  std::regex sr("^cluster\\.((.*?)\\.)");
+  std::match_results<absl::string_view::iterator> smatch;
+  ASSERT_TRUE(std::regex_search("cluster.test_cluster.upstream_cx_total", smatch, sr));
+  ASSERT_LE(3, smatch.size());
+  EXPECT_EQ("test_cluster.", std::string(smatch[1]));
+  EXPECT_EQ("test_cluster", std::string(smatch[2]));
 }
 
 TEST(TagExtractorTest, SingleSubexpression) {
