@@ -327,18 +327,14 @@ public:
    * @return Network::FilterFactoryCb the factory creation function.
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                FactoryContext& context) {
-    UNREFERENCED_PARAMETER(config);
-    UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                                                                FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
    *         JSON and then parsed into this empty proto.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -408,19 +404,14 @@ public:
    */
   virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                              const std::string& stat_prefix,
-                                                             FactoryContext& context) {
-    UNREFERENCED_PARAMETER(config);
-    UNREFERENCED_PARAMETER(stat_prefix);
-    UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                                                             FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
    *         JSON and then parsed into this empty proto.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
