@@ -190,23 +190,24 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
+
+  // Trailers only matter if it is a chunk transfer encoding
+  // https://tools.ietf.org/html/rfc7230#section-4.4
   if (chunk_encoding_) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
 
-    // Trailers only matter if it is a chunk transfer encoding
-    // https://tools.ietf.org/html/rfc7230#section-4.4
     trailers.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          Buffer::WatermarkBuffer* buffer = static_cast<Buffer::WatermarkBuffer*>(context);
-          buffer->add(header.key().getStringView());
-          buffer->add(":");
-          buffer->add(header.value().getStringView());
-          buffer->add(CRLF);
+          static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(header.key().getStringView(),
+                                                                          header.value().getStringView());
           return HeaderMap::Iterate::Continue;
         },
-        &connection_.buffer());
+        this);
 
+    //We have to flush output here since we use encodeFormattedHeader?
+    //Not sure why
+    connection_.flushOutput();
     connection_.buffer().add(CRLF);
   }
 
