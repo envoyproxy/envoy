@@ -199,14 +199,14 @@ void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
 
     trailers.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(header.key().getStringView(),
-                                                                          header.value().getStringView());
+          static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
+              header.key().getStringView(), header.value().getStringView());
           return HeaderMap::Iterate::Continue;
         },
         this);
 
-    //We have to flush output here since we use encodeFormattedHeader?
-    //Not sure why
+    // We have to flush output here since we use encodeFormattedHeader?
+    // Not sure why
     connection_.flushOutput();
     connection_.buffer().add(CRLF);
   }
