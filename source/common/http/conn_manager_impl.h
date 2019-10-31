@@ -655,6 +655,7 @@ private:
 
   void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
   void onIdleTimeout();
+  void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
@@ -675,6 +676,8 @@ private:
   // connection. When there are active streams it is disarmed in favor of each stream's
   // stream_idle_timer_.
   Event::TimerPtr connection_idle_timer_;
+  // A connection duration timer. Armed during handling new connection if enabled in config.
+  Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
   Http::Context& http_context_;

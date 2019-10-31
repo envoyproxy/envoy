@@ -9,7 +9,8 @@ namespace Envoy {
 const std::string ADAPTIVE_CONCURRENCY_CONFIG =
     R"EOF(
 name: envoy.filters.http.adaptive_concurrency
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency
   gradient_controller_config:
     sample_aggregate_percentile:
       value: 50

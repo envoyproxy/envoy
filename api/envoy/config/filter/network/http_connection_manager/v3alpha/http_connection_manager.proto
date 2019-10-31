@@ -589,7 +589,9 @@ message ScopedRds {
 }
 
 message HttpFilter {
-  reserved 3;
+  reserved 3, 2;
+
+  reserved "config";
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_http_filters>`.
@@ -598,8 +600,6 @@ message HttpFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 4;
   }
 }

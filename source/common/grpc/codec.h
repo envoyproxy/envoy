@@ -66,10 +66,37 @@ enum class State {
   DATA,
 };
 
-class Decoder {
+class FrameInspector {
 public:
-  Decoder();
+  // Inspects the given buffer with GRPC data frame and updates the frame count.
+  // Invokes visitor callbacks for each frame in the following sequence:
+  //   "frameStart frameDataStart frameData* frameDataEnd"
+  // If frameStart returns false, then the inspector aborts.
+  // Returns the increase in the frame count.
+  uint64_t inspect(const Buffer::Instance& input);
 
+  // Returns the current frame count, corresponding to the request/response
+  // message count. Counter is incremented on a frame start.
+  uint64_t frameCount() const { return count_; }
+
+  // Returns the current state in the frame parsing.
+  State state() const { return state_; }
+
+  virtual ~FrameInspector() = default;
+
+protected:
+  virtual bool frameStart(uint8_t) { return true; }
+  virtual void frameDataStart() {}
+  virtual void frameData(uint8_t*, uint64_t) {}
+  virtual void frameDataEnd() {}
+
+  State state_{State::FH_FLAG};
+  uint32_t length_{0};
+  uint64_t count_{0};
+};
+
+class Decoder : public FrameInspector {
+public:
   // Decodes the given buffer with GRPC data frame. Drains the input buffer when
   // decoding succeeded (returns true). If the input is not sufficient to make a
   // complete GRPC data frame, it will be buffered in the decoder. If a decoding
@@ -87,28 +114,16 @@ public:
   // Indicates whether it has buffered any partial data.
   bool hasBufferedData() const { return state_ != State::FH_FLAG; }
 
+protected:
+  bool frameStart(uint8_t) override;
+  void frameDataStart() override;
+  void frameData(uint8_t*, uint64_t) override;
+  void frameDataEnd() override;
+
 private:
-  State state_;
   Frame frame_;
-};
-
-class FrameInspector {
-public:
-  // Decodes the given buffer with GRPC data frame and updates the frame count.
-  // Returns the increase in the frame count.
-  uint64_t decode(const Buffer::Instance& input);
-
-  // Returns the current frame count, corresponding to the request/response
-  // message count. Counter is incremented on a frame start.
-  uint64_t frameCount() const { return count_; }
-
-  // Returns the current state in the frame parsing.
-  State state() const { return state_; }
-
-private:
-  State state_{State::FH_FLAG};
-  uint32_t length_{0};
-  uint64_t count_{0};
+  std::vector<Frame>* output_{nullptr};
+  bool decoding_error_{false};
 };
 
 } // namespace Grpc

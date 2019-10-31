@@ -95,8 +95,15 @@ TEST_F(WorkerImplTest, BasicFlow) {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
         ci.setReady();
       }));
-  worker_.stopListener(listener2);
+
+  ConditionalInitializer ci2;
+  // Verify that callback is called from the other thread.
+  worker_.stopListener(listener2, [current_thread_id, &ci2]() {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+    ci2.setReady();
+  });
   ci.waitReady();
+  ci2.waitReady();
 
   EXPECT_CALL(*handler_, removeListeners(2))
       .WillOnce(InvokeWithoutArgs([current_thread_id]() -> void {

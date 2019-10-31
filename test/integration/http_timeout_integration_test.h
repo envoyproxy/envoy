@@ -29,7 +29,9 @@ public:
                   hcm) {
             envoy::config::filter::http::router::v2::Router router_config;
             router_config.set_respect_expected_rq_timeout(respect_expected_rq_timeout);
-            TestUtility::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
+            // TestUtility::jsonConvert(router_config,
+            // *hcm.mutable_http_filters(0)->mutable_config());
+            hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
           });
     }
 
