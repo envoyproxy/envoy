@@ -215,23 +215,13 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
   }
 }
 
-TEST_F(StreamInfoImplTest, RequestheadersTest) {
-  Http::LowerCaseString headerName{std::string("x-header")};
-  Http::LowerCaseString notFoundHeaderName{std::string("x-no-such-header")};
-
+TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
-  EXPECT_EQ("", stream_info.getRequestHeader(headerName));
+  EXPECT_FALSE(stream_info.getRequestHeaders());
 
   Http::HeaderMapImpl headers;
-  headers.addCopy(headerName, 123);
-
   stream_info.setRequestHeaders(headers);
-  EXPECT_EQ("123", stream_info.getRequestHeader(headerName));
-  EXPECT_EQ("", stream_info.getRequestHeader(notFoundHeaderName));
-
-  // We still can get the header after it was removed from the original map.
-  headers.remove(headerName);
-  EXPECT_EQ("123", stream_info.getRequestHeader(headerName));
+  EXPECT_EQ(&headers, stream_info.getRequestHeaders());
 }
 
 } // namespace

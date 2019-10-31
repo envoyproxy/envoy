@@ -193,15 +193,7 @@ public:
 
   void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
 
-  std::string getRequestHeader(const Http::LowerCaseString& name) const override {
-    if (request_headers_) {
-      const auto* entry = request_headers_->get(name);
-      if (entry) {
-        return std::string(entry->value().getStringView());
-      }
-    }
-    return std::string();
-  }
+  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 

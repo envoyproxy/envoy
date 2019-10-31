@@ -687,7 +687,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
-      {"%REQ(x-request-id)%", {"123-req-id"}, {}},
+      {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
@@ -763,8 +763,9 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
-  ON_CALL(stream_info, getRequestHeader(Http::LowerCaseString("x-request-id")))
-      .WillByDefault(Return("123-req-id"));
+  Http::HeaderMapImpl request_headers;
+  request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
+  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 
   // Upstream metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(

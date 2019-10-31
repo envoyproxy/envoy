@@ -219,24 +219,9 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_transport_failure_reason_;
   }
 
-  void setRequestHeaders(const Http::HeaderMap& headers) override {
-    headers.iterate(
-        [](const Http::HeaderEntry& entry, void* self) {
-          static_cast<StreamInfoImpl*>(self)->request_headers_.emplace_back(
-              std::string(entry.key().getStringView()), entry.value().getStringView());
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
 
-  std::string getRequestHeader(const Http::LowerCaseString& name) const override {
-    for (const auto& entry : request_headers_) {
-      if (entry.first == name) {
-        return entry.second;
-      }
-    }
-    return std::string();
-  }
+  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -275,7 +260,7 @@ private:
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
-  Http::HeaderVector request_headers_;
+  const Http::HeaderMap* request_headers_{};
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
 };

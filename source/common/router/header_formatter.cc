@@ -166,17 +166,22 @@ parsePerRequestStateField(absl::string_view param_str) {
 // request header from an StreamInfo::StreamInfo. Expects a string formatted as:
 //   (<header_name>)
 std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
-parseRequestHeader(absl::string_view param_str) {
-  param_str = StringUtil::trim(param_str);
-  if (param_str.size() <= 2 || param_str.front() != '(' || param_str.back() != ')') {
+parseRequestHeader(absl::string_view param) {
+  param = StringUtil::trim(param);
+  if (param.size() <= 2 || param.front() != '(' || param.back() != ')') {
     throw EnvoyException(fmt::format("Invalid header configuration. Expected format "
                                      "REQ(<header-name>), actual format REQ{}",
-                                     param_str));
+                                     param));
   }
-  param_str = param_str.substr(1, param_str.size() - 2); // trim parens
-  Http::LowerCaseString param{std::string(param_str)};
-  return [param](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-    return stream_info.getRequestHeader(param);
+  param = param.substr(1, param.size() - 2); // Trim parens.
+  Http::LowerCaseString header_name{std::string(param)};
+  return [header_name](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+    if (const auto* request_headers = stream_info.getRequestHeaders()) {
+      if (const auto* entry = request_headers->get(header_name)) {
+        return std::string(entry->value().getStringView());
+      }
+    }
+    return std::string();
   };
 }
 

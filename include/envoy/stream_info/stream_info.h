@@ -502,10 +502,9 @@ public:
   virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
 
   /**
-   * @param name request header name.
-   * @return request header value.
+   * @return request headers.
    */
-  virtual std::string getRequestHeader(const Http::LowerCaseString& name) const PURE;
+  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
 };
 
 } // namespace StreamInfo
