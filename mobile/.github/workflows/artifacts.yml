@@ -20,7 +20,7 @@ jobs:
         run: ./bazelw build --config=release-android --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a //:android_dist
       - uses: actions/upload-artifact@v1
         with:
-          name: envoy_android_aar.zip
+          name: envoy_android_aar
           path: dist/envoy.aar
   master_ios_dist:
     name: master_ios_dist
@@ -34,7 +34,11 @@ jobs:
         run: ./ci/mac_ci_setup.sh
       - name: 'Build Envoy.framework distributable'
         run: ./bazelw build --config=release-ios --ios_multi_cpus=i386,x86_64,armv7,arm64 //:ios_dist
+      - name: 'Create temporary directory for artifact to produce properly named zip'
+        run: mkdir -p dist/ios_artifact/Envoy.framework
+      - name: 'Move artifact to directory for zipping'
+        run: mv dist/Envoy.framework/* dist/ios_artifact/Envoy.framework
       - uses: actions/upload-artifact@v1
         with:
-          name: envoy_ios_framework.zip
-          path: dist/Envoy.framework
+          name: envoy_ios_framework
+          path: dist/ios_artifact
