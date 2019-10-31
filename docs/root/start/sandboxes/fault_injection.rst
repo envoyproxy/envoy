@@ -3,7 +3,7 @@
 Fault Injection Filter
 ======================
 
-This simple example demonstrates Envoy's fault injection capability using Envoy's runtime support to control the feature.
+This simple example demonstrates Envoy's :ref:`fault injection <config_http_filters_fault_injection>` capability using Envoy's :ref:`runtime support <config_runtime>` to control the feature.
 
 Running the Sandboxes
 ~~~~~~~~~~~~~~~~~~~~~
@@ -14,7 +14,7 @@ The following documentation runs through the setup of both services.
 
 Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
 
-A simple way to achieve this is via the `Docker Toolbox <https://www.docker.com/products/docker-toolbox>`_.
+A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
 **Step 2: Clone the Envoy repo and start all of our containers**
 
@@ -23,6 +23,7 @@ or ``git clone https://github.com/envoyproxy/envoy.git``
 
 
 Terminal 1
+
 .. code-block:: console
 
   $ pwd
@@ -39,21 +40,24 @@ Terminal 1
 **Step 3: Start sending continuous stream of HTTP requests**
 
 Terminal 2
+
 .. code-block:: console
+
   $ pwd
   envoy/examples/fault-injection
   $ docker-compose exec envoy bash
   $ bash send_request.sh
 
-  The script above (`send_request.sh`) sends a continuous stream of HTTP requests to Envoy, which in turn forwards the requests to the backend container. Fauilt injection is configured in Evoy but turned off (i.e. affects 0% of requests) .
-  Consequently, you should see a continuous sequence of HTTP 200 response codes.
+The script above (``send_request.sh``) sends a continuous stream of HTTP requests to Envoy, which in turn forwards the requests to the backend container. Fauilt injection is configured in Evoy but turned off (i.e. affects 0% of requests). Consequently, you should see a continuous sequence of HTTP 200 response codes.
 
 **Step 4: Test Envoy's abort fault injection**
 
-Turn on _abort_ fault injection via the runtime using the commands below.
+Turn on *abort* fault injection via the runtime using the commands below.
 
 Terminal 3
+
 .. code-block:: console
+
   $ docker-compose exec envoy bash
   $ bash enable_abort_fault_injection.sh
 
@@ -63,36 +67,38 @@ responses for all requests.
 To disable the abort injection:
 
 Terminal 3
+
 .. code-block:: console
+
   $ bash disable_abort_fault_injection.sh
 
-**Step 5: Test Envoy's delay fault injection
+**Step 5: Test Envoy's delay fault injection**
 
-Turn on _delay_ fault injection via the runtime using the commands below.
+Turn on *delay* fault injection via the runtime using the commands below.
 
 Terminal 3
+
 .. code-block:: console
+
   $ docker-compose exec envoy bash
   $ bash enable_delay_fault_injection.sh
-
 
 The script above will add a 3-second delay to 50% of HTTP requests. You should now see a continuous sequence of HTTP 200 responses for all requests, but half of the requests will take 3 seconds to complete.
 
 To disable the delay injection:
 
 Terminal 3
+
 .. code-block:: console
+
   $ bash disable_delay_fault_injection.sh
-
-
-```
-# in terminal 3 in the "envoy" container
-```
 
 **Step 5: Check the current runtime filesystem**
 
 To see the current runtime filesystem overview:
 
-Terminal 3:
+Terminal 3
+
 .. code-block:: console
+
   $ tree /srv/runtime
