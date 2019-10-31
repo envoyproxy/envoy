@@ -438,4 +438,45 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
+// Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
+TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        const std::string access_log_name =
+            TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        // Configure just enough of an upstream access log to reference the upstream headers.
+        const std::string yaml_string = R"EOF(
+name: envoy.router
+config:
+  upstream_log:
+    name: envoy.http_grpc_access_log
+    filter:
+      not_health_check_filter: {}
+    config:
+      common_config:
+        log_name: foo
+        grpc_service:
+          envoy_grpc:
+            cluster_name: cluster_0
+  )EOF";
+        const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
+        // Replace the terminal envoy.router.
+        hcm.clear_http_filters();
+        TestUtility::loadFromJson(json, *hcm.add_http_filters());
+      });
+
+  initialize();
+
+  // Send the request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send the response headers.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 } // namespace Envoy
