@@ -953,13 +953,18 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   codec_client_->sendData(*request_encoder_, 10, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  if (size >= max_size && downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    // For HTTP/2, expect a stream reset when the size of the trailers is larger than the maximum
+  if (size >= max_size) {
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      codec_client_->waitForDisconnect();
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("431", response->headers().Status()->value().getStringView());
+    } else {
+    // Expect a stream reset when the size of the trailers is larger than the maximum
     // limit.
-    response->waitForReset();
-    codec_client_->close();
-    EXPECT_FALSE(response->complete());
-
+      response->waitForReset();
+      codec_client_->close();
+      EXPECT_FALSE(response->complete());
+    }
   } else {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);

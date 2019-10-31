@@ -61,13 +61,9 @@ protected:
   }
 
   void verifyUpStreamRequestAfterStopAllFilter() {
-    if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
-      // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
-      // decodeTrailers. 2 decoded data were added.
-      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
-    } else {
-      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
-    }
+    // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
+    // decodeTrailers. 2 decoded data were added.
+    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
     EXPECT_EQ(true, upstream_request_->complete());
   }
 
@@ -961,25 +957,15 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  // Only relevant to Http2Downstream.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    // Http1 Downstream ignores trailers.
-    waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  } else {
-    // Expect rejection.
-    // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
-    // connections without it. Likely need to reconsider whether the waits/closes should be on
-    // client or upstream.
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    response->waitForReset();
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  }
+  // Expect rejection.
+  // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
+  // connections without it. Likely need to reconsider whether the waits/closes should be on
+  // client or upstream.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  response->waitForReset();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
@@ -1247,7 +1233,9 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
+  //addDecodedData gets called twice in decodeTrailers and decodeData since we
+  //added is_first_trigger
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, response->body().size());
 }
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
@@ -1287,7 +1275,7 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, response->body().size());
 }
 
 // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
