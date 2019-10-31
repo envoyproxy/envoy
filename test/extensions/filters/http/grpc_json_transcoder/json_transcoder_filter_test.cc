@@ -879,23 +879,17 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrail
 
 TEST_F(GrpcJsonTranscoderFilterConvertInvalidGrpcStatusTest, TranscodingInvalidGrpcStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
-                                           {":status", "200"},
-                                           };
+                                           {":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
-  std::string expected_response(R"({"code":5,"message":"Resource not found"})");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
-        EXPECT_EQ(expected_response, data.toString());
-      }));
   Http::TestHeaderMapImpl response_trailers{
       {"grpc-status", "1024"},
       {"grpc-message", "message"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ("503", response_headers.get_(":status"));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
-  EXPECT_EQ("17", response_headers.get_("grpc-status"))
+  EXPECT_EQ("17", response_headers.get_("grpc-status"));
   EXPECT_TRUE(response_headers.has("grpc-message"));
 }
 

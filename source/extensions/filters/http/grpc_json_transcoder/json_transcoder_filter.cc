@@ -488,6 +488,9 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
+    if (!is_trailers_only_response) {
+      response_headers_->insertGrpcStatus().value(Grpc::Status::InvalidCode); 
+    }
   } else {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
     if (!is_trailers_only_response) {
