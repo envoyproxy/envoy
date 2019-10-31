@@ -1,6 +1,6 @@
 #include "extensions/filters/network/dubbo_proxy/config.h"
 
-#include "envoy/registry/registry.h"
+#include "envoy/registry/extensions_registry.h"
 
 #include "common/config/utility.h"
 
@@ -154,6 +154,11 @@ void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
 
   filter_factories_.push_back(callback);
 }
+
+REGISTER_EXTENSION_FACTORY(DubboFilters::NamedDubboFilterConfigFactory, "dubbo_proxy.filters");
+REGISTER_EXTENSION_FACTORY(NamedProtocolConfigFactory, "dubbo_proxy.protocols");
+REGISTER_EXTENSION_FACTORY(Router::NamedRouteMatcherConfigFactory, "dubbo_proxy.route_matchers");
+REGISTER_EXTENSION_FACTORY(NamedSerializerConfigFactory, "dubbo_proxy.serializers");
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

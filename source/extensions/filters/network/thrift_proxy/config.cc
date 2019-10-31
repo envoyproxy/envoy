@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/network/connection.h"
-#include "envoy/registry/registry.h"
+#include "envoy/registry/extensions_registry.h"
 
 #include "common/config/utility.h"
 
@@ -175,6 +175,9 @@ void ConfigImpl::processFilter(
 
   filter_factories_.push_back(callback);
 }
+
+REGISTER_EXTENSION_FACTORY(ThriftFilters::NamedThriftFilterConfigFactory, "thrift_proxy.filters");
+REGISTER_EXTENSION_FACTORY(NamedTransportConfigFactory, "thrift_proxy.transports");
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

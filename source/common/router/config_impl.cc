@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/http/header_map.h"
+#include "envoy/registry/extensions_registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/percent.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -1190,6 +1191,10 @@ const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) 
   auto it = configs_.find(name);
   return it == configs_.end() ? nullptr : it->second.get();
 }
+
+REGISTER_EXTENSION_FACTORY(Server::Configuration::NamedHttpFilterConfigFactory, "filters.http");
+REGISTER_EXTENSION_FACTORY(Upstream::RetryHostPredicateFactory, "retry_host_predicates");
+REGISTER_EXTENSION_FACTORY(Upstream::RetryPriorityFactory, "retry_priorities");
 
 } // namespace Router
 } // namespace Envoy

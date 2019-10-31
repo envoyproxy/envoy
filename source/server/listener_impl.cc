@@ -1,6 +1,6 @@
 #include "server/listener_impl.h"
 
-#include "envoy/registry/registry.h"
+#include "envoy/registry/extensions_registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
@@ -314,6 +314,9 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
     socket_->addOptions(listen_socket_options_);
   }
 }
+
+REGISTER_EXTENSION_FACTORY(Configuration::NamedListenerFilterConfigFactory, "filters.listeners");
+REGISTER_EXTENSION_FACTORY(ActiveUdpListenerConfigFactory, "udp_listeners");
 
 } // namespace Server
 } // namespace Envoy

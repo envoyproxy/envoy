@@ -39,17 +39,20 @@ template <typename T> class InjectFactory;
 template <class Base> class FactoryRegistry {
 public:
   /**
-   * Return all registered factories in a comma delimited list.
+   * Return a sorted vector of registered factory names.
    */
-  static std::string allFactoryNames() {
+  static std::vector<absl::string_view> registeredNames() {
     std::vector<absl::string_view> ret;
+
     ret.reserve(factories().size());
+
     for (const auto& factory : factories()) {
       ret.push_back(factory.first);
     }
+
     std::sort(ret.begin(), ret.end());
 
-    return absl::StrJoin(ret, ",");
+    return ret;
   }
 
   /**

@@ -2,7 +2,7 @@
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
-#include "envoy/registry/registry.h"
+#include "envoy/registry/extensions_registry.h"
 
 #include "common/config/datasource.h"
 
@@ -148,6 +148,8 @@ getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_se
   }
   return credentials_factory->getChannelCredentials(grpc_service, api);
 }
+
+REGISTER_EXTENSION_FACTORY(Grpc::GoogleGrpcCredentialsFactory, "grpc_credentials");
 
 } // namespace Grpc
 } // namespace Envoy

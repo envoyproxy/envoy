@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/registry/registry.h"
+#include "envoy/registry/extensions_registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
@@ -673,6 +673,12 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
                                                   std::move(server_names)),
       parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
 }
+
+REGISTER_EXTENSION_FACTORY(Configuration::DownstreamTransportSocketConfigFactory,
+                           "transport_sockets.downstream");
+REGISTER_EXTENSION_FACTORY(Configuration::NamedUdpListenerFilterConfigFactory,
+                           "filters.udp_listeners");
+REGISTER_EXTENSION_FACTORY(Configuration::NamedNetworkFilterConfigFactory, "filters.network");
 
 } // namespace Server
 } // namespace Envoy
