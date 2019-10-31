@@ -254,6 +254,7 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("binary-bin"), "help"},
   };
   stream->sendServerInitialMetadata(initial_metadata);
   stream->sendReply();
