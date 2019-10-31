@@ -51,8 +51,45 @@ R"(
       endpoints: *base_endpoints
     tls_context: *base_tls_context
     type: LOGICAL_DNS
+  - name: stats
+    connect_timeout: {{ connect_timeout_seconds }}s
+    dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+    dns_lookup_family: V4_ONLY
+    http2_protocol_options: {}
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: stats
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: {address: {{ stats_domain }}, port_value: 443}
+    tls_context: *base_tls_context
+    type: LOGICAL_DNS
 stats_flush_interval: {{ stats_flush_interval_seconds }}s
+stats_sinks:
+  - name: envoy.metrics_service
+    config:
+      grpc_service:
+        envoy_grpc:
+          cluster_name: stats
+stats_config:
+  stats_matcher:
+    inclusion_list:
+      patterns:
+        - safe_regex:
+            google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_total'
+        - safe_regex:
+            google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_cx_active'
+        - safe_regex:
+            google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_time'
 watchdog:
   megamiss_timeout: 60s
   miss_timeout: 60s
+node:
+  metadata:
+    os: {{ device_os }}
 )";

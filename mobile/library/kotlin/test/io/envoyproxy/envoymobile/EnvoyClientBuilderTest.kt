@@ -11,6 +11,8 @@ mock_template:
   connect_timeout: {{ connect_timeout_seconds }}
   dns_refresh_rate: {{ dns_refresh_rate_seconds }}
   stats_flush_interval: {{ stats_flush_interval_seconds }}
+  stats_domain: {{ stats_domain }}
+  os: {{ device_os }}
 """
 
 class EnvoyBuilderTest {
@@ -27,6 +29,16 @@ class EnvoyBuilderTest {
     clientBuilder.addLogLevel(LogLevel.DEBUG)
     val envoy = clientBuilder.build()
     assertThat(envoy.logLevel).isEqualTo(LogLevel.DEBUG)
+  }
+
+  @Test
+  fun `specifying stats domain overrides default`() {
+    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
+    clientBuilder.addEngineType { engine }
+
+    clientBuilder.addStatsDomain("stats.foo.com")
+    val envoy = clientBuilder.build()
+    assertThat(envoy.envoyConfiguration!!.statsDomain).isEqualTo("stats.foo.com")
   }
 
   @Test

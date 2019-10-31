@@ -17,6 +17,7 @@ open class EnvoyClientBuilder internal constructor(
   private var logLevel = LogLevel.INFO
   private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl() }
 
+  private var statsDomain = "0.0.0.0"
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
   private var statsFlushSeconds = 60
@@ -27,6 +28,15 @@ open class EnvoyClientBuilder internal constructor(
    */
   fun addLogLevel(logLevel: LogLevel): EnvoyClientBuilder {
     this.logLevel = logLevel
+    return this
+  }
+
+  /**
+   * Add a domain to flush stats to.
+   * @param statsDomain the domain to flush stats to.
+   */
+  fun addStatsDomain(statsDomain: String): EnvoyClientBuilder {
+    this.statsDomain = statsDomain
     return this
   }
 
@@ -71,7 +81,7 @@ open class EnvoyClientBuilder internal constructor(
         return Envoy(engineType(), configuration.value, logLevel)
       }
       is Domain -> {
-        Envoy(engineType(), EnvoyConfiguration(configuration.value, connectTimeoutSeconds, dnsRefreshSeconds, statsFlushSeconds), logLevel)
+        Envoy(engineType(), EnvoyConfiguration(configuration.value, statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, statsFlushSeconds), logLevel)
       }
     }
   }
