@@ -159,6 +159,7 @@ envoy_cc_test(
         "//source/common/stats:tag_extractor_lib",
         "//source/common/stats:tag_producer_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_code_re2//:re2",
     ],
 )
 
