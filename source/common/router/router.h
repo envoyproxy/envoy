@@ -296,7 +296,7 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
   }
-  const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
+  const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_.get(); }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
     // We only care about host selection when performing a retry, at which point we consult the
@@ -569,7 +569,7 @@ private:
   // response forwarded downstream
   UpstreamRequest* final_upstream_request_;
   bool grpc_request_{};
-  Http::HeaderMap* downstream_headers_{};
+  Http::HeaderMapPtr downstream_headers_;
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};

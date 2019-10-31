@@ -439,6 +439,8 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
 }
 
 // Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
+// TODO(asraa): Test output of the upstream logs.
+// See https://github.com/envoyproxy/envoy/issues/8828.
 TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
@@ -460,10 +462,9 @@ config:
           envoy_grpc:
             cluster_name: cluster_0
   )EOF";
-        const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
         // Replace the terminal envoy.router.
         hcm.clear_http_filters();
-        TestUtility::loadFromJson(json, *hcm.add_http_filters());
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
       });
 
   initialize();

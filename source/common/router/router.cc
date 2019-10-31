@@ -345,7 +345,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Method());
   ASSERT(headers.Host());
 
-  downstream_headers_ = &headers;
+  downstream_headers_ = std::make_unique<Http::HeaderMapImpl>(headers);
 
   // Extract debug configuration from filter state. This is used further along to determine whether
   // we should append cluster and host headers to the response, and whether to forward the request
@@ -1400,7 +1400,7 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
 
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
+    upstream_log->log(parent_.downstream_headers_.get(), upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);
   }
 }
@@ -1646,7 +1646,6 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   if (span_ != nullptr) {
     span_->injectContext(*parent_.downstream_headers_);
   }
-
   upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
 
   const bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
