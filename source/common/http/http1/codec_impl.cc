@@ -410,11 +410,7 @@ void ConnectionImpl::completeLastHeader() {
     throw CodecProtocolException("headers size exceeds limit");
   }
 
-  if (processing_trailers_) {
-    trailer_parsing_state_ = HeaderParsingState::Field;
-  } else {
-    header_parsing_state_ = HeaderParsingState::Field;
-  }
+  header_parsing_state_ = HeaderParsingState::Field;
   ASSERT(current_header_field_.empty());
   ASSERT(current_header_value_.empty());
 }
@@ -485,9 +481,9 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
   // now trailers
   if (header_parsing_state_ == HeaderParsingState::Done) {
     processing_trailers_ = true;
+    header_parsing_state_ = HeaderParsingState::Field;
   }
-  if (header_parsing_state_ == HeaderParsingState::Value ||
-      trailer_parsing_state_ == HeaderParsingState::Value) {
+  if (header_parsing_state_ == HeaderParsingState::Value) {
     completeLastHeader();
   }
 
@@ -501,7 +497,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     current_header_map_ = std::make_unique<HeaderMapImpl>();
   }
 
-  if (strict_header_validation_ && !processing_trailers_) {
+  if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
       error_code_ = Http::Code::BadRequest;
@@ -516,11 +512,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 
-  if (processing_trailers_) {
-    trailer_parsing_state_ = HeaderParsingState::Value;
-  } else {
-    header_parsing_state_ = HeaderParsingState::Value;
-  }
+  header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
 
   validateHeaderMapSize();
@@ -528,7 +520,6 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 
 void ConnectionImpl::validateHeaderMapSize() {
   // Verify that the cached value in byte size exists.
-  ASSERT(current_header_map_.get() != nullptr, "current_header_map_ is nullptr");
   ASSERT(current_header_map_->byteSize().has_value());
   const uint32_t total = current_header_field_.size() + current_header_value_.size() +
                          current_header_map_->byteSize().value();
@@ -599,7 +590,7 @@ void ConnectionImpl::onMessageCompleteBase() {
     return;
   }
 
-  if (trailer_parsing_state_ == HeaderParsingState::Value) {
+  if (header_parsing_state_ == HeaderParsingState::Value) {
     completeLastHeader();
   }
 
@@ -615,7 +606,6 @@ void ConnectionImpl::onMessageBeginBase() {
   ASSERT(!current_header_map_);
   current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
-  trailer_parsing_state_ = HeaderParsingState::Field;
   onMessageBegin();
 }
 

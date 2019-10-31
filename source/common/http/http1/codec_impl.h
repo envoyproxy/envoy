@@ -304,7 +304,6 @@ private:
 
   HeaderMapImplPtr current_header_map_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
-  HeaderParsingState trailer_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   bool reset_stream_called_{};
