@@ -38,13 +38,6 @@ template <typename R, typename... Args> struct ConvertFunctionTypeWordToUint32<R
       typename ConvertWordTypeToUint32<Args>::type...);
 };
 
-// A wrapper for a global variable within the VM.
-template <typename T> struct Global {
-  virtual ~Global() = default;
-  virtual T get() PURE;
-  virtual void set(const T& t) PURE;
-};
-
 // These are templates and its helper for constructing signatures of functions calling into and out
 // of WASM VMs.
 // - WasmFuncTypeHelper is a helper for WasmFuncType and shouldn't be used anywhere else than
@@ -147,33 +140,12 @@ public:
   virtual bool load(const std::string& code, bool allow_precompiled) PURE;
 
   /**
-   * Link the WASM code to the host-provided functions and globals, e.g. the ABI. Prior to linking,
-   * the module should be loaded and the ABI callbacks registered (see above). Linking should be
-   * done once between load() and start().
+   * Link the WASM code to the host-provided functions, e.g. the ABI. Prior to linking, the module
+   * should be loaded and the ABI callbacks registered (see above). Linking should be done once
+   * after load().
    * @param debug_name user-provided name for use in log and error messages.
-   * @param needs_emscripten whether emscripten support should be provided (e.g.
-   * _emscripten_memcpy_bigHandler). Emscripten (http://https://emscripten.org/) is
-   * a C++ WebAssembly tool chain.
    */
-  virtual void link(absl::string_view debug_name, bool needs_emscripten) PURE;
-
-  /**
-   * Set memory layout (start of dynamic heap base, etc.) in the VM.
-   * @param stack_base the location in VM memory of the stack.
-   * @param heap_base the location in VM memory of the heap.
-   * @param heap_base_ptr the location in VM memory of a location to store the heap pointer.
-   */
-  virtual void setMemoryLayout(uint64_t stack_base, uint64_t heap_base,
-                               uint64_t heap_base_pointer) PURE;
-
-  /**
-   * Initialize globals (including calling global constructors) and call the 'start' function.
-   * Prior to calling start() the module should be load()ed, ABI callbacks should be registered
-   * (registerCallback), the module link()ed, and any exported functions should be gotten
-   * (getFunction).
-   * @param vm_context a context which represents the caller: in this case Envoy itself.
-   */
-  virtual void start(Context* vm_context) PURE;
+  virtual void link(absl::string_view debug_name) PURE;
 
   /**
    * Get size of the currently allocated memory in the VM.
@@ -189,15 +161,6 @@ public:
    * a host string_view pointing to the pointer/size pair in VM memory.
    */
   virtual absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) PURE;
-
-  /**
-   * Convert a host pointer to memory in the VM into a VM "pointer" (an offset into the Memory).
-   * @param host_pointer a pointer to host memory to be converted into a VM offset (pointer).
-   * @param vm_pointer a pointer to an uint64_t to be filled with the offset in VM memory
-   * corresponding to 'host_pointer'.
-   * @return whether or not the host_pointer was a valid VM memory offset.
-   */
-  virtual bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) PURE;
 
   /**
    * Set a block of memory in the VM, returns true on success, false if the pointer/size is invalid.
@@ -230,18 +193,12 @@ public:
   virtual bool setWord(uint64_t pointer, Word data) PURE;
 
   /**
-   * Make a new intrinsic module (e.g. for Emscripten support).
-   * @param name the name of the module to make.
-   */
-  virtual void makeModule(absl::string_view name) PURE;
-
-  /**
-   * Get the contents of the user section with the given name or "" if it does not exist.
-   * @param name the name of the user section to get.
-   * @return the contents of the user section (if any). The result will be empty() if there
+   * Get the contents of the custom section with the given name or "" if it does not exist.
+   * @param name the name of the custom section to get.
+   * @return the contents of the custom section (if any). The result will be empty if there
    * is no such section.
    */
-  virtual absl::string_view getUserSection(absl::string_view name) PURE;
+  virtual absl::string_view getCustomSection(absl::string_view name) PURE;
 
   /**
    * Get typed function exported by the WASM module.
@@ -258,26 +215,6 @@ public:
                                 _T f, typename ConvertFunctionTypeWordToUint32<_T>::type) PURE;
   FOR_ALL_WASM_VM_IMPORTS(_REGISTER_CALLBACK)
 #undef _REGISTER_CALLBACK
-
-  /**
-   * Register typed value exported by the host environment.
-   * @param module_name the name of the module to which to export the global.
-   * @param name the name of the global variable to export.
-   * @param initial_value the initial value of the global.
-   * @return a Global object which can be used to access the exported global.
-   */
-  virtual std::unique_ptr<Global<Word>> makeGlobal(absl::string_view module_name,
-                                                   absl::string_view name, Word initial_value) PURE;
-
-  /**
-   * Register typed value exported by the host environment.
-   * @param module_name the name of the module to which to export the global.
-   * @param name the name of the global variable to export.
-   * @param initial_value the initial value of the global.
-   * @return a Global object which can be used to access the exported global.
-   */
-  virtual std::unique_ptr<Global<double>>
-  makeGlobal(absl::string_view module_name, absl::string_view name, double initial_value) PURE;
 };
 using WasmVmPtr = std::unique_ptr<WasmVm>;
 

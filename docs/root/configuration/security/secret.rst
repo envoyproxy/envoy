@@ -65,19 +65,25 @@ This example show how to configure secrets in the static_resource:
         load_assignment:
           cluster_name: local_service_tls
           ...
-          tls_context:
-            common_tls_context:
-              tls_certificate_sds_secret_configs:
-              - name: client_cert
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+              common_tls_context:
+                tls_certificate_sds_secret_configs:
+                - name: client_cert
     listeners:
       ....
       filter_chains:
-        tls_context:
-          common_tls_context:
-            tls_certificate_sds_secret_configs:
-            - name: server_cert
-            validation_context_sds_secret_config:
-              name: validation_context
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+            common_tls_context:
+              tls_certificate_sds_secret_configs:
+              - name: server_cert
+              validation_context_sds_secret_config:
+                name: validation_context
 
 
 In this example, certificates are specified in the bootstrap static_resource, they are not fetched remotely. In the config, *secrets* static resource has 3 secrets: **client_cert**, **server_cert** and **validation_context**. In the cluster config, one of hosts uses **client_cert** in its *tls_certificate_sds_secret_configs*. In the listeners section, one of them uses **server_cert** in its *tls_certificate_sds_secret_configs* and **validation_context** for its *validation_context_sds_secret_config*.
@@ -101,13 +107,16 @@ This example shows how to configure secrets fetched from remote SDS servers:
                   socket_address:
                     address: 127.0.0.1
                     port_value: 8234
-        tls_context:
-          common_tls_context:
-          - tls_certificate:
-            certificate_chain:
-              filename: certs/sds_cert.pem
-            private_key:
-              filename: certs/sds_key.pem
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            common_tls_context:
+            - tls_certificate:
+              certificate_chain:
+                filename: certs/sds_cert.pem
+              private_key:
+                filename: certs/sds_key.pem
       - name: sds_server_uds
         http2_protocol_options: {}
         load_assignment:
@@ -123,37 +132,43 @@ This example shows how to configure secrets fetched from remote SDS servers:
         load_assignment:
           cluster_name: local_service_tls
           ...
-          tls_context:
+          transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+              common_tls_context:
+                tls_certificate_sds_secret_configs:
+                - name: client_cert
+                  sds_config:
+                    api_config_source:
+                      api_type: GRPC
+                      grpc_services:
+                        google_grpc:
+                          target_uri: unix:/tmp/uds_path
+    listeners:
+      ....
+      filter_chains:
+      - transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
             common_tls_context:
               tls_certificate_sds_secret_configs:
-              - name: client_cert
+              - name: server_cert
                 sds_config:
                   api_config_source:
                     api_type: GRPC
                     grpc_services:
-                      google_grpc:
-                        target_uri: unix:/tmp/uds_path
-    listeners:
-      ....
-      filter_chains:
-        tls_context:
-          common_tls_context:
-            tls_certificate_sds_secret_configs:
-            - name: server_cert
-              sds_config:
-                api_config_source:
-                  api_type: GRPC
-                  grpc_services:
-                    envoy_grpc:
-                      cluster_name: sds_server_mtls
-            validation_context_sds_secret_config:
-              name: validation_context
-              sds_config:
-                api_config_source:
-                  api_type: GRPC
-                  grpc_services:
-                    envoy_grpc:
-                      cluster_name: sds_server_uds
+                      envoy_grpc:
+                        cluster_name: sds_server_mtls
+              validation_context_sds_secret_config:
+                name: validation_context
+                sds_config:
+                  api_config_source:
+                    api_type: GRPC
+                    grpc_services:
+                      envoy_grpc:
+                        cluster_name: sds_server_uds
 
 
 For illustration, above example uses three methods to access the SDS server. A gRPC SDS server can be reached by Unix Domain Socket path **/tmp/uds_path** and **127.0.0.1:8234** by mTLS. It provides three secrets, **client_cert**, **server_cert** and **validation_context**. In the config, cluster **example_cluster** certificate **client_cert** is configured to use Google gRPC with UDS to talk to the SDS server. The Listener needs to fetch **server_cert** and **validation_context** from the SDS server. The **server_cert** is using Envoy gRPC with cluster **sds_server_mtls** configured with client certificate to use mTLS to talk to SDS server. The **validate_context** is using Envoy gRPC with cluster **sds_server_uds** configured with UDS path to talk to the SDS server.

@@ -2,7 +2,6 @@
 #include <memory>
 #include <string>
 
-#include "common/config/filter_json.h"
 #include "common/config/json_utility.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"

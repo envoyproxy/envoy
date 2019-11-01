@@ -22,7 +22,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/config/protocol_json.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -639,6 +638,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
+      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),

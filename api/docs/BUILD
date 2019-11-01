@@ -36,6 +36,7 @@ proto_library(
         "//envoy/config/filter/http/ext_authz/v2:pkg",
         "//envoy/config/filter/http/fault/v2:pkg",
         "//envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1:pkg",
+        "//envoy/config/filter/http/grpc_stats/v2alpha:pkg",
         "//envoy/config/filter/http/gzip/v2:pkg",
         "//envoy/config/filter/http/header_to_metadata/v2:pkg",
         "//envoy/config/filter/http/health_check/v2:pkg",

@@ -237,8 +237,11 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
 
   if (nullptr != options.parent_span_) {
-    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(),
-                                                   "async " + parent.cluster_->name() + " egress",
+    const std::string child_span_name =
+        options.child_span_name_.empty()
+            ? absl::StrCat("async ", parent.cluster_->name(), " egress")
+            : options.child_span_name_;
+    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(), child_span_name,
                                                    parent.dispatcher().timeSource().systemTime());
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
