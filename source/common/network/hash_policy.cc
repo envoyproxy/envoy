@@ -36,12 +36,7 @@ HashPolicyImpl::HashPolicyImpl(absl::Span<const envoy::type::HashPolicy* const> 
 absl::optional<uint64_t>
 HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
                              const Network::Address::Instance* upstream_addr) const {
-  absl::optional<uint64_t> hash;
-  for (const HashMethodPtr& hash_impl : hash_impls_) {
-    // Only one hash policy is allowed. Modify this code when enabling multiple hash policies.
-    hash = hash_impl->evaluate(downstream_addr, upstream_addr);
-  }
-  return hash;
+  return hash_impl_->evaluate(downstream_addr, upstream_addr);
 }
 
 } // namespace Network
