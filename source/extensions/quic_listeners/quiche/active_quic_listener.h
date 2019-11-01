@@ -17,12 +17,6 @@ namespace Quic {
 // packets, write signals and listener errors to QuicDispatcher.
 class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            public Server::ConnectionHandlerImpl::ActiveListenerImplBase,
-                           // Inherits below two interfaces just to have common
-                           // interfaces. Not expected to support listener
-                           // filter.
-                           // TODO(danzh): clean up meaningless inheritance.
-                           public Network::UdpListenerFilterManager,
-                           public Network::UdpReadFilterCallbacks,
                            Logger::Loggable<Logger::Id::quic> {
 public:
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
@@ -43,14 +37,9 @@ public:
     // No-op. Quic can't do anything upon listener error.
   }
 
-  // Network::UdpListenerFilterManager
-  void addReadFilter(Network::UdpListenerReadFilterPtr&& /*filter*/) override {
-    // QUIC doesn't support listener filter.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
-  // Network::UdpReadFilterCallbacks
-  Network::UdpListener& udpListener() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  // ActiveListenerImplBase
+  Network::Listener* listener() override { return udp_listener_.get(); }
+  void destroy() override { udp_listener_.reset(); }
 
 private:
   friend class ActiveQuicListenerPeer;
@@ -60,6 +49,7 @@ private:
                      Network::UdpListenerPtr&& listener, Network::ListenerConfig& listener_config,
                      const quic::QuicConfig& quic_config);
 
+  Network::UdpListenerPtr udp_listener_;
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;
   Event::Dispatcher& dispatcher_;

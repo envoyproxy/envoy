@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
+
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -9,7 +11,8 @@ namespace {
 
 const std::string RBAC_CONFIG = R"EOF(
 name: envoy.filters.http.rbac
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:
     policies:
       foo:
@@ -21,7 +24,8 @@ config:
 
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
 name: envoy.filters.http.rbac
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:
     policies:
       foo:
@@ -158,15 +162,15 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
 TEST_P(RBACIntegrationTest, RouteOverride) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
-        ProtobufWkt::Struct pfc;
-        TestUtility::loadFromJson("{}", pfc);
+        envoy::config::filter::http::rbac::v2::RBACPerRoute per_route_config;
+        TestUtility::loadFromJson("{}", per_route_config);
 
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()
                            ->Mutable(0)
-                           ->mutable_per_filter_config();
+                           ->mutable_typed_per_filter_config();
 
-        (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac] = pfc;
+        (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac].PackFrom(per_route_config);
       });
   config_helper_.addFilter(RBAC_CONFIG);
 

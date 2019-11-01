@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::ContainerEq;
 using testing::InSequence;
 
 namespace Envoy {
@@ -35,6 +36,26 @@ public:
   void makeArray(RespValue& value, const std::vector<RespValue> items) {
     value.type(RespType::Array);
     value.asArray().insert(value.asArray().end(), items.begin(), items.end());
+  }
+
+  void verifyMoves(RespValue& value) {
+    RespValue copy = value;
+    RespValue move(std::move(copy));
+    EXPECT_TRUE(value == move);
+
+    RespValue move_assign;
+    move_assign = std::move(move);
+    EXPECT_TRUE(value == move_assign);
+  }
+
+  void validateIterator(RespValue& value, const std::vector<std::string>& strings) {
+    EXPECT_EQ(RespType::CompositeArray, value.type());
+    EXPECT_EQ(value.asCompositeArray().size(), strings.size());
+    std::vector<std::string> values;
+    for (const RespValue& part : value.asCompositeArray()) {
+      values.emplace_back(part.asString());
+    }
+    EXPECT_THAT(values, ContainerEq(strings));
   }
 };
 
@@ -115,6 +136,83 @@ TEST_F(RedisRespValueTest, EqualityTestingAndCopyingTest) {
   EXPECT_EQ(value8.type(), RespType::Integer);
   value8 = null_value;
   EXPECT_EQ(value8.type(), RespType::Null);
+}
+
+TEST_F(RedisRespValueTest, MoveOperationsTest) {
+  InSequence s;
+
+  RespValue array_value, bulkstring_value, simplestring_value, error_value, integer_value,
+      null_value, composite_array_empty;
+  makeBulkStringArray(array_value, {"get", "foo", "bar", "now"});
+  bulkstring_value.type(RespType::BulkString);
+  bulkstring_value.asString() = "foo";
+  simplestring_value.type(RespType::SimpleString);
+  simplestring_value.asString() = "bar";
+  error_value.type(RespType::Error);
+  error_value.asString() = "error";
+  integer_value.type(RespType::Integer);
+  integer_value.asInteger() = 123;
+  composite_array_empty.type(RespType::CompositeArray);
+
+  verifyMoves(array_value);
+  verifyMoves(bulkstring_value);
+  verifyMoves(simplestring_value);
+  verifyMoves(error_value);
+  verifyMoves(integer_value);
+  verifyMoves(null_value);
+  verifyMoves(composite_array_empty);
+}
+
+TEST_F(RedisRespValueTest, SwapTest) {
+  InSequence s;
+
+  RespValue value1, value2, value3;
+
+  makeBulkStringArray(value1, {"get", "foo", "bar", "now"});
+  makeBulkStringArray(value2, {"get", "foo", "bar", "now"});
+  makeBulkStringArray(value3, {"get", "foo", "bar", "later"});
+
+  std::swap(value2, value3);
+  EXPECT_TRUE(value1 == value3);
+
+  std::swap(value3, value3);
+  EXPECT_TRUE(value1 == value3);
+}
+
+TEST_F(RedisRespValueTest, CompositeArrayTest) {
+  InSequence s;
+
+  RespValueSharedPtr base = std::make_shared<RespValue>();
+  makeBulkStringArray(*base, {"get", "foo", "bar", "now"});
+
+  RespValue command;
+  command.type(RespType::SimpleString);
+  command.asString() = "get";
+
+  RespValue value1{base, command, 1, 1};
+  RespValue value2{base, command, 2, 2};
+  RespValue value3{base, command, 3, 3};
+
+  validateIterator(value1, {"get", "foo"});
+  validateIterator(value2, {"get", "bar"});
+  validateIterator(value3, {"get", "now"});
+
+  EXPECT_EQ(value1.asCompositeArray().command(), &command);
+  EXPECT_EQ(value1.asCompositeArray().baseArray(), base);
+
+  RespValue value4{base, command, 1, 1};
+  EXPECT_TRUE(value1 == value1);
+  EXPECT_FALSE(value1 == value2);
+  EXPECT_FALSE(value1 == value3);
+  EXPECT_TRUE(value1 == value4);
+
+  RespValue value5;
+  value5 = value1;
+  EXPECT_TRUE(value1 == value5);
+
+  RespValue empty;
+  empty.type(RespType::CompositeArray);
+  validateIterator(empty, {});
 }
 
 class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {
@@ -239,6 +337,35 @@ TEST_F(RedisEncoderDecoderImplTest, Array) {
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, CompositeArray) {
+  std::vector<RespValue> values(2);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "bar";
+  values[1].type(RespType::BulkString);
+  values[1].asString() = "foo";
+
+  auto base = std::make_shared<RespValue>();
+  base->type(RespType::Array);
+  base->asArray().swap(values);
+
+  RespValue command;
+  command.type(RespType::SimpleString);
+  command.asString() = "get";
+
+  RespValue value1{base, command, 0, 0};
+  RespValue value2{base, command, 1, 1};
+
+  EXPECT_EQ("[\"get\", \"bar\"]", value1.toString());
+  encoder_.encode(value1, buffer_);
+  EXPECT_EQ("*2\r\n+get\r\n$3\r\nbar\r\n", buffer_.toString());
+
+  EXPECT_EQ("[\"get\", \"foo\"]", value2.toString());
+  encoder_.encode(value2, buffer_);
+  EXPECT_EQ("*2\r\n+get\r\n$3\r\nbar\r\n*2\r\n+get\r\n$3\r\nfoo\r\n", buffer_.toString());
+
+  // There is no decoder for composite array
 }
 
 TEST_F(RedisEncoderDecoderImplTest, NestedArray) {

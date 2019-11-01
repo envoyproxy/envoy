@@ -43,6 +43,13 @@ void validateIpv6Supported(const std::string& address) {
   }
 }
 
+// Constructs a readable string with the embedded nulls in the abstract path replaced with '@'.
+std::string friendlyNameFromAbstractPath(absl::string_view path) {
+  std::string friendly_name(path.data(), path.size());
+  std::replace(friendly_name.begin(), friendly_name.end(), '\0', '@');
+  return friendly_name;
+}
+
 } // namespace
 
 // Check if an IP family is supported on this machine.
@@ -341,10 +348,13 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
     address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
   address_ = *address;
-  friendly_name_ =
-      abstract_namespace_
-          ? fmt::format("@{}", absl::string_view(address_.sun_path + 1, address_length_ - 1))
-          : address_.sun_path;
+  if (abstract_namespace_) {
+    // Replace all null characters with '@' in friendly_name_.
+    friendly_name_ =
+        friendlyNameFromAbstractPath(absl::string_view(address_.sun_path, address_length_));
+  } else {
+    friendly_name_ = address->sun_path;
+  }
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
@@ -355,15 +365,29 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
   }
   memset(&address_, 0, sizeof(address_));
   address_.sun_family = AF_UNIX;
-  StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
-  friendly_name_ = address_.sun_path;
-  if (address_.sun_path[0] == '@') {
+  if (pipe_path[0] == '@') {
+    // This indicates an abstract namespace.
+    // In this case, null bytes in the name have no special significance, and so we copy all
+    // characters of pipe_path to sun_path, including null bytes in the name. The pathname must also
+    // be null terminated. The friendly name is the address path with embedded nulls replaced with
+    // '@' for consistency with the first character.
 #if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
     abstract_namespace_ = true;
-    address_length_ = strlen(address_.sun_path);
+    address_length_ = pipe_path.size();
+    memcpy(&address_.sun_path[0], pipe_path.data(), pipe_path.size());
     address_.sun_path[0] = '\0';
+    address_.sun_path[pipe_path.size()] = '\0';
+    friendly_name_ =
+        friendlyNameFromAbstractPath(absl::string_view(address_.sun_path, address_length_));
+  } else {
+    // Throw an error if the pipe path has an embedded null character.
+    if (pipe_path.size() != strlen(pipe_path.c_str())) {
+      throw EnvoyException("UNIX domain socket pathname contains embedded null characters");
+    }
+    StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
+    friendly_name_ = address_.sun_path;
   }
 }
 

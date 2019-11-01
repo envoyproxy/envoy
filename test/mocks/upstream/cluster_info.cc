@@ -47,6 +47,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, eds_service_name()).WillByDefault(ReturnPointee(&eds_service_name_));
+  ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Settings()).WillByDefault(ReturnRef(http2_settings_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxResponseHeadersCount())

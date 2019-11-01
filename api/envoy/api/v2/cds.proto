@@ -583,15 +583,13 @@ message Cluster {
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   cluster.CircuitBreakers circuit_breakers = 10;
 
-  // The TLS configuration for connections to the upstream cluster. If no TLS
-  // configuration is specified, TLS will not be used for new connections.
+  // The TLS configuration for connections to the upstream cluster.
   //
   // .. attention::
   //
-  //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
-  //   verification.
-  auth.UpstreamTlsContext tls_context = 11;
+  //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
+  //   set, `transport_socket` takes priority.
+  auth.UpstreamTlsContext tls_context = 11 [deprecated = true];
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
@@ -612,7 +610,7 @@ message Cluster {
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
-  map<string, google.protobuf.Struct> extension_protocol_options = 35;
+  map<string, google.protobuf.Struct> extension_protocol_options = 35 [deprecated = true];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
@@ -717,6 +715,10 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
+  // To setup TLS, set a transport socket with name `tls` and
+  // :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` in the `typed_config`.
+  // If no transport socket configuration is specified, new connections
+  // will be set up with plaintext.
   core.TransportSocket transport_socket = 24;
 
   // The Metadata field can be used to provide additional information about the
@@ -808,7 +810,7 @@ message LoadBalancingPolicy {
 
     // Optional config for the LB policy.
     // No more than one of these two fields may be populated.
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
     google.protobuf.Any typed_config = 3;
   }

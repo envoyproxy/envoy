@@ -6283,7 +6283,7 @@ public:
       registered_default_factory_;
 };
 
-TEST_F(PerFilterConfigsTest, TypedConfigFilterError) {
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(TypedConfigFilterError)) {
   {
     const std::string yaml = R"EOF(
 name: foo
@@ -6325,9 +6325,8 @@ virtual_hosts:
   }
 }
 
-TEST_F(PerFilterConfigsTest, UnknownFilter) {
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(UnknownFilterStruct)) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6338,13 +6337,13 @@ virtual_hosts:
     per_filter_config: { unknown.filter: {} }
 )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
-  }
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
+}
 
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, UnknownFilterAny) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6357,17 +6356,15 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.Timestamp
 )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(
-        TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-        EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
-  }
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Didn't find a registered implementation for name: 'unknown.filter'");
 }
 
 // Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
 // error.
-TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(DefaultFilterImplementationStruct)) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6378,11 +6375,11 @@ virtual_hosts:
     per_filter_config: { test.default.filter: { seconds: 123} }
 )EOF";
 
-    checkNoPerFilterConfig(yaml);
-  }
+  checkNoPerFilterConfig(yaml);
+}
 
-  {
-    const std::string yaml = R"EOF(
+TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAny) {
+  const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: bar
@@ -6397,11 +6394,10 @@ virtual_hosts:
           seconds: 123
 )EOF";
 
-    checkNoPerFilterConfig(yaml);
-  }
+  checkNoPerFilterConfig(yaml);
 }
 
-TEST_F(PerFilterConfigsTest, RouteLocalConfig) {
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(RouteLocalConfig)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -6441,7 +6437,7 @@ virtual_hosts:
   checkEach(yaml, 123, 123, 456);
 }
 
-TEST_F(PerFilterConfigsTest, WeightedClusterConfig) {
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterConfig)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -6461,7 +6457,35 @@ virtual_hosts:
   checkEach(yaml, 789, 789, 1011);
 }
 
-TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughConfig) {
+TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+                typed_per_filter_config:
+                  test.filter:
+                    "@type": type.googleapis.com/google.protobuf.Timestamp
+                    value:
+                      seconds: 789
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 1011
+)EOF";
+
+  checkEach(yaml, 789, 789, 1011);
+}
+
+TEST_F(PerFilterConfigsTest, DEPRECATED_FEATURE_TEST(WeightedClusterFallthroughConfig)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -6476,6 +6500,34 @@ virtual_hosts:
                 weight: 100
         per_filter_config: { test.filter: { seconds: 1213 } }
     per_filter_config: { test.filter: { seconds: 1415 } }
+)EOF";
+
+  checkEach(yaml, 1213, 1213, 1415);
+}
+
+TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 1213
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 1415
 )EOF";
 
   checkEach(yaml, 1213, 1213, 1415);

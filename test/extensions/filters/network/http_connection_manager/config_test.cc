@@ -888,7 +888,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
 - name: envoy.router
   )EOF";
 

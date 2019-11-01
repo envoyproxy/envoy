@@ -12,7 +12,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
-#include "envoy/server/admin.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
@@ -138,6 +137,12 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
+  }
+
+  if (config_.maxConnectionDuration()) {
+    connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onConnectionDurationTimeout(); });
+    connection_duration_timer_->enableTimer(config_.maxConnectionDuration().value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_.delayedCloseTimeout());
@@ -395,6 +400,11 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       connection_idle_timer_.reset();
     }
 
+    if (connection_duration_timer_) {
+      connection_duration_timer_->disableTimer();
+      connection_duration_timer_.reset();
+    }
+
     if (drain_timer_) {
       drain_timer_->disableTimer();
       drain_timer_.reset();
@@ -426,6 +436,17 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    startDrainSequence();
+  }
+}
+
+void ConnectionManagerImpl::onConnectionDurationTimeout() {
+  ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
+  stats_.named_.downstream_cx_max_duration_reached_.inc();
+  if (!codec_) {
+    // Attempt to write out buffered data one last time and issue a local close if successful.
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
@@ -467,22 +488,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
-  // For Server::Admin, no routeConfigProvider or SRDS route provider is used.
-  ASSERT(dynamic_cast<Server::Admin*>(&connection_manager_.config_) != nullptr ||
+  ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||
               (connection_manager.config_.routeConfigProvider() != nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
-  if (connection_manager.config_.routeConfigProvider() != nullptr) {
-    snapped_route_config_ = connection_manager.config_.routeConfigProvider()->config();
-  } else if (connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
-    snapped_scoped_routes_config_ =
-        connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
-    ASSERT(snapped_scoped_routes_config_ != nullptr,
-           "Scoped rds provider returns null for scoped routes config.");
-  }
+
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
 
@@ -673,13 +686,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
-  // For Admin thread, we don't use routeConfigProvider or SRDS route provider.
-  if (dynamic_cast<Server::Admin*>(&connection_manager_.config_) == nullptr &&
-      connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
-    ASSERT(snapped_route_config_ == nullptr,
-           "Route config already latched to the active stream when scoped RDS is enabled.");
-    // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
-    snapScopedRouteConfig();
+
+  // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
+  if (connection_manager_.config_.isRoutable()) {
+    if (connection_manager_.config_.routeConfigProvider() != nullptr) {
+      snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->config();
+    } else if (connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+      snapped_scoped_routes_config_ =
+          connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+      snapScopedRouteConfig();
+    }
+  } else {
+    snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->config();
   }
 
   if (Http::Headers::get().MethodValues.Head ==
@@ -1300,7 +1318,7 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
-    if (dynamic_cast<Server::Admin*>(&connection_manager_.config_) == nullptr &&
+    if (connection_manager_.config_.isRoutable() &&
         connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
       // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
       snapScopedRouteConfig();

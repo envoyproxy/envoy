@@ -19,6 +19,7 @@ build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --copt=-fPIC
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -102,8 +103,8 @@ build:sizeopt -c opt --copt -Os
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --host_platform=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
-build:rbe-toolchain --platforms=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
+build:rbe-toolchain --host_platform=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
+build:rbe-toolchain --platforms=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 build:rbe-toolchain-clang --config=rbe-toolchain
@@ -127,15 +128,14 @@ build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=3600
 build:remote --auth_enabled=true
-build:remote --experimental_inmemory_jdeps_files
-build:remote --experimental_inmemory_dotd_files
-build:remote --experimental_remote_download_outputs=toplevel
+build:remote --remote_download_toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
 
 # Docker sandbox
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
+# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

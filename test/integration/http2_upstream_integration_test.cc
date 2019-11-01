@@ -251,7 +251,8 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
   config_helper_.addFilter(R"EOF(
   name: random-pause-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
@@ -323,12 +324,14 @@ TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
         // Configure just enough of an upstream access log to reference the upstream headers.
         const std::string yaml_string = R"EOF(
 name: envoy.router
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
     name: envoy.file_access_log
     filter:
       not_health_check_filter: {}
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
       path: /dev/null
   )EOF";
         const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
@@ -338,7 +341,8 @@ config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -432,6 +436,50 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   response->waitForEndStream();
   // Upstream stream reset.
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+// Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
+// TODO(asraa): Test output of the upstream logs.
+// See https://github.com/envoyproxy/envoy/issues/8828.
+TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        const std::string access_log_name =
+            TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        // Configure just enough of an upstream access log to reference the upstream headers.
+        const std::string yaml_string = R"EOF(
+name: envoy.router
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+  upstream_log:
+    name: envoy.http_grpc_access_log
+    filter:
+      not_health_check_filter: {}
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.accesslog.v2.HttpGrpcAccessLogConfig
+      common_config:
+        log_name: foo
+        grpc_service:
+          envoy_grpc:
+            cluster_name: cluster_0
+  )EOF";
+        // Replace the terminal envoy.router.
+        hcm.clear_http_filters();
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+      });
+
+  initialize();
+
+  // Send the request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send the response headers.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace Envoy

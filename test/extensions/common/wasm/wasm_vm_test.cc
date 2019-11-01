@@ -69,11 +69,6 @@ TEST(WasmVmTest, NullVmMemory) {
   EXPECT_EQ(m.size(), d.size());
   EXPECT_FALSE(wasm_vm->getMemory(0 /* nullptr */, 1 /* size */).has_value());
 
-  uint64_t offset;
-  char l;
-  EXPECT_TRUE(wasm_vm->getMemoryOffset(&l, &offset));
-  EXPECT_EQ(offset, reinterpret_cast<uint64_t>(&l));
-
   char c;
   char z = 'z';
   EXPECT_TRUE(wasm_vm->setMemory(reinterpret_cast<uint64_t>(&c), 1, &z));
