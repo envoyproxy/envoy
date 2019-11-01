@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.type";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: HashPolicy]
+// [#protodoc-title: Hash Policy]
 
 // Specifies the hash policy
 message HashPolicy {

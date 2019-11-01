@@ -96,5 +96,5 @@ message TcpProxy {
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
 
   // Optional configuration for TCP proxy hash policy.
-  repeated type.v3alpha.HashPolicy hash_policy = 11;
+  repeated type.v3alpha.HashPolicy hash_policy = 11 [(validate.rules).repeated = {max_items: 1}];
 }

@@ -3,6 +3,7 @@ Version history
 
 1.13.0 (pending)
 ================
+* tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 
 1.12.0 (October 31, 2019)
 =========================
@@ -103,7 +104,6 @@ Version history
 * stats: added unit support to histogram.
 * tcp_proxy: the default :ref:`idle_timeout
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
-* tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * thrift_proxy: add support for stripping service name from method when using the multiplexed protocol.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the

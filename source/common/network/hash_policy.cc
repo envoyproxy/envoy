@@ -39,13 +39,9 @@ HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
                              const Network::Address::Instance* upstream_addr) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const absl::optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, upstream_addr);
-    if (new_hash) {
-      // Rotating the old value prevents duplicate hash rules from cancelling each other out
-      // and preserves all of the entropy
-      const uint64_t old_value = hash ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
-      hash = old_value ^ new_hash.value();
-    }
+    // Only one hash policy is allowed. Modify this code when enabling multiple hash policies.
+    // Considering using absl::Hash.
+    hash = hash_impl->evaluate(downstream_addr, upstream_addr);
   }
   return hash;
 }
