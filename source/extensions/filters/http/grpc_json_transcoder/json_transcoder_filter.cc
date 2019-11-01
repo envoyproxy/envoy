@@ -499,7 +499,8 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
       response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
     }
     if (!is_trailers_only_response) {
-      response_headers_->insertGrpcStatus().value(grpc_status_greater_maximum ? grpc_status.value() : enumToInt(grpc_status.value()));
+      response_headers_->insertGrpcStatus().value(
+          grpc_status_greater_maximum ? grpc_status.value() : enumToInt(grpc_status.value()));
     }
   }
 
