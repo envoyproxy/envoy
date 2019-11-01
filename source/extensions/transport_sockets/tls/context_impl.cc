@@ -25,6 +25,8 @@
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -88,7 +90,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
       throw EnvoyException(fmt::format("Failed to initialize cipher suites {}. The following "
                                        "ciphers were rejected when tried individually: {}",
-                                       config.cipherSuites(), StringUtil::join(bad_ciphers, ", ")));
+                                       config.cipherSuites(), absl::StrJoin(bad_ciphers, ", ")));
     }
 
     if (!SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
