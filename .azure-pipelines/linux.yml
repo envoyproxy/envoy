@@ -15,6 +15,11 @@ jobs:
   pool:
     vmImage: 'Ubuntu 16.04'
   steps:
+  - task: CacheBeta@1
+    inputs:
+      key: 'format | ./WORKSPACE | **/*.bzl'
+      path: $(Build.StagingDirectory)/repository_cache
+
   - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
     workingDirectory: $(Build.SourcesDirectory)
     env:
@@ -43,6 +48,8 @@ jobs:
         CI_TARGET: 'bazel.asan'
       tsan:
         CI_TARGET: 'bazel.tsan'
+      clang_tidy:
+        CI_TARGET: 'bazel.clang_tidy'
       gcc:
         CI_TARGET: 'bazel.gcc'
       compile_time_options:
@@ -55,6 +62,11 @@ jobs:
   pool:
     vmImage: 'Ubuntu 16.04'
   steps:
+  - task: CacheBeta@1
+    inputs:
+      key: '"$(CI_TARGET)" | ./WORKSPACE | **/*.bzl'
+      path: $(Build.StagingDirectory)/repository_cache
+
   - bash: |
       echo "disk space at beginning of build:"
       df -h
