@@ -525,6 +525,7 @@ faceplant
 facto
 failover
 fallbacks
+fallthru
 favicon
 fd
 fds

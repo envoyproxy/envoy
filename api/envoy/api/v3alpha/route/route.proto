@@ -1023,7 +1023,7 @@ message DirectResponseAction {
 
 message Fallthru {
   // If this flag is set to 1 then route name (if exists for the route) for fallthru routes will be
-  // aded in access logs default flag value is 0 access log field is FALLTHRU_ROUTE_NAME
+  // added in access logs default flag value is 0 access log field is FALLTHRU_ROUTE_NAME
   bool add_route_name_to_stream_info = 1;
 }
 
