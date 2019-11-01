@@ -255,6 +255,21 @@ public:
   virtual uint32_t bufferLimit() const PURE;
 
   /**
+   * Set the receive buffer size for the socket to a value specified by the 'buffer_size'
+   */
+  virtual void setSocketRecvBufferSize(uint32_t buffer_size) PURE;
+
+  /**
+   * Return the receive buffer size for the socket
+   */
+  virtual uint32_t getSocketRecvBufferSize() PURE;
+
+  /**
+   * Set the receive buffer low water-mark size to a value specified by 'low_watermark'
+   */
+  virtual void setSocketRecvLoWat(uint32_t low_watermark) PURE;
+
+  /**
    * @return boolean telling if the connection's local address has been restored to an original
    *         destination address, rather than the address the connection was accepted at.
    */

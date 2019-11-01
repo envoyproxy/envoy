@@ -120,6 +120,42 @@ enum class FilterMetadataStatus {
 };
 
 /**
+ * An interface for a per-connection object that is created by a filter and then managed by the
+ * HTTP connection manager. This pushes singleton handling into the HTTP connection manager.
+ */
+
+class MutableHttpConnection;
+
+class PerConnectionObject {
+public:
+  PerConnectionObject(MutableHttpConnection& mutable_connection)
+    : mutable_connection_(mutable_connection) {}
+  virtual ~PerConnectionObject() = default;
+
+private:
+  MutableHttpConnection& mutable_connection_;
+};
+using PerConnectionObjectSharedPtr = std::shared_ptr<PerConnectionObject>;
+
+/**
+ * An interface for connection attributes that are modifiable by HTTP filters. Generally, these
+ * should be modified only via a PerConnectionObject.
+ */
+class MutableHttpConnection {
+public:
+  MutableHttpConnection(Network::Connection& connection)
+    :connection_(connection){}
+  virtual ~MutableHttpConnection() = default;
+
+  // Fill with the things that we want HTTP filters to be able to do to the connection such as
+  // setting certain socket options, etc. Everything needs to be abstracted and then flowed through
+  // to the underlying writable Network::Connection.
+
+private:
+  Network::Connection& connection_;
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -131,6 +167,21 @@ public:
    * @return const Network::Connection* the originating connection, or nullptr if there is none.
    */
   virtual const Network::Connection* connection() PURE;
+
+  /**
+   * Create a per-connection object. The connection manager will track whether the object exists
+   * already and if so, return it. Otherwise it will be created via the creation function. Objects
+   * are keyed by name and thus can be shared between filters if needed.
+   * @param object_name supplies the name of the object to create or fetch.
+   * @param creation_function supplies function used to create the object if it does not already
+   *        exist. The creation function will be passed a mutable HTTP connection object that it
+   *        can use for singleton operations against the connection.
+   */
+  using PerConnectionObjectCreator =
+      std::function<PerConnectionObjectSharedPtr(MutableHttpConnection& connection)>;
+  virtual PerConnectionObjectSharedPtr
+  createPerConnectionObject(const std::string& object_name,
+                            const PerConnectionObjectCreator& creation_function) PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.

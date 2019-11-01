@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <list>
 #include <memory>
 #include <string>
@@ -114,7 +115,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().DisableHttpKeepAlive)
                            : Server::OverloadManager::getInactiveState()),
-      time_source_(time_source) {}
+      time_source_(time_source){}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -1981,6 +1982,32 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
 
 const Network::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::connection() {
   return parent_.connection();
+}
+
+PerConnectionObjectSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::createPerConnectionObject(
+    const std::string& object_name,
+    const PerConnectionObjectCreator& creation_function) {
+
+  // Check if the object was already created
+  const std::string map_object_name = object_name;
+  auto iterator = per_connection_object_map_.find(map_object_name);
+  if (iterator != per_connection_object_map_.end()) {
+    return iterator->second;
+  } else {
+    // If it is not created; create an object and store it in map
+    MutableHttpConnection mutable_connection(
+        parent_.connection_manager_.read_callbacks_->connection());
+    if (creation_function != nullptr) {
+      PerConnectionObjectSharedPtr created_per_connection_object =
+        creation_function(mutable_connection);
+      // Add to the map
+      iterator = per_connection_object_map_.emplace(
+          object_name,std::move(created_per_connection_object)).first;
+      return created_per_connection_object;
+    }
+  }
+  return nullptr;
+
 }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
