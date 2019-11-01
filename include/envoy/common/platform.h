@@ -2,7 +2,7 @@
 // NOLINT(namespace-envoy)
 
 // This common "platform.h" header exists to simplify the most common references
-// to non-ANSI C/C++ headers, required on windows, posix, linux, bsd etc,
+// to non-ANSI C/C++ headers, required on Windows, Posix, Linux, BSD etc,
 // and to provide substitute definitions when absolutely required.
 //
 // The goal is to eventually not require this file of envoy header declarations,
