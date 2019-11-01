@@ -357,8 +357,3 @@ alias(
         },
     ),
 )
-
-alias(
-    name = "crypto_utility_lib",
-    actual = "//source/extensions/common/crypto:utility_lib",
-)
