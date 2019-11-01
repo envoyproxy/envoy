@@ -939,6 +939,30 @@ TEST_P(IntegrationTest, ProcessObjectUnealthy) {
   EXPECT_THAT(response->headers(), HttpStatusIs("500"));
 }
 
+// Validates that we can handle an upgrade response to a HEAD request, although the upgrade is not
+// performed.
+TEST_P(IntegrationTest, UpgradeResponseToHeadRequest) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestHeaderMapImpl request_headers{{":method", "HEAD"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"},
+                                           {"connection", "upgrade"},
+                                           {"upgrade", "websocket"},
+                                           {"content-length", "0"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+  // Wait for the response to be read by the codec client.
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

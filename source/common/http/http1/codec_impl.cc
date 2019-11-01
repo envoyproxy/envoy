@@ -790,6 +790,27 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   headers->insertStatus().value(parser_.status_code);
 
+  // Handle the case of an upgrade response to a HEAD request. In this case we remove the upgrade
+  // and continue.
+  if (!pending_responses_.empty() && pending_responses_.front().head_request_ &&
+      handling_upgrade_) {
+    ENVOY_CONN_LOG(trace, "removing unsupported upgrade in response to a HEAD request",
+                   connection_);
+    handling_upgrade_ = false;
+    headers->removeUpgrade();
+    if (headers->Connection()) {
+      std::string new_value = StringUtil::removeTokens(
+          headers->Connection()->value().getStringView(), ",",
+          StringUtil::CaseUnorderedSet{Http::Headers::get().ConnectionValues.Upgrade}, ",");
+      if (new_value.empty()) {
+        headers->removeConnection();
+      } else {
+        headers->Connection()->value(new_value);
+      }
+    }
+    headers->remove(Headers::get().Http2Settings);
+  }
+
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
@@ -801,8 +822,7 @@ int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
       // Swallow the spurious onMessageComplete and continue processing.
       ignore_message_complete_for_100_continue_ = true;
       pending_responses_.front().decoder_->decode100ContinueHeaders(std::move(headers));
-      // Avoid deferred_end_stream_headers_ optimization when handling upgrades.
-    } else if (cannotHaveBody() && !handling_upgrade_) {
+    } else if (cannotHaveBody()) {
       deferred_end_stream_headers_ = std::move(headers);
     } else {
       pending_responses_.front().decoder_->decodeHeaders(std::move(headers), false);

@@ -1225,7 +1225,7 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
   codec_->dispatch(websocket_payload);
 }
 
-TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithNoBody) {
+TEST_F(Http1ClientConnectionImplTest, UpgradeResponseToHeadRequest) {
   initialize();
 
   InSequence s;
@@ -1235,8 +1235,8 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithNoBody) {
   TestHeaderMapImpl headers{{":method", "HEAD"}, {":path", "/"}, {":authority", "host"}};
   request_encoder.encodeHeaders(headers, true);
 
-  // Send upgrade headers. Make sure we avoid the deferred_end_stream_headers_ optimization.
-  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  // Send upgrade headers.
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response(
       "HTTP/1.1 200 OK\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
   codec_->dispatch(response);
