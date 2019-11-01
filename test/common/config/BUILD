@@ -11,12 +11,6 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
-load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
-    "envoy_windows_extensions",
-)
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
