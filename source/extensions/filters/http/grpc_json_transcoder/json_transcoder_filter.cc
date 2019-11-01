@@ -490,7 +490,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   // be user defined grpc-status. so that must handled as 200 OK
   bool grpc_status_greater_maximum = grpc_status.value() > Grpc::Status::MaximumValid;
 
-  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
+  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatusMapping::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
     if (grpc_status_greater_maximum) {
@@ -577,8 +577,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
     return false;
   }
 
-  if (grpc_status == Grpc::Status::GrpcStatus::Ok ||
-      grpc_status == Grpc::Status::GrpcStatus::InvalidCode) {
+  if (grpc_status == Grpc::Status::GrpcStatusMapping::Ok ||
+      grpc_status == Grpc::Status::GrpcStatusMapping::InvalidCode) {
     return false;
   }
 

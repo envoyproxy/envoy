@@ -58,7 +58,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
     return absl::nullopt;
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code)) {
-    return {Status::GrpcStatus::InvalidCode};
+    return {Status::GrpcStatusMapping::InvalidCode};
   }
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
@@ -223,7 +223,7 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
     return;
   }
 
-  if (grpc_status_code.value() == Status::GrpcStatus::InvalidCode) {
+  if (grpc_status_code.value() == Status::GrpcStatusMapping::InvalidCode) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 

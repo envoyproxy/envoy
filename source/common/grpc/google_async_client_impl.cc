@@ -83,7 +83,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
-  for (uint32_t i = 0; i <= Status::GrpcStatus::MaximumValid; ++i) {
+  for (uint32_t i = 0; i <= Status::GrpcStatusMapping::MaximumValid; ++i) {
     stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
   }
 }
@@ -176,7 +176,7 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   rw_ = parent_.stub_->PrepareCall(&ctxt_, "/" + service_full_name_ + "/" + method_name_,
                                    &parent_.tls_.completionQueue());
   if (rw_ == nullptr) {
-    notifyRemoteClose(Status::GrpcStatus::Unavailable, nullptr, EMPTY_STRING);
+    notifyRemoteClose(Status::GrpcStatusMapping::Unavailable, nullptr, EMPTY_STRING);
     call_failed_ = true;
     return;
   }
@@ -192,12 +192,12 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
     // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
     // crash..
-    grpc_status = Status::GrpcStatus::InvalidCode;
-    parent_.stats_.streams_closed_[Status::GrpcStatus::Unknown]->inc();
-  } else if (grpc_status > Status::GrpcStatus::MaximumValid) {
+    grpc_status = Status::GrpcStatusMapping::InvalidCode;
+    parent_.stats_.streams_closed_[Status::GrpcStatusMapping::Unknown]->inc();
+  } else if (grpc_status > Status::GrpcStatusMapping::MaximumValid) {
     // closed streams on stats is fixed length, so we can't handle custom grpc-status
     // To prevent out-of-range exception, deal with this method
-    parent_.stats_.streams_closed_[Status::GrpcStatus::MaximumValid]->inc();
+    parent_.stats_.streams_closed_[Status::GrpcStatusMapping::MaximumValid]->inc();
   } else {
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
@@ -275,7 +275,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     // Early fails can be just treated as Internal.
     if (op == GoogleAsyncTag::Operation::Init ||
         op == GoogleAsyncTag::Operation::ReadInitialMetadata) {
-      notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
+      notifyRemoteClose(Status::GrpcStatusMapping::Internal, nullptr, EMPTY_STRING);
       resetStream();
       return;
     }
@@ -327,7 +327,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     auto buffer = GoogleGrpcUtils::makeBufferInstance(read_buf_);
     if (!buffer || !callbacks_.onReceiveMessageRaw(std::move(buffer))) {
       // This is basically streamError in Grpc::AsyncClientImpl.
-      notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
+      notifyRemoteClose(Status::GrpcStatusMapping::Internal, nullptr, EMPTY_STRING);
       resetStream();
       break;
     }
@@ -436,7 +436,7 @@ void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                            const std::string& message) {
   current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
 
-  if (status != Grpc::Status::GrpcStatus::Ok) {
+  if (status != Grpc::Status::GrpcStatusMapping::Ok) {
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(status, message, *current_span_);
   } else if (response_ == nullptr) {

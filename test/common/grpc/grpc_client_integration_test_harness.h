@@ -148,7 +148,7 @@ public:
   }
 
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
-    if (grpc_status == Status::GrpcStatus::InvalidCode) {
+    if (grpc_status == Status::GrpcStatusMapping::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();

@@ -8,77 +8,77 @@ Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
   // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
   switch (http_response_status) {
   case 400:
-    return Status::GrpcStatus::Internal;
+    return Status::GrpcStatusMapping::Internal;
   case 401:
-    return Status::GrpcStatus::Unauthenticated;
+    return Status::GrpcStatusMapping::Unauthenticated;
   case 403:
-    return Status::GrpcStatus::PermissionDenied;
+    return Status::GrpcStatusMapping::PermissionDenied;
   case 404:
-    return Status::GrpcStatus::Unimplemented;
+    return Status::GrpcStatusMapping::Unimplemented;
   case 429:
   case 502:
   case 503:
   case 504:
-    return Status::GrpcStatus::Unavailable;
+    return Status::GrpcStatusMapping::Unavailable;
   default:
-    return Status::GrpcStatus::Unknown;
+    return Status::GrpcStatusMapping::Unknown;
   }
 }
 
 uint64_t Utility::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
   // From https://cloud.google.com/apis/design/errors#handling_errors.
   switch (grpc_status) {
-  case Status::GrpcStatus::Ok:
+  case Status::GrpcStatusMapping::Ok:
     return 200;
-  case Status::GrpcStatus::Canceled:
+  case Status::GrpcStatusMapping::Canceled:
     // Client closed request.
     return 499;
-  case Status::GrpcStatus::Unknown:
+  case Status::GrpcStatusMapping::Unknown:
     // Internal server error.
     return 500;
-  case Status::GrpcStatus::InvalidArgument:
+  case Status::GrpcStatusMapping::InvalidArgument:
     // Bad request.
     return 400;
-  case Status::GrpcStatus::DeadlineExceeded:
+  case Status::GrpcStatusMapping::DeadlineExceeded:
     // Gateway Time-out.
     return 504;
-  case Status::GrpcStatus::NotFound:
+  case Status::GrpcStatusMapping::NotFound:
     // Not found.
     return 404;
-  case Status::GrpcStatus::AlreadyExists:
+  case Status::GrpcStatusMapping::AlreadyExists:
     // Conflict.
     return 409;
-  case Status::GrpcStatus::PermissionDenied:
+  case Status::GrpcStatusMapping::PermissionDenied:
     // Forbidden.
     return 403;
-  case Status::GrpcStatus::ResourceExhausted:
+  case Status::GrpcStatusMapping::ResourceExhausted:
     //  Too many requests.
     return 429;
-  case Status::GrpcStatus::FailedPrecondition:
+  case Status::GrpcStatusMapping::FailedPrecondition:
     // Bad request.
     return 400;
-  case Status::GrpcStatus::Aborted:
+  case Status::GrpcStatusMapping::Aborted:
     // Conflict.
     return 409;
-  case Status::GrpcStatus::OutOfRange:
+  case Status::GrpcStatusMapping::OutOfRange:
     // Bad request.
     return 400;
-  case Status::GrpcStatus::Unimplemented:
+  case Status::GrpcStatusMapping::Unimplemented:
     // Not implemented.
     return 501;
-  case Status::GrpcStatus::Internal:
+  case Status::GrpcStatusMapping::Internal:
     // Internal server error.
     return 500;
-  case Status::GrpcStatus::Unavailable:
+  case Status::GrpcStatusMapping::Unavailable:
     // Service unavailable.
     return 503;
-  case Status::GrpcStatus::DataLoss:
+  case Status::GrpcStatusMapping::DataLoss:
     // Internal server error.
     return 500;
-  case Status::GrpcStatus::Unauthenticated:
+  case Status::GrpcStatusMapping::Unauthenticated:
     // Unauthorized.
     return 401;
-  case Status::GrpcStatus::InvalidCode:
+  case Status::GrpcStatusMapping::InvalidCode:
   default:
     // Internal server error.
     return 500;
