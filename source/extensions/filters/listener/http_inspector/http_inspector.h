@@ -86,8 +86,6 @@ private:
   absl::string_view protocol_;
   http_parser parser_;
   static http_parser_settings settings_;
-  uint32_t read_{0};
-  const int s_req_http_end_{42};
 
   // Use static thread_local to avoid allocating buffer over and over again.
   static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];

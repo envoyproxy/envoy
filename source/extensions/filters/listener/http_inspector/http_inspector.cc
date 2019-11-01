@@ -113,7 +113,6 @@ ParseState Filter::onRead() {
 
   const auto parse_state =
       parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
-  read_ = result.rc_;
   switch (parse_state) {
   case ParseState::Continue:
     // do nothing but wait for the next event
@@ -138,41 +137,32 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     protocol_ = "HTTP/2";
     return ParseState::Done;
   } else {
-    const size_t pos = data.find_first_of("\r\n");
-    if (pos != absl::string_view::npos) {
-      // Detect CR or LF. It is likely this is the request line.
-      const absl::string_view request_line = data.substr(0, pos);
+    absl::string_view new_data = data.substr(parser_.nread);
+    const size_t pos = new_data.find_first_of("\r\n");
 
-      http_parser_init(&parser_, HTTP_REQUEST);
-      ssize_t rc =
-          http_parser_execute(&parser_, &settings_, request_line.data(), request_line.length());
-      ENVOY_LOG(trace,
-                "http inspector: http_parser parsed {} chars, error code: {}, parser state: {}", rc,
-                HTTP_PARSER_ERRNO(&parser_), parser_.state);
+    if (pos != absl::string_view::npos) {
+      // Include \r or \n
+      new_data = new_data.substr(0, pos + 1);
+      ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+      ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
+                HTTP_PARSER_ERRNO(&parser_));
 
       // Errors in parsing HTTP.
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
         return ParseState::Error;
       }
 
-      // If the line is request line, the state should be s_req_http_end.
-      if (parser_.state != s_req_http_end_) {
-        return ParseState::Error;
+      if (parser_.http_major == 1 && parser_.http_minor == 1) {
+        protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
       } else {
-        if (parser_.http_major == 1 && parser_.http_minor == 1) {
-          protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
-        } else {
-          // Set other HTTP protocols to HTTP/1.0
-          protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
-        }
-        return ParseState::Done;
+        // Set other HTTP protocols to HTTP/1.0
+        protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
       }
+      return ParseState::Done;
     } else {
-      ssize_t rc =
-          http_parser_execute(&parser_, &settings_, data.data() + read_, data.length() - read_);
-      ENVOY_LOG(trace,
-                "http inspector: http_parser parsed {} chars, error code: {}, parser state: {}", rc,
-                HTTP_PARSER_ERRNO(&parser_), parser_.state);
+      ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+      ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
+                HTTP_PARSER_ERRNO(&parser_));
 
       // Errors in parsing HTTP.
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
