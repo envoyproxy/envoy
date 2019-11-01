@@ -538,7 +538,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
     // If we fail to sanitize the request, return a 400 to the client
     if (!Utility::sanitizeConnectionHeader(*current_header_map_)) {
       absl::string_view header_value = current_header_map_->Connection()->value().getStringView();
-      ENVOY_CONN_LOG(debug, "Too many nominated headers in Connection: {}", connection_,
+      ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
                      header_value);
       error_code_ = Http::Code::BadRequest;
       sendProtocolError();

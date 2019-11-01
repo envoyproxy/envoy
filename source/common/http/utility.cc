@@ -437,12 +437,18 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
       keep_header = true;
       headers_to_remove.emplace(token_sv);
 
-    } else if (token_sv.find(':') == 0) {
-      // Remove any pseudo headers from the Connection header if they are nominated.
-      // The pseudo headers are left intact.
-      ENVOY_LOG_MISC(trace, "Skipping nominated pseudo header [{}]", token_sv);
-      keep_header = true;
-      headers_to_remove.emplace(token_sv);
+    } else if (StringUtil::CaseInsensitiveCompare()(token_sv,
+                                                    Http::Headers::get().Connection.get()) ||
+               StringUtil::CaseInsensitiveCompare()(token_sv,
+                                                    Http::Headers::get().ForwardedFor.get()) ||
+               StringUtil::CaseInsensitiveCompare()(token_sv,
+                                                    Http::Headers::get().ForwardedHost.get()) ||
+               StringUtil::CaseInsensitiveCompare()(token_sv,
+                                                    Http::Headers::get().ForwardedProto.get()) ||
+               !token_sv.find(':')) {
+      // If pseudo headers or X-Forwarded* headers are nominated, this could be
+      // an invalid request. Reject the request
+      return false;
 
     } else {
       // Examine the value of all other nominated headers
