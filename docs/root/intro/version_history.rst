@@ -104,7 +104,6 @@ Version history
 * stats: added unit support to histogram.
 * tcp_proxy: the default :ref:`idle_timeout
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
-* tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * thrift_proxy: fixed crashing bug on invalid transport/protocol framing.
 * thrift_proxy: added support for stripping service name from method when using the multiplexed protocol.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the certificate validation context.
