@@ -3,6 +3,7 @@ Version history
 
 1.13.0 (pending)
 ================
+* router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 
 1.12.0 (October 31, 2019)
 =========================
@@ -211,8 +212,6 @@ Version history
 * router: per try timeouts will no longer start before the downstream request has been received in full by the router.This ensures that the per try timeout does not account for slow downstreams and that will not start before the global timeout.
 * router: added :ref:`RouteAction's auto_host_rewrite_header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>` to allow upstream host header substitution with some other header's value
 * router: added support for UPSTREAM_REMOTE_ADDRESS :ref:`header formatter
-  <config_http_conn_man_headers_custom_request_headers>`.
-* router: added support for REQ(header-name) :ref:`header formatter
   <config_http_conn_man_headers_custom_request_headers>`.
 * router: add ability to reject a request that includes invalid values for
   headers configured in :ref:`strict_check_headers <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>`
