@@ -108,6 +108,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "logger_test",
+    srcs = ["logger_test.cc"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "logger_fuzz_test",
+    srcs = ["logger_fuzz_test.cc"],
+    corpus = "logger_corpus",
+    deps = ["//source/common/common:minimal_logger_lib"],
+)
+
+envoy_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
     deps = [
