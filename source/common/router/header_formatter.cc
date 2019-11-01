@@ -174,7 +174,7 @@ parseRequestHeader(absl::string_view param) {
                                      "REQ(<header-name>), actual format REQ{}",
                                      param));
   }
-  ASSERT(param.back() == ')');  // Ensured by header_parser.
+  ASSERT(param.back() == ')');               // Ensured by header_parser.
   param = param.substr(1, param.size() - 2); // Trim parens.
   Http::LowerCaseString header_name{std::string(param)};
   return [header_name](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
