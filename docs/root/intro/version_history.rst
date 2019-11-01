@@ -3,6 +3,7 @@ Version history
 
 1.13.0 (pending)
 ================
+* redis: performance improvement for larger split commands by avoiding string copies.
 
 1.12.0 (October 31, 2019)
 =========================
@@ -71,8 +72,6 @@ Version history
 * redis: added :ref:`read_policy <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.read_policy>` to allow reading from redis replicas for Redis Cluster deployments.
 * redis: fixed a bug where the redis health checker ignored the upstream auth password.
 * redis: enable_hashtaging is always enabled when the upstream uses open source Redis cluster protocol.
-* redis: performance improvement for larger split commands by avoiding string copies.
-* regex: introduce new :ref:`RegexMatcher <envoy_api_msg_type.matcher.RegexMatcher>` type that
 * regex: introduced new :ref:`RegexMatcher <envoy_api_msg_type.matcher.RegexMatcher>` type that
   provides a safe regex implementation for untrusted user input. This type is now used in all
   configuration that processes user provided input. See :ref:`deprecated configuration details

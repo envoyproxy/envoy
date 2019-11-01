@@ -281,7 +281,8 @@ void ClientImpl::PendingRequest::cancel() {
 void ClientImpl::initialize(const std::string& auth_password) {
   if (!auth_password.empty()) {
     // Send an AUTH command to the upstream server.
-    makeRequest(Utility::makeAuthCommand(auth_password), null_pool_callbacks);
+    Utility::AuthRequest auth_request(auth_password);
+    makeRequest(auth_request, null_pool_callbacks);
   }
   // Any connection to replica requires the READONLY command in order to perform read.
   // Also the READONLY command is a no-opt for the master.
