@@ -8,7 +8,13 @@
 #pragma mark - Utility types and functions
 
 typedef struct {
-  EnvoyHTTPCallbacks *callbacks;
+  // The stream is kept in memory through a strong reference to itself. In order to free the
+  // stream when it finishes, it is stored in this context so that it can be called when it
+  // is safe to be cleaned up.
+  // This approach allows `EnvoyHTTPCallbacks` to be agnostic of associated streams, enabling
+  // instances to be reused with multiple streams if desired.
+  __unsafe_unretained EnvoyHTTPStreamImpl *stream;
+  __unsafe_unretained EnvoyHTTPCallbacks *callbacks;
   atomic_bool *canceled;
 } ios_context;
 
@@ -85,6 +91,7 @@ static void ios_on_headers(envoy_headers headers, bool end_stream, void *context
     if (atomic_load(c->canceled) || !callbacks.onHeaders) {
       return;
     }
+
     callbacks.onHeaders(to_ios_headers(headers), end_stream);
   });
 }
@@ -96,6 +103,7 @@ static void ios_on_data(envoy_data data, bool end_stream, void *context) {
     if (atomic_load(c->canceled) || !callbacks.onData) {
       return;
     }
+
     callbacks.onData(to_ios_data(data), end_stream);
   });
 }
@@ -107,6 +115,7 @@ static void ios_on_metadata(envoy_headers metadata, void *context) {
     if (atomic_load(c->canceled) || !callbacks.onMetadata) {
       return;
     }
+
     callbacks.onMetadata(to_ios_headers(metadata));
   });
 }
@@ -118,6 +127,7 @@ static void ios_on_trailers(envoy_headers trailers, void *context) {
     if (atomic_load(c->canceled) || !callbacks.onTrailers) {
       return;
     }
+
     callbacks.onTrailers(to_ios_headers(trailers));
   });
 }
@@ -125,40 +135,51 @@ static void ios_on_trailers(envoy_headers trailers, void *context) {
 static void ios_on_complete(void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
+  EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
-    // TODO: release stream
     if (atomic_load(c->canceled)) {
       return;
     }
+
+    assert(stream);
+    [stream cleanUp];
   });
 }
 
 static void ios_on_cancel(void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
-  // TODO: release stream
+  EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
     // This call is atomically gated at the call-site and will only happen once.
-    if (!callbacks.onCancel) {
-      return;
+    if (callbacks.onCancel) {
+      callbacks.onCancel();
     }
-    callbacks.onCancel();
+
+    assert(stream);
+    [stream cleanUp];
   });
 }
 
 static void ios_on_error(envoy_error error, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
+  EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
-    // TODO: release stream
-    if (atomic_load(c->canceled) || !callbacks.onError) {
+    if (atomic_load(c->canceled)) {
       return;
     }
-    NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
-                                                      length:error.message.length
-                                                    encoding:NSUTF8StringEncoding];
-    error.message.release(error.message.context);
-    callbacks.onError(error.error_code, errorMessage);
+
+    if (callbacks.onError) {
+      NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
+                                                        length:error.message.length
+                                                      encoding:NSUTF8StringEncoding];
+      error.message.release(error.message.context);
+      callbacks.onError(error.error_code, errorMessage);
+    }
+
+    assert(stream);
+    [stream cleanUp];
   });
 }
 
@@ -179,13 +200,14 @@ static void ios_on_error(envoy_error error, void *context) {
     return nil;
   }
 
-  _streamHandle = handle;
   // Retain platform callbacks
   _platformCallbacks = callbacks;
+  _streamHandle = handle;
 
   // Create callback context
   ios_context *context = safe_malloc(sizeof(ios_context));
   context->callbacks = callbacks;
+  context->stream = self;
   context->canceled = safe_malloc(sizeof(atomic_bool));
   atomic_store(context->canceled, NO);
 
@@ -197,7 +219,6 @@ static void ios_on_error(envoy_error error, void *context) {
 
   // We need create the native-held strong ref on this stream before we call start_stream because
   // start_stream could result in a reset that would release the native ref.
-  // TODO: To be truly safe we probably need stronger guarantees of operation ordering on this ref
   _strongSelf = self;
   envoy_stream_options stream_options = {bufferForRetry};
   envoy_status_t result = start_stream(_streamHandle, native_callbacks, stream_options);
@@ -210,8 +231,7 @@ static void ios_on_error(envoy_error error, void *context) {
 }
 
 - (void)dealloc {
-  envoy_http_callbacks native_callbacks = _nativeCallbacks;
-  ios_context *context = native_callbacks.context;
+  ios_context *context = _nativeCallbacks.context;
   free(context->canceled);
   free(context);
 }
@@ -245,6 +265,10 @@ static void ios_on_error(envoy_error error, void *context) {
   } else {
     return 1;
   }
+}
+
+- (void)cleanUp {
+  _strongSelf = nil;
 }
 
 @end

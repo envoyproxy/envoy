@@ -38,4 +38,6 @@ extension MockEnvoyHTTPStream: EnvoyHTTPStream {
   func cancel() -> Int32 {
     return 0
   }
+
+  func cleanUp() {}
 }
