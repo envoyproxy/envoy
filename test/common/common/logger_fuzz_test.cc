@@ -6,8 +6,7 @@ namespace Envoy {
 namespace Fuzz {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-  Logger::DelegatingLogSink::escapeLogLine(string_buffer);
+  Logger::DelegatingLogSink::escapeLogLine(absl::string_view(reinterpret_cast<const char*>(buf), len));
 }
 
 } // namespace Fuzz
