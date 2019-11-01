@@ -112,6 +112,11 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  */
 - (int)cancel;
 
+/**
+ Clean up the stream after it's closed (by completion, cancellation, or error).
+ */
+- (void)cleanUp;
+
 @end
 
 #pragma mark - EnvoyHTTPStreamImpl
