@@ -77,6 +77,8 @@ protected:
 // downstream and H1/H2 upstreams.
 using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
+TEST_P(ProtocolIntegrationTest, TrailerSupport) { testTrailers(10, 20); }
+
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
   // Shut down the server with active connection pool connections.
