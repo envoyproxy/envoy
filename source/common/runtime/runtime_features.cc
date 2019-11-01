@@ -25,15 +25,6 @@ namespace Runtime {
 constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
-    "envoy.reloadable_features.http2_protocol_options.max_outbound_control_frames",
-    "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
-    "envoy.reloadable_features.http2_protocol_options.",
-    "envoy.reloadable_features.strict_header_validation",
-    "envoy.reloadable_features.http2_protocol_options.max_inbound_priority_frames_per_stream",
-    "envoy.reloadable_features.trusted_forwarded_proto",
-    "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
-    "envoy.reloadable_features.buffer_filter_populate_content_length",
-    "envoy.reloadable_features.http2_protocol_options.max_outbound_frames",
     "envoy.reloadable_features.buffer_filter_populate_content_length",
     "envoy.reloadable_features.trusted_forwarded_proto",
     "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
@@ -54,6 +45,7 @@ constexpr const char* disallowed_features[] = {
     // Acts as both a test entry for deprecated.proto and a marker for the Envoy
     // deprecation scripts.
     "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
+    // 1.12.0
     "envoy.deprecated_features.route.proto:regex_match",
     "envoy.deprecated_features.route.proto:regex",
     "envoy.deprecated_features.accesslog.proto:config",
