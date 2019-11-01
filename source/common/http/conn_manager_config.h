@@ -233,6 +233,12 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl
+   * has no route config.
+   */
+  virtual bool isRoutable() const PURE;
+
+  /**
    * @return optional maximum connection duration timeout for manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;

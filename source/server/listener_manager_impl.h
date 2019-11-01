@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
@@ -155,6 +156,8 @@ private:
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
                                      const Network::Address::Instance& address);
+  static bool hasListenerWithSocket(const ListenerList& list,
+                                    const Network::SocketSharedPtr& socket);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
     // restart.
@@ -176,6 +179,15 @@ private:
    * @param listener supplies the listener to drain.
    */
   void drainListener(ListenerImplPtr&& listener);
+
+  /**
+   * Stop a listener. The listener will stop accepting new connections and its socket will be
+   * closed.
+   * @param listener supplies the listener to stop.
+   * @param completion supplies the completion to be called when all workers are stopped accepting
+   * new connections. This completion is called on the main thread.
+   */
+  void stopListener(Network::ListenerConfig& listener, std::function<void()> completion);
 
   /**
    * Get a listener by name. This routine is used because listeners have inherent order in static
