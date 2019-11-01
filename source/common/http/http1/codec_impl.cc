@@ -189,7 +189,6 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
-
   // Trailers only matter if it is a chunk transfer encoding
   // https://tools.ietf.org/html/rfc7230#section-4.4
   if (chunk_encoding_) {
@@ -204,8 +203,6 @@ void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
         },
         this);
 
-    // We have to flush output here since we use encodeFormattedHeader?
-    // Not sure why
     connection_.flushOutput();
     connection_.buffer().add(CRLF);
   }
@@ -514,10 +511,6 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
 
-  validateHeaderMapSize();
-}
-
-void ConnectionImpl::validateHeaderMapSize() {
   // Verify that the cached value in byte size exists.
   ASSERT(current_header_map_->byteSize().has_value());
   const uint32_t total = current_header_field_.size() + current_header_value_.size() +
@@ -589,6 +582,8 @@ void ConnectionImpl::onMessageCompleteBase() {
     return;
   }
 
+  // If true, this indicates we were processing trailers and must
+  // move the last header into current_header_map_
   if (header_parsing_state_ == HeaderParsingState::Value) {
     completeLastHeader();
   }

@@ -294,11 +294,6 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
-  /**
-   * Validates that the headers available are not too big
-   */
-  void validateHeaderMapSize();
-
   static http_parser_settings settings_;
   static const ToLowerTable& toLowerTable();
 
