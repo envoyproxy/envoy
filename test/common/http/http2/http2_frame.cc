@@ -47,20 +47,20 @@ uint32_t Http2Frame::payloadSize() const {
 }
 
 Http2Frame::ResponseStatus Http2Frame::responseStatus() const {
-  if (empty() || Type::HEADERS != type() || size() <= HeaderSize ||
+  if (empty() || Type::Headers != type() || size() <= HeaderSize ||
       ((data_[HeaderSize] & 0x80) == 0)) {
-    return ResponseStatus::UNKNOWN;
+    return ResponseStatus::Unknown;
   }
   // See https://tools.ietf.org/html/rfc7541#appendix-A for header values
   switch (static_cast<StaticHeaderIndex>(data_[HeaderSize] & 0x7f)) {
-  case StaticHeaderIndex::STATUS_200:
-    return ResponseStatus::_200;
-  case StaticHeaderIndex::STATUS_404:
-    return ResponseStatus::_404;
+  case StaticHeaderIndex::Status200:
+    return ResponseStatus::Ok;
+  case StaticHeaderIndex::Status404:
+    return ResponseStatus::NotFound;
   default:
     break;
   }
-  return ResponseStatus::UNKNOWN;
+  return ResponseStatus::Unknown;
 }
 
 void Http2Frame::buildHeader(Type type, uint32_t payload_size, uint8_t flags, uint32_t stream_id) {
@@ -115,7 +115,7 @@ void Http2Frame::appendEmptyHeader() {
 Http2Frame Http2Frame::makePingFrame(absl::string_view data) {
   static constexpr size_t kPingPayloadSize = 8;
   Http2Frame frame;
-  frame.buildHeader(Type::PING, kPingPayloadSize);
+  frame.buildHeader(Type::Ping, kPingPayloadSize);
   if (!data.empty()) {
     memcpy(&frame.data_[HeaderSize], data.data(), std::min(kPingPayloadSize, data.size()));
   }
@@ -124,34 +124,34 @@ Http2Frame Http2Frame::makePingFrame(absl::string_view data) {
 
 Http2Frame Http2Frame::makeEmptySettingsFrame(SettingsFlags flags) {
   Http2Frame frame;
-  frame.buildHeader(Type::SETTINGS, 0, static_cast<uint8_t>(flags));
+  frame.buildHeader(Type::Settings, 0, static_cast<uint8_t>(flags));
   return frame;
 }
 
 Http2Frame Http2Frame::makeEmptyHeadersFrame(uint32_t stream_index, HeadersFlags flags) {
   Http2Frame frame;
-  frame.buildHeader(Type::HEADERS, 0, static_cast<uint8_t>(flags),
+  frame.buildHeader(Type::Headers, 0, static_cast<uint8_t>(flags),
                     makeRequestStreamId(stream_index));
   return frame;
 }
 
 Http2Frame Http2Frame::makeEmptyContinuationFrame(uint32_t stream_index, HeadersFlags flags) {
   Http2Frame frame;
-  frame.buildHeader(Type::CONTINUATION, 0, static_cast<uint8_t>(flags),
+  frame.buildHeader(Type::Continuation, 0, static_cast<uint8_t>(flags),
                     makeRequestStreamId(stream_index));
   return frame;
 }
 
 Http2Frame Http2Frame::makeEmptyDataFrame(uint32_t stream_index, DataFlags flags) {
   Http2Frame frame;
-  frame.buildHeader(Type::DATA, 0, static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
+  frame.buildHeader(Type::Data, 0, static_cast<uint8_t>(flags), makeRequestStreamId(stream_index));
   return frame;
 }
 
 Http2Frame Http2Frame::makePriorityFrame(uint32_t stream_index, uint32_t dependent_index) {
   static constexpr size_t kPriorityPayloadSize = 5;
   Http2Frame frame;
-  frame.buildHeader(Type::PRIORITY, kPriorityPayloadSize, 0, makeRequestStreamId(stream_index));
+  frame.buildHeader(Type::Priority, kPriorityPayloadSize, 0, makeRequestStreamId(stream_index));
   uint32_t dependent_net = makeRequestStreamId(dependent_index);
   memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&dependent_net), sizeof(uint32_t));
   return frame;
@@ -160,7 +160,7 @@ Http2Frame Http2Frame::makePriorityFrame(uint32_t stream_index, uint32_t depende
 Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment) {
   static constexpr size_t kWindowUpdatePayloadSize = 4;
   Http2Frame frame;
-  frame.buildHeader(Type::WINDOW_UPDATE, kWindowUpdatePayloadSize, 0,
+  frame.buildHeader(Type::WindowUpdate, kWindowUpdatePayloadSize, 0,
                     makeRequestStreamId(stream_index));
   uint32_t increment_net = htonl(increment);
   memcpy(&frame.data_[HeaderSize], reinterpret_cast<void*>(&increment_net), sizeof(uint32_t));
@@ -169,10 +169,10 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
 
 Http2Frame Http2Frame::makeMalformedRequest(uint32_t stream_index) {
   Http2Frame frame;
-  frame.buildHeader(Type::HEADERS, 0, orFlags(HeadersFlags::END_STREAM, HeadersFlags::END_HEADERS),
+  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
                     makeRequestStreamId(stream_index));
   frame.appendStaticHeader(
-      StaticHeaderIndex::STATUS_200); // send :status as request header, which is invalid
+      StaticHeaderIndex::Status200); // send :status as request header, which is invalid
   frame.adjustPayloadSize();
   return frame;
 }
@@ -181,12 +181,12 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
                                                              absl::string_view host,
                                                              absl::string_view path) {
   Http2Frame frame;
-  frame.buildHeader(Type::HEADERS, 0, orFlags(HeadersFlags::END_STREAM, HeadersFlags::END_HEADERS),
+  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
                     makeRequestStreamId(stream_index));
-  frame.appendStaticHeader(StaticHeaderIndex::METHOD_GET);
-  frame.appendStaticHeader(StaticHeaderIndex::SCHEME_HTTPS);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::PATH, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::HOST, host);
+  frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
+  frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
   frame.appendEmptyHeader();
   frame.adjustPayloadSize();
   return frame;
@@ -195,12 +195,12 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
 Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
                                    absl::string_view path) {
   Http2Frame frame;
-  frame.buildHeader(Type::HEADERS, 0, orFlags(HeadersFlags::END_STREAM, HeadersFlags::END_HEADERS),
+  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
                     makeRequestStreamId(stream_index));
-  frame.appendStaticHeader(StaticHeaderIndex::METHOD_GET);
-  frame.appendStaticHeader(StaticHeaderIndex::SCHEME_HTTPS);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::PATH, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::HOST, host);
+  frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
+  frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
   frame.adjustPayloadSize();
   return frame;
 }
@@ -208,12 +208,12 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
 Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view host,
                                        absl::string_view path) {
   Http2Frame frame;
-  frame.buildHeader(Type::HEADERS, 0, orFlags(HeadersFlags::END_HEADERS),
+  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndHeaders),
                     makeRequestStreamId(stream_index));
-  frame.appendStaticHeader(StaticHeaderIndex::METHOD_POST);
-  frame.appendStaticHeader(StaticHeaderIndex::SCHEME_HTTPS);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::PATH, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::HOST, host);
+  frame.appendStaticHeader(StaticHeaderIndex::MethodPost);
+  frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
   frame.adjustPayloadSize();
   return frame;
 }

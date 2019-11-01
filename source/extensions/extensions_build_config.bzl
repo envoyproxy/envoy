@@ -102,6 +102,12 @@ EXTENSIONS = {
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
 
     #
+    # SSL
+    #
+
+    "envoy.extensions.common.crypto.utility_lib":       "//source/extensions/common/crypto:utility_lib",
+
+    #
     # Stat sinks
     #
 
