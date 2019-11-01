@@ -118,7 +118,7 @@ def CreateIssues(access_token, runtime_and_pr):
         repo.create_issue(title, body=body, assignees=[user.login], labels=labels)
       except github.GithubException as e:
         try:
-          body += '\ncc @' +  user.login
+          body += '\ncc @' + user.login
           repo.create_issue(title, body=body, labels=labels)
           print(('unable to assign issue %s to %s. Add them to the Envoy proxy org'
                  'and assign it their way.') % (title, user.login))
