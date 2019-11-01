@@ -102,7 +102,7 @@ private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
 };
 
-enum UpdateOrder { REMOVES_FIRST, SIMULTANEOUS };
+enum class UpdateOrder { RemovesFirst, Simultaneous };
 
 class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
 public:
@@ -283,7 +283,7 @@ public:
       host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
     }
 
-    if (GetParam() == REMOVES_FIRST && !remove.empty()) {
+    if (GetParam() == UpdateOrder::RemovesFirst && !remove.empty()) {
       host_set.runCallbacks({}, remove);
     }
 
@@ -299,7 +299,7 @@ public:
       }
     }
 
-    if (GetParam() == REMOVES_FIRST) {
+    if (GetParam() == UpdateOrder::RemovesFirst) {
       if (!add.empty()) {
         host_set_.runCallbacks(add, {});
       }
@@ -325,7 +325,7 @@ public:
       local_hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
     }
 
-    if (GetParam() == REMOVES_FIRST && !remove.empty()) {
+    if (GetParam() == UpdateOrder::RemovesFirst && !remove.empty()) {
       local_priority_set_.updateHosts(
           0,
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
@@ -341,7 +341,7 @@ public:
       local_hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
     }
 
-    if (GetParam() == REMOVES_FIRST) {
+    if (GetParam() == UpdateOrder::RemovesFirst) {
       if (!add.empty()) {
         local_priority_set_.updateHosts(
             0,
@@ -2050,7 +2050,7 @@ TEST_P(SubsetLoadBalancerTest, FallbackForCompoundSelector) {
 }
 
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerTest,
-                         testing::ValuesIn({REMOVES_FIRST, SIMULTANEOUS}));
+                         testing::ValuesIn({UpdateOrder::RemovesFirst, UpdateOrder::Simultaneous}));
 
 } // namespace SubsetLoadBalancerTest
 } // namespace Upstream

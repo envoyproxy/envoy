@@ -251,10 +251,10 @@ protected:
   };
 
   enum class UpstreamFailureReason {
-    CONNECT_FAILED,
-    NO_HEALTHY_UPSTREAM,
-    RESOURCE_LIMIT_EXCEEDED,
-    NO_ROUTE,
+    ConnectFailed,
+    NoHealthyUpstream,
+    ResourceLimitExceeded,
+    NoRoute,
   };
 
   // Callbacks for different error and success states during connection establishment

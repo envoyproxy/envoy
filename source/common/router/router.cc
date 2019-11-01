@@ -745,7 +745,7 @@ void Filter::onResponseTimeout() {
       // If this upstream request already hit a "soft" timeout, then it
       // already recorded a timeout into outlier detection. Don't do it again.
       if (!upstream_request->outlier_detection_timeout_recorded_) {
-        updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, *upstream_request,
+        updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, *upstream_request,
                                absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
       }
 
@@ -763,7 +763,7 @@ void Filter::onResponseTimeout() {
 void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   // Track this as a timeout for outlier detection purposes even though we didn't
   // cancel the request yet and might get a 2xx later.
-  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
   upstream_request.outlier_detection_timeout_recorded_ = true;
 
@@ -801,7 +801,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 
   upstream_request.resetStream();
 
-  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
 
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
@@ -914,7 +914,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   // treated as external origin error and distinguished from local origin error.
   // This matters only when running OutlierDetection with split_external_local_origin_errors
   // config param set to true.
-  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
                          absl::nullopt);
 
   if (maybeRetryReset(reset_reason, upstream_request)) {
@@ -1617,7 +1617,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
-  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
