@@ -8,11 +8,15 @@ load(
     "envoy_proto_library",
 )
 load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
+load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
     "envoy_windows_extensions",
 )
-load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -340,13 +344,15 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
+    extension_name = "envoy.extensions.common.crypto.utility_lib",
     deps = [
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
