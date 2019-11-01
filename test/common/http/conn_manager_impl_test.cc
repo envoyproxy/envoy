@@ -841,16 +841,10 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
          h.set_default_value(v);
          return std::make_shared<Tracing::RequestHeaderCustomTag>(t, h);
        }},
-      {"m-req-tag",
-       [](const std::string& t, const std::string& v) {
+      {"m-tag", [](const std::string& t, const std::string& v) {
          envoy::type::tracing::v2::CustomTag::Metadata m;
          m.set_default_value(v);
-         return std::make_shared<Tracing::RequestMetadataCustomTag>(t, m);
-       }},
-      {"m-rot-tag", [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v2::CustomTag::Metadata m;
-         m.set_default_value(v);
-         return std::make_shared<Tracing::RouteMetadataCustomTag>(t, m);
+         return std::make_shared<Tracing::MetadataCustomTag>(t, m);
        }}};
   std::vector<TracingTagSuite> tracing_tag_cases;
   for (const TracingTagMetaSuite& ms : tracing_tag_meta_cases) {

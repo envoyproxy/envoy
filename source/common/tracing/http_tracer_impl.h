@@ -253,35 +253,16 @@ public:
                     const envoy::type::tracing::v2::CustomTag::Metadata& metadata);
   void apply(Span& span, const CustomTagContext& ctx) const override;
   absl::string_view value(const CustomTagContext&) const override { return default_value_; }
-  virtual const envoy::api::v2::core::Metadata* metadata(const CustomTagContext& ctx) const PURE;
+  const envoy::api::v2::core::Metadata* metadata(const CustomTagContext& ctx) const;
+  std::string toString() const override {
+    return fmt::format("METADATA|{}|{}|{}|{}|{}", source_, tag_, metadata_key_.filter_,
+                       absl::StrJoin(metadata_key_.path_, "."), default_value_);
+  }
 
 protected:
+  envoy::type::tracing::v2::CustomTag::Metadata::Source source_;
   Envoy::Config::MetadataKey metadata_key_;
   std::string default_value_;
-};
-
-class RequestMetadataCustomTag : public MetadataCustomTag {
-public:
-  RequestMetadataCustomTag(const std::string& tag,
-                           const envoy::type::tracing::v2::CustomTag::Metadata& request_metadata)
-      : MetadataCustomTag(tag, request_metadata) {}
-  std::string toString() const override {
-    return fmt::format("REQUEST_METADATA|{}|{}|{}|{}", tag_, metadata_key_.filter_,
-                       absl::StrJoin(metadata_key_.path_, "."), default_value_);
-  }
-  const envoy::api::v2::core::Metadata* metadata(const CustomTagContext& ctx) const override;
-};
-
-class RouteMetadataCustomTag : public MetadataCustomTag {
-public:
-  RouteMetadataCustomTag(const std::string& tag,
-                         const envoy::type::tracing::v2::CustomTag::Metadata& route_metadata)
-      : MetadataCustomTag(tag, route_metadata) {}
-  std::string toString() const override {
-    return fmt::format("ROUTE_METADATA|{}|{}|{}|{}", tag_, metadata_key_.filter_,
-                       absl::StrJoin(metadata_key_.path_, "."), default_value_);
-  }
-  const envoy::api::v2::core::Metadata* metadata(const CustomTagContext& ctx) const override;
 };
 
 } // namespace Tracing

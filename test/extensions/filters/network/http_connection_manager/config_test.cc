@@ -247,13 +247,9 @@ tracing:
     request_header:
       name: X-Tag-N
       default_value: rvalue
-  - tag: req_mtag
-    request_metadata:
-      metadata_key:
-        filter: com.bar.foo
-        path: [ { key: xx }, { key: yy } ]
-  - tag: rot_mtag
-    route_metadata:
+  - tag: mtag
+    metadata:
+      source: Request
       metadata_key:
         filter: com.bar.foo
         path: [ { key: xx }, { key: yy } ]
@@ -280,8 +276,7 @@ http_filters:
                   "REQUEST_HEADER|foo|foo|", "LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG||e_val",
                   "ENVIRONMENT|etag-n|E_TAG_N|evalue|evalue", "REQUEST_HEADER|rtag|x-tag|",
                   "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
-                  "REQUEST_METADATA|req_mtag|com.bar.foo|xx.yy|",
-                  "ROUTE_METADATA|rot_mtag|com.bar.foo|xx.yy|mvalue"));
+                  "METADATA|0|mtag|com.bar.foo|xx.yy|mvalue"));
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());

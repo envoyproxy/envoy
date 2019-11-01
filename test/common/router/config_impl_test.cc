@@ -5432,13 +5432,9 @@ virtual_hosts:
             request_header:
               name: X-Tag-N
               default_value: rvalue
-          - tag: req_mtag
-            request_metadata:
-              metadata_key:
-                filter: com.bar.foo
-                path: [ { key: xx }, { key: yy } ]
-          - tag: rot_mtag
-            route_metadata:
+          - tag: mtag
+            metadata:
+              source: Route
               metadata_key:
                 filter: com.bar.foo
                 path: [ { key: xx }, { key: yy } ]
@@ -5482,8 +5478,7 @@ virtual_hosts:
                                    "ENVIRONMENT|etag-n|E_TAG_N|evalue|evalue",
                                    "REQUEST_HEADER|rtag|x-tag|",
                                    "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
-                                   "REQUEST_METADATA|req_mtag|com.bar.foo|xx.yy|",
-                                   "ROUTE_METADATA|rot_mtag|com.bar.foo|xx.yy|mvalue"));
+                                   "METADATA|1|mtag|com.bar.foo|xx.yy|mvalue"));
 }
 
 // Test to check Prefix Rewrite for redirects

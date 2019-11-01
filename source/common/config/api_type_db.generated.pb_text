@@ -5773,6 +5773,7 @@ types {
   value {
     qualified_package: "envoy.config.overload.v2alpha"
     proto_path: "envoy/config/overload/v2alpha/overload.proto"
+    next_version_type_name: "envoy.config.overload.v3alpha.OverloadAction"
   }
 }
 types {
@@ -5780,6 +5781,7 @@ types {
   value {
     qualified_package: "envoy.config.overload.v2alpha"
     proto_path: "envoy/config/overload/v2alpha/overload.proto"
+    next_version_type_name: "envoy.config.overload.v3alpha.OverloadManager"
   }
 }
 types {
@@ -5787,6 +5789,7 @@ types {
   value {
     qualified_package: "envoy.config.overload.v2alpha"
     proto_path: "envoy/config/overload/v2alpha/overload.proto"
+    next_version_type_name: "envoy.config.overload.v3alpha.ResourceMonitor"
   }
 }
 types {
@@ -5794,6 +5797,7 @@ types {
   value {
     qualified_package: "envoy.config.overload.v2alpha"
     proto_path: "envoy/config/overload/v2alpha/overload.proto"
+    next_version_type_name: "envoy.config.overload.v3alpha.ThresholdTrigger"
   }
 }
 types {
@@ -5801,6 +5805,42 @@ types {
   value {
     qualified_package: "envoy.config.overload.v2alpha"
     proto_path: "envoy/config/overload/v2alpha/overload.proto"
+    next_version_type_name: "envoy.config.overload.v3alpha.Trigger"
+  }
+}
+types {
+  key: "envoy.config.overload.v3alpha.OverloadAction"
+  value {
+    qualified_package: "envoy.config.overload.v3alpha"
+    proto_path: "envoy/config/overload/v3alpha/overload.proto"
+  }
+}
+types {
+  key: "envoy.config.overload.v3alpha.OverloadManager"
+  value {
+    qualified_package: "envoy.config.overload.v3alpha"
+    proto_path: "envoy/config/overload/v3alpha/overload.proto"
+  }
+}
+types {
+  key: "envoy.config.overload.v3alpha.ResourceMonitor"
+  value {
+    qualified_package: "envoy.config.overload.v3alpha"
+    proto_path: "envoy/config/overload/v3alpha/overload.proto"
+  }
+}
+types {
+  key: "envoy.config.overload.v3alpha.ThresholdTrigger"
+  value {
+    qualified_package: "envoy.config.overload.v3alpha"
+    proto_path: "envoy/config/overload/v3alpha/overload.proto"
+  }
+}
+types {
+  key: "envoy.config.overload.v3alpha.Trigger"
+  value {
+    qualified_package: "envoy.config.overload.v3alpha"
+    proto_path: "envoy/config/overload/v3alpha/overload.proto"
   }
 }
 types {
@@ -7870,6 +7910,13 @@ types {
   }
 }
 types {
+  key: "envoy.type.tracing.v2.CustomTag.Metadata.Source"
+  value {
+    qualified_package: "envoy.type.tracing.v2"
+    proto_path: "envoy/type/tracing/v2/custom_tag.proto"
+  }
+}
+types {
   key: "envoy.type.v3alpha.CodecClientType"
   value {
     qualified_package: "envoy.type.v3alpha"
@@ -8088,6 +8135,10 @@ next_version_packages {
 next_version_packages {
   key: "envoy.config.metrics.v2"
   value: "envoy.config.metrics.v3alpha"
+}
+next_version_packages {
+  key: "envoy.config.overload.v2alpha"
+  value: "envoy.config.overload.v3alpha"
 }
 next_version_packages {
   key: "envoy.config.ratelimit.v2"
@@ -8436,6 +8487,10 @@ next_version_proto_paths {
 next_version_proto_paths {
   key: "envoy/config/metrics/v2/stats.proto"
   value: "envoy/config/metrics/v3alpha/stats.proto"
+}
+next_version_proto_paths {
+  key: "envoy/config/overload/v2alpha/overload.proto"
+  value: "envoy/config/overload/v3alpha/overload.proto"
 }
 next_version_proto_paths {
   key: "envoy/config/ratelimit/v2/rls.proto"

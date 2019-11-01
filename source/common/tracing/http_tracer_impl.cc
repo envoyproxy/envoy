@@ -230,10 +230,8 @@ HttpTracerUtility::createCustomTag(const envoy::type::tracing::v2::CustomTag& ta
     return std::make_shared<Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
   case envoy::type::tracing::v2::CustomTag::kRequestHeader:
     return std::make_shared<Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
-  case envoy::type::tracing::v2::CustomTag::kRequestMetadata:
-    return std::make_shared<Tracing::RequestMetadataCustomTag>(tag.tag(), tag.request_metadata());
-  case envoy::type::tracing::v2::CustomTag::kRouteMetadata:
-    return std::make_shared<Tracing::RouteMetadataCustomTag>(tag.tag(), tag.route_metadata());
+  case envoy::type::tracing::v2::CustomTag::kMetadata:
+    return std::make_shared<Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
   case envoy::type::tracing::v2::CustomTag::TYPE_NOT_SET:
     return nullptr;
   }
@@ -295,7 +293,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
                                      const envoy::type::tracing::v2::CustomTag::Metadata& metadata)
-    : GeneralCustomTag(tag), metadata_key_(metadata.metadata_key()),
+    : GeneralCustomTag(tag), source_(metadata.source()), metadata_key_(metadata.metadata_key()),
       default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
@@ -332,14 +330,26 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
 }
 
 const envoy::api::v2::core::Metadata*
-RequestMetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  return &ctx.stream_info.dynamicMetadata();
-}
-
-const envoy::api::v2::core::Metadata*
-RouteMetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  const Router::RouteEntry* route_entry = ctx.stream_info.routeEntry();
-  return route_entry ? &route_entry->metadata() : nullptr;
+MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
+  const StreamInfo::StreamInfo& info = ctx.stream_info;
+  switch (source_) {
+  case envoy::type::tracing::v2::CustomTag::Metadata::Request:
+    return &info.dynamicMetadata();
+  case envoy::type::tracing::v2::CustomTag::Metadata::Route: {
+    const Router::RouteEntry* route_entry = info.routeEntry();
+    return route_entry ? &route_entry->metadata() : nullptr;
+  }
+  case envoy::type::tracing::v2::CustomTag::Metadata::Cluster: {
+    const auto& hostPtr = info.upstreamHost();
+    return hostPtr ? &hostPtr->cluster().metadata() : nullptr;
+  }
+  case envoy::type::tracing::v2::CustomTag::Metadata::Host: {
+    const auto& hostPtr = info.upstreamHost();
+    return hostPtr ? hostPtr->metadata().get() : nullptr;
+  }
+  default:
+    return nullptr;
+  }
 }
 
 } // namespace Tracing

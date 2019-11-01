@@ -215,16 +215,14 @@ cases:
       name: X-Ax
 - custom_tag:
     tag: b
-    route_metadata:
-      metadata_key:
-        filter: m.rot
-        path: [ {key: not-found } ]
+    metadata:
+      source: Route
+      metadata_key: { filter: m.rot, path: [ {key: not-found } ] }
 - custom_tag:
     tag: c
-    route_metadata:
-      metadata_key:
-        filter: m.rot
-        path: [ {key: not-found } ]
+    metadata:
+      source: Route
+      metadata_key: { filter: m.rot, path: [ {key: not-found } ] }
       default_value: _c
   value: _c
 )EOF");
@@ -377,55 +375,65 @@ cases:
 - custom_tag: { tag: cc-3, environment: { name: E_CC_NOT_FOUND} }
 - custom_tag:
     tag: dd-1,
-    request_metadata:
+    metadata:
+      source: Request
       metadata_key: { filter: m.req, path: [ { key: ree }, { key: foo } ] }
   value: bar
 - custom_tag:
     tag: dd-2,
-    request_metadata:
+    metadata:
+      source: Request
       metadata_key: { filter: m.req, path: [ { key: not-found } ] }
       default_value: d2
   value: d2
 - custom_tag:
     tag: dd-3,
-    request_metadata:
+    metadata:
+      source: Request
       metadata_key: { filter: m.req, path: [ { key: not-found } ] }
 - custom_tag:
     tag: ee-1,
-    route_metadata:
+    metadata:
+      source: Route
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: nuu } ] }
       default_value: _e
   value: "1"
 - custom_tag:
     tag: ee-2,
-    route_metadata:
+    metadata:
+      source: Route
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: boo } ] }
   value: "true"
 - custom_tag:
     tag: ee-3,
-    route_metadata:
+    metadata:
+      source: Route
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: poo } ] }
   value: "false"
 - custom_tag:
     tag: ee-4,
-    route_metadata:
+    metadata:
+      source: Route
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: emp } ] }
       default_value: _e
   value: ''
 - custom_tag:
     tag: ee-5,
-    route_metadata:
+    metadata:
+      source: Route
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: lii } ] }
       default_value: _e
   value: "[\"something\"]"
 - custom_tag:
     tag: ee-6,
-    route_metadata:
+    metadata:
+      source: Route
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: stt } ] }
   value: "{\"some\":\"thing\"}"
 - custom_tag:
     tag: ee-7,
-    route_metadata:
+    metadata:
+      source: Route
       metadata_key: { filter: m.rot, path: [ { key: not-found } ] }
 )EOF");
 
