@@ -30,7 +30,7 @@ public:
   using HashMethodPtr = std::unique_ptr<HashMethod>;
 
 private:
-  std::vector<HashMethodPtr> hash_impls_;
+  HashMethodPtr hash_impl_;
 };
 } // namespace Network
 } // namespace Envoy

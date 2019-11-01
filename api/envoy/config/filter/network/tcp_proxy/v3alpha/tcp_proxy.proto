@@ -95,6 +95,8 @@ message TcpProxy {
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
 
-  // Optional configuration for TCP proxy hash policy.
+  // Optional configuration for TCP proxy hash policy. If hash_policy is not set, the hash-based
+  // load balancing algorithms will select a host randomly. Currently the number of hash policies is
+  // limited to 1.
   repeated type.v3alpha.HashPolicy hash_policy = 11 [(validate.rules).repeated = {max_items: 1}];
 }

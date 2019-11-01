@@ -21,12 +21,11 @@ public:
 };
 
 HashPolicyImpl::HashPolicyImpl(absl::Span<const envoy::type::HashPolicy* const> hash_policies) {
-  hash_impls_.reserve(hash_policies.size());
-
+  ASSERT(hash_policies.size() == 1);
   for (auto* hash_policy : hash_policies) {
     switch (hash_policy->policy_specifier_case()) {
     case envoy::type::HashPolicy::kSourceIp:
-      hash_impls_.emplace_back(new SourceIpHashMethod());
+      hash_impl_ = std::make_unique<SourceIpHashMethod>();
       break;
     default:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
