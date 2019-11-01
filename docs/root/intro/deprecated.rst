@@ -10,6 +10,10 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
+Version 1.13.0 (pending)
+========================
+
+
 Version 1.12.0 (October 31, 2019)
 =================================
 * The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is

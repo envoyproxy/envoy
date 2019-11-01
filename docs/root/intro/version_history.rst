@@ -4,6 +4,8 @@ Version history
 (pending)
 =========================
 * cluster: added aggregate cluster that allows load balancing between clusters.
+1.13.0 (pending)
+================
 
 1.12.0 (October 31, 2019)
 =========================
