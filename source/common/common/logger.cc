@@ -80,7 +80,8 @@ std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
   // Split the actual message from the trailing whitespace.
   auto eol_it = std::find_if_not(msg_view.rbegin(), msg_view.rend(), absl::ascii_isspace);
   absl::string_view msg_leading = msg_view.substr(0, msg_view.rend() - eol_it);
-  absl::string_view msg_trailing_whitespace = msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
+  absl::string_view msg_trailing_whitespace =
+      msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
 
   // Escape the message, but keep the whitespace unescaped.
   return absl::StrCat(absl::CEscape(msg_leading), msg_trailing_whitespace);

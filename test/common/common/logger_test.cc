@@ -14,7 +14,8 @@ TEST_F(LoggerEscapeTest, LinuxEOL) {
 }
 
 TEST_F(LoggerEscapeTest, WindowEOL) {
-  EXPECT_EQ("line 1 \\n line 2\r\n", Logger::DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"));
+  EXPECT_EQ("line 1 \\n line 2\r\n",
+            Logger::DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"));
 }
 
 TEST_F(LoggerEscapeTest, NoTrailingWhitespace) {
@@ -26,7 +27,8 @@ TEST_F(LoggerEscapeTest, NoWhitespace) {
 }
 
 TEST_F(LoggerEscapeTest, AnyTrailingWhitespace) {
-  EXPECT_EQ("line 1 \\t tab 1 \\n line 2\t\n", Logger::DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\n"));
+  EXPECT_EQ("line 1 \\t tab 1 \\n line 2\t\n",
+            Logger::DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\n"));
 }
 
 TEST_F(LoggerEscapeTest, WhitespaceOnly) {
@@ -37,8 +39,6 @@ TEST_F(LoggerEscapeTest, WhitespaceOnly) {
   EXPECT_EQ("\r\n\t \r\n \n", Logger::DelegatingLogSink::escapeLogLine("\r\n\t \r\n \n"));
 }
 
-TEST_F(LoggerEscapeTest, Empty) {
-  EXPECT_EQ("", Logger::DelegatingLogSink::escapeLogLine(""));
-}
+TEST_F(LoggerEscapeTest, Empty) { EXPECT_EQ("", Logger::DelegatingLogSink::escapeLogLine("")); }
 
 } // namespace Envoy
