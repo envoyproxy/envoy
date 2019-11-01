@@ -12,7 +12,7 @@ namespace Network {
  */
 class HashPolicyImpl : public Network::HashPolicy {
 public:
-  explicit HashPolicyImpl(absl::Span<const envoy::type::HashPolicy* const> hash_policy);
+  explicit HashPolicyImpl(const absl::Span<const envoy::type::HashPolicy* const>& hash_policy);
 
   // Network::HashPolicy
   absl::optional<uint64_t>

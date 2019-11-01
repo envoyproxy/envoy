@@ -11,8 +11,8 @@ class SourceIpHashMethod : public HashPolicyImpl::HashMethod {
 public:
   absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                     const Network::Address::Instance*) const override {
-    if (downstream_addr && downstream_addr->ip() &&
-        !downstream_addr->ip()->addressAsString().empty()) {
+    if (downstream_addr && downstream_addr->ip()) {
+      ASSERT(!downstream_addr->ip()->addressAsString().empty());
       return HashUtil::xxHash64(downstream_addr->ip()->addressAsString());
     }
 
@@ -20,16 +20,15 @@ public:
   }
 };
 
-HashPolicyImpl::HashPolicyImpl(absl::Span<const envoy::type::HashPolicy* const> hash_policies) {
+HashPolicyImpl::HashPolicyImpl(
+    const absl::Span<const envoy::type::HashPolicy* const>& hash_policies) {
   ASSERT(hash_policies.size() == 1);
-  for (auto* hash_policy : hash_policies) {
-    switch (hash_policy->policy_specifier_case()) {
-    case envoy::type::HashPolicy::kSourceIp:
-      hash_impl_ = std::make_unique<SourceIpHashMethod>();
-      break;
-    default:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+  switch (hash_policies[0]->policy_specifier_case()) {
+  case envoy::type::HashPolicy::kSourceIp:
+    hash_impl_ = std::make_unique<SourceIpHashMethod>();
+    break;
+  default:
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 }
 
