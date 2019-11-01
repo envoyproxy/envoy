@@ -21,7 +21,7 @@ function setup_gcc_toolchain() {
   fi
 }
 
-function setup_clang_toolchain() {
+function setup_clang_libstdcxx_toolchain() {
   if [[ -z "${ENVOY_RBE}" ]]; then
     export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
   else
@@ -30,7 +30,7 @@ function setup_clang_toolchain() {
   echo "clang toolchain configured"
 }
 
-function setup_clang_libcxx_toolchain() {
+function setup_clang_toolchain() {
   if [[ -z "${ENVOY_RBE}" ]]; then
     export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
   else

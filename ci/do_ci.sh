@@ -204,7 +204,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
   "
-  setup_clang_libcxx_toolchain
+  setup_clang_libstdcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
 
