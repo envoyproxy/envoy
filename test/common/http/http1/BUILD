@@ -9,6 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "header_formatter_test",
+    srcs = ["header_formatter_test.cc"],
+    deps = [
+        "//source/common/http/http1:header_formatter_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     deps = [
@@ -28,6 +36,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -50,6 +59,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )

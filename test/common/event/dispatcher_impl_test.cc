@@ -18,8 +18,6 @@
 using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
-using testing::Return;
-using testing::StartsWith;
 
 namespace Envoy {
 namespace Event {
@@ -98,8 +96,10 @@ protected:
 // TODO(mergeconflict): We also need integration testing to validate that the expected histograms
 // are written when `enable_dispatcher_stats` is true. See issue #6582.
 TEST_F(DispatcherImplTest, InitializeStats) {
-  EXPECT_CALL(scope_, histogram("test.dispatcher.loop_duration_us"));
-  EXPECT_CALL(scope_, histogram("test.dispatcher.poll_delay_us"));
+  EXPECT_CALL(scope_,
+              histogram("test.dispatcher.loop_duration_us", Stats::Histogram::Unit::Microseconds));
+  EXPECT_CALL(scope_,
+              histogram("test.dispatcher.poll_delay_us", Stats::Histogram::Unit::Microseconds));
   dispatcher_->initializeStats(scope_, "test.");
 }
 
@@ -251,6 +251,49 @@ TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
   // Thread safe because the dispatcher has not started.
   // Therefore, no thread id has been assigned.
   EXPECT_TRUE(dispatcher_->isThreadSafe());
+}
+
+class DispatcherMonotonicTimeTest : public testing::Test {
+protected:
+  DispatcherMonotonicTimeTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  ~DispatcherMonotonicTimeTest() override = default;
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+  MonotonicTime time_;
+};
+
+TEST_F(DispatcherMonotonicTimeTest, UpdateApproximateMonotonicTime) {
+  dispatcher_->post([this]() {
+    {
+      MonotonicTime time1 = dispatcher_->approximateMonotonicTime();
+      dispatcher_->updateApproximateMonotonicTime();
+      MonotonicTime time2 = dispatcher_->approximateMonotonicTime();
+      EXPECT_LT(time1, time2);
+    }
+  });
+
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
+TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
+  // approximateMonotonicTime is constant within one event loop run.
+  dispatcher_->post([this]() {
+    {
+      time_ = dispatcher_->approximateMonotonicTime();
+      EXPECT_EQ(time_, dispatcher_->approximateMonotonicTime());
+    }
+  });
+
+  dispatcher_->run(Dispatcher::RunType::Block);
+
+  // approximateMonotonicTime is increasing between event loop runs.
+  dispatcher_->post([this]() {
+    { EXPECT_LT(time_, dispatcher_->approximateMonotonicTime()); }
+  });
+
+  dispatcher_->run(Dispatcher::RunType::Block);
 }
 
 TEST(TimerImplTest, TimerEnabledDisabled) {

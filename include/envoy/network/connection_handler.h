@@ -25,18 +25,23 @@ public:
   virtual uint64_t numConnections() PURE;
 
   /**
+   * Increment the return value of numConnections() by one.
+   * TODO(mattklein123): re-visit the connection accounting interface. Make TCP
+   * listener to do accounting through these interfaces instead of directly
+   * access the counter.
+   */
+  virtual void incNumConnections() PURE;
+
+  /**
+   * Decrement the return value of numConnections() by one.
+   */
+  virtual void decNumConnections() PURE;
+
+  /**
    * Adds a listener to the handler.
    * @param config listener configuration options.
    */
   virtual void addListener(ListenerConfig& config) PURE;
-
-  /**
-   * Find a listener based on the provided listener address value.
-   * @param address supplies the address value.
-   * @return a pointer to the listener or nullptr if not found.
-   * Ownership of the listener is NOT transferred
-   */
-  virtual Network::Listener* findListenerByAddress(const Network::Address::Instance& address) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
@@ -70,6 +75,11 @@ public:
   virtual void enableListeners() PURE;
 
   /**
+   * @return the stat prefix used for per-handler stats.
+   */
+  virtual const std::string& statPrefix() PURE;
+
+  /**
    * Used by ConnectionHandler to manage listeners.
    */
   class ActiveListener {
@@ -80,10 +90,12 @@ public:
      * @return the tag value as configured.
      */
     virtual uint64_t listenerTag() PURE;
+
     /**
      * @return the actual Listener object.
      */
     virtual Listener* listener() PURE;
+
     /**
      * Destroy the actual Listener it wraps.
      */
@@ -96,8 +108,7 @@ public:
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 
 /**
- * A registered factory interface to create different kinds of
- * ActiveUdpListener.
+ * A registered factory interface to create different kinds of ActiveUdpListener.
  */
 class ActiveUdpListenerFactory {
 public:
@@ -108,16 +119,18 @@ public:
    * according to given config.
    * @param parent is the owner of the created ActiveListener objects.
    * @param dispatcher is used to create actual UDP listener.
-   * @param logger might not need to be passed in.
-   * TODO(danzh): investigate if possible to use statically defined logger in ActiveUdpListener
-   * implementation instead.
    * @param config provides information needed to create ActiveUdpListener and
    * UdpListener objects.
    * @return the ActiveUdpListener created.
    */
   virtual ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          spdlog::logger& logger, Network::ListenerConfig& config) const PURE;
+                          Network::ListenerConfig& config) const PURE;
+
+  /**
+   * @return true if the UDP passing through listener doesn't form stateful connections.
+   */
+  virtual bool isTransportConnectionless() const PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

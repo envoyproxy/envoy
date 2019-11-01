@@ -31,9 +31,7 @@ EXTENSIONS = {
     # HTTP filters
     #
 
-    # NOTE: The adaptive concurrency filter does not have a proper filter
-    #       implemented right now. We are just referencing the filter lib here.
-    "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
+    "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
@@ -44,6 +42,7 @@ EXTENSIONS = {
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
+    "envoy.filters.http.grpc_stats":                    "//source/extensions/filters/http/grpc_stats:config",
     "envoy.filters.http.grpc_web":                      "//source/extensions/filters/http/grpc_web:config",
     "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
@@ -102,6 +101,12 @@ EXTENSIONS = {
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
 
     #
+    # SSL
+    #
+
+    "envoy.extensions.common.crypto.utility_lib":       "//source/extensions/common/crypto:utility_lib",
+
+    #
     # Stat sinks
     #
 
@@ -126,6 +131,7 @@ EXTENSIONS = {
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
+    "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
 
     #
     # Transport sockets

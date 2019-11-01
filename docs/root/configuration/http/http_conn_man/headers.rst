@@ -602,9 +602,13 @@ Supported variable names are:
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
 
+    Upstream metadata cannot be added to request headers as the upstream host has not been selected
+    when custom request headers are generated.
+
 %UPSTREAM_REMOTE_ADDRESS%
     Remote address of the upstream host. If the address is an IP address it includes both address
-    and port.
+    and port. The upstream remote address cannot be added to request headers as the upstream host
+    has not been selected when custom request headers are generated.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be

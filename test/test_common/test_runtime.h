@@ -25,7 +25,6 @@
 
 namespace Envoy {
 
-// TODO(alyssawilk) move existing runtime tests over to using this.
 class TestScopedRuntime {
 public:
   TestScopedRuntime() : api_(Api::createApiForTest()) {

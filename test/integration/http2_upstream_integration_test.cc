@@ -10,8 +10,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
@@ -253,7 +251,8 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
   config_helper_.addFilter(R"EOF(
   name: random-pause-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
@@ -325,12 +324,14 @@ TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
         // Configure just enough of an upstream access log to reference the upstream headers.
         const std::string yaml_string = R"EOF(
 name: envoy.router
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
     name: envoy.file_access_log
     filter:
       not_health_check_filter: {}
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
       path: /dev/null
   )EOF";
         const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
@@ -340,7 +341,8 @@ config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -371,6 +373,113 @@ config:
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
+}
+
+// Tests the default limit for the number of response headers is 100. Results in a stream reset if
+// exceeds.
+TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
+  // Default limit for response headers is 100.
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl many_headers(default_response_headers_);
+  for (int i = 0; i < 100; i++) {
+    many_headers.addCopy("many", std::string(1, 'a'));
+  }
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(many_headers, true);
+  response->waitForEndStream();
+  // Upstream stream reset triggered.
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+// Tests bootstrap configuration of max response headers.
+TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
+  // Set max response header count to 200.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_count()->set_value(200);
+  });
+  Http::TestHeaderMapImpl response_headers(default_response_headers_);
+  for (int i = 0; i < 150; i++) {
+    response_headers.addCopy(std::to_string(i), std::string(1, 'a'));
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+}
+
+// Tests that HTTP/2 response headers over 60 kB are rejected and result in a stream reset.
+TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl large_headers(default_response_headers_);
+  large_headers.addCopy("large", std::string(60 * 1024, 'a'));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(large_headers, true);
+  response->waitForEndStream();
+  // Upstream stream reset.
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+// Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
+// TODO(asraa): Test output of the upstream logs.
+// See https://github.com/envoyproxy/envoy/issues/8828.
+TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        const std::string access_log_name =
+            TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        // Configure just enough of an upstream access log to reference the upstream headers.
+        const std::string yaml_string = R"EOF(
+name: envoy.router
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+  upstream_log:
+    name: envoy.http_grpc_access_log
+    filter:
+      not_health_check_filter: {}
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.accesslog.v2.HttpGrpcAccessLogConfig
+      common_config:
+        log_name: foo
+        grpc_service:
+          envoy_grpc:
+            cluster_name: cluster_0
+  )EOF";
+        // Replace the terminal envoy.router.
+        hcm.clear_http_filters();
+        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
+      });
+
+  initialize();
+
+  // Send the request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send the response headers.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace Envoy

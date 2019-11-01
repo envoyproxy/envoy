@@ -26,9 +26,6 @@
 #include "integration.h"
 #include "utility.h"
 
-using testing::NiceMock;
-using testing::Return;
-
 namespace Envoy {
 namespace Ssl {
 
@@ -41,16 +38,19 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* common_tls_context = bootstrap.mutable_static_resources()
-                                     ->mutable_listeners(0)
-                                     ->mutable_filter_chains(0)
-                                     ->mutable_tls_context()
-                                     ->mutable_common_tls_context();
+      auto* transport_socket = bootstrap.mutable_static_resources()
+                                   ->mutable_listeners(0)
+                                   ->mutable_filter_chains(0)
+                                   ->mutable_transport_socket();
+      envoy::api::v2::auth::DownstreamTlsContext tls_context;
+      auto* common_tls_context = tls_context.mutable_common_tls_context();
       common_tls_context->add_alpn_protocols("http/1.1");
 
       common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
           "validation_context");
       common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       auto* secret = bootstrap.mutable_static_resources()->add_secrets();
       secret->set_name("validation_context");
@@ -63,9 +63,9 @@ public:
       secret->set_name("server_cert");
       auto* tls_certificate = secret->mutable_tls_certificate();
       tls_certificate->mutable_certificate_chain()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
       tls_certificate->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
     });
 
     HttpIntegrationTest::initialize();
@@ -113,20 +113,21 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      bootstrap.mutable_static_resources()
-          ->mutable_clusters(0)
-          ->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->add_tls_certificate_sds_secret_configs()
-          ->set_name("client_cert");
+      envoy::api::v2::auth::UpstreamTlsContext tls_context;
+      tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs()->set_name(
+          "client_cert");
+      auto* transport_socket =
+          bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
 
       auto* secret = bootstrap.mutable_static_resources()->add_secrets();
       secret->set_name("client_cert");
       auto* tls_certificate = secret->mutable_tls_certificate();
       tls_certificate->mutable_certificate_chain()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/clientcert.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
       tls_certificate->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("/test/config/integration/certs/clientkey.pem"));
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     });
 
     HttpIntegrationTest::initialize();

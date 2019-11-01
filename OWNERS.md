@@ -20,6 +20,8 @@ routing PRs, questions, etc. to the right place.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
+* Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
+  * Upstream, host/priority sets, load balancing, and retry plugins.
 
 # Maintainers
 
@@ -31,14 +33,13 @@ routing PRs, questions, etc. to the right place.
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
-* Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
-  * Upstream, host/priority sets, load balancing, and retry plugins.
 
 # Envoy security team
 
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Emeritus maintainers
 
@@ -60,3 +61,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Bazel/build.
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
   * Redis, Python, configuration/operational questions.
+* Yuchen Dai ([lambdai](https://github.com/lambdai)) (lambdai@google.com)
+  * v2 xDS, listeners, filter chain discovery service.

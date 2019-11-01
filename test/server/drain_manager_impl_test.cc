@@ -10,7 +10,6 @@
 using testing::_;
 using testing::InSequence;
 using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Server {

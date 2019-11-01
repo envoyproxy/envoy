@@ -106,7 +106,12 @@ public:
   bool generateRequestId() override { return generate_request_id_; }
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
+  uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  bool isRoutable() const override { return true; }
+  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+    return max_connection_duration_;
+  }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   Router::RouteConfigProvider* routeConfigProvider() override {
@@ -116,6 +121,9 @@ public:
     return scoped_routes_config_provider_.get();
   }
   const std::string& serverName() override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -142,7 +150,7 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
-  enum class CodecType { HTTP1, HTTP2, AUTO };
+  enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
   void processFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
       int i, absl::string_view prefix, FilterFactoriesList& filter_factories, bool& is_terminal);
@@ -166,11 +174,15 @@ private:
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   const Http::Http1Settings http1_settings_;
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
+  const uint32_t max_request_headers_count_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> max_connection_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
   Router::RouteConfigProviderPtr route_config_provider_;

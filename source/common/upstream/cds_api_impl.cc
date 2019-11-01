@@ -56,8 +56,12 @@ void CdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
-  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+  std::unique_ptr<Cleanup> maybe_eds_resume;
+  if (cm_.adsMux()) {
+    cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
+    maybe_eds_resume = std::make_unique<Cleanup>(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+  }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
             removed_resources.size());
@@ -76,7 +80,9 @@ void CdsApiImpl::onConfigUpdate(
       }
       if (cm_.addOrUpdateCluster(cluster, resource.version())) {
         any_applied = true;
-        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
+        ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster.name());
+      } else {
+        ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
       }
     } catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
@@ -85,7 +91,7 @@ void CdsApiImpl::onConfigUpdate(
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
-      ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
+      ENVOY_LOG(info, "cds: remove cluster '{}'", resource_name);
     }
   }
 
@@ -99,8 +105,9 @@ void CdsApiImpl::onConfigUpdate(
   }
 }
 
-void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                       const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   runInitializeCallbackIfAny();

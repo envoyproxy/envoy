@@ -21,11 +21,13 @@ public:
     filter_chains:
       filters:
         name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
           http_filters:
             - name: envoy.fault
-              config:
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
                 delay:
                   fixed_delay:
                     seconds: {}
@@ -39,6 +41,11 @@ public:
             virtual_hosts:
               name: metadata_endpoint
               routes:
+                - name: redirect_route
+                  redirect:
+                    prefix_rewrite: "/"
+                  match:
+                    prefix: "/redirect"
                 - name: auth_route
                   direct_response:
                     status: {}
@@ -97,6 +104,22 @@ TEST_F(AwsMetadataIntegrationTestSuccess, AuthToken) {
 
   ASSERT_NE(nullptr, test_server_->counter("http.metadata_test.downstream_rq_completed"));
   EXPECT_EQ(1, test_server_->counter("http.metadata_test.downstream_rq_completed")->value());
+}
+
+TEST_F(AwsMetadataIntegrationTestSuccess, Redirect) {
+  const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                                    lookupPort("listener_0"));
+  const auto response = Utility::metadataFetcher(endpoint, "redirect", "AUTH_TOKEN");
+
+  ASSERT_TRUE(response.has_value());
+  EXPECT_EQ("METADATA_VALUE_WITH_AUTH", *response);
+
+  // We should make 2 requests, 1 that results in a redirect, and a final successful one
+  ASSERT_NE(nullptr, test_server_->counter("http.metadata_test.downstream_rq_completed"));
+  EXPECT_EQ(2, test_server_->counter("http.metadata_test.downstream_rq_completed")->value());
+
+  ASSERT_NE(nullptr, test_server_->counter("http.metadata_test.downstream_rq_3xx"));
+  EXPECT_EQ(1, test_server_->counter("http.metadata_test.downstream_rq_3xx")->value());
 }
 
 class AwsMetadataIntegrationTestFailure : public AwsMetadataIntegrationTestBase {

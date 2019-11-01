@@ -10,8 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -256,10 +254,12 @@ TEST(Context, ResponseAttributes) {
 
 TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
-  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ConnectionWrapper connection(info);
+  UpstreamWrapper upstream(info);
   PeerWrapper source(info, false);
   PeerWrapper destination(info, true);
 
@@ -267,16 +267,44 @@ TEST(Context, ConnectionAttributes) {
       Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   Network::Address::InstanceConstSharedPtr remote =
       Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
-  Network::Address::InstanceConstSharedPtr upstream =
+  Network::Address::InstanceConstSharedPtr upstream_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 679, false);
   const std::string sni_name = "kittens.com";
   EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
-  EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
-  EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(host));
+  EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
+  EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
+  EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
   EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
-  EXPECT_CALL(connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*host, address()).WillRepeatedly(Return(upstream));
+  EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
+
+  const std::string tls_version = "TLSv1";
+  EXPECT_CALL(*downstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
+  EXPECT_CALL(*upstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
+  std::vector<std::string> dns_sans_peer = {"www.peer.com"};
+  EXPECT_CALL(*downstream_ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans_peer));
+  EXPECT_CALL(*upstream_ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans_peer));
+  std::vector<std::string> dns_sans_local = {"www.local.com"};
+  EXPECT_CALL(*downstream_ssl_info, dnsSansLocalCertificate())
+      .WillRepeatedly(Return(dns_sans_local));
+  EXPECT_CALL(*upstream_ssl_info, dnsSansLocalCertificate()).WillRepeatedly(Return(dns_sans_local));
+  std::vector<std::string> uri_sans_peer = {"www.peer.com/uri"};
+  EXPECT_CALL(*downstream_ssl_info, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans_peer));
+  EXPECT_CALL(*upstream_ssl_info, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans_peer));
+  std::vector<std::string> uri_sans_local = {"www.local.com/uri"};
+  EXPECT_CALL(*downstream_ssl_info, uriSanLocalCertificate())
+      .WillRepeatedly(Return(uri_sans_local));
+  EXPECT_CALL(*upstream_ssl_info, uriSanLocalCertificate()).WillRepeatedly(Return(uri_sans_local));
+  const std::string subject_local = "local.com";
+  EXPECT_CALL(*downstream_ssl_info, subjectLocalCertificate())
+      .WillRepeatedly(ReturnRef(subject_local));
+  EXPECT_CALL(*upstream_ssl_info, subjectLocalCertificate())
+      .WillRepeatedly(ReturnRef(subject_local));
+  const std::string subject_peer = "peer.com";
+  EXPECT_CALL(*downstream_ssl_info, subjectPeerCertificate())
+      .WillRepeatedly(ReturnRef(subject_peer));
+  EXPECT_CALL(*upstream_ssl_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject_peer));
 
   {
     auto value = connection[CelValue::CreateString(Undefined)];
@@ -327,14 +355,14 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
-    auto value = connection[CelValue::CreateString(UpstreamAddress)];
+    auto value = upstream[CelValue::CreateString(Address)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("10.1.2.3:679", value.value().StringOrDie().value());
   }
 
   {
-    auto value = connection[CelValue::CreateString(UpstreamPort)];
+    auto value = upstream[CelValue::CreateString(Port)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(679, value.value().Int64OrDie());
@@ -352,6 +380,104 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(sni_name, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(TLSVersion)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(tls_version, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(DNSSanLocalCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(dns_sans_local[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(DNSSanPeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(dns_sans_peer[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(URISanLocalCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(uri_sans_local[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(URISanPeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(uri_sans_peer[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(SubjectLocalCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(subject_local, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(SubjectPeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(subject_peer, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(TLSVersion)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(tls_version, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(DNSSanLocalCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(dns_sans_local[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(DNSSanPeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(dns_sans_peer[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(URISanLocalCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(uri_sans_local[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(URISanPeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(uri_sans_peer[0], value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(SubjectLocalCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(subject_local, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(SubjectPeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(subject_peer, value.value().StringOrDie().value());
   }
 }
 

@@ -19,6 +19,7 @@ using testing::_;
 using testing::An;
 using testing::ContainerEq;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +36,11 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
+  HttpConnectionManagerConfigTest() {
+    ON_CALL(context_, getServerFactoryContext()).WillByDefault(ReturnRef(server_context_));
+  }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
@@ -115,7 +120,6 @@ access_log:
   ON_CALL(context_.runtime_loader_.snapshot_,
           deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
       .WillByDefault(Return(true));
-
   HttpConnectionManagerFilterConfigFactory().createFilterFactory(
       *Json::Factory::loadFromYamlString(yaml_string), context_);
 }
@@ -224,6 +228,7 @@ tracing:
   operation_name: ingress
   request_headers_for_tags:
   - foo
+  max_path_tag_length: 128
 http_filters:
 - name: envoy.router
   config: {}
@@ -235,9 +240,68 @@ http_filters:
 
   EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
+  EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
+            config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionOutboundOverride) {
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing:
+  operation_name: ingress
+http_filters:
+- name: envoy.router
+  config: {}
+  )EOF";
+
+  ON_CALL(context_, direction())
+      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::OUTBOUND));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(Tracing::OperationName::Egress, config.tracingConfig()->operation_name_);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionInboundOverride) {
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing:
+  operation_name: egress
+http_filters:
+- name: envoy.router
+  config: {}
+  )EOF";
+
+  ON_CALL(context_, direction())
+      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::INBOUND));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(Tracing::OperationName::Ingress, config.tracingConfig()->operation_name_);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
@@ -258,6 +322,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
                                      scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
+  EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
@@ -294,10 +359,44 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   EXPECT_EQ(1, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
-  EXPECT_EQ(2, config.tracingConfig()->random_sampling_.numerator());
+  EXPECT_EQ(200, config.tracingConfig()->random_sampling_.numerator());
   EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
   EXPECT_EQ(3, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+            config.tracingConfig()->overall_sampling_.denominator());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    unix_sockets: true
+  route_config:
+    name: local_route
+  tracing:
+    operation_name: ingress
+    client_sampling:
+      value: 0.1
+    random_sampling:
+      value: 0.2
+    overall_sampling:
+      value: 0.3
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+
+  EXPECT_EQ(0, config.tracingConfig()->client_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+            config.tracingConfig()->client_sampling_.denominator());
+  EXPECT_EQ(20, config.tracingConfig()->random_sampling_.numerator());
+  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+            config.tracingConfig()->random_sampling_.denominator());
+  EXPECT_EQ(0, config.tracingConfig()->overall_sampling_.numerator());
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
             config.tracingConfig()->overall_sampling_.denominator());
 }
@@ -386,6 +485,169 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
+}
+
+// Validate that deprecated idle_timeout is still ingested.
+TEST_F(HttpConnectionManagerConfigTest, DeprecatedIdleTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  idle_timeout: 1s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(1000, config.idleTimeout().value().count());
+}
+
+// Validate that idle_timeout set in common_http_protocol_options is used.
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    idle_timeout: 1s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(1000, config.idleTimeout().value().count());
+}
+
+// Validate that idle_timeout defaults to 1h
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(std::chrono::hours(1), config.idleTimeout().value());
+}
+
+// Validate that idle_timeouts can be turned off
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    idle_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_FALSE(config.idleTimeout().has_value());
+}
+
+// Check that the default max request header count is 100.
+TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(100, config.maxRequestHeadersCount());
+}
+
+// Check that max request header count is configured.
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_headers_count: 200
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(200, config.maxRequestHeadersCount());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  server_header_transformation: OVERWRITE
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
+            config.serverHeaderTransformation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  server_header_transformation: APPEND_IF_ABSENT
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT,
+            config.serverHeaderTransformation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  server_header_transformation: PASS_THROUGH
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::PASS_THROUGH,
+            config.serverHeaderTransformation());
 }
 
 // Validated that by default we don't normalize paths
@@ -584,7 +846,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
 - name: envoy.router
   )EOF";
 

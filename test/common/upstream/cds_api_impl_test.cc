@@ -19,11 +19,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
-using testing::ReturnRef;
 using testing::StrEq;
 using testing::Throw;
 
@@ -355,8 +352,8 @@ TEST_F(CdsApiImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(initialized_, ready());
-  cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                       {});
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
   EXPECT_EQ("", cds_->versionInfo());
 }
 

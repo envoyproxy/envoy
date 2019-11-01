@@ -29,6 +29,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
+  FUNCTION(conn_handler)         \
   FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
@@ -60,7 +61,8 @@ namespace Logger {
   FUNCTION(thrift)               \
   FUNCTION(tracing)              \
   FUNCTION(upstream)             \
-  FUNCTION(udp)           
+  FUNCTION(udp)                  \
+  FUNCTION(wasm)
 
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)
@@ -77,14 +79,14 @@ public:
    * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
    * fine spdlog::info corresponds to LOGGER.info method.
    */
-  using levels = enum {
-    trace = spdlog::level::trace,
-    debug = spdlog::level::debug,
-    info = spdlog::level::info,
-    warn = spdlog::level::warn,
-    error = spdlog::level::err,
-    critical = spdlog::level::critical,
-    off = spdlog::level::off
+  using Levels = enum {
+    trace = spdlog::level::trace,       // NOLINT(readability-identifier-naming)
+    debug = spdlog::level::debug,       // NOLINT(readability-identifier-naming)
+    info = spdlog::level::info,         // NOLINT(readability-identifier-naming)
+    warn = spdlog::level::warn,         // NOLINT(readability-identifier-naming)
+    error = spdlog::level::err,         // NOLINT(readability-identifier-naming)
+    critical = spdlog::level::critical, // NOLINT(readability-identifier-naming)
+    off = spdlog::level::off            // NOLINT(readability-identifier-naming)
   };
 
   spdlog::string_view_t levelString() const {
@@ -188,7 +190,7 @@ private:
 
   SinkDelegate* sink_{nullptr};
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
-  std::unique_ptr<spdlog::formatter> formatter_ GUARDED_BY(format_mutex_);
+  std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
   absl::Mutex format_mutex_; // direct absl reference to break build cycle.
 };
 

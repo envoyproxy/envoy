@@ -21,6 +21,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/ssl/private_key:private_key_config_interface",
         "//include/envoy/ssl/private_key:private_key_interface",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )

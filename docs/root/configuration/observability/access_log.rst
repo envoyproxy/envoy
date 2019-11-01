@@ -221,6 +221,7 @@ The following command operators are supported:
     * **IH**: The request was rejected because it set an invalid value for a
       :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
+    * **DPE**: The downstream request had an HTTP protocol error.
 
 %RESPONSE_TX_DURATION%
   HTTP
@@ -273,6 +274,26 @@ The following command operators are supported:
     This may not be the physical remote address of the peer if the address has been inferred from
     :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
+  Direct remote address of the downstream connection. If the address is an IP address it includes both
+  address and port.
+
+  .. note::
+
+    This is always the physical remote address of the peer even if the downstream remote address has 
+    been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
+    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
+  The direct remote address of the downstream connection. If the address is an IP address the output does
+  *not* include port.
+
+  .. note::
+
+    This is always the physical remote address of the peer even if the downstream remote address has 
+    been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
+    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS%
   Local address of the downstream connection. If the address is an IP address it includes both

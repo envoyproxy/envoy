@@ -18,6 +18,7 @@
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -35,11 +36,9 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Upstream {
@@ -64,10 +63,11 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  Api::MockApi api;
 
   EXPECT_THROW_WITH_MESSAGE(
       HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, random,
-                                   dispatcher, log_manager, validation_visitor),
+                                   dispatcher, log_manager, validation_visitor, api),
       EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
@@ -82,12 +82,13 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  Api::MockApi api;
 
-  EXPECT_NE(nullptr,
-            dynamic_cast<GrpcHealthCheckerImpl*>(
-                HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime,
-                                             random, dispatcher, log_manager, validation_visitor)
-                    .get()));
+  EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
+                         HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
+                                                      runtime, random, dispatcher, log_manager,
+                                                      validation_visitor, api)
+                             .get()));
 }
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
@@ -135,7 +136,7 @@ public:
     http_health_check:
       service_name: locations
       path: /healthcheck
-      use_http2: true
+      codec_client_type: Http2
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
@@ -485,7 +486,8 @@ public:
                   new NiceMock<Upstream::MockClusterInfo>()};
               Event::MockDispatcher dispatcher_;
               return new CodecClientForTest(
-                  std::move(conn_data.connection_), test_session.codec_, nullptr,
+                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
+                  test_session.codec_, nullptr,
                   Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
             }));
   }
@@ -2050,7 +2052,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->health());
 }
 
-TEST_F(HttpHealthCheckerImplTest, Http2ClusterUsesHttp2CodecClient) {
+TEST_F(HttpHealthCheckerImplTest, Http2ClusterUseHttp2CodecClient) {
   setupNoServiceValidationHCWithHttp2();
   EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
 }
@@ -2081,7 +2083,7 @@ public:
     http_health_check:
       service_name: locations
       path: /healthcheck
-      use_http2: true
+      codec_client_type: Http2
     )EOF";
 
     health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
@@ -2124,6 +2126,54 @@ TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH1HealthChecking) {
   setupNoServiceValidationHC();
   EXPECT_EQ(Http::CodecClient::Type::HTTP1,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
+}
+
+TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+      use_http2: false
+    )EOF";
+
+  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                      dispatcher_, runtime_, random_,
+                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_->addHostCheckCompleteCb(
+      [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        onHostStatus(host, changed_state);
+      });
+  EXPECT_EQ(Http::CodecClient::Type::HTTP1, health_checker_->codecClientType());
+}
+
+TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+      use_http2: true
+    )EOF";
+
+  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                      dispatcher_, runtime_, random_,
+                                                      HealthCheckEventLoggerPtr(event_logger_)));
+  health_checker_->addHostCheckCompleteCb(
+      [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        onHostStatus(host, changed_state);
+      });
+  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
@@ -3065,7 +3115,8 @@ public:
               Event::MockDispatcher dispatcher_;
 
               test_session.codec_client_ = new CodecClientForTest(
-                  std::move(conn_data.connection_), test_session.codec_, nullptr,
+                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
+                  test_session.codec_, nullptr,
                   Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
               return test_session.codec_client_;
             }));

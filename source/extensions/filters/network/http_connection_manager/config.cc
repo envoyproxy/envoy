@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
@@ -23,6 +24,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -152,7 +154,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
-      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
+      max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.common_http_protocol_options(), max_headers_count,
+          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
+                                                  Http::DEFAULT_MAX_HEADERS_COUNT))),
+      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
+      max_connection_duration_(
+          PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
@@ -175,6 +183,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
                                                       ))),
       merge_slashes_(config.merge_slashes()) {
+  // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
+  // idle_timeout field.
+  // TODO(asraa): Remove when idle_timeout is removed.
+  if (!idle_timeout_) {
+    idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout);
+  }
+  if (!idle_timeout_) {
+    idle_timeout_ = std::chrono::hours(1);
+  } else if (idle_timeout_.value().count() == 0) {
+    idle_timeout_ = absl::nullopt;
+  }
+
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
@@ -244,13 +264,27 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::OperationName tracing_operation_name;
     std::vector<Http::LowerCaseString> request_headers_for_tags;
 
-    switch (tracing_config.operation_name()) {
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::INGRESS:
+    // Listener level traffic direction overrides the operation name
+    switch (context.direction()) {
+    case envoy::api::v2::core::TrafficDirection::UNSPECIFIED: {
+      switch (tracing_config.operation_name()) {
+      case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+          Tracing::INGRESS:
+        tracing_operation_name = Tracing::OperationName::Ingress;
+        break;
+      case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+          Tracing::EGRESS:
+        tracing_operation_name = Tracing::OperationName::Egress;
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+      break;
+    }
+    case envoy::api::v2::core::TrafficDirection::INBOUND:
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::EGRESS:
+    case envoy::api::v2::core::TrafficDirection::OUTBOUND:
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
@@ -267,17 +301,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     envoy::type::FractionalPercent random_sampling;
     // TODO: Random sampling historically was an integer and default to out of 10,000. We should
     // deprecate that and move to a straight fractional percent config.
-    random_sampling.set_numerator(
-        tracing_config.has_random_sampling() ? tracing_config.random_sampling().value() : 10000);
+    uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, random_sampling, 10000, 10000)};
+    random_sampling.set_numerator(random_sampling_numerator);
     random_sampling.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
     envoy::type::FractionalPercent overall_sampling;
     overall_sampling.set_numerator(
         tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
 
+    const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
+
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
             tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-            overall_sampling, tracing_config.verbose()});
+            overall_sampling, tracing_config.verbose(), max_path_tag_length});
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -285,6 +323,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         AccessLog::AccessLogFactory::fromProto(access_log, context_);
     access_logs_.push_back(current_access_log);
   }
+
+  server_transformation_ = config.server_header_transformation();
 
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();
@@ -301,6 +341,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     break;
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP2:
     codec_type_ = CodecType::HTTP2;
+    break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP3:
+    codec_type_ = CodecType::HTTP3;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -378,14 +421,19 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb());
+        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
+        maxRequestHeadersCount());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
+        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
+        maxRequestHeadersCount());
+  case CodecType::HTTP3:
+    // TODO(danzh) create QUIC specific codec.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   case CodecType::AUTO:
-    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
-                                                           context_.scope(), http1_settings_,
-                                                           http2_settings_, maxRequestHeadersKb());
+    return Http::ConnectionManagerUtility::autoCreateCodec(
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
+        maxRequestHeadersKb(), maxRequestHeadersCount());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

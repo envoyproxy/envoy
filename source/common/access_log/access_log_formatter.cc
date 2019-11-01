@@ -25,9 +25,10 @@ static const std::string UnspecifiedValueString = "-";
 namespace {
 
 // Matches newline pattern in a StartTimeFormatter format string.
-const std::regex& getStartTimeNewlinePattern(){
-    CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
-const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "\n")};
+const std::regex& getStartTimeNewlinePattern() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
+}
+const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
@@ -219,7 +220,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 }
 
-// TODO(derekargueta): #2967 - Rewrite AccessLogformatter with parser library & formal grammar
+// TODO(derekargueta): #2967 - Rewrite AccessLogFormatter with parser library & formal grammar
 std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
@@ -400,6 +401,15 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
           *stream_info.downstreamRemoteAddress());
+    };
+  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamDirectRemoteAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(
+          *stream_info.downstreamDirectRemoteAddress());
     };
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {

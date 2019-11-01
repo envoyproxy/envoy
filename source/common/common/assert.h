@@ -105,9 +105,11 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  * Indicate a panic situation and exit.
  */
 #define PANIC(X)                                                                                   \
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,        \
-                      "panic: {}", X);                                                             \
-  abort();
+  do {                                                                                             \
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,      \
+                        "panic: {}", X);                                                           \
+    abort();                                                                                       \
+  } while (false)
 
 // NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
 // The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage

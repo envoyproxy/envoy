@@ -76,10 +76,11 @@ public:
                  AsyncRequest*(absl::string_view service_full_name, absl::string_view method_name,
                                Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
                                Tracing::Span& parent_span,
-                               const absl::optional<std::chrono::milliseconds>& timeout));
-  MOCK_METHOD3_T(startRaw,
+                               const Http::AsyncClient::RequestOptions& options));
+  MOCK_METHOD4_T(startRaw,
                  RawAsyncStream*(absl::string_view service_full_name, absl::string_view method_name,
-                                 RawAsyncStreamCallbacks& callbacks));
+                                 RawAsyncStreamCallbacks& callbacks,
+                                 const Http::AsyncClient::StreamOptions& options));
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {
@@ -124,14 +125,37 @@ MATCHER_P2(ProtoBufferEqIgnoringField, expected, ignored_field, "") {
     *result_listener << "\nParse of buffer failed\n";
     return false;
   }
-  auto equal = ::Envoy::TestUtility::protoEqualIgnoringField(proto, expected, ignored_field);
+  const bool equal = ::Envoy::TestUtility::protoEqualIgnoringField(proto, expected, ignored_field);
   if (!equal) {
     std::string but_ignoring = absl::StrCat("(but ignoring ", ignored_field, ")");
     *result_listener << "\n"
+                     << ::Envoy::TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
+                     << ::Envoy::TestUtility::addLeftAndRightPadding(but_ignoring) << "\n"
+                     << expected.DebugString()
+                     << ::Envoy::TestUtility::addLeftAndRightPadding(
+                            "is not equal to actual proto:")
+                     << "\n"
+                     << proto.DebugString()
+                     << ::Envoy::TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
+MATCHER_P(ProtoBufferEqIgnoreRepeatedFieldOrdering, expected, "") {
+  typename std::remove_const<decltype(expected)>::type proto;
+  if (!proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length())) {
+    *result_listener << "\nParse of buffer failed\n";
+    return false;
+  }
+  const bool equal =
+      ::Envoy::TestUtility::protoEqual(proto, expected, /*ignore_repeated_field_ordering=*/true);
+  if (!equal) {
+    *result_listener << "\n"
                      << "=======================Expected proto:===========================\n"
-                     << expected.DebugString() << " " << but_ignoring
+                     << expected.DebugString()
                      << "------------------is not equal to actual proto:------------------\n"
-                     << proto.DebugString() << " " << but_ignoring
+                     << proto.DebugString()
                      << "=================================================================\n";
   }
   return equal;

@@ -164,8 +164,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
     GrpcMuxCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
-        throw EnvoyException(fmt::format("{} does not match {} type URL in DiscoveryResponse {}",
-                                         resource.type_url(), type_url, message->DebugString()));
+        throw EnvoyException(
+            fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
+                        resource.type_url(), type_url, message->DebugString()));
       }
       const std::string resource_name = callbacks.resourceName(resource);
       resources.emplace(resource_name, resource);
@@ -232,10 +233,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
 
 void GrpcMuxImpl::clearRequestQueue() {
   grpc_stream_.maybeUpdateQueueSizeStat(0);
-  // TODO(fredlas) when we have C++17: request_queue_ = {};
-  while (!request_queue_.empty()) {
-    request_queue_.pop();
-  }
+  request_queue_ = {};
 }
 
 void GrpcMuxImpl::drainRequests() {

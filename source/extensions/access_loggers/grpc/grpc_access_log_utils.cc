@@ -35,7 +35,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x20000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x40000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -111,6 +111,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders)) {
     common_access_log.mutable_response_flags()->set_invalid_envoy_request_headers(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError)) {
+    common_access_log.mutable_response_flags()->set_downstream_protocol_error(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
@@ -122,6 +126,11 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamRemoteAddress(),
         *common_access_log.mutable_downstream_remote_address());
   }
+  if (stream_info.downstreamDirectRemoteAddress() != nullptr) {
+    Network::Utility::addressToProtobufAddress(
+        *stream_info.downstreamDirectRemoteAddress(),
+        *common_access_log.mutable_downstream_direct_remote_address());
+  }
   if (stream_info.downstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.downstreamLocalAddress(),
@@ -129,7 +138,8 @@ void Utility::extractCommonAccessLogProperties(
   }
   if (stream_info.downstreamSslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
-    const auto* downstream_ssl_connection = stream_info.downstreamSslConnection();
+    const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
+        stream_info.downstreamSslConnection();
 
     tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
 

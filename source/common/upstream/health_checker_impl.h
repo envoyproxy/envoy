@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/grpc/status.h"
 
@@ -32,12 +33,11 @@ public:
    * @param validation_visitor message validation visitor instance.
    * @return a health checker.
    */
-  static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& health_check_config,
-                                       Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                                       Runtime::RandomGenerator& random,
-                                       Event::Dispatcher& dispatcher,
-                                       AccessLog::AccessLogManager& log_manager,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor);
+  static HealthCheckerSharedPtr
+  create(const envoy::api::v2::core::HealthCheck& health_check_config, Upstream::Cluster& cluster,
+         Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         AccessLog::AccessLogManager& log_manager,
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
 /**
@@ -133,7 +133,7 @@ private:
     return envoy::data::core::v2alpha::HealthCheckerType::HTTP;
   }
 
-  Http::CodecClient::Type codecClientType(bool use_http2);
+  Http::CodecClient::Type codecClientType(const envoy::type::CodecClientType& type);
 
   const std::string path_;
   const std::string host_value_;

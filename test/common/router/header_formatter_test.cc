@@ -5,7 +5,6 @@
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
@@ -89,28 +88,28 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableSingleSan) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::vector<std::string> sans{"san"};
-  ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_URI_SAN", "san");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableMultipleSans) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::vector<std::string> sans{"san1", "san2"};
-  ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_URI_SAN", "san1,san2");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, uriSanPeerCertificate())
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, uriSanPeerCertificate())
       .WillByDefault(Return(std::vector<std::string>()));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_URI_SAN", EMPTY_STRING);
 }
 
@@ -122,28 +121,28 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerNoTls) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariableSingleSan) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::vector<std::string> sans{"san"};
-  ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_URI_SAN", "san");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariableMultipleSans) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::vector<std::string> sans{"san1", "san2"};
-  ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_URI_SAN", "san1,san2");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariableNoSans) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, uriSanLocalCertificate())
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, uriSanLocalCertificate())
       .WillByDefault(Return(std::vector<std::string>()));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_URI_SAN", EMPTY_STRING);
 }
 
@@ -155,17 +154,19 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanNoTls) 
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalSubject) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("subject"));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string subject = "subject";
+  ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(subject));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_SUBJECT", "subject");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalSubjectEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return(""));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string subject;
+  ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(subject));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_SUBJECT", EMPTY_STRING);
 }
 
@@ -177,17 +178,19 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalSubjectNoTls)
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsSessionId) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, sessionId()).WillByDefault(Return("deadbeef"));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string session_id = "deadbeef";
+  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_TLS_SESSION_ID", "deadbeef");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsSessionIdEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, sessionId()).WillByDefault(Return(""));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string session_id;
+  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_TLS_SESSION_ID", EMPTY_STRING);
 }
 
@@ -199,18 +202,18 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsSessionIdNoTls)
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsCipher) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, ciphersuiteString())
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, ciphersuiteString())
       .WillByDefault(Return("TLS_DHE_RSA_WITH_AES_256_GCM_SHA384"));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_TLS_CIPHER", "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsCipherEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, ciphersuiteString()).WillByDefault(Return(""));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, ciphersuiteString()).WillByDefault(Return(""));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_TLS_CIPHER", EMPTY_STRING);
 }
 
@@ -222,17 +225,18 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsCipherNoTls) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsVersion) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.2"));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string tls_version = "TLSv1.2";
+  ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tls_version));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_TLS_VERSION", "TLSv1.2");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsVersionEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, tlsVersion()).WillByDefault(Return(""));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(EMPTY_STRING));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_TLS_VERSION", EMPTY_STRING);
 }
 
@@ -244,20 +248,20 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsVersionNoTls) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
-  ON_CALL(connection_info, sha256PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, sha256PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256",
                  "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprintEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha;
-  ON_CALL(connection_info, sha256PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, sha256PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256", EMPTY_STRING);
 }
 
@@ -269,17 +273,19 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprintNoT
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSerial) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, serialNumberPeerCertificate()).WillByDefault(Return("b8b5ecc898f2124a"));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  const std::string serial_number = "b8b5ecc898f2124a";
+  ON_CALL(*connection_info, serialNumberPeerCertificate()).WillByDefault(ReturnRef(serial_number));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_SERIAL", "b8b5ecc898f2124a");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSerialEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, serialNumberPeerCertificate()).WillByDefault(Return(""));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  const std::string serial_number;
+  ON_CALL(*connection_info, serialNumberPeerCertificate()).WillByDefault(ReturnRef(serial_number));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_SERIAL", EMPTY_STRING);
 }
 
@@ -291,20 +297,21 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSerialNoTls) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerIssuer) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, issuerPeerCertificate())
-      .WillByDefault(
-          Return("CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  const std::string issuer_peer =
+      "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US";
+  ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(issuer_peer));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_ISSUER",
                  "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerIssuerEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, issuerPeerCertificate()).WillByDefault(Return(""));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  const std::string issuer_peer;
+  ON_CALL(*connection_info, issuerPeerCertificate()).WillByDefault(ReturnRef(issuer_peer));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_ISSUER", EMPTY_STRING);
 }
 
@@ -316,20 +323,21 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerIssuerNoTls) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSubject) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, subjectPeerCertificate())
-      .WillByDefault(
-          Return("CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  const std::string subject_peer =
+      "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US";
+  ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(subject_peer));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_SUBJECT",
                  "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSubjectEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return(""));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  const std::string subject_peer;
+  ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(subject_peer));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_SUBJECT", EMPTY_STRING);
 }
 
@@ -341,21 +349,21 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSubjectNoTls) 
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCert) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_cert = "<some cert>";
-  ON_CALL(connection_info, urlEncodedPemEncodedPeerCertificate())
+  ON_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
       .WillByDefault(ReturnRef(expected_cert));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT", expected_cert);
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_cert;
-  ON_CALL(connection_info, urlEncodedPemEncodedPeerCertificate())
+  ON_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
       .WillByDefault(ReturnRef(expected_cert));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT", EMPTY_STRING);
 }
 
@@ -367,20 +375,20 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertNoTls) {
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertVStart) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   absl::Time abslStartTime =
       TestUtility::parseTime("Dec 18 01:50:34 2018 GMT", "%b %e %H:%M:%S %Y GMT");
   SystemTime startTime = absl::ToChronoTime(abslStartTime);
-  ON_CALL(connection_info, validFromPeerCertificate()).WillByDefault(Return(startTime));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, validFromPeerCertificate()).WillByDefault(Return(startTime));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT_V_START", "2018-12-18T01:50:34.000Z");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertVStartEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, validFromPeerCertificate()).WillByDefault(Return(absl::nullopt));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, validFromPeerCertificate()).WillByDefault(Return(absl::nullopt));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT_V_START", EMPTY_STRING);
 }
 
@@ -392,20 +400,20 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertVStartNoTl
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertVEnd) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   absl::Time abslStartTime =
       TestUtility::parseTime("Dec 17 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");
   SystemTime startTime = absl::ToChronoTime(abslStartTime);
-  ON_CALL(connection_info, expirationPeerCertificate()).WillByDefault(Return(startTime));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  ON_CALL(*connection_info, expirationPeerCertificate()).WillByDefault(Return(startTime));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT_V_END", "2020-12-17T01:50:34.000Z");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertVEndEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
-  ON_CALL(connection_info, expirationPeerCertificate()).WillByDefault(Return(absl::nullopt));
-  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, expirationPeerCertificate()).WillByDefault(Return(absl::nullopt));
+  EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT_V_END", EMPTY_STRING);
 }
 
@@ -659,6 +667,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   static const TestCase test_cases[] = {
       // Valid inputs
+      {"", {}, {}},
       {"%PROTOCOL%", {"HTTP/1.1"}, {}},
       {"[%PROTOCOL%", {"[HTTP/1.1"}, {}},
       {"%PROTOCOL%]", {"HTTP/1.1]"}, {}},
@@ -676,6 +685,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
@@ -708,9 +718,7 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
-      // TODO(dio): Un-terminated variable expressions with arguments and argument errors for
-      // generic %VAR are not checked anymore. Find a way to get the same granularity as before for
-      // following cases.
+      // Parsing errors in variable expressions that take a JSON-array parameter.
       {"%UPSTREAM_METADATA(no array)%",
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
@@ -721,6 +729,26 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
         "Error(offset 2, line 1): Invalid value.\n"}},
+      {"%UPSTREAM_METADATA([\"unterminated array\")%",
+       {},
+       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
+        "'UPSTREAM_METADATA([\"unterminated array\"', but found ')'"}},
+      {"%UPSTREAM_METADATA([not-a-string])%",
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'UPSTREAM_METADATA([', "
+        "but found 'n'"}},
+      {"%UPSTREAM_METADATA([\"\\",
+       {},
+       {"Invalid header configuration. Un-terminated backslash in JSON string after "
+        "'UPSTREAM_METADATA([\"'"}},
+      {"%UPSTREAM_METADATA([\"ns\", \"key\"]x",
+       {},
+       {"Invalid header configuration. Expecting ')' or whitespace after "
+        "'UPSTREAM_METADATA([\"ns\", \"key\"]', but found 'x'"}},
+      {"%UPSTREAM_METADATA([\"ns\", \"key\"])x",
+       {},
+       {"Invalid header configuration. Expecting '%' or whitespace after "
+        "'UPSTREAM_METADATA([\"ns\", \"key\"])', but found 'x'"}},
 
       {"%PER_REQUEST_STATE no parens%",
        {},
@@ -755,6 +783,8 @@ TEST(HeaderParserTest, TestParseInternal) {
         filter_metadata:
           ns:
             key: value
+          '"quoted"':
+            '"key"': value
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
@@ -788,8 +818,12 @@ TEST(HeaderParserTest, TestParseInternal) {
 
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
 
+    if (!test_case.expected_output_) {
+      EXPECT_FALSE(header_map.has("x-header")) << descriptor;
+      continue;
+    }
+
     EXPECT_TRUE(header_map.has("x-header")) << descriptor;
-    EXPECT_TRUE(test_case.expected_output_) << descriptor;
     EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
   }
 }

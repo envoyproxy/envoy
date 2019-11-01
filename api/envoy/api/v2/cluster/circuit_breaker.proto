@@ -5,7 +5,6 @@ package envoy.api.v2.cluster;
 option java_outer_classname = "CircuitBreakerProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.cluster";
-option go_package = "cluster";
 option csharp_namespace = "Envoy.Api.V2.ClusterNS";
 option ruby_package = "Envoy.Api.V2.ClusterNS";
 
@@ -13,24 +12,20 @@ import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
+import "validate/validate.proto";
 
 // [#protodoc-title: Circuit breakers]
 
 // :ref:`Circuit breaking<arch_overview_circuit_break>` settings can be
 // specified individually for each defined priority.
 message CircuitBreakers {
-
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`.
+  // [#next-free-field: 8]
   message Thresholds {
     // The :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.
-    // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
-    // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-    core.RoutingPriority priority = 1;
+    core.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
 
     // The maximum number of connections that Envoy will make to the upstream
     // cluster. If not specified, the default is 1024.

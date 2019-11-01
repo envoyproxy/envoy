@@ -68,7 +68,7 @@ public:
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+  Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Http::ConnectionCallbacks
@@ -130,7 +130,7 @@ private:
     virtual void doTrailers() PURE;
     virtual const HeaderMapPtr& trailers() PURE;
     virtual void doMetadata() PURE;
-    // TODO(soya3129): make this pure when adding impl to encodefilter.
+    // TODO(soya3129): make this pure when adding impl to encoder filter.
     virtual void handleMetadataAfterHeadersCallback() PURE;
 
     // Http::StreamFilterCallbacks
@@ -479,6 +479,7 @@ private:
     Tracing::OperationName operationName() const override;
     const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
     bool verbose() const override;
+    uint32_t maxPathTagLength() const override;
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {
@@ -495,6 +496,10 @@ private:
     }
 
     void traceRequest();
+
+    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
+    // not found, snapped_route_config_ is set to Router::NullConfigImpl.
+    void snapScopedRouteConfig();
 
     void refreshCachedRoute();
 
@@ -585,7 +590,7 @@ private:
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
-    Router::ScopedConfigConstSharedPtr snapped_scoped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
@@ -648,8 +653,9 @@ private:
    */
   void doEndStream(ActiveStream& stream);
 
-  void resetAllStreams();
+  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
   void onIdleTimeout();
+  void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
@@ -670,6 +676,8 @@ private:
   // connection. When there are active streams it is disarmed in favor of each stream's
   // stream_idle_timer_.
   Event::TimerPtr connection_idle_timer_;
+  // A connection duration timer. Armed during handling new connection if enabled in config.
+  Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
   Http::Context& http_context_;

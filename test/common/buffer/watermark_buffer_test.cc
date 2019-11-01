@@ -253,6 +253,14 @@ TEST_P(WatermarkBufferTest, Search) {
   EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5));
 }
 
+TEST_P(WatermarkBufferTest, StartsWith) {
+  buffer_.add(TEN_BYTES, 10);
+
+  EXPECT_TRUE(buffer_.startsWith({TEN_BYTES, 2}));
+  EXPECT_TRUE(buffer_.startsWith({TEN_BYTES, 10}));
+  EXPECT_FALSE(buffer_.startsWith({&TEN_BYTES[1], 2}));
+}
+
 TEST_P(WatermarkBufferTest, MoveBackWithWatermarks) {
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;

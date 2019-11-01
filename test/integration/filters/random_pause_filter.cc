@@ -62,7 +62,7 @@ public:
   }
 
   absl::Mutex rand_lock_;
-  std::unique_ptr<TestRandomGenerator> rng_ GUARDED_BY(rand_lock_);
+  std::unique_ptr<TestRandomGenerator> rng_ ABSL_GUARDED_BY(rand_lock_);
 };
 
 // perform static registration

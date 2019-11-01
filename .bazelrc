@@ -16,9 +16,10 @@ build --experimental_local_memory_estimate
 build --experimental_strict_action_env=true
 build --host_force_python=PY2
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc
+build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --copt=-fPIC
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -28,19 +29,27 @@ build --action_env=CC
 build --action_env=CXX
 build --action_env=PATH
 
+# Common flags for sanitizers
+build:sanitizer --define tcmalloc=disabled
+build:sanitizer --linkopt -ldl
+build:sanitizer --build_tag_filters=-no_san
+build:sanitizer --test_tag_filters=-no_san
+
+# Common flags for Clang
+build:clang --action_env=BAZEL_COMPILER=clang
+build:clang --linkopt=-fuse-ld=lld
+
 # Basic ASAN/UBSAN that works for gcc
-build:asan --action_env=BAZEL_LINKLIBS=
-build:asan --action_env=BAZEL_LINKOPTS=-lstdc++:-lm
+build:asan --config=sanitizer
+# ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
+build:asan --define signal_trace=disabled
 build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
-build:asan --copt -fno-sanitize=vptr
-build:asan --linkopt -fno-sanitize=vptr
-build:asan --linkopt -ldl
-build:asan --define tcmalloc=disabled
-build:asan --build_tag_filters=-no_asan
-build:asan --test_tag_filters=-no_asan
-build:asan --define signal_trace=disabled
+# TODO(lizan): vptr and function requires C++ UBSAN runtime which we're not currently linking to.
+# Enable them when bazel has better support for that or with explicit linker options.
+build:asan --copt -fno-sanitize=vptr,function
+build:asan --linkopt -fno-sanitize=vptr,function
 build:asan --copt -DADDRESS_SANITIZER=1
 build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
@@ -62,30 +71,29 @@ build:macos-asan --copt -DGRPC_BAZEL_BUILD
 build:macos-asan --dynamic_mode=off
 
 # Clang TSAN
+build:clang-tsan --config=sanitizer
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
-build:clang-tsan --linkopt -static-libsan
-build:clang-tsan --define tcmalloc=disabled
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
+build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
-build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 
 # Clang with libc++
 # TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
 # and update stats_integration_test with appropriate m_per_cluster value
+build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
-build:libc++ --host_linkopt=-fuse-ld=lld
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
@@ -95,19 +103,20 @@ build:sizeopt -c opt --copt -Os
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --host_platform=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
-build:rbe-toolchain --platforms=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
+build:rbe-toolchain --host_platform=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
+build:rbe-toolchain --platforms=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
 build:rbe-toolchain-clang --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
-build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
 
 build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
 build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
-build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
+build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
@@ -119,10 +128,7 @@ build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=3600
 build:remote --auth_enabled=true
-build:remote --experimental_inmemory_jdeps_files
-build:remote --experimental_inmemory_dotd_files
-build:remote --experimental_remote_download_outputs=toplevel
-test:remote --experimental_remote_download_outputs=minimal
+build:remote --remote_download_toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
@@ -134,7 +140,8 @@ build:remote-gcc --config=remote
 build:remote-gcc --config=rbe-toolchain-gcc
 
 # Docker sandbox
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
+# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -160,6 +167,9 @@ build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 build:asan-fuzzer --config=asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-build:asan-fuzzer --copt=-fsanitize-coverage=trace-pc-guard
+build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
+
+try-import clang.bazelrc
+try-import user.bazelrc

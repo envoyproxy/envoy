@@ -14,9 +14,15 @@ namespace Expr {
 BuilderPtr createBuilder(Protobuf::Arena* arena) {
   google::api::expr::runtime::InterpreterOptions options;
 
-  // Conformance with spec/go runtimes requires this setting
-  options.partial_string_match = true;
+  // Security-oriented defaults
+  options.enable_comprehension = false;
+  options.enable_regex = true;
+  options.regex_max_program_size = 100;
+  options.enable_string_conversion = false;
+  options.enable_string_concat = false;
+  options.enable_list_concat = false;
 
+  // Enable constant folding (performance optimization)
   if (arena != nullptr) {
     options.constant_folding = true;
     options.constant_arena = arena;
@@ -24,7 +30,7 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
 
   auto builder = google::api::expr::runtime::CreateCelExpressionBuilder(options);
   auto register_status =
-      google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry());
+      google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry(), options);
   if (!register_status.ok()) {
     throw EnvoyException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
@@ -51,12 +57,14 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
   const RequestWrapper request(request_headers, info);
   const ResponseWrapper response(response_headers, response_trailers, info);
   const ConnectionWrapper connection(info);
+  const UpstreamWrapper upstream(info);
   const PeerWrapper source(info, false);
   const PeerWrapper destination(info, true);
   activation.InsertValue(Request, CelValue::CreateMap(&request));
   activation.InsertValue(Response, CelValue::CreateMap(&response));
   activation.InsertValue(Metadata, CelValue::CreateMessage(&info.dynamicMetadata(), arena));
   activation.InsertValue(Connection, CelValue::CreateMap(&connection));
+  activation.InsertValue(Upstream, CelValue::CreateMap(&upstream));
   activation.InsertValue(Source, CelValue::CreateMap(&source));
   activation.InsertValue(Destination, CelValue::CreateMap(&destination));
 

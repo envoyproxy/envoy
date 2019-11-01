@@ -14,6 +14,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -31,7 +32,7 @@ using testing::NiceMock;
 using testing::Pointee;
 using testing::Ref;
 using testing::Return;
-using testing::SaveArg;
+using testing::ReturnRef;
 using testing::Throw;
 
 namespace Envoy {
@@ -54,8 +55,9 @@ public:
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(std::move(connection), codec_, nullptr, host_,
-                                                   dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
+                                                   codec_, nullptr, host_, dispatcher_);
+    ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
   ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
@@ -70,7 +72,22 @@ public:
       new NiceMock<Upstream::MockIdleTimeEnabledClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
+
+TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+
+  EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
+  EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection, connect());
+  EXPECT_CALL(*connection, addReadFilter(_));
+  auto codec = new Http::MockClientConnection();
+
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  auto client = std::make_unique<CodecClientForTest>(
+      CodecClient::Type::HTTP3, std::move(connection), codec, nullptr, host_, dispatcher_);
+}
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   Http::StreamDecoder* inner_decoder;
@@ -257,33 +274,37 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
   connection_cb_->onBelowWriteBufferLowWatermark();
 }
 
+TEST_F(CodecClientTest, SSLConnectionInfo) {
+  std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
+  EXPECT_CALL(*connection_, ssl()).WillRepeatedly(Return(connection_info));
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_NE(nullptr, stream_info_.downstreamSslConnection());
+  EXPECT_EQ(session_id, stream_info_.downstreamSslConnection()->sessionId());
+}
+
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()) {
     dispatcher_ = api_->allocateDispatcher();
-    upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+    upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_ = std::make_unique<CodecClientForTest>(std::move(client_connection), codec_, nullptr,
-                                                   host_, *dispatcher_);
-
-    EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket());
-          listener_callbacks_.onNewConnection(std::move(new_connection));
-        }));
+    client_ =
+        std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
+                                             codec_, nullptr, host_, *dispatcher_);
 
     int expected_callbacks = 2;
-
-    EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
-        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-          upstream_connection_ = std::move(conn);
+    EXPECT_CALL(listener_callbacks_, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          upstream_connection_ = dispatcher_->createServerConnection(
+              std::move(socket), Network::Test::createRawBufferSocket());
           upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
 
           expected_callbacks--;

@@ -5,21 +5,17 @@ package envoy.api.v2;
 option java_outer_classname = "DiscoveryProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2";
-option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/any.proto";
 import "google/rpc/status.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Common discovery API components]
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
+// [#next-free-field: 7]
 message DiscoveryRequest {
   // The version_info provided in the request messages will be the version_info
   // received with the most recent successfully processed response or empty on
@@ -49,8 +45,9 @@ message DiscoveryRequest {
 
   // nonce corresponding to DiscoveryResponse being ACK/NACKed. See above
   // discussion on version_info and the DiscoveryResponse nonce comment. This
-  // may be empty if no nonce is available, e.g. at startup or for non-stream
-  // xDS implementations.
+  // may be empty only if 1) this is a non-persistent-stream xDS such as HTTP,
+  // or 2) the client has not yet accepted an update in this xDS stream (unlike
+  // delta, where it is populated only for new explicit ACKs).
   string response_nonce = 5;
 
   // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
@@ -60,6 +57,7 @@ message DiscoveryRequest {
   google.rpc.Status error_detail = 6;
 }
 
+// [#next-free-field: 7]
 message DiscoveryResponse {
   // The version of the response data.
   string version_info = 1;
@@ -134,6 +132,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
+// [#next-free-field: 8]
 message DeltaDiscoveryRequest {
   // The node making the request.
   core.Node node = 1;
@@ -181,7 +180,7 @@ message DeltaDiscoveryRequest {
   // When the DeltaDiscoveryRequest is a ACK or NACK message in response
   // to a previous DeltaDiscoveryResponse, the response_nonce must be the
   // nonce in the DeltaDiscoveryResponse.
-  // Otherwise response_nonce must be omitted.
+  // Otherwise (unlike in DiscoveryRequest) response_nonce must be omitted.
   string response_nonce = 6;
 
   // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
@@ -190,6 +189,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
+// [#next-free-field: 7]
 message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;

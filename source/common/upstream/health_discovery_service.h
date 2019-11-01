@@ -59,7 +59,8 @@ public:
 
   // Creates and starts healthcheckers to its endpoints
   void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
+                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                         Api::Api& api);
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
@@ -153,7 +154,7 @@ private:
       stream_{};
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
-  Envoy::Stats::Store& store_stats;
+  Envoy::Stats::Store& store_stats_;
   Ssl::ContextManager& ssl_context_manager_;
   Runtime::RandomGenerator& random_;
   ClusterInfoFactory& info_factory_;
@@ -173,16 +174,6 @@ private:
   Event::TimerPtr hds_stream_response_timer_;
   Event::TimerPtr hds_retry_timer_;
   BackOffStrategyPtr backoff_strategy_;
-
-  /**
-   * TODO(lilika): Add API knob for RetryInitialDelayMilliseconds
-   * and RetryMaxDelayMilliseconds, instead of hardcoding them.
-   *
-   * Parameters of the jittered backoff strategy that defines how often
-   * we retry to establish a stream to the management server
-   */
-  const uint32_t RetryInitialDelayMilliseconds = 1000;
-  const uint32_t RetryMaxDelayMilliseconds = 30000;
 
   // Soft limit on size of the cluster’s connections read and write buffers.
   static constexpr uint32_t ClusterConnectionBufferLimitBytes = 32768;

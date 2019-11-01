@@ -91,15 +91,19 @@ public:
   virtual TimeSource& timeSource() PURE;
 
   /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
    * @return Api::Api& a reference to the api object.
    */
   virtual Api::Api& api() PURE;
+};
+
+/**
+ * ServerFactoryContext is an specialization of common interface for downstream and upstream network
+ * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
+ * across listeners.
+ */
+class ServerFactoryContext : public virtual CommonFactoryContext {
+public:
+  ~ServerFactoryContext() override = default;
 };
 
 /**
@@ -110,6 +114,11 @@ public:
 class FactoryContext : public virtual CommonFactoryContext {
 public:
   ~FactoryContext() override = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
@@ -180,9 +189,16 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return ProcessContext& a reference to the process context.
+   * @return OptProcessContextRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
    */
-  virtual ProcessContext& processContext() PURE;
+  virtual OptProcessContextRef processContext() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
@@ -427,7 +443,8 @@ public:
    * config. Returned object will be stored in the loaded route configuration.
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
+  createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) {
     return nullptr;
   }
 

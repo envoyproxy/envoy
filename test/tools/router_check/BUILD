@@ -27,8 +27,7 @@ envoy_cc_test_library(
     copts = ["-DHAVE_LONG_LONG"],
     external_deps = ["tclap"],
     deps = [
-        ":validation_proto_cc",
-        "//source/common/config:rds_json_lib",
+        ":validation_proto_cc_proto",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -45,5 +44,5 @@ envoy_cc_test_library(
 envoy_proto_library(
     name = "validation_proto",
     srcs = ["validation.proto"],
-    deps = ["@envoy_api//envoy/api/v2/core:base_export"],
+    deps = ["@envoy_api//envoy/api/v2/core:pkg"],
 )

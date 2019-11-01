@@ -27,6 +27,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -56,6 +57,7 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
+#include "extensions/common/redis/redirection_mgr_impl.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
@@ -90,9 +92,9 @@ namespace Redis {
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::api::v2::Cluster& cluster,
-               const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
+               const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
+               Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
                Server::Configuration::TransportSocketFactoryContext& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api,
@@ -214,10 +216,13 @@ private:
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
-    // This is effectively not in used for making the "Cluster Slots" calls.
-    // since we call cluster slots on both the master and slaves, ANY is more appropriate here.
+    bool enableCommandStats() const override { return false; }
+    // For any readPolicy other than Master, the RedisClientFactory will send a READONLY command
+    // when establishing a new connection. Since we're only using this for making the "cluster
+    // slots" commands, the READONLY command is not relevant in this context. We're setting it to
+    // Master to avoid the additional READONLY command.
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
-      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Any;
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
     }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
@@ -241,11 +246,14 @@ private:
     Event::TimerPtr resolve_timer_;
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
     const std::chrono::milliseconds buffer_timeout_;
+    NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   };
 
   Upstream::ClusterManager& cluster_manager_;
   const std::chrono::milliseconds cluster_refresh_rate_;
   const std::chrono::milliseconds cluster_refresh_timeout_;
+  const std::chrono::milliseconds redirect_refresh_interval_;
+  const uint32_t redirect_refresh_threshold_;
   std::list<DnsDiscoveryResolveTargetPtr> dns_discovery_resolve_targets_;
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -259,8 +267,9 @@ private:
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;
 
-  envoy::api::v2::core::DataSource auth_password_datasource_;
-  Api::Api& api_;
+  const std::string auth_password_;
+  const Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
+  const Common::Redis::RedirectionManager::HandlePtr registration_handle_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

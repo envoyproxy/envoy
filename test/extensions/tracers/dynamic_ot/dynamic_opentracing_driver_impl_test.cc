@@ -28,8 +28,7 @@ public:
   void setupValidDriver() { setup(library_path_, tracer_config_); }
 
   const std::string library_path_ =
-      TestEnvironment::runfilesDirectory() +
-      "/external/io_opentracing_cpp/mocktracer/libmocktracer_plugin.so";
+      TestEnvironment::runfilesPath("mocktracer/libmocktracer_plugin.so", "io_opentracing_cpp");
   const std::string spans_file_ = TestEnvironment::temporaryDirectory() + "/spans.json";
   const std::string tracer_config_ = fmt::sprintf(R"EOF(
       {

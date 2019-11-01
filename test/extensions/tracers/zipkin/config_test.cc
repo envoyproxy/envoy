@@ -17,6 +17,7 @@ namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::MockInstance> server;
+
   EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
 
@@ -26,6 +27,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
     config:
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
+      collector_endpoint_version: HTTP_JSON
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;
@@ -40,6 +42,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   NiceMock<Server::MockInstance> server;
+
   EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
 
@@ -49,7 +52,8 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
-      collector_endpoint: /api/v1/spans
+      collector_endpoint: /api/v2/spans
+      collector_endpoint_version: HTTP_PROTO
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;

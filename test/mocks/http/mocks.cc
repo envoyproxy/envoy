@@ -8,13 +8,8 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::MakeMatcher;
-using testing::Matcher;
-using testing::MatcherInterface;
-using testing::MatchResultListener;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Http {
@@ -29,7 +24,7 @@ MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
 
 MockServerConnection::MockServerConnection() {
-  ON_CALL(*this, protocol()).WillByDefault(Return(protocol_));
+  ON_CALL(*this, protocol()).WillByDefault(Invoke([this]() { return protocol_; }));
 }
 
 MockServerConnection::~MockServerConnection() = default;

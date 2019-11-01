@@ -7,7 +7,6 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
-    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 load(
@@ -15,7 +14,7 @@ load(
     "envoy_all_extensions",
     "envoy_windows_extensions",
 )
-load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -44,7 +43,6 @@ envoy_cc_library(
     ] + select({
         "//bazel:windows_x86_64": envoy_windows_extensions(),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//bazel:boringssl_disabled": envoy_all_extensions(NOBORINGSSL_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -72,6 +70,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
@@ -95,7 +94,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",
         "//source/server:proto_descriptors_lib",
-    ] + envoy_google_grpc_external_deps(),
+    ],
 )
 
 envoy_cc_library(

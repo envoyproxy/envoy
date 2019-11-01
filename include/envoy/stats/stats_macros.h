@@ -5,6 +5,9 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 /**
  * These are helper macros for allocating "fixed" stats throughout the code base in a way that
@@ -14,7 +17,7 @@ namespace Envoy {
  *   #define MY_COOL_STATS(COUNTER, GAUGE, HISTOGRAM)     \
  *     COUNTER(counter1)                                  \
  *     GAUGE(gauge1, mode)                                \
- *     HISTOGRAM(histogram1)
+ *     HISTOGRAM(histogram1, unit)
  *     ...
  *
  * By convention, starting with #7083, we sort the lines of this macro block, so
@@ -35,14 +38,25 @@ namespace Envoy {
 // Fully-qualified for use in external callsites.
 #define GENERATE_COUNTER_STRUCT(NAME) Envoy::Stats::Counter& NAME##_;
 #define GENERATE_GAUGE_STRUCT(NAME, MODE) Envoy::Stats::Gauge& NAME##_;
-#define GENERATE_HISTOGRAM_STRUCT(NAME) Envoy::Stats::Histogram& NAME##_;
+#define GENERATE_HISTOGRAM_STRUCT(NAME, UNIT) Envoy::Stats::Histogram& NAME##_;
 
-#define FINISH_STAT_DECL_(X) + std::string(#X)),
-#define FINISH_STAT_DECL_MODE_(X, MODE) + std::string(#X), Envoy::Stats::Gauge::ImportMode::MODE),
+#define FINISH_STAT_DECL_(X) #X)),
+#define FINISH_STAT_DECL_MODE_(X, MODE) #X), Envoy::Stats::Gauge::ImportMode::MODE),
+#define FINISH_STAT_DECL_UNIT_(X, UNIT) #X), Envoy::Stats::Histogram::Unit::UNIT),
 
-#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(PREFIX FINISH_STAT_DECL_
-#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(PREFIX FINISH_STAT_DECL_MODE_
-#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(PREFIX FINISH_STAT_DECL_
+static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_view token) {
+  if (prefix.empty()) {
+    return std::string(token);
+  } else if (absl::EndsWith(prefix, ".")) {
+    // TODO(jmarantz): eliminate this case -- remove all the trailing dots from prefixes.
+    return absl::StrCat(prefix, token);
+  }
+  return absl::StrCat(prefix, ".", token);
+}
+
+#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
+#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_UNIT_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")

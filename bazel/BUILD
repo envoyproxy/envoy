@@ -1,11 +1,16 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
+
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//visibility:public"])
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+
+envoy_package()
+
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
-    "cc_wrapper.py",
 ])
 
 genrule(
@@ -35,6 +40,31 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
+)
+
+sh_binary(
+    name = "fuzzit_wrapper",
+    srcs = ["fuzzit_wrapper.sh"],
+    data = ["@fuzzit_linux//:fuzzit"],
+)
+
+# A target to optionally link C++ standard library dynamically in sanitizer runs.
+# TSAN doesn't support libc/libstdc++ static linking per doc:
+#   http://releases.llvm.org/8.0.1/tools/clang/docs/ThreadSanitizer.html
+cc_library(
+    name = "dynamic_stdlib",
+    linkopts = envoy_select_force_libcpp(
+        ["-lc++"],
+        ["-lstdc++"],
+    ),
+)
+
+cc_library(
+    name = "static_stdlib",
+    linkopts = select({
+        "//bazel:linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
 )
 
 config_setting(
@@ -82,6 +112,11 @@ config_setting(
 )
 
 config_setting(
+    name = "tsan_build",
+    values = {"define": "ENVOY_CONFIG_TSAN=1"},
+)
+
+config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
 )
@@ -97,6 +132,13 @@ config_setting(
     name = "gcc_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
+    },
+)
+
+config_setting(
+    name = "dynamic_link_tests",
+    values = {
+        "define": "dynamic_link_tests=true",
     },
 )
 

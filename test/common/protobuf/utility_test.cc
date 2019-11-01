@@ -1,8 +1,11 @@
 #include <unordered_set>
 
+#include "envoy/api/v2/cds.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
+#include "common/common/base64.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -27,6 +30,14 @@ protected:
 
   Api::ApiPtr api_;
 };
+
+TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
+  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  common_config_.mutable_healthy_panic_threshold()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(common_config_, healthy_panic_threshold, 0.5),
+               EnvoyException);
+}
 
 TEST_F(ProtobufUtilityTest, convertPercentNaN) {
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
@@ -114,6 +125,26 @@ TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
 
 } // namespace ProtobufPercentHelper
 
+TEST_F(ProtobufUtilityTest, MessageUtilHash) {
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["ab"].set_string_value("fgh");
+  (*s.mutable_fields())["cde"].set_string_value("ij");
+
+  ProtobufWkt::Any a1;
+  a1.PackFrom(s);
+  // The two base64 encoded Struct to test map is identical to the struct above, this tests whether
+  // a map is deterministically serialized and hashed.
+  ProtobufWkt::Any a2 = a1;
+  a2.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  ProtobufWkt::Any a3 = a1;
+  a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
+  EXPECT_NE(0, MessageUtil::hash(a1));
+  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+}
+
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
@@ -142,6 +173,19 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFields) {
                             "unknown field set {1}) has unknown fields");
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
                             "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
+                            "unknown field set {1}) has unknown fields");
+}
+
+// Validated exception thrown when downcastAndValidate observes a nested unknown field.
+TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+  cluster->GetReflection()->MutableUnknownFields(cluster)->AddVarint(1, 0);
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(*cluster), EnvoyException,
+                            "Protobuf message (type envoy.api.v2.Cluster with "
+                            "unknown field set {1}) has unknown fields");
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
+                            "Protobuf message (type envoy.api.v2.Cluster with "
                             "unknown field set {1}) has unknown fields");
 }
 
@@ -494,20 +538,24 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
+void checkForDeprecation(const Protobuf::Message& message) {
+  MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor());
+}
+
 TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
   loader_.reset();
 
   envoy::test::deprecation_test::Base base;
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
-  MessageUtil::checkForDeprecation(base);
+  checkForDeprecation(base);
 }
 
 TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   envoy::test::deprecation_test::Base base;
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
-  MessageUtil::checkForDeprecation(base);
+  checkForDeprecation(base);
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
 }
 
@@ -517,7 +565,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated))
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
-                      MessageUtil::checkForDeprecation(base));
+                      checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
 
@@ -526,7 +574,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed))
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base), ProtoValidationException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
 }
 
@@ -537,7 +585,7 @@ TEST_F(DeprecatedFieldsTest,
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base), ProtoValidationException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
   // The config will be rejected, so the feature will not be used.
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
@@ -549,7 +597,7 @@ TEST_F(DeprecatedFieldsTest,
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
-      MessageUtil::checkForDeprecation(base));
+      checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
 
@@ -559,7 +607,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
 
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
-                      MessageUtil::checkForDeprecation(base));
+                      checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 
   // Now create a new snapshot with this feature disallowed.
@@ -567,7 +615,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
       {{"envoy.deprecated_features.deprecated.proto:is_deprecated", " false"}});
 
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      checkForDeprecation(base), ProtoValidationException,
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
@@ -582,7 +630,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
         EXPECT_THROW_WITH_REGEX(
-            MessageUtil::checkForDeprecation(base), ProtoValidationException,
+            checkForDeprecation(base), ProtoValidationException,
             "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
       });
 }
@@ -593,7 +641,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MessageDeprecated)) {
   base.mutable_deprecated_message();
   EXPECT_LOG_CONTAINS(
       "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'",
-      MessageUtil::checkForDeprecation(base));
+      checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
 
@@ -601,15 +649,14 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(InnerMessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
   // Checks for a non-deprecated field shouldn't trigger warnings
-  EXPECT_LOG_NOT_CONTAINS("warning", "Using deprecated option",
-                          MessageUtil::checkForDeprecation(base));
+  EXPECT_LOG_NOT_CONTAINS("warning", "Using deprecated option", checkForDeprecation(base));
 
   base.mutable_not_deprecated_message()->set_inner_deprecated("bar");
   // Checks for a deprecated sub-message should result in a warning.
   EXPECT_LOG_CONTAINS(
       "warning",
       "Using deprecated option 'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
-      MessageUtil::checkForDeprecation(base));
+      checkForDeprecation(base));
 }
 
 // Check that repeated sub-messages get validated.
@@ -623,7 +670,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(SubMessageDeprecated)) {
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option "
                       "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
-                      MessageUtil::checkForDeprecation(base));
+                      checkForDeprecation(base));
 }
 
 // Check that deprecated repeated messages trigger
@@ -635,7 +682,49 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RepeatedMessageDeprecated))
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option "
                       "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
-                      MessageUtil::checkForDeprecation(base));
+                      checkForDeprecation(base));
+}
+
+// Check that deprecated enum values trigger for default values
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecatedDefault)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container();
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using the default now-deprecated value DEPRECATED_DEFAULT for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' from "
+      "file deprecated.proto. This enum value will be removed from Envoy soon so a non-default "
+      "value must now be explicitly set.",
+      checkForDeprecation(base));
+}
+
+// Check that deprecated enum values trigger for non-default values
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecated)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container()->set_deprecated_enum(
+      envoy::test::deprecation_test::Base::DEPRECATED_NOT_DEFAULT);
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using deprecated value DEPRECATED_NOT_DEFAULT for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
+      "from file deprecated.proto. This enum value will be removed from Envoy soon.",
+      checkForDeprecation(base));
+}
+
+// Make sure the runtime overrides for protos work, by checking the non-fatal to
+// fatal option.
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container();
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:DEPRECATED_DEFAULT", "false"}});
+
+  // Make sure this is set up right.
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+                          "Using the default now-deprecated value DEPRECATED_DEFAULT");
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
