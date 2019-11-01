@@ -6,12 +6,6 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include <memory>
-
-namespace quiche {
-
-template <typename T, typename... Args> std::unique_ptr<T> QuicheMakeUniqueImpl(Args&&... args) {
-  return std::make_unique<T>(std::forward<Args>(args)...);
-}
-
-} // namespace quiche
+#define QUICHE_EXPORT
+#define QUICHE_EXPORT_PRIVATE
+#define QUICHE_NO_EXPORT
