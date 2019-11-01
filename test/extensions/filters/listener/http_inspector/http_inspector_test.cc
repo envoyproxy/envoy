@@ -99,9 +99,9 @@ TEST_F(HttpInspectorTest, InlineReadInspectHttp10) {
       "15000\r\ncontent-length: 0\r\n\r\n";
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
   const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
 
@@ -123,9 +123,9 @@ TEST_F(HttpInspectorTest, InlineReadParseError) {
       "15000\r\ncontent-length: 0\r\n\r\n";
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
@@ -144,9 +144,9 @@ TEST_F(HttpInspectorTest, InspectHttp10) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
@@ -167,9 +167,9 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
@@ -190,9 +190,9 @@ TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
@@ -210,9 +210,9 @@ TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
@@ -229,9 +229,9 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
@@ -246,9 +246,9 @@ TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
@@ -263,9 +263,9 @@ TEST_F(HttpInspectorTest, OldHttpProtocol) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
@@ -281,9 +281,9 @@ TEST_F(HttpInspectorTest, InvalidRequestLine) {
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-        ASSERT(length >= header.size());
-        memcpy(buffer, header.data(), header.size());
-        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+        ASSERT(length >= header.length());
+        memcpy(buffer, header.data(), header.length());
+        return Api::SysCallSizeResult{ssize_t(header.length()), 0};
       }));
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
@@ -435,8 +435,8 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
+                ASSERT(length >= data.length());
+                memcpy(buffer, data.data(), data.length());
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
@@ -469,8 +469,8 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(Invoke([&data, &end_stream, i](int, void* buffer, size_t length,
                                                    int) -> Api::SysCallSizeResult {
-            ASSERT(length >= data.size());
-            memcpy(buffer, data.data(), data.size());
+            ASSERT(length >= data.length());
+            memcpy(buffer, data.data(), data.length());
             if (i == data.length()) {
               end_stream = true;
             }
@@ -501,8 +501,8 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
+                ASSERT(length >= data.length());
+                memcpy(buffer, data.data(), data.length());
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
@@ -535,8 +535,8 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(Invoke([&truncate_header, i](int, void* buffer, size_t length,
                                                  int) -> Api::SysCallSizeResult {
-            ASSERT(length >= truncate_header.size());
-            memcpy(buffer, truncate_header.data(), truncate_header.size());
+            ASSERT(length >= truncate_header.length());
+            memcpy(buffer, truncate_header.data(), truncate_header.length());
             return Api::SysCallSizeResult{ssize_t(i), 0};
           }));
     }
@@ -579,8 +579,8 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, len](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
+                ASSERT(length >= data.length());
+                memcpy(buffer, data.data(), data.length());
                 return Api::SysCallSizeResult{len, 0};
               }));
     }
@@ -615,8 +615,8 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
+                ASSERT(length >= data.length());
+                memcpy(buffer, data.data(), data.length());
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
