@@ -185,6 +185,15 @@ public:
    */
   static DelegatingLogSinkPtr init();
 
+  /**
+   * Give a log line with trailing whitespace, this will escape all c-style
+   * escape sequences except for the trailing whitespace.
+   * This allows logging escaped messages, but preserves end-of-line characters.
+   *
+   * @param source the log line with trailing whitespace
+   */
+  static std::string escapeLogLine(absl::string_view source);
+
 private:
   friend class SinkDelegate;
 

@@ -128,13 +128,51 @@ public:
 
 TEST_F(FormatTest, OutputUnescaped) {
   const Envoy::ExpectedLogMessages message{{"info", "line 1 \n line 2 \t tab \\r test"}};
-  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(message, logMessageEscapeSequences(), false);
+  EXPECT_LOG_CONTAINS_ALL_OF(message, logMessageEscapeSequences());
 }
 
 TEST_F(FormatTest, OutputEscaped) {
   // Note this uses a raw string literal
   const Envoy::ExpectedLogMessages message{{"info", R"(line 1 \n line 2 \t tab \\r test)"}};
-  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(message, logMessageEscapeSequences(), true);
+  EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(message, logMessageEscapeSequences());
+}
+
+class EscapeTest : public testing::Test {
+};
+
+TEST_F(EscapeTest, LinuxEOL) {
+  const std::string log = Logger::DelegatingLogSink::escapeLogLine("line 1 \n line 2\n");
+  EXPECT_EQ("line 1 \\n line 2\n", log);
+}
+
+TEST_F(EscapeTest, WindowEOL) {
+  const std::string log = Logger::DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n");
+  EXPECT_EQ("line 1 \\n line 2\r\n", log);
+}
+
+TEST_F(EscapeTest, NoTrailingWhitespace) {
+  const std::string log = Logger::DelegatingLogSink::escapeLogLine("line 1 \n line 2");
+  EXPECT_EQ("line 1 \\n line 2", log);
+}
+
+TEST_F(EscapeTest, NoWhitespace) {
+  const std::string log = Logger::DelegatingLogSink::escapeLogLine("line1");
+  EXPECT_EQ("line1", log);
+}
+
+TEST_F(EscapeTest, AnyTrailingWhitespace) {
+  const std::string log = Logger::DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\n");
+  EXPECT_EQ("line 1 \\t tab 1 \\n line 2\t\n", log);
+}
+
+TEST_F(EscapeTest, WhitespaceOnly) {
+  // 8 spaces
+  const std::string log1 = Logger::DelegatingLogSink::escapeLogLine("        ");
+  EXPECT_EQ("        ", log1);
+
+  // Any whitespace characters
+  const std::string log2 = Logger::DelegatingLogSink::escapeLogLine("\r\n\t \r\n \n");
+  EXPECT_EQ("\r\n\t \r\n \n", log2);
 }
 
 } // namespace Envoy

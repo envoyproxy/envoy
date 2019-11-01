@@ -68,6 +68,10 @@ using ExpectedLogMessages = std::vector<StringPair>;
 // Below macros specify Envoy:: before class names so that the macro can be used outside of
 // namespace Envoy.
 
+// Alias for EXPECT_LOG_CONTAINS_ALL_OF_HELPER, with escaped=true
+#define EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(expected_messages, stmt)                                        \
+  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, true)
+
 // Alias for EXPECT_LOG_CONTAINS_ALL_OF_HELPER, with escaped=false
 #define EXPECT_LOG_CONTAINS_ALL_OF(expected_messages, stmt)                                        \
   EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, false)

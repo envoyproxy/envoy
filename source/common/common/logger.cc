@@ -70,18 +70,21 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   lock.Release();
 
   if (should_escape_) {
-    // Split the actual log message from the trailing whitespace.
+    sink_->log(escapeLogLine(msg_view));
+  } else {
+    sink_->log(msg_view);
+  }
+}
+
+std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
+    // Split the actual message from the trailing whitespace.
     auto eol_it = std::find_if_not(msg_view.rbegin(), msg_view.rend(), absl::ascii_isspace);
     auto msg_leading_view = msg_view.substr(0, msg_view.rend() - eol_it);
     auto msg_whitespace_view =
         msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
 
-    // Escape the log message, but keep the whitespace unescaped.
-    sink_->log(absl::CEscape(msg_leading_view));
-    sink_->log(msg_whitespace_view);
-  } else {
-    sink_->log(msg_view);
-  }
+    // Escape the message, but keep the whitespace unescaped.
+    return absl::StrCat(absl::CEscape(msg_leading_view), msg_whitespace_view);
 }
 
 DelegatingLogSinkPtr DelegatingLogSink::init() {
