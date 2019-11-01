@@ -53,22 +53,39 @@ hosts. In VHDS, Envoy will send a
 with :ref:`type_url` set to 
 `type.googleapis.com/envoy.api.v2.route.VirtualHost` 
 and :ref:`resource_names <envoy_api_msg_DeltaDiscoveryRequest.resource_names>` 
-set to a list of routeconfig names + the request HTTP "host"
-headers for which it would like configuration. The management server will
-respond with a
+set to a list of virtual host resource names for which it would like
+configuration. The management server will respond with a
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`
 with the :ref:`resources <envoy_api_msg_DeltaDiscoveryResponse.resources>`
 field populated with the specified virtual hosts, the 
 :ref:`name <envoy_api_msg_DeltaDiscoveryResponse.name>`
-field populated with the virtual host name, and the :ref:`alias` field populated with
-the explicit (no wildcard) domains of the virtual host. Future updates to these
-virtual hosts will be sent via spontaneous updates.
+field populated with the virtual host name, and the 
+:ref:`alias <envoy_api_msg_DeltaDiscoveryResponse.alias>` field
+populated with the explicit (no wildcard) domains of the virtual host. Future
+updates to these virtual hosts will be sent via spontaneous updates.
+
+Updates to the route configuration entry to which a virtual host belongs will
+clear the virtual host table and require all virtual hosts to be sent again. It
+may be useful for the management server to populate and RDS responses with the
+subscribed list of virtual hosts. 
+
+Virtual Host Naming Convention
+==============================
+Virtual hosts in VHDS are identified by a combination of the name of the route
+configuration to which the virtual host belong as well as the host HTTP "host"
+header entry. Resources should be named as follows:
+
+<route configuration name>/<host entry>
+
+Note that matching should be done from right to left since a host entry cannot
+contain slashes while a route configuration name can. 
 
 Subscribing to Virtual Hosts
 ============================
 Envoy will send a
-:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`
-with the :ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>` field populated with the route config names
+:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` with the
+:ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>`
+field populated with the route config names
 + domains of each of the resources that it would like to subscribe to. Each of
 the virtual hosts contained in the
 :ref:`DeltaDiscoveryRequest's <envoy_api_msg_DeltaDiscoveryRequest>`
@@ -80,6 +97,17 @@ but only if the updated virtual host is different from its current state.
 During spontaneous updates configuration server will only send updates for
 virtual hosts that Envoy is aware of. The configuration server needs to
 keep track of virtual hosts known to Envoy.
+
+If a virtual host is requested for which the management sever does not know
+about, then the management server should respond with a 
+:ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` in which
+the :ref:`resources <envoy_api_msg_DeltaDiscoveryRequest.resources>` entry for
+that virtual host has the 
+:ref:`name <envoy_api_msg_DeltaDiscoveryResponse.name>` 
+and :ref:`alias <envoy_api_msg_DeltaDiscoveryResponse.alias>` 
+set to the requested host entry and
+the resource unpopulated. This will allow Envoy to match the requested resource
+to the response.
 
 Unsubscribing from Virtual Hosts
 ================================
