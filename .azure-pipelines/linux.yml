@@ -48,6 +48,8 @@ jobs:
         CI_TARGET: 'bazel.asan'
       tsan:
         CI_TARGET: 'bazel.tsan'
+      clang_tidy:
+        CI_TARGET: 'bazel.clang_tidy'
       gcc:
         CI_TARGET: 'bazel.gcc'
       compile_time_options:
