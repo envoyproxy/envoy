@@ -69,7 +69,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
 // namespace Envoy.
 
 // Alias for EXPECT_LOG_CONTAINS_ALL_OF_HELPER, with escaped=true
-#define EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(expected_messages, stmt)                                        \
+#define EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(expected_messages, stmt)                                \
   EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, true)
 
 // Alias for EXPECT_LOG_CONTAINS_ALL_OF_HELPER, with escaped=false

@@ -137,8 +137,7 @@ TEST_F(FormatTest, OutputEscaped) {
   EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(message, logMessageEscapeSequences());
 }
 
-class EscapeTest : public testing::Test {
-};
+class EscapeTest : public testing::Test {};
 
 TEST_F(EscapeTest, LinuxEOL) {
   const std::string log = Logger::DelegatingLogSink::escapeLogLine("line 1 \n line 2\n");
