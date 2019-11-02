@@ -271,21 +271,13 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
-elif [[ "$CI_TARGET" == "bazel.fuzzit_regression" ]]; then
+elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
   setup_clang_toolchain
   FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
-  echo "Building fuzzers and run a regression with corpus from Fuzzit"
-  bazel_with_collection build ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
-  ./ci/run_fuzzit.sh local-regression
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.fuzzit_fuzzing" ]]; then
-  setup_clang_toolchain
-  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
-  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
-  echo "Build fuzzers and push them to Fuzzit servers for continuous fuzzing"
-  bazel_with_collection build ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
-  ./ci/run_fuzzit.sh fuzzing
+  echo "Building fuzzers and run under Fuzzit"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} \
+    --test_env=FUZZIT_API_KEY --test_timeout=1200 --run_under=//bazel:fuzzit_wrapper
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.

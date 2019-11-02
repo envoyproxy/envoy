@@ -24,7 +24,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "//source/extensions/filters/http:well_known_names",
