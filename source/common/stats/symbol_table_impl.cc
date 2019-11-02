@@ -58,25 +58,6 @@ uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
   return num_bytes;
 }
 
-uint8_t* SymbolTableImpl::Encoding::writeEncodingReturningNext(uint64_t number, uint8_t* bytes) {
-  // UTF-8-like encoding where a value 127 or less gets written as a single
-  // byte. For higher values we write the low-order 7 bits with a 1 in
-  // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
-  // until we have consumed all the non-zero bits in symbol.
-  //
-  // When decoding, we stop consuming uint8_t when we see a uint8_t with
-  // high-order bit 0.
-  do {
-    if (number < (1 << 7)) {
-      *bytes++ = number; // number <= 127 get encoded in one byte.
-    } else {
-      *bytes++ = ((number & Low7Bits) | SpilloverMask); // number >= 128 need spillover bytes.
-    }
-    number >>= 7;
-  } while (number != 0);
-  return bytes;
-}
-
 void SymbolTableImpl::Encoding::appendEncoding(uint64_t number, MemBlock<uint8_t>& mem_block) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
@@ -87,9 +68,9 @@ void SymbolTableImpl::Encoding::appendEncoding(uint64_t number, MemBlock<uint8_t
   // high-order bit 0.
   do {
     if (number < (1 << 7)) {
-      mem_block.push_back(number); // number <= 127 get encoded in one byte.
+      mem_block.appendOne(number); // number <= 127 get encoded in one byte.
     } else {
-      mem_block.push_back((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
+      mem_block.appendOne((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
     }
     number >>= 7;
   } while (number != 0);
@@ -133,7 +114,7 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
 
 void SymbolTableImpl::Encoding::moveToStorage(MemBlock<uint8_t>& mem_block) {
   appendEncoding(data_bytes_required_, mem_block);
-  mem_block.append(mem_block_);
+  mem_block.appendBlock(mem_block_);
   mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
@@ -503,8 +484,8 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   MemBlock<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
   for (StatName stat_name : stat_names) {
-    const uint64_t stat_name_bytes = stat_name.dataSize();
-    mem_block.append(stat_name.data(), stat_name_bytes);
+    //mem_block.appendData(stat_name.data(), stat_name.dataSize());
+    stat_name.copyDataToStorage(mem_block);
   }
   return mem_block.release();
 }
@@ -526,7 +507,7 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
   MemBlock<uint8_t> mem_block(total_size_bytes);
-  mem_block.push_back(num_names);
+  mem_block.appendOne(num_names);
   for (auto& encoding : encodings) {
     encoding.moveToStorage(mem_block);
   }
@@ -535,7 +516,7 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
   // total_size_bytes. After appending all the encoded data into the
   // allocated byte array, we should have exhausted all the memory
   // we though we needed.
-  ASSERT(mem_block.bytesRemaining() == 0);
+  ASSERT(mem_block.capacityRemaining() == 0);
   list.moveStorageIntoList(mem_block.release());
 }
 

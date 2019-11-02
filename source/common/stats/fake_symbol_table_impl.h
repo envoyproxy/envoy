@@ -73,13 +73,13 @@ public:
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
     MemBlock<uint8_t> mem_block(total_size_bytes);
-    mem_block.push_back(num_names);
+    mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
       auto& name = names[i];
       size_t sz = name.size();
       SymbolTableImpl::Encoding::appendEncoding(sz, mem_block);
       if (!name.empty()) {
-        mem_block.append(reinterpret_cast<const uint8_t*>(name.data()), sz);
+        mem_block.appendData(reinterpret_cast<const uint8_t*>(name.data()), sz);
       }
     }
 
@@ -87,7 +87,7 @@ public:
     // total_size_bytes. After appending all the encoded data into the
     // allocated byte array, we should have exhausted all the memory
     // we though we needed.
-    ASSERT(mem_block.bytesRemaining() == 0);
+    ASSERT(mem_block.capacityRemaining() == 0);
     list.moveStorageIntoList(mem_block.release());
   }
 
@@ -140,7 +140,7 @@ private:
     ASSERT(!absl::EndsWith(name, "."));
     MemBlock<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
     SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
-    mem_block.append(reinterpret_cast<const uint8_t*>(name.data()), name.size());
+    mem_block.appendData(reinterpret_cast<const uint8_t*>(name.data()), name.size());
     return mem_block.release();
     ;
   }

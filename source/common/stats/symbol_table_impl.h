@@ -138,16 +138,14 @@ public:
      * Requires that the buffer be sized to accommodate encodingSizeBytes(number).
      *
      * @param number the number to write.
-     * @param bytes the pointer into which to write the number.
-     * @return the pointer to the next byte for writing the data.
+     * @param MemBlock the memory into which to append the number.
      */
-    static uint8_t* writeEncodingReturningNext(uint64_t number, uint8_t* bytes);
     static void appendEncoding(uint64_t number, MemBlock<uint8_t>& mem_block);
 
     /**
      * Decodes a byte-array containing a variable-length number.
      *
-     * @param The encoded byte array, written previously by writeNumberReturningNext.
+     * @param The encoded byte array, written previously by appendEncoding.
      * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
      */
     static std::pair<uint64_t, uint64_t> decodeNumber(const uint8_t* encoding);
@@ -389,7 +387,8 @@ public:
    */
   uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
-  void copyToStorage(MemBlock<uint8_t>& storage) { storage.append(size_and_data_, size()); }
+  void copyToStorage(MemBlock<uint8_t>& storage) { storage.appendData(size_and_data_, size()); }
+  void copyDataToStorage(MemBlock<uint8_t>& storage) { storage.appendData(data(), dataSize()); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
