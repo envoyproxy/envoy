@@ -14,7 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"
-#include "common/common/mem_block.h"
+#include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
 #include "common/common/stack_array.h"
 #include "common/common/thread.h"

@@ -69,9 +69,9 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "mem_block_test",
-    srcs = ["mem_block_test.cc"],
-    deps = ["//source/common/common:mem_block_lib"],
+    name = "mem_block_builder_test",
+    srcs = ["mem_block_builder_test.cc"],
+    deps = ["//source/common/common:mem_block_builder_lib"],
 )
 
 envoy_cc_test(

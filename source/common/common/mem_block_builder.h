@@ -11,15 +11,15 @@ namespace Envoy {
 // empty-constructible. This class carries extra member variables for tracking
 // size, and a write-pointer to support safe appends.
 //
-// MemBlockBuilder is used to safely write blocks of data into a memory buffer. Due to
-// two extra member variables, it is not optimal for storing in data
-// structures. The intended usage model is to release the raw assembled memory
-// block from the MemBlockBuilder for efficient storage.
+// MemBlockBuilder is used to safely write blocks of data into a memory
+// buffer. Due to two extra member variables, it is not optimal for storing in
+// data structures. The intended usage model is to release the raw assembled
+// memory block from the MemBlockBuilder for efficient storage.
 //
 // The goal for this class is to provide a usage model to replace direct usage
 // of memcpy with a pattern that is easy to validate for correctness by
-// inspection, asserts, and fuzzing, but when compiled for optimization is just
-// as efficient as raw memcpy.
+// inspection, asserts, and fuzzing, but when compiled for optimization is
+// roughly as efficient as raw memcpy.
 template <class T> class MemBlockBuilder {
 public:
   // Constructs a MemBlockBuilder of the specified size.
@@ -28,8 +28,8 @@ public:
   MemBlockBuilder() : capacity_(0), write_ptr_(nullptr) {}
 
   /**
-   * Populates (or repopulates) the MemBlockBuilder to make it the specified size.
-   * This does not have resize semantics; when populate() is called any
+   * Populates (or repopulates) the MemBlockBuilder to make it the specified
+   * size.  This does not have resize semantics; when populate() is called any
    * previous contents are erased.
    *
    * @param size The number of memory elements to allocate.

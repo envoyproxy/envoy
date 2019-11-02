@@ -114,8 +114,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "mem_block_lib",
-    hdrs = ["mem_block.h"],
+    name = "mem_block_builder_lib",
+    hdrs = ["mem_block_builder.h"],
     deps = [":assert_lib"],
 )
 
