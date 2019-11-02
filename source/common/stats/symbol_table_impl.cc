@@ -46,7 +46,7 @@ void StatName::debugPrint() {
 SymbolTableImpl::Encoding::~Encoding() {
   // Verifies that moveToStorage() was called on this encoding. Failure
   // to call moveToStorage() will result in leaks symbols.
-  ASSERT(storage_ == nullptr);
+  ASSERT(mem_block_.data() == nullptr);
 }
 
 uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
@@ -100,12 +100,11 @@ void SymbolTableImpl::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   for (Symbol symbol : symbols) {
     data_bytes_required_ += encodingSizeBytes(symbol);
   }
-  storage_ = std::make_unique<Storage>(data_bytes_required_);
-  uint8_t* bytes = storage_.get();
+  mem_block_.populate(data_bytes_required_);
   for (Symbol symbol : symbols) {
-    bytes = writeEncodingReturningNext(symbol, bytes);
+    appendEncoding(symbol, mem_block_);
   }
-  ASSERT(static_cast<uint64_t>(bytes - storage_.get()) == data_bytes_required_);
+  //ASSERT(static_cast<uint64_t>(bytes - storage_.get()) == data_bytes_required_);
 }
 
 std::pair<uint64_t, uint64_t> SymbolTableImpl::Encoding::decodeNumber(const uint8_t* encoding) {
@@ -132,13 +131,10 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
   return symbol_vec;
 }
 
-void SymbolTableImpl::Encoding::moveToStorage(MemBlock<uint8_t>& mem_block, uint64_t dst_offset) {
-  uint8_t* p = mem_block.data() + dst_offset;
-  dst_offset += writeEncodingReturningNext(data_bytes_required_, p) - p;
-  if (data_bytes_required_ != 0) {
-    mem_block.dangerousCopyFrom(storage_.get(), data_bytes_required_, dst_offset);
-  }
-  storage_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
+void SymbolTableImpl::Encoding::moveToStorage(MemBlock<uint8_t>& mem_block) {
+  appendEncoding(data_bytes_required_, mem_block);
+  mem_block.append(mem_block_);
+  mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
 SymbolTableImpl::SymbolTableImpl()
@@ -426,7 +422,7 @@ SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
   ASSERT(!absl::EndsWith(name, "."));
   Encoding encoding;
   addTokensToEncoding(name, encoding);
-  MemBlock<uint8_t> mem_block(encoding.bytesRequired());
+  MemBlock<uint8_t> mem_block(Encoding::totalSizeBytes(encoding.bytesRequired()));
   encoding.moveToStorage(mem_block);
   return mem_block.release();
 }
@@ -530,11 +526,9 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
   MemBlock<uint8_t> mem_block(total_size_bytes);
-  mem_block.data()[0] = num_names;
-  uint64_t offset = 1;
+  mem_block.push_back(num_names);
   for (auto& encoding : encodings) {
-    encoding.moveToStorage(mem_block, offset);
-    offset += encoding.bytesRequired();
+    encoding.moveToStorage(mem_block);
   }
 
   // This assertion double-checks the arithmetic where we computed

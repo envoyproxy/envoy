@@ -114,7 +114,7 @@ public:
      *
      * @param array destination memory to receive the encoded bytes.
      */
-    void moveToStorage(MemBlock<uint8_t>& array, uint64_t dst_offset = 0);
+    void moveToStorage(MemBlock<uint8_t>& array);
 
     /**
      * @param number A number to encode in a variable length byte-array.
@@ -152,9 +152,11 @@ public:
      */
     static std::pair<uint64_t, uint64_t> decodeNumber(const uint8_t* encoding);
 
+    StoragePtr release() { return mem_block_.release(); }
+
   private:
     uint64_t data_bytes_required_{0};
-    StoragePtr storage_;
+    MemBlock<uint8_t> mem_block_;
   };
 
   SymbolTableImpl();

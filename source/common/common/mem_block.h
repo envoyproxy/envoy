@@ -12,6 +12,13 @@ template<class T> class MemBlock {
   // is responsible for ensuring that 'data' has size 'size'.
   explicit MemBlock(uint64_t size) : data_(std::make_unique<T[]>(size)), size_(size),
                                      next_(data_.get()) {}
+  explicit MemBlock() : size_(0), next_(nullptr) {}
+
+  void populate(uint64_t size) {
+    data_ = std::make_unique<T[]>(size);
+    size_ = size;
+    next_ = data_.get();
+  }
 
   T* data() { return data_.get(); }
 
@@ -30,14 +37,30 @@ template<class T> class MemBlock {
   }
 
   void push_back(T byte) {
-    ASSERT(static_cast<uint64_t>((next_ - data_.get()) + 1) <= size_);
+    ASSERT(bytesRemaining() >= 1);
     *next_++ = byte;
   }
 
+  uint64_t bytesRemaining() const {
+    return (data_.get() + size_) - next_;
+  }
+
   void append(const T* byte, uint64_t size) {
-    ASSERT(static_cast<uint64_t>((next_ - data_.get()) + size) <= size_);
+    ASSERT(bytesRemaining() >= size);
     memcpy(next_, byte, size);
     next_ += size;
+  }
+
+  void append(const MemBlock& src) {
+    ASSERT(bytesRemaining() >= src.size_);
+    memcpy(next_, src.data_.get(), src.size_);
+    next_ += src.size_;
+  }
+
+  void reset() {
+    data_.reset();
+    size_ = 0;
+    next_ = nullptr;
   }
 
   std::unique_ptr<T[]> release() { return std::move(data_); }
