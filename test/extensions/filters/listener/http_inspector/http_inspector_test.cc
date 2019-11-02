@@ -370,8 +370,8 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
+                ASSERT(length >= i);
+                memcpy(buffer, data.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
@@ -403,8 +403,8 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
+                ASSERT(length >= i);
+                memcpy(buffer, data.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
@@ -431,12 +431,12 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
       return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
     }));
 
-    for (size_t i = 1; i <= data.length(); i++) {
+    for (size_t i = 1; i <= data.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.length());
-                memcpy(buffer, data.data(), data.length());
+                ASSERT(length >= i);
+                memcpy(buffer, data.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
@@ -465,13 +465,13 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
       return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
     }));
 
-    for (size_t i = 1; i <= data.length(); i++) {
+    for (size_t i = 1; i <= data.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(Invoke([&data, &end_stream, i](int, void* buffer, size_t length,
                                                    int) -> Api::SysCallSizeResult {
-            ASSERT(length >= data.length());
-            memcpy(buffer, data.data(), data.length());
-            if (i == data.length()) {
+            ASSERT(length >= i);
+            memcpy(buffer, data.data(), i);
+            if (i == data.size()) {
               end_stream = true;
             }
 
@@ -497,12 +497,12 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
       return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
     }));
 
-    for (size_t i = 1; i <= data.length(); i++) {
+    for (size_t i = 1; i <= data.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.length());
-                memcpy(buffer, data.data(), data.length());
+                ASSERT(length >= i);
+                memcpy(buffer, data.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
@@ -572,16 +572,16 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
 #endif
 
     for (size_t i = 1; i <= num_loops; i++) {
-      ssize_t len = i;
+      size_t len = i;
       if (num_loops == 2) {
-        len = Config::MAX_INSPECT_SIZE / (3 - i);
+        len = size_t(Config::MAX_INSPECT_SIZE / (3 - i));
       }
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, len](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.length());
-                memcpy(buffer, data.data(), data.length());
-                return Api::SysCallSizeResult{len, 0};
+                ASSERT(length >= len);
+                memcpy(buffer, data.data(), len);
+                return Api::SysCallSizeResult{ssize_t(len), 0};
               }));
     }
   }
@@ -615,8 +615,8 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(
               Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.length());
-                memcpy(buffer, data.data(), data.length());
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), i);
                 return Api::SysCallSizeResult{ssize_t(i), 0};
               }));
     }
