@@ -1397,4 +1397,63 @@ TEST_P(HeaderIntegrationTest, TestRejectNominatedXForwardedProto) {
           {"connection", "close"},
       });
 }
+
+TEST_P(HeaderIntegrationTest, TestRejectTeHeaderTooLong) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      });
+}
 } // namespace Envoy

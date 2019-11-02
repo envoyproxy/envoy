@@ -438,8 +438,6 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
       headers_to_remove.emplace(token_sv);
 
     } else if (StringUtil::CaseInsensitiveCompare()(token_sv,
-                                                    Http::Headers::get().Connection.get()) ||
-               StringUtil::CaseInsensitiveCompare()(token_sv,
                                                     Http::Headers::get().ForwardedFor.get()) ||
                StringUtil::CaseInsensitiveCompare()(token_sv,
                                                     Http::Headers::get().ForwardedHost.get()) ||
@@ -457,18 +455,36 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
 
     if (nominated_header) {
       const HeaderString& nominated_header_value = nominated_header->value();
-      for (const auto& header_value : absl::StrSplit(nominated_header_value.getStringView(), ',')) {
+      auto nominated_heaader_value_sv = nominated_header_value.getStringView();
 
-        const absl::string_view header_sv = StringUtil::trim(header_value);
+      const bool is_te_header =
+          StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().TE.get());
 
-        // Check whether TE contains multiple values and remove everything except "trailers"
-        if (StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().TE.get()) &&
-            (StringUtil::CaseInsensitiveCompare()(header_sv,
-                                                  Http::Headers::get().TEValues.Trailers))) {
-          keep_header = true;
-        } else {
-          ENVOY_LOG_MISC(trace, "Sanitizing nominated header [{}] value [{}]", token_sv, header_sv);
-          tokens_to_remove.emplace(header_sv);
+      // If TE exists and does not contain trailers, remove the entire TE header
+      // We will sanitize the header later if it does contain "trailers" and may have
+      // other values
+      const bool sanitize_te_header_values =
+          (is_te_header && (nominated_heaader_value_sv.find(
+                                Http::Headers::get().TEValues.Trailers) != std::string::npos));
+
+      // reject the request if the TE header is too large
+      if (is_te_header && (nominated_heaader_value_sv.size() >= 256)) {
+        return false;
+      }
+
+      if (sanitize_te_header_values) {
+        keep_header = true;
+        for (const auto& header_value : absl::StrSplit(nominated_heaader_value_sv, ',')) {
+
+          const absl::string_view header_sv = StringUtil::trim(header_value);
+
+          // Remove everything from TE header except "trailers"
+          if (!StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                    Http::Headers::get().TEValues.Trailers)) {
+            ENVOY_LOG_MISC(trace, "Sanitizing nominated header [{}] value [{}]", token_sv,
+                           header_sv);
+            tokens_to_remove.emplace(header_sv);
+          }
         }
       }
 
