@@ -113,6 +113,12 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+envoy_cc_library(
+    name = "mem_block_lib",
+    hdrs = ["mem_block.h"],
+    deps = [":assert_lib"],
+)
+
 # Contains macros and helpers for dumpState utilities
 envoy_cc_library(
     name = "dump_state_utils",

@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"
+#include "common/common/mem_block.h"
 #include "common/common/non_copyable.h"
 #include "common/common/stack_array.h"
 #include "common/common/thread.h"
@@ -113,7 +114,7 @@ public:
      *
      * @param array destination memory to receive the encoded bytes.
      */
-    void moveToStorage(SymbolTable::Storage array);
+    void moveToStorage(MemBlock<uint8_t>& array, uint64_t dst_offset = 0);
 
     /**
      * @param number A number to encode in a variable length byte-array.
@@ -137,10 +138,11 @@ public:
      * Requires that the buffer be sized to accommodate encodingSizeBytes(number).
      *
      * @param number the number to write.
-     * @param bytes the pointer into which to write the length.
+     * @param bytes the pointer into which to write the number.
      * @return the pointer to the next byte for writing the data.
      */
-    static uint8_t* writeEncodingReturningNext(uint64_t number, uint8_t* buffer);
+    static uint8_t* writeEncodingReturningNext(uint64_t number, uint8_t* bytes);
+    static void appendEncoding(uint64_t number, MemBlock<uint8_t>& mem_block);
 
     /**
      * Decodes a byte-array containing a variable-length number.
@@ -385,7 +387,9 @@ public:
    */
   uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
-  void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
+  void copyToStorage(MemBlock<uint8_t>& storage) {
+    storage.dangerousCopyFrom(size_and_data_, size());
+  }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
