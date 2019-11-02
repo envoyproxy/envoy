@@ -1,19 +1,25 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "common/common/assert.h"
 
 namespace Envoy {
 
 // Manages a block of raw memory for objects of type T. T must be
-// empty-constructible. This class carries extra member variables
-// for tracking size, and a write-pointer to support safe appends.
+// empty-constructible. This class carries extra member variables for tracking
+// size, and a write-pointer to support safe appends.
 //
-// MemBlock is used to efficiently write blocks of data into a memory
-// buffer. Due to the extra member variables, it is not optimal for
-// storing in data structures. Instead, the raw assembled memory block
-// is released from the MemBlock after assembly.
+// MemBlock is used to safely write blocks of data into a memory buffer. Due to
+// two extra member variables, it is not optimal for storing in data
+// structures. The intended usage model is to release the raw assembled memory
+// block from the MemBlock for efficient storage.
+//
+// The goal for this class is to provide a usage model to replace direct usage
+// of memcpy with a pattern that is easy to validate for correctness by
+// inspection, asserts, and fuzzing, but when compiled for optimization is just
+// as efficient as raw memcpy.
 template <class T> class MemBlock {
 public:
   // Constructs a MemBlock of the specified size.
