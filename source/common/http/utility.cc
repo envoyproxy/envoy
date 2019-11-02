@@ -24,6 +24,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Http {
@@ -387,6 +388,115 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 }
 
+bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
+  // Remove any headers nominated by the Connection header. The TE header
+  // is sanitized and removed only if it's empty after removing unsupported values
+  // See https://github.com/envoyproxy/envoy/issues/8623
+  const auto& cv = Http::Headers::get().ConnectionValues;
+  const auto& connection_header_value = headers.Connection()->value();
+
+  StringUtil::CaseUnorderedSet headers_to_remove{};
+  std::vector<std::string> connection_header_tokens =
+      absl::StrSplit(connection_header_value.getStringView(), ',');
+
+  // If we have 10 or more nominated headers, fail this request
+  if (connection_header_tokens.size() >= 10) {
+    ENVOY_LOG_MISC(trace, "Too many nominated headers in request");
+    return false;
+  }
+
+  // Split the connection header and evaluate each nominated header
+  for (const auto& token : connection_header_tokens) {
+
+    const absl::string_view token_sv = StringUtil::trim(token);
+
+    // If the Connection token value is not a nominated header, ignore it here since
+    // the connection header is removed elsewhere when the H1 request is upgraded to H2
+    if (StringUtil::CaseInsensitiveCompare()(token_sv, cv.Close) ||
+        StringUtil::CaseInsensitiveCompare()(token_sv, cv.Http2Settings) ||
+        StringUtil::CaseInsensitiveCompare()(token_sv, cv.KeepAlive) ||
+        StringUtil::CaseInsensitiveCompare()(token_sv, cv.Upgrade)) {
+      continue;
+    }
+
+    // Build the LowerCaseString for header lookup
+    const std::string header_to_remove = std::string(token_sv);
+    const LowerCaseString lcs_header_to_remove(header_to_remove);
+
+    // By default we will remove any nominated headers
+    bool keep_header = false;
+
+    // Determine whether the nominated header contains invalid values
+    HeaderEntry* nominated_header = NULL;
+
+    if (StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().Connection.get())) {
+      // Remove the connection header from the nominated tokens if it's self nominated
+      // The connection header itself is *not removed*
+      ENVOY_LOG_MISC(trace, "Skipping self nominated header [{}]", token_sv);
+      keep_header = true;
+      headers_to_remove.emplace(token_sv);
+
+    } else if (StringUtil::CaseInsensitiveCompare()(token_sv,
+                                                    Http::Headers::get().ForwardedFor.get()) ||
+               StringUtil::CaseInsensitiveCompare()(token_sv,
+                                                    Http::Headers::get().ForwardedHost.get()) ||
+               StringUtil::CaseInsensitiveCompare()(token_sv,
+                                                    Http::Headers::get().ForwardedProto.get()) ||
+               !token_sv.find(':')) {
+      // If pseudo headers or X-Forwarded* headers are nominated, this could be
+      // an invalid request. Reject the request
+      return false;
+
+    } else {
+      // Examine the value of all other nominated headers
+      nominated_header = headers.get(lcs_header_to_remove);
+    }
+
+    if (nominated_header) {
+      const HeaderString& nominated_header_value = nominated_header->value();
+      auto nominated_heaader_value_sv = nominated_header_value.getStringView();
+
+      const bool is_te_header =
+          StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().TE.get());
+
+      // reject the request if the TE header is too large
+      if (is_te_header && (nominated_heaader_value_sv.size() >= 256)) {
+        return false;
+      }
+
+      // If the TE header contains "trailers" we will reset the header to this value since it's
+      // the only permitted value
+      if (is_te_header && (nominated_heaader_value_sv.find(
+                               Http::Headers::get().TEValues.Trailers) != std::string::npos)) {
+        nominated_header->value().clear();
+        nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
+                                          Http::Headers::get().TEValues.Trailers.size());
+        continue;
+      }
+    }
+
+    if (!keep_header) {
+      ENVOY_LOG_MISC(trace, "Removing nominated header [{}]", token_sv);
+      headers.remove(lcs_header_to_remove);
+      headers_to_remove.emplace(token_sv);
+    }
+  }
+
+  // Lastly remove extra nominated headers from the Connection header
+  if (!headers_to_remove.empty()) {
+    const std::string new_value = StringUtil::removeTokens(connection_header_value.getStringView(),
+                                                           ",", headers_to_remove, ",");
+
+    if (new_value.empty()) {
+      headers.removeConnection();
+    } else {
+      headers.Connection()->value(new_value);
+    }
+  }
+
+  return true;
+}
+
 const std::string& Utility::getProtocolString(const Protocol protocol) {
   switch (protocol) {
   case Protocol::Http10:
@@ -568,8 +678,8 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
     //
     // We do checking for each char in the string. If the current char is included in the defined
-    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded] to
-    // the returned string one by one) started from the current index.
+    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
+    // to the returned string one by one) started from the current index.
     if (ch < ' ' || ch >= '~' || ch == '%') {
       return PercentEncoding::encode(value, i);
     }

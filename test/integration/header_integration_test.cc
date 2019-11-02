@@ -4,6 +4,7 @@
 
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
+#include "common/http/exception.h"
 #include "common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
@@ -1065,6 +1066,394 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {":status", "200"},
+      });
+}
+
+// Validates TE header is forwarded if it contains a supported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+      });
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, close"},
+          {"te", "gzip"},
+          {"mike", "foo"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+          {"connection", "close"},
+      });
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+// Also validate the behavior if a nominated header does not exist
+TEST_P(HeaderIntegrationTest, TestTeHeaderGzipTrailersSanitized) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, close"},
+          {"te", "gzip, trailers"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+      });
+}
+
+// Validates that if the connection header is nominated, the
+// true connection header is not removed
+TEST_P(HeaderIntegrationTest, TestNominatedConnectionHeader) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, connection, close"},
+          {"te", "gzip"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+          {"connection", "close"},
+      });
+}
+
+// Validate that if the connection header is nominated, we
+// sanitize correctly preserving other nominated headers with
+// supported values
+TEST_P(HeaderIntegrationTest, TestNominatedConnectionHeader2) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, connection, close"},
+          {"te", "trailers"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+      });
+}
+
+// Validate that connection is rejected if pseudo headers are nominated
+// This includes an extra comma to ensure that the resulting
+// header is still correct
+TEST_P(HeaderIntegrationTest, TestNominatedPseudoHeader) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, :path,, :method, :authority, connection, close"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      });
+}
+
+// Validate that we fail the request if there are too many
+// nominated headers
+TEST_P(HeaderIntegrationTest, TestTooManyNominatedHeaders) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, connection, close, seahawks, niners, chargers, rams, raiders, "
+                         "cardinals, eagles, giants, ravens"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      });
+}
+
+TEST_P(HeaderIntegrationTest, TestRejectNominatedXForwardedFor) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, x-forwarded-for"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      });
+}
+
+TEST_P(HeaderIntegrationTest, TestRejectNominatedXForwardedHost) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, x-forwarded-host"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      });
+}
+
+TEST_P(HeaderIntegrationTest, TestRejectNominatedXForwardedProto) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, x-forwarded-proto"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      });
+}
+
+TEST_P(HeaderIntegrationTest, TestRejectTeHeaderTooLong) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"
+                 "1234567890abcdef"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"connection", "close"},
       });
 }
 } // namespace Envoy
