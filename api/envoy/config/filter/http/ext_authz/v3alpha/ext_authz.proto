@@ -17,7 +17,7 @@ import "validate/validate.proto";
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ExtAuthz {
   reserved 4;
 
@@ -80,6 +80,14 @@ message ExtAuthz {
   //    - envoy.filters.http.jwt_authn
   //
   repeated string metadata_context_namespaces = 8;
+
+  // Specifies if the filter is enabled.
+  //
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests to filter.
+  //
+  // If this field is not specified, the filter will be enabled for all requests.
+  api.v3alpha.core.RuntimeFractionalPercent filter_enabled = 9;
 }
 
 // Configuration for buffering the request data.

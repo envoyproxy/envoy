@@ -84,6 +84,11 @@ public:
   virtual void close() PURE;
 
   /**
+   * Return true if close() hasn't been called.
+   */
+  virtual bool isOpen() const PURE;
+
+  /**
    * Visitor class for setting socket options.
    */
   class Option {

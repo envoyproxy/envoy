@@ -20,7 +20,9 @@ class TransportSocketFactoryContext;
 
 namespace Ssl {
 
+#ifdef OPENSSL_IS_BORINGSSL
 using BoringSslPrivateKeyMethodSharedPtr = std::shared_ptr<SSL_PRIVATE_KEY_METHOD>;
+#endif
 
 class PrivateKeyMethodProvider {
 public:
@@ -49,12 +51,14 @@ public:
    */
   virtual bool checkFips() PURE;
 
+#ifdef OPENSSL_IS_BORINGSSL
   /**
    * Get the private key methods from the provider.
    * @return the private key methods associated with this provider and
    * configuration.
    */
   virtual BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() PURE;
+#endif
 };
 
 using PrivateKeyMethodProviderSharedPtr = std::shared_ptr<PrivateKeyMethodProvider>;

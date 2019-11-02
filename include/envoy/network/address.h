@@ -45,7 +45,7 @@ public:
   virtual absl::uint128 address() const PURE;
 };
 
-enum class IpVersion { v4, v6 };
+enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)
 
 /**
  * Interface for a generic IP address.

@@ -16,114 +16,114 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
   switch (session_.getState()) {
 
   // Expect Server Challenge packet
-  case MySQLSession::State::MYSQL_INIT: {
+  case MySQLSession::State::Init: {
     ServerGreeting greeting;
     greeting.decode(message, seq, len);
     callbacks_.onServerGreeting(greeting);
 
-    session_.setState(MySQLSession::State::MYSQL_CHALLENGE_REQ);
+    session_.setState(MySQLSession::State::ChallengeReq);
     break;
   }
 
   // Process Client Handshake Response
-  case MySQLSession::State::MYSQL_CHALLENGE_REQ: {
+  case MySQLSession::State::ChallengeReq: {
     ClientLogin client_login{};
     client_login.decode(message, seq, len);
     callbacks_.onClientLogin(client_login);
 
     if (client_login.isSSLRequest()) {
-      session_.setState(MySQLSession::State::MYSQL_SSL_PT);
+      session_.setState(MySQLSession::State::SslPt);
     } else if (client_login.isResponse41()) {
-      session_.setState(MySQLSession::State::MYSQL_CHALLENGE_RESP_41);
+      session_.setState(MySQLSession::State::ChallengeResp41);
     } else {
-      session_.setState(MySQLSession::State::MYSQL_CHALLENGE_RESP_320);
+      session_.setState(MySQLSession::State::ChallengeResp320);
     }
     break;
   }
 
-  case MySQLSession::State::MYSQL_SSL_PT:
+  case MySQLSession::State::SslPt:
     break;
 
-  case MySQLSession::State::MYSQL_CHALLENGE_RESP_41:
-  case MySQLSession::State::MYSQL_CHALLENGE_RESP_320: {
+  case MySQLSession::State::ChallengeResp41:
+  case MySQLSession::State::ChallengeResp320: {
     ClientLoginResponse client_login_resp{};
     client_login_resp.decode(message, seq, len);
     callbacks_.onClientLoginResponse(client_login_resp);
 
     if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
-      session_.setState(MySQLSession::State::MYSQL_REQ);
+      session_.setState(MySQLSession::State::Req);
       // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
-      session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
+      session_.setState(MySQLSession::State::AuthSwitchResp);
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
       // client/server should close the connection:
       // https://dev.mysql.com/doc/internals/en/connection-phase.html
-      session_.setState(MySQLSession::State::MYSQL_ERROR);
+      session_.setState(MySQLSession::State::Error);
     } else {
-      session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
+      session_.setState(MySQLSession::State::NotHandled);
     }
     break;
   }
 
-  case MySQLSession::State::MYSQL_AUTH_SWITCH_RESP: {
+  case MySQLSession::State::AuthSwitchResp: {
     ClientSwitchResponse client_switch_resp{};
     client_switch_resp.decode(message, seq, len);
     callbacks_.onClientSwitchResponse(client_switch_resp);
 
-    session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_MORE);
+    session_.setState(MySQLSession::State::AuthSwitchMore);
     break;
   }
 
-  case MySQLSession::State::MYSQL_AUTH_SWITCH_MORE: {
+  case MySQLSession::State::AuthSwitchMore: {
     ClientLoginResponse client_login_resp{};
     client_login_resp.decode(message, seq, len);
     callbacks_.onMoreClientLoginResponse(client_login_resp);
 
     if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
-      session_.setState(MySQLSession::State::MYSQL_REQ);
+      session_.setState(MySQLSession::State::Req);
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_MORE) {
-      session_.setState(MySQLSession::State::MYSQL_AUTH_SWITCH_RESP);
+      session_.setState(MySQLSession::State::AuthSwitchResp);
     } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
       // stop parsing auth req/response, attempt to resync in command state
-      session_.setState(MySQLSession::State::MYSQL_RESYNC);
+      session_.setState(MySQLSession::State::Resync);
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
     } else {
-      session_.setState(MySQLSession::State::MYSQL_NOT_HANDLED);
+      session_.setState(MySQLSession::State::NotHandled);
     }
     break;
   }
 
-  case MySQLSession::State::MYSQL_RESYNC: {
+  case MySQLSession::State::Resync: {
     // re-sync to MYSQL_REQ state
     // expected seq check succeeded, no need to verify
-    session_.setState(MySQLSession::State::MYSQL_REQ);
+    session_.setState(MySQLSession::State::Req);
     FALLTHRU;
   }
 
   // Process Command
-  case MySQLSession::State::MYSQL_REQ: {
+  case MySQLSession::State::Req: {
     Command command{};
     command.decode(message, seq, len);
     callbacks_.onCommand(command);
 
-    session_.setState(MySQLSession::State::MYSQL_REQ_RESP);
+    session_.setState(MySQLSession::State::ReqResp);
     break;
   }
 
   // Process Command Response
-  case MySQLSession::State::MYSQL_REQ_RESP: {
+  case MySQLSession::State::ReqResp: {
     CommandResponse command_resp{};
     command_resp.decode(message, seq, len);
     callbacks_.onCommandResponse(command_resp);
 
-    session_.setState(MySQLSession::State::MYSQL_REQ);
+    session_.setState(MySQLSession::State::Req);
     session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
     break;
   }
 
-  case MySQLSession::State::MYSQL_ERROR:
-  case MySQLSession::State::MYSQL_NOT_HANDLED:
+  case MySQLSession::State::Error:
+  case MySQLSession::State::NotHandled:
   default:
     break;
   }
