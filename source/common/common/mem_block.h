@@ -9,24 +9,35 @@ namespace Envoy {
 // Manages a block of raw memory for objects of type T. T must be
 // empty-constructible. This class carries extra member variables
 // for tracking size, and a write-pointer to support safe appends.
+//
+// MemBlock is used to efficiently write blocks of data into a memory
+// buffer. Due to the extra member variables, it is not optimal for
+// storing in data structures. Instead, the raw assembled memory block
+// is released from the MemBlock after assembly.
 template <class T> class MemBlock {
 public:
   // Constructs a MemBlock of the specified size.
   explicit MemBlock(uint64_t size)
-      : data_(std::make_unique<T[]>(size)), size_(size), write_ptr_(data_.get()) {}
-  MemBlock() : size_(0), write_ptr_(nullptr) {}
+      : data_(std::make_unique<T[]>(size)), capacity_(size), write_ptr_(data_.get()) {}
+  MemBlock() : capacity_(0), write_ptr_(nullptr) {}
 
-  // Populates (or repopulates) the MemBlock to make it the specified size.
-  // This does not have resize semantics; when populate() is called any
-  // previous contents are erased.
+  /**
+   * Populates (or repopulates) the MemBlock to make it the specified size.
+   * This does not have resize semantics; when populate() is called any
+   * previous contents are erased.
+   *
+   * @param size The number of memory elements to allocate.
+   */
   void populate(uint64_t size) {
     data_ = std::make_unique<T[]>(size);
-    size_ = size;
+    capacity_ = size;
     write_ptr_ = data_.get();
   }
 
-  // Returns whether the block has been populated.
-  bool empty() const { return data_ == nullptr; }
+  /**
+   * @return the capacity.
+   */
+  uint64_t capacity() const { return capacity_; }
 
   /**
    * Appends a single object of type T, moving an internal write-pointer
@@ -59,30 +70,30 @@ public:
    *
    * @param src the block to append.
    */
-  void appendBlock(const MemBlock& src) { appendData(src.data_.get(), src.size_); }
+  void appendBlock(const MemBlock& src) { appendData(src.data_.get(), src.size()); }
 
   /**
    * @return the number of elements remaining in the MemBlock.
    */
-  uint64_t capacityRemaining() const { return (data_.get() + size_) - write_ptr_; }
+  uint64_t capacityRemaining() const { return (data_.get() + capacity_) - write_ptr_; }
 
   /**
    * Empties the contents of this.
    */
   void reset() {
     data_.reset();
-    size_ = 0;
+    capacity_ = 0;
     write_ptr_ = nullptr;
   }
 
   /**
    * Returns the underlying storage as a unique pointer, clearing this.
    *
-   * @return The transferred storage.
+   * @return the transferred storage.
    */
   std::unique_ptr<T[]> release() {
     write_ptr_ = nullptr;
-    size_ = 0;
+    capacity_ = 0;
     return std::move(data_);
   }
 
@@ -94,9 +105,11 @@ public:
   std::vector<T> toVector() const { return std::vector<T>(data_.get(), write_ptr_); }
 
 private:
+  uint64_t size() const { return write_ptr_ - data_.get(); }
+
   std::unique_ptr<T[]> data_;
-  uint64_t size_;
-  uint8_t* write_ptr_;
+  uint64_t capacity_;
+  T* write_ptr_;
 };
 
 } // namespace Envoy
