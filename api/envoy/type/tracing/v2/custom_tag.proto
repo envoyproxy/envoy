@@ -61,6 +61,8 @@ message CustomTag {
   message Metadata {
     // Specify the source where to pull the metadata from.
     oneof source {
+      option (validate.required) = true;
+
       // Obtain metadata from the dynamic metadata associated with the request.
       google.protobuf.Empty request = 1;
 

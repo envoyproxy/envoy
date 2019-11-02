@@ -293,8 +293,8 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
                                      const envoy::type::tracing::v2::CustomTag::Metadata& metadata)
-    : GeneralCustomTag(tag), source_(metadata.source_case()), metadata_key_(metadata.metadata_key()),
-      default_value_(metadata.default_value()) {}
+    : GeneralCustomTag(tag), source_(metadata.source_case()),
+      metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
   const envoy::api::v2::core::Metadata* meta = metadata(ctx);
