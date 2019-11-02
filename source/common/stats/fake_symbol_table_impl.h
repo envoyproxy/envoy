@@ -85,9 +85,9 @@ public:
 
     // This assertion double-checks the arithmetic where we computed
     // total_size_bytes. After appending all the encoded data into the
-    // allocated byte array, we should wind up with a pointer difference of
-    // total_size_bytes from the beginning of the allocation.
-    //ASSERT(p == &storage[0] + total_size_bytes);
+    // allocated byte array, we should have exhausted all the memory
+    // we though we needed.
+    ASSERT(mem_block.bytesRemaining() == 0);
     list.moveStorageIntoList(mem_block.release());
   }
 
@@ -141,7 +141,8 @@ private:
     MemBlock<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
     SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
     mem_block.append(reinterpret_cast<const uint8_t*>(name.data()), name.size());
-    return mem_block.release();;
+    return mem_block.release();
+    ;
   }
 };
 

@@ -6,12 +6,12 @@
 
 namespace Envoy {
 
-template<class T> class MemBlock {
- public:
+template <class T> class MemBlock {
+public:
   // Constructs a MemBlock wrapper to an existing memory block. The caller
   // is responsible for ensuring that 'data' has size 'size'.
-  explicit MemBlock(uint64_t size) : data_(std::make_unique<T[]>(size)), size_(size),
-                                     next_(data_.get()) {}
+  explicit MemBlock(uint64_t size)
+      : data_(std::make_unique<T[]>(size)), size_(size), next_(data_.get()) {}
   explicit MemBlock() : size_(0), next_(nullptr) {}
 
   void populate(uint64_t size) {
@@ -27,9 +27,7 @@ template<class T> class MemBlock {
     *next_++ = byte;
   }
 
-  uint64_t bytesRemaining() const {
-    return (data_.get() + size_) - next_;
-  }
+  uint64_t bytesRemaining() const { return (data_.get() + size_) - next_; }
 
   void append(const T* byte, uint64_t size) {
     ASSERT(bytesRemaining() >= size);
@@ -37,9 +35,7 @@ template<class T> class MemBlock {
     next_ += size;
   }
 
-  void append(const MemBlock& src) {
-    append(src.data_.get(), src.size_);
-  }
+  void append(const MemBlock& src) { append(src.data_.get(), src.size_); }
 
   void reset() {
     data_.reset();
@@ -53,7 +49,7 @@ template<class T> class MemBlock {
     return std::move(data_);
   }
 
- private:
+private:
   std::unique_ptr<T[]> data_;
   uint64_t size_;
   uint8_t* next_;

@@ -104,7 +104,7 @@ void SymbolTableImpl::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   for (Symbol symbol : symbols) {
     appendEncoding(symbol, mem_block_);
   }
-  //ASSERT(static_cast<uint64_t>(bytes - storage_.get()) == data_bytes_required_);
+  // ASSERT(static_cast<uint64_t>(bytes - storage_.get()) == data_bytes_required_);
 }
 
 std::pair<uint64_t, uint64_t> SymbolTableImpl::Encoding::decodeNumber(const uint8_t* encoding) {
@@ -533,9 +533,9 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
 
   // This assertion double-checks the arithmetic where we computed
   // total_size_bytes. After appending all the encoded data into the
-  // allocated byte array, we should wind up with a pointer difference of
-  // total_size_bytes from the beginning of the allocation.
-  //ASSERT(p == &storage[0] + total_size_bytes);
+  // allocated byte array, we should have exhausted all the memory
+  // we though we needed.
+  ASSERT(mem_block.bytesRemaining() == 0);
   list.moveStorageIntoList(mem_block.release());
 }
 
