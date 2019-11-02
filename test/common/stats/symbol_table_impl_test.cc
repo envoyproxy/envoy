@@ -75,9 +75,9 @@ protected:
     MemBlock<uint8_t> mem_block(block_size);
     SymbolTableImpl::Encoding::appendEncoding(number, mem_block);
     EXPECT_EQ(block_size, num_bytes + mem_block.capacityRemaining());
-    EXPECT_EQ(number, SymbolTableImpl::Encoding::decodeNumber(mem_block.data()).first) << number;
-    //return std::vector<uint8_t>(buf, buf + num_bytes);
-    return mem_block.toVector(); //std::vector<uint8_t>(buf, buf + num_bytes);
+    std::vector<uint8_t> vec = mem_block.toVector();
+    EXPECT_EQ(number, SymbolTableImpl::Encoding::decodeNumber(&vec[0]).first) << number;
+    return vec;
   }
 
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};

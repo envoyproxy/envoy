@@ -7,7 +7,8 @@
 namespace Envoy {
 
 // Manages a block of raw memory for objects of type T. T must be
-// empty-constructible.
+// empty-constructible. This class carries extra member variables
+// for tracking size, and a write-pointer to support safe appends.
 template <class T> class MemBlock {
 public:
   // Constructs a MemBlock of the specified size.
@@ -86,14 +87,9 @@ public:
   }
 
   /**
-   * @return read-only access to the data.
-   */
-  const T* data() const { return data_.get(); }
-
-  /**
-   * This is exposed to help with unit testing.
-   *
    * @return the populated data as a vector.
+   *
+   * This is exposed to help with unit testing.
    */
   std::vector<T> toVector() const { return std::vector<T>(data_.get(), write_ptr_); }
 
