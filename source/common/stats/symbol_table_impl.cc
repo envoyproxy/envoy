@@ -58,7 +58,7 @@ uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
   return num_bytes;
 }
 
-void SymbolTableImpl::Encoding::appendEncoding(uint64_t number, MemBlock<uint8_t>& mem_block) {
+void SymbolTableImpl::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
   // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
@@ -112,7 +112,7 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
   return symbol_vec;
 }
 
-void SymbolTableImpl::Encoding::moveToStorage(MemBlock<uint8_t>& mem_block) {
+void SymbolTableImpl::Encoding::moveToStorage(MemBlockBuilder<uint8_t>& mem_block) {
   appendEncoding(data_bytes_required_, mem_block);
   mem_block.appendBlock(mem_block_);
   mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
@@ -403,7 +403,7 @@ SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
   ASSERT(!absl::EndsWith(name, "."));
   Encoding encoding;
   addTokensToEncoding(name, encoding);
-  MemBlock<uint8_t> mem_block(Encoding::totalSizeBytes(encoding.bytesRequired()));
+  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(encoding.bytesRequired()));
   encoding.moveToStorage(mem_block);
   return mem_block.release();
 }
@@ -413,7 +413,7 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   const uint64_t size = src.size();
-  MemBlock<uint8_t> storage(size);
+  MemBlockBuilder<uint8_t> storage(size);
   src.copyToStorage(storage);
   bytes_ = storage.release();
   table.incRefCount(statName());
@@ -481,7 +481,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  MemBlock<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
+  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
   for (StatName stat_name : stat_names) {
     //mem_block.appendData(stat_name.data(), stat_name.dataSize());
@@ -506,7 +506,7 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
 
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
-  MemBlock<uint8_t> mem_block(total_size_bytes);
+  MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
   mem_block.appendOne(num_names);
   for (auto& encoding : encodings) {
     encoding.moveToStorage(mem_block);

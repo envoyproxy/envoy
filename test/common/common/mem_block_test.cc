@@ -4,8 +4,8 @@
 
 namespace Envoy {
 
-TEST(MemBlockTest, AppendUint8) {
-  MemBlock<uint8_t> mem_block(10);
+TEST(MemBlockBuilderTest, AppendUint8) {
+  MemBlockBuilder<uint8_t> mem_block(10);
   EXPECT_EQ(10, mem_block.capacity());
   mem_block.appendOne(5);
   EXPECT_EQ(9, mem_block.capacityRemaining());
@@ -13,7 +13,7 @@ TEST(MemBlockTest, AppendUint8) {
   mem_block.appendData(foo, ABSL_ARRAYSIZE(foo));
   EXPECT_EQ(7, mem_block.capacityRemaining());
 
-  MemBlock<uint8_t> append;
+  MemBlockBuilder<uint8_t> append;
   EXPECT_EQ(0, append.capacity());
   append.populate(7);
   EXPECT_EQ(7, append.capacity());
@@ -32,8 +32,8 @@ TEST(MemBlockTest, AppendUint8) {
   EXPECT_EQ(0, mem_block.capacity());
 }
 
-TEST(MemBlockTest, AppendUint32) {
-  MemBlock<uint32_t> mem_block(10);
+TEST(MemBlockBuilderTest, AppendUint32) {
+  MemBlockBuilder<uint32_t> mem_block(10);
   EXPECT_EQ(10, mem_block.capacity());
   mem_block.appendOne(100005);
   EXPECT_EQ(9, mem_block.capacityRemaining());
@@ -41,7 +41,7 @@ TEST(MemBlockTest, AppendUint32) {
   mem_block.appendData(foo, ABSL_ARRAYSIZE(foo));
   EXPECT_EQ(7, mem_block.capacityRemaining());
 
-  MemBlock<uint32_t> append;
+  MemBlockBuilder<uint32_t> append;
   EXPECT_EQ(0, append.capacity());
   append.populate(7);
   EXPECT_EQ(7, append.capacity());

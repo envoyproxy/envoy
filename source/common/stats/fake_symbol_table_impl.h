@@ -72,7 +72,7 @@ public:
 
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
-    MemBlock<uint8_t> mem_block(total_size_bytes);
+    MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
     mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
       auto& name = names[i];
@@ -138,7 +138,7 @@ private:
 
   StoragePtr encodeHelper(absl::string_view name) const {
     ASSERT(!absl::EndsWith(name, "."));
-    MemBlock<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
+    MemBlockBuilder<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
     SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
     mem_block.appendData(reinterpret_cast<const uint8_t*>(name.data()), name.size());
     return mem_block.release();

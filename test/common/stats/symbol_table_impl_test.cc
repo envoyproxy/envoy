@@ -72,7 +72,7 @@ protected:
   std::vector<uint8_t> serializeDeserialize(uint64_t number) {
     const uint64_t num_bytes = SymbolTableImpl::Encoding::encodingSizeBytes(number);
     const uint64_t block_size = 10;
-    MemBlock<uint8_t> mem_block(block_size);
+    MemBlockBuilder<uint8_t> mem_block(block_size);
     SymbolTableImpl::Encoding::appendEncoding(number, mem_block);
     EXPECT_EQ(block_size, num_bytes + mem_block.capacityRemaining());
     std::vector<uint8_t> vec = mem_block.toVector();

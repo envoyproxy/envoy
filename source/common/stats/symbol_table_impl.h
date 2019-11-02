@@ -114,7 +114,7 @@ public:
      *
      * @param array destination memory to receive the encoded bytes.
      */
-    void moveToStorage(MemBlock<uint8_t>& array);
+    void moveToStorage(MemBlockBuilder<uint8_t>& array);
 
     /**
      * @param number A number to encode in a variable length byte-array.
@@ -138,9 +138,9 @@ public:
      * Requires that the buffer be sized to accommodate encodingSizeBytes(number).
      *
      * @param number the number to write.
-     * @param MemBlock the memory into which to append the number.
+     * @param mem_block the memory into which to append the number.
      */
-    static void appendEncoding(uint64_t number, MemBlock<uint8_t>& mem_block);
+    static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
 
     /**
      * Decodes a byte-array containing a variable-length number.
@@ -154,7 +154,7 @@ public:
 
   private:
     uint64_t data_bytes_required_{0};
-    MemBlock<uint8_t> mem_block_;
+    MemBlockBuilder<uint8_t> mem_block_;
   };
 
   SymbolTableImpl();
@@ -387,8 +387,12 @@ public:
    */
   uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
-  void copyToStorage(MemBlock<uint8_t>& storage) { storage.appendData(size_and_data_, size()); }
-  void copyDataToStorage(MemBlock<uint8_t>& storage) { storage.appendData(data(), dataSize()); }
+  void copyToStorage(MemBlockBuilder<uint8_t>& storage) {
+    storage.appendData(size_and_data_, size());
+  }
+  void copyDataToStorage(MemBlockBuilder<uint8_t>& storage) {
+    storage.appendData(data(), dataSize());
+  }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
