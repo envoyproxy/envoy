@@ -72,16 +72,14 @@ public:
 
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
-    auto storage = std::make_unique<Storage>(total_size_bytes);
-    uint8_t* p = &storage[0];
-    *p++ = num_names;
+    MemBlock<uint8_t> mem_block(total_size_bytes);
+    mem_block.push_back(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
       auto& name = names[i];
       size_t sz = name.size();
-      p = SymbolTableImpl::Encoding::writeEncodingReturningNext(sz, p);
+      SymbolTableImpl::Encoding::appendEncoding(sz, mem_block);
       if (!name.empty()) {
-        memcpy(p, name.data(), sz * sizeof(uint8_t));
-        p += sz;
+        mem_block.append(reinterpret_cast<const uint8_t*>(name.data()), sz);
       }
     }
 
@@ -89,8 +87,8 @@ public:
     // total_size_bytes. After appending all the encoded data into the
     // allocated byte array, we should wind up with a pointer difference of
     // total_size_bytes from the beginning of the allocation.
-    ASSERT(p == &storage[0] + total_size_bytes);
-    list.moveStorageIntoList(std::move(storage));
+    //ASSERT(p == &storage[0] + total_size_bytes);
+    list.moveStorageIntoList(mem_block.release());
   }
 
   std::string toString(const StatName& stat_name) const override {
@@ -140,11 +138,10 @@ private:
 
   StoragePtr encodeHelper(absl::string_view name) const {
     ASSERT(!absl::EndsWith(name, "."));
-    auto bytes = std::make_unique<Storage>(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
-    uint8_t* buffer =
-        SymbolTableImpl::Encoding::writeEncodingReturningNext(name.size(), bytes.get());
-    memcpy(buffer, name.data(), name.size());
-    return bytes;
+    MemBlock<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
+    SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
+    mem_block.append(reinterpret_cast<const uint8_t*>(name.data()), name.size());
+    return mem_block.release();;
   }
 };
 

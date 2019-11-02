@@ -20,21 +20,7 @@ template<class T> class MemBlock {
     next_ = data_.get();
   }
 
-  T* data() { return data_.get(); }
-
-  void copyFrom(const MemBlock& src, uint64_t size,
-                uint64_t src_offset = 0, uint64_t dst_offset = 0) {
-    ASSERT(src_offset + size <= src.size_);
-    ASSERT(dst_offset + size <= size_);
-    memcpy(data_.get() + dst_offset, src.data_ + src_offset, size);
-    next_ += size;
-  }
-
-  void dangerousCopyFrom(const T* source, uint64_t size, uint64_t dst_offset = 0) {
-    ASSERT(dst_offset + size <= size_);
-    memcpy(data_.get() + dst_offset, source, size);
-    next_ += size;
-  }
+  bool empty() const { return data_ == nullptr; }
 
   void push_back(T byte) {
     ASSERT(bytesRemaining() >= 1);
@@ -52,9 +38,7 @@ template<class T> class MemBlock {
   }
 
   void append(const MemBlock& src) {
-    ASSERT(bytesRemaining() >= src.size_);
-    memcpy(next_, src.data_.get(), src.size_);
-    next_ += src.size_;
+    append(src.data_.get(), src.size_);
   }
 
   void reset() {
@@ -63,7 +47,11 @@ template<class T> class MemBlock {
     next_ = nullptr;
   }
 
-  std::unique_ptr<T[]> release() { return std::move(data_); }
+  std::unique_ptr<T[]> release() {
+    next_ = nullptr;
+    size_ = 0;
+    return std::move(data_);
+  }
 
  private:
   std::unique_ptr<T[]> data_;

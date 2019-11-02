@@ -389,9 +389,7 @@ public:
    */
   uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
-  void copyToStorage(MemBlock<uint8_t>& storage) {
-    storage.dangerousCopyFrom(size_and_data_, size());
-  }
+  void copyToStorage(MemBlock<uint8_t>& storage) { storage.append(size_and_data_, size()); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();

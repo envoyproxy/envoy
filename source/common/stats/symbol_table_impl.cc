@@ -46,7 +46,7 @@ void StatName::debugPrint() {
 SymbolTableImpl::Encoding::~Encoding() {
   // Verifies that moveToStorage() was called on this encoding. Failure
   // to call moveToStorage() will result in leaks symbols.
-  ASSERT(mem_block_.data() == nullptr);
+  ASSERT(mem_block_.empty());
 }
 
 uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
