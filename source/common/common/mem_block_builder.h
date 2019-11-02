@@ -29,7 +29,7 @@ public:
 
   /**
    * Populates (or repopulates) the MemBlockBuilder to make it the specified
-   * size.  This does not have resize semantics; when populate() is called any
+   * size. This does not have resize semantics; when populate() is called any
    * previous contents are erased.
    *
    * @param size The number of memory elements to allocate.

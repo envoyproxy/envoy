@@ -58,7 +58,8 @@ uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
   return num_bytes;
 }
 
-void SymbolTableImpl::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
+void SymbolTableImpl::Encoding::appendEncoding(uint64_t number,
+                                               MemBlockBuilder<uint8_t>& mem_block) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
   // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
@@ -484,7 +485,6 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
   for (StatName stat_name : stat_names) {
-    //mem_block.appendData(stat_name.data(), stat_name.dataSize());
     stat_name.copyDataToStorage(mem_block);
   }
   return mem_block.release();
