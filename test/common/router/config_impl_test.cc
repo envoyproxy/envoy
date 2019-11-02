@@ -5434,7 +5434,7 @@ virtual_hosts:
               default_value: rvalue
           - tag: mtag
             metadata:
-              source: Route
+              route: {}
               metadata_key:
                 filter: com.bar.foo
                 path: [ { key: xx }, { key: yy } ]
@@ -5478,7 +5478,7 @@ virtual_hosts:
                                    "ENVIRONMENT|etag-n|E_TAG_N|evalue|evalue",
                                    "REQUEST_HEADER|rtag|x-tag|",
                                    "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
-                                   "METADATA|1|mtag|com.bar.foo|xx.yy|mvalue"));
+                                   "METADATA|2|mtag|com.bar.foo|xx.yy|mvalue"));
 }
 
 // Test to check Prefix Rewrite for redirects

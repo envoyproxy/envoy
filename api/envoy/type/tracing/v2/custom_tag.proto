@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.type.tracing.v2";
 
 import "envoy/type/metadata/v2/metadata.proto";
 
+import "google/protobuf/empty.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Custom Tag]
@@ -55,32 +57,31 @@ message CustomTag {
   // * `list`/`struct`: populate with the corresponding JSON string
   //   converted from the protobuf message;
   // * otherwise means that no valid metadata is found.
+  // [#next-free-field: 7]
   message Metadata {
-    enum Source {
-      // obtain metadata from the dynamic metadata associated with the request.
-      Request = 0;
+    // Specify the source where to pull the metadata from.
+    oneof source {
+      // Obtain metadata from the dynamic metadata associated with the request.
+      google.protobuf.Empty request = 1;
 
-      // obtain metadata from :ref:`the route<envoy_api_field_route.Route.metadata>`.
-      Route = 1;
+      // Obtain metadata from :ref:`the route<envoy_api_field_route.Route.metadata>`.
+      google.protobuf.Empty route = 2;
 
-      // obtain metadata from :ref:`the upstream cluster<envoy_api_field_Cluster.metadata>`.
-      Cluster = 2;
+      // Obtain metadata from :ref:`the upstream cluster<envoy_api_field_Cluster.metadata>`.
+      google.protobuf.Empty cluster = 3;
 
-      // obtain metadata from :ref:`the upstream
+      // Obtain metadata from :ref:`the upstream
       // host<envoy_api_field_endpoint.LbEndpoint.metadata>`.
-      Host = 3;
+      google.protobuf.Empty host = 4;
     }
 
-    // Specify the source where to pull the metadata from.
-    Source source = 1;
-
     // Metadata key to define the path to retrieve the tag value.
-    metadata.v2.MetadataKey metadata_key = 2;
+    metadata.v2.MetadataKey metadata_key = 5;
 
     // When no valid metadata is found,
     // the tag value would be populated with this default value if specified,
     // otherwise no tag would be populated.
-    string default_value = 3;
+    string default_value = 6;
   }
 
   // Used to populate the tag name.

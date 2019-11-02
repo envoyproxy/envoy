@@ -3,8 +3,8 @@ Version history
 
 1.13.0 (pending)
 ================
-* tracing: added multiple kinds of custom tags for the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`route <envoy_api_field_route.Route.tracing>` level both.
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
+* tracing: added multiple kinds of custom tags for the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`route <envoy_api_field_route.Route.tracing>` level both.
 
 1.12.0 (October 31, 2019)
 =========================

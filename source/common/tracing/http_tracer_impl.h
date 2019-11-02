@@ -260,7 +260,7 @@ public:
   }
 
 protected:
-  envoy::type::tracing::v2::CustomTag::Metadata::Source source_;
+  envoy::type::tracing::v2::CustomTag::Metadata::SourceCase source_;
   Envoy::Config::MetadataKey metadata_key_;
   std::string default_value_;
 };
