@@ -20,12 +20,11 @@
 
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
 #include "openssl/x509v3.h"
-
-#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -16,7 +16,6 @@
 #include "common/network/utility.h"
 
 #include "absl/strings/str_join.h"
-
 #include "ares.h"
 
 namespace Envoy {

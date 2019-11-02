@@ -8,7 +8,6 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {

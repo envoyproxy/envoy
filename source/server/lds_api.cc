@@ -77,8 +77,8 @@ void LdsApiImpl::onConfigUpdate(
   }
   init_target_.ready();
   if (!exception_msgs.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
-                                     absl::StrJoin(exception_msgs, ", ")));
+    throw EnvoyException(
+        fmt::format("Error adding/updating listener(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
 }
 

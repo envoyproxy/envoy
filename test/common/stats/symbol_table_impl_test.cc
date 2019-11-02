@@ -13,7 +13,6 @@
 #include "absl/hash/hash_testing.h"
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
