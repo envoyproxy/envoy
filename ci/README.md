@@ -23,8 +23,11 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 Currently there are three build images:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) with GCC 7 and Clang 8 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 7 and Clang 8 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) with GCC 7 and Clang 9 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 7 and Clang 9 compiler, this image is experimental and not well tested.
+
+The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+repository.
 
 We use the Clang compiler for all CI runs with tests. We have an additional CI run with GCC which builds binary only.
 

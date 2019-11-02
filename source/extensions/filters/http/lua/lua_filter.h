@@ -5,7 +5,6 @@
 
 #include "common/crypto/utility.h"
 
-#include "extensions/common/crypto/crypto_impl.h"
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"

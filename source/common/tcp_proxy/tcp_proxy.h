@@ -24,6 +24,7 @@
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
+#include "common/network/hash_policy.h"
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -113,6 +114,7 @@ public:
   const Router::MetadataMatchCriteria* metadataMatchCriteria() {
     return cluster_metadata_match_criteria_.get();
   }
+  const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
   struct Route {
@@ -149,6 +151,7 @@ private:
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Runtime::RandomGenerator& random_generator_;
+  std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -194,6 +197,17 @@ public:
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return config_->metadataMatchCriteria();
+  }
+
+  // Upstream::LoadBalancerContext
+  absl::optional<uint64_t> computeHashKey() override {
+    auto hash_policy = config_->hashPolicy();
+    if (hash_policy) {
+      return hash_policy->generateHash(downstreamConnection()->remoteAddress().get(),
+                                       downstreamConnection()->localAddress().get());
+    }
+
+    return {};
   }
 
   const Network::Connection* downstreamConnection() const override {
@@ -251,10 +265,10 @@ protected:
   };
 
   enum class UpstreamFailureReason {
-    CONNECT_FAILED,
-    NO_HEALTHY_UPSTREAM,
-    RESOURCE_LIMIT_EXCEEDED,
-    NO_ROUTE,
+    ConnectFailed,
+    NoHealthyUpstream,
+    ResourceLimitExceeded,
+    NoRoute,
   };
 
   // Callbacks for different error and success states during connection establishment
