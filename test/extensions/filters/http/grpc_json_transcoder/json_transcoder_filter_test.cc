@@ -775,10 +775,10 @@ private:
   }
 };
 
-class GrpcJsonTranscoderFilterConvertGreaterMaximumValidGrpcStatusTest
+class GrpcJsonTranscoderFilterConvertGreaterMaximumKnownGrpcStatusTest
     : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
 public:
-  GrpcJsonTranscoderFilterConvertGreaterMaximumValidGrpcStatusTest()
+  GrpcJsonTranscoderFilterConvertGreaterMaximumKnownGrpcStatusTest()
       : GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(makeProtoConfig()) {}
 
 private:
@@ -879,7 +879,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrail
   EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
 }
 
-TEST_F(GrpcJsonTranscoderFilterConvertGreaterMaximumValidGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterConvertGreaterMaximumKnownGrpcStatusTest,
        TranscodingInvalidGrpcStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
@@ -888,7 +888,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGreaterMaximumValidGrpcStatusTest,
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "1024"}, {"grpc-message", "message"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  EXPECT_EQ("200", response_headers.get_(":status"));
+  EXPECT_EQ("500", response_headers.get_(":status"));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
   EXPECT_EQ("1024", response_headers.get_("grpc-status"));
   EXPECT_TRUE(response_headers.has("grpc-message"));

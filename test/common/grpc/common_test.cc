@@ -89,14 +89,14 @@ TEST(GrpcCommonTest, GrpcStatusDetailsBin) {
       {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA"}};
   auto status = Common::getGrpcStatusDetailsBin(unpadded_value);
   ASSERT_TRUE(status);
-  EXPECT_EQ(Status::GrpcStatusMapping::NotFound, status->code());
+  EXPECT_EQ(Status::WellKnownGrpcStatus::NotFound, status->code());
   EXPECT_EQ("Resource not found", status->message());
 
   Http::TestHeaderMapImpl padded_value{
       {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA=="}};
   status = Common::getGrpcStatusDetailsBin(padded_value);
   ASSERT_TRUE(status);
-  EXPECT_EQ(Status::GrpcStatusMapping::NotFound, status->code());
+  EXPECT_EQ(Status::WellKnownGrpcStatus::NotFound, status->code());
   EXPECT_EQ("Resource not found", status->message());
 }
 
@@ -200,24 +200,24 @@ TEST(GrpcContextTest, PrepareHeaders) {
 
 TEST(GrpcContextTest, GrpcToHttpStatus) {
   const std::vector<std::pair<Status::GrpcStatus, uint64_t>> test_set = {
-      {Status::GrpcStatusMapping::Ok, 200},
-      {Status::GrpcStatusMapping::Canceled, 499},
-      {Status::GrpcStatusMapping::Unknown, 500},
-      {Status::GrpcStatusMapping::InvalidArgument, 400},
-      {Status::GrpcStatusMapping::DeadlineExceeded, 504},
-      {Status::GrpcStatusMapping::NotFound, 404},
-      {Status::GrpcStatusMapping::AlreadyExists, 409},
-      {Status::GrpcStatusMapping::PermissionDenied, 403},
-      {Status::GrpcStatusMapping::ResourceExhausted, 429},
-      {Status::GrpcStatusMapping::FailedPrecondition, 400},
-      {Status::GrpcStatusMapping::Aborted, 409},
-      {Status::GrpcStatusMapping::OutOfRange, 400},
-      {Status::GrpcStatusMapping::Unimplemented, 501},
-      {Status::GrpcStatusMapping::Internal, 500},
-      {Status::GrpcStatusMapping::Unavailable, 503},
-      {Status::GrpcStatusMapping::DataLoss, 500},
-      {Status::GrpcStatusMapping::Unauthenticated, 401},
-      {Status::GrpcStatusMapping::InvalidCode, 500},
+      {Status::WellKnownGrpcStatus::Ok, 200},
+      {Status::WellKnownGrpcStatus::Canceled, 499},
+      {Status::WellKnownGrpcStatus::Unknown, 500},
+      {Status::WellKnownGrpcStatus::InvalidArgument, 400},
+      {Status::WellKnownGrpcStatus::DeadlineExceeded, 504},
+      {Status::WellKnownGrpcStatus::NotFound, 404},
+      {Status::WellKnownGrpcStatus::AlreadyExists, 409},
+      {Status::WellKnownGrpcStatus::PermissionDenied, 403},
+      {Status::WellKnownGrpcStatus::ResourceExhausted, 429},
+      {Status::WellKnownGrpcStatus::FailedPrecondition, 400},
+      {Status::WellKnownGrpcStatus::Aborted, 409},
+      {Status::WellKnownGrpcStatus::OutOfRange, 400},
+      {Status::WellKnownGrpcStatus::Unimplemented, 501},
+      {Status::WellKnownGrpcStatus::Internal, 500},
+      {Status::WellKnownGrpcStatus::Unavailable, 503},
+      {Status::WellKnownGrpcStatus::DataLoss, 500},
+      {Status::WellKnownGrpcStatus::Unauthenticated, 401},
+      {Status::WellKnownGrpcStatus::InvalidCode, 500},
   };
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, Grpc::Utility::grpcToHttpStatus(test_case.first));
@@ -226,15 +226,15 @@ TEST(GrpcContextTest, GrpcToHttpStatus) {
 
 TEST(GrpcContextTest, HttpToGrpcStatus) {
   const std::vector<std::pair<uint64_t, Status::GrpcStatus>> test_set = {
-      {400, Status::GrpcStatusMapping::Internal},
-      {401, Status::GrpcStatusMapping::Unauthenticated},
-      {403, Status::GrpcStatusMapping::PermissionDenied},
-      {404, Status::GrpcStatusMapping::Unimplemented},
-      {429, Status::GrpcStatusMapping::Unavailable},
-      {502, Status::GrpcStatusMapping::Unavailable},
-      {503, Status::GrpcStatusMapping::Unavailable},
-      {504, Status::GrpcStatusMapping::Unavailable},
-      {500, Status::GrpcStatusMapping::Unknown},
+      {400, Status::WellKnownGrpcStatus::Internal},
+      {401, Status::WellKnownGrpcStatus::Unauthenticated},
+      {403, Status::WellKnownGrpcStatus::PermissionDenied},
+      {404, Status::WellKnownGrpcStatus::Unimplemented},
+      {429, Status::WellKnownGrpcStatus::Unavailable},
+      {502, Status::WellKnownGrpcStatus::Unavailable},
+      {503, Status::WellKnownGrpcStatus::Unavailable},
+      {504, Status::WellKnownGrpcStatus::Unavailable},
+      {500, Status::WellKnownGrpcStatus::Unknown},
   };
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, Grpc::Utility::httpToGrpcStatus(test_case.first));

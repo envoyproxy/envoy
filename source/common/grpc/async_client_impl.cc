@@ -64,7 +64,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
-    callbacks_.onRemoteClose(Status::GrpcStatusMapping::Unavailable, "Cluster not available");
+    callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
     return;
   }
@@ -74,7 +74,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
 
   if (stream_ == nullptr) {
-    callbacks_.onRemoteClose(Status::GrpcStatusMapping::Unavailable, EMPTY_STRING);
+    callbacks_.onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
     http_reset_ = true;
     return;
   }
@@ -113,7 +113,7 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
     // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
     // this as GrpcStatusMapping::Canceled.
-    streamError(Status::GrpcStatusMapping::Canceled);
+    streamError(Status::WellKnownGrpcStatus::Canceled);
     return;
   }
   if (end_stream) {
@@ -124,24 +124,24 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
   decoded_frames_.clear();
   if (!decoder_.decode(data, decoded_frames_)) {
-    streamError(Status::GrpcStatusMapping::Internal);
+    streamError(Status::WellKnownGrpcStatus::Internal);
     return;
   }
 
   for (auto& frame : decoded_frames_) {
     if (frame.length_ > 0 && frame.flags_ != GRPC_FH_DEFAULT) {
-      streamError(Status::GrpcStatusMapping::Internal);
+      streamError(Status::WellKnownGrpcStatus::Internal);
       return;
     }
     if (!callbacks_.onReceiveMessageRaw(frame.data_ ? std::move(frame.data_)
                                                     : std::make_unique<Buffer::OwnedImpl>())) {
-      streamError(Status::GrpcStatusMapping::Internal);
+      streamError(Status::WellKnownGrpcStatus::Internal);
       return;
     }
   }
 
   if (end_stream) {
-    streamError(Status::GrpcStatusMapping::Unknown);
+    streamError(Status::WellKnownGrpcStatus::Unknown);
   }
 }
 
@@ -152,7 +152,7 @@ void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
   callbacks_.onReceiveTrailingMetadata(std::move(trailers));
   if (!grpc_status) {
-    grpc_status = Status::GrpcStatusMapping::Unknown;
+    grpc_status = Status::WellKnownGrpcStatus::Unknown;
   }
   callbacks_.onRemoteClose(grpc_status.value(), grpc_message);
   cleanup();
@@ -174,7 +174,7 @@ void AsyncStreamImpl::onReset() {
   }
 
   http_reset_ = true;
-  streamError(Status::GrpcStatusMapping::Internal);
+  streamError(Status::WellKnownGrpcStatus::Internal);
 }
 
 void AsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
@@ -252,7 +252,7 @@ void AsyncRequestImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&&) {}
 void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
 
-  if (status != Grpc::Status::GrpcStatusMapping::Ok) {
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(status, message, *current_span_);
   } else if (response_ == nullptr) {

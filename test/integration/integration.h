@@ -227,7 +227,7 @@ public:
       const std::vector<std::string>& expected_resource_names,
       const std::vector<std::string>& expected_resource_names_added,
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = true,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatusMapping::Ok,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
@@ -244,7 +244,7 @@ public:
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatusMapping::Ok,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "") {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
                                         expected_resource_unsubscriptions, xds_stream_,
@@ -255,7 +255,7 @@ public:
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatusMapping::Ok,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
   // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
@@ -263,7 +263,7 @@ public:
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = true,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatusMapping::Ok,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
   template <class T>

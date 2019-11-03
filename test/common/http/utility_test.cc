@@ -457,7 +457,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_EQ(headers.Status()->value().getStringView(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatusMapping::Unknown)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
       }));
@@ -483,7 +483,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
         EXPECT_EQ(headers.Status()->value().getStringView(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatusMapping::Unauthenticated)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unauthenticated)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         const auto& encoded = Utility::PercentEncoding::encode(json);
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), encoded);
@@ -499,7 +499,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatusMapping::Unavailable)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
       }));
   Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
                           false);
@@ -508,11 +508,11 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
-                  std::to_string(enumToInt(Grpc::Status::GrpcStatusMapping::ResourceExhausted)));
+                  std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
       }));
   Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "",
                           absl::make_optional<Grpc::Status::GrpcStatus>(
-                              Grpc::Status::GrpcStatusMapping::ResourceExhausted),
+                              Grpc::Status::WellKnownGrpcStatus::ResourceExhausted),
                           false);
 }
 
