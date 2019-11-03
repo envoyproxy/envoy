@@ -83,7 +83,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
-  for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::MaximumKnown; ++i) {
+  for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::UserDefinedGrpcStatus; ++i) {
     stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
   }
 }
@@ -184,7 +184,7 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   rw_->StartCall(&init_tag_);
   ++inflight_tags_;
 }
-
+#include <iostream>
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
