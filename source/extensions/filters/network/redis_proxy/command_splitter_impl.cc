@@ -240,8 +240,9 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
-      Common::Redis::RespValue single_mget(base_request,
-                                           Common::Redis::Utility::GetRequest::instance(), i, i);
+      // Create composiste array for a single get.
+      const Common::Redis::RespValue single_mget(
+          base_request, Common::Redis::Utility::GetRequest::instance(), i, i);
       pending_request.conn_pool_ = route->upstream();
       pending_request.handle_ = makeRequest(route, "get", base_request->asArray()[i].asString(),
                                             single_mget, pending_request);
@@ -330,6 +331,8 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 }
 
 void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
+  // 1st resp value in incoming_request_ is the command.
+  // index + 1 is the key for the ith request.
   Common::Redis::RespValue::CompositeArray single_get(
       incoming_request_, Common::Redis::Utility::GetRequest::instance(), index + 1, index + 1);
   request.type(Common::Redis::RespType::CompositeArray);
@@ -361,8 +364,9 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      Common::Redis::RespValue single_set(base_request,
-                                          Common::Redis::Utility::SetRequest::instance(), i, i + 1);
+      // Create composite array for a single set command.
+      const Common::Redis::RespValue single_set(
+          base_request, Common::Redis::Utility::SetRequest::instance(), i, i + 1);
       ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set.toString());
       pending_request.handle_ = makeRequest(route, "set", base_request->asArray()[i].asString(),
                                             single_set, pending_request);
@@ -411,6 +415,9 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 }
 
 void MSETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
+  // 1st resp value in the incoming_request_ is the mset
+  // index*2 + 1 is the key for the ith request.
+  // index*2 + 2 is the value for the ith request.
   Common::Redis::RespValue::CompositeArray single_set(
       incoming_request_, Common::Redis::Utility::SetRequest::instance(), index * 2 + 1,
       index * 2 + 2);
@@ -437,7 +444,8 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
+    // Create the composite array for a single fragment.
+    const Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", base_request->asArray()[0].asString(),
               single_fragment.toString());
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
@@ -490,6 +498,8 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 }
 
 void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
+  // 1st resp value in incoming_request_ is the command.
+  // index + 1 is the key for the ith request.
   Common::Redis::RespValue::CompositeArray single_fragment(
       incoming_request_, incoming_request_->asArray()[0], index + 1, index + 1);
   request.type(Common::Redis::RespType::CompositeArray);
