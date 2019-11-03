@@ -80,13 +80,13 @@ public:
    * fine spdlog::info corresponds to LOGGER.info method.
    */
   using Levels = enum {
-    trace = spdlog::level::trace,
-    debug = spdlog::level::debug,
-    info = spdlog::level::info,
-    warn = spdlog::level::warn,
-    error = spdlog::level::err,
-    critical = spdlog::level::critical,
-    off = spdlog::level::off
+    trace = spdlog::level::trace,       // NOLINT(readability-identifier-naming)
+    debug = spdlog::level::debug,       // NOLINT(readability-identifier-naming)
+    info = spdlog::level::info,         // NOLINT(readability-identifier-naming)
+    warn = spdlog::level::warn,         // NOLINT(readability-identifier-naming)
+    error = spdlog::level::err,         // NOLINT(readability-identifier-naming)
+    critical = spdlog::level::critical, // NOLINT(readability-identifier-naming)
+    off = spdlog::level::off            // NOLINT(readability-identifier-naming)
   };
 
   spdlog::string_view_t levelString() const {

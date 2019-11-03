@@ -97,6 +97,7 @@ envoy_cc_test(
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
@@ -160,6 +161,7 @@ envoy_cc_test(
         "//source/common/stats:tag_producer_lib",
         "//test/test_common:utility_lib",
         "@com_googlesource_code_re2//:re2",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
@@ -169,6 +171,7 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:tag_producer_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
