@@ -31,7 +31,7 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
 
 private:
-  // Prepends the grpc frame into the buffer
+  // Prepend the grpc frame into the buffer
   void buildGrpcFrameHeader(Buffer::Instance& buffer);
 
   const std::string upstream_content_type_;
