@@ -62,6 +62,9 @@ envoy_cc_library(
     deps = [
         ":grpc_access_log_lib",
         ":grpc_access_log_utils",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -72,6 +75,9 @@ envoy_cc_library(
     deps = [
         ":grpc_access_log_lib",
         ":grpc_access_log_utils",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -98,6 +104,8 @@ envoy_cc_library(
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -113,5 +121,7 @@ envoy_cc_library(
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/grpc:tcp_grpc_access_log_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )
