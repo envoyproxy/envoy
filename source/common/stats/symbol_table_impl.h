@@ -75,11 +75,11 @@ public:
   class Encoding {
   public:
     /**
-     * Before destructing SymbolEncoding, you must call moveToStorage. This
+     * Before destructing SymbolEncoding, you must call moveToMemBlock. This
      * transfers ownership, and in particular, the responsibility to call
-     * SymbolTable::clear() on all referenced symbols. If we ever wanted
-     * to be able to destruct a SymbolEncoding without transferring it
-     * we could add a clear(SymbolTable&) method.
+     * SymbolTable::clear() on all referenced symbols. If we ever wanted to be
+     * able to destruct a SymbolEncoding without transferring it we could add a
+     * clear(SymbolTable&) method.
      */
     ~Encoding();
 
@@ -112,9 +112,9 @@ public:
      * Moves the contents of the vector into an allocated array. The array
      * must have been allocated with bytesRequired() bytes.
      *
-     * @param array destination memory to receive the encoded bytes.
+     * @param mem_block_builder memory block to receive the encoded bytes.
      */
-    void moveToStorage(MemBlockBuilder<uint8_t>& array);
+    void moveToMemBlock(MemBlockBuilder<uint8_t>& array);
 
     /**
      * @param number A number to encode in a variable length byte-array.
@@ -387,10 +387,27 @@ public:
    */
   uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
-  void copyToStorage(MemBlockBuilder<uint8_t>& storage) {
-    storage.appendData(size_and_data_, size());
+  /**
+   * Copies the entire StatName representation into a MemBlockBuilder, including
+   * the length metadata at the beginning. The MemBlockBuilder must not have
+   * any other data in it.
+   *
+   * @param mem_block_builder the builder to receive the storage.
+   */
+  void copyToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder) {
+    ASSERT(mem_block_builder.size() == 0);
+    mem_block_builder.appendData(size_and_data_, size());
   }
-  void copyDataToStorage(MemBlockBuilder<uint8_t>& storage) {
+
+  /**
+   * Appends the data portion of the StatName representation into a
+   * MemBlockBuilder, excluding the length metadata. This is appropriate for
+   * join(), where several stat-names are combined, and we only need the
+   * aggregated length metadata.
+   *
+   * @param mem_block_builder the builder to receive the storage.
+   */
+  void appendDataToMemBlock(MemBlockBuilder<uint8_t>& storage) {
     storage.appendData(data(), dataSize());
   }
 

@@ -110,9 +110,12 @@ public:
    */
   std::vector<T> toVector() const { return std::vector<T>(data_.get(), write_ptr_); }
 
-private:
+  /**
+   * @return The number of elements the have been added to the builder.
+   */
   uint64_t size() const { return write_ptr_ - data_.get(); }
 
+private:
   std::unique_ptr<T[]> data_;
   uint64_t capacity_;
   T* write_ptr_;

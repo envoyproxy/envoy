@@ -44,8 +44,8 @@ void StatName::debugPrint() {
 #endif
 
 SymbolTableImpl::Encoding::~Encoding() {
-  // Verifies that moveToStorage() was called on this encoding. Failure
-  // to call moveToStorage() will result in leaks symbols.
+  // Verifies that moveToMemBlock() was called on this encoding. Failure
+  // to call moveToMemBlock() will result in leaks symbols.
   ASSERT(mem_block_.capacity() == 0);
 }
 
@@ -113,7 +113,7 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
   return symbol_vec;
 }
 
-void SymbolTableImpl::Encoding::moveToStorage(MemBlockBuilder<uint8_t>& mem_block) {
+void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) {
   appendEncoding(data_bytes_required_, mem_block);
   mem_block.appendBlock(mem_block_);
   mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
@@ -405,7 +405,7 @@ SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
   Encoding encoding;
   addTokensToEncoding(name, encoding);
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(encoding.bytesRequired()));
-  encoding.moveToStorage(mem_block);
+  encoding.moveToMemBlock(mem_block);
   return mem_block.release();
 }
 
@@ -415,7 +415,7 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   const uint64_t size = src.size();
   MemBlockBuilder<uint8_t> storage(size);
-  src.copyToStorage(storage);
+  src.copyToMemBlock(storage);
   bytes_ = storage.release();
   table.incRefCount(statName());
 }
@@ -485,7 +485,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
   for (StatName stat_name : stat_names) {
-    stat_name.copyDataToStorage(mem_block);
+    stat_name.appendDataToMemBlock(mem_block);
   }
   return mem_block.release();
 }
@@ -509,7 +509,7 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
   MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
   mem_block.appendOne(num_names);
   for (auto& encoding : encodings) {
-    encoding.moveToStorage(mem_block);
+    encoding.moveToMemBlock(mem_block);
   }
 
   // This assertion double-checks the arithmetic where we computed
