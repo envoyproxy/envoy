@@ -1253,7 +1253,8 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: test_header_filter
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.filter.accesslog.v2.HeaderFilter
       header:
         name: test-header
 typed_config:
@@ -1326,8 +1327,10 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: sample_extension_filter
-    config:
-      rate: 5
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        rate: 5
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
@@ -1352,8 +1355,10 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: unregistered_extension_filter
-    config:
-      foo: bar
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        foo: bar
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
