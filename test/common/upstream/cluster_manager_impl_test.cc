@@ -41,6 +41,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -221,7 +222,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 }
 
 std::string clustersJson(const std::vector<std::string>& clusters) {
-  return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
+  return fmt::sprintf("\"clusters\": [%s]", absl::StrJoin(clusters, ","));
 }
 
 class ClusterManagerImplTest : public testing::Test {
