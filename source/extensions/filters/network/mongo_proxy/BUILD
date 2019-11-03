@@ -112,5 +112,6 @@ envoy_cc_library(
         "//source/common/config:filter_json_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:pkg_cc_proto",
     ],
 )

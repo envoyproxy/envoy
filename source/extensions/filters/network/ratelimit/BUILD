@@ -39,5 +39,6 @@ envoy_cc_library(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/ratelimit:ratelimit_lib",
+        "@envoy_api//envoy/config/filter/network/rate_limit/v2:pkg_cc_proto",
     ],
 )
