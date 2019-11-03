@@ -79,7 +79,7 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
   PERF_OPERATION(perf);
 
   if (substrMismatch(stat_name)) {
-    PERF_RECORD(perf, "re-skip-substr", name_);
+    PERF_RECORD(perf, "re-skip", name_);
     return false;
   }
 
@@ -123,7 +123,7 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
   PERF_OPERATION(perf);
 
   if (substrMismatch(stat_name)) {
-    PERF_RECORD(perf, "re2-skip-substr", name_);
+    PERF_RECORD(perf, "re2-skip", name_);
     return false;
   }
 
