@@ -67,7 +67,9 @@ public:
    */
   void appendData(const T* data, uint64_t size) {
     ASSERT(capacityRemaining() >= size);
-    memcpy(write_ptr_, data, size * sizeof(T));
+    if (size != 0) {
+      memcpy(write_ptr_, data, size * sizeof(T));
+    }
     write_ptr_ += size;
   }
 
