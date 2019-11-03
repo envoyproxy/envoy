@@ -240,7 +240,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
-      // Create composiste array for a single get.
+      // Create composite array for a single get.
       const Common::Redis::RespValue single_mget(
           base_request, Common::Redis::Utility::GetRequest::instance(), i, i);
       pending_request.conn_pool_ = route->upstream();
@@ -332,7 +332,7 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 
 void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
   // 1st resp value in incoming_request_ is the command.
-  // index + 1 is the key for the ith request.
+  // index + 1 is the key for the request.
   Common::Redis::RespValue::CompositeArray single_get(
       incoming_request_, Common::Redis::Utility::GetRequest::instance(), index + 1, index + 1);
   request.type(Common::Redis::RespType::CompositeArray);
@@ -416,8 +416,8 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 
 void MSETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
   // 1st resp value in the incoming_request_ is the mset
-  // index*2 + 1 is the key for the ith request.
-  // index*2 + 2 is the value for the ith request.
+  // index*2 + 1 is the key for the request.
+  // index*2 + 2 is the value for the request.
   Common::Redis::RespValue::CompositeArray single_set(
       incoming_request_, Common::Redis::Utility::SetRequest::instance(), index * 2 + 1,
       index * 2 + 2);
@@ -499,7 +499,7 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 
 void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
   // 1st resp value in incoming_request_ is the command.
-  // index + 1 is the key for the ith request.
+  // index + 1 is the key for the request.
   Common::Redis::RespValue::CompositeArray single_fragment(
       incoming_request_, incoming_request_->asArray()[0], index + 1, index + 1);
   request.type(Common::Redis::RespType::CompositeArray);
