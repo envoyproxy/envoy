@@ -89,8 +89,8 @@ TagNameValues::TagNameValues() {
   addRegex(RATELIMIT_PREFIX, R"(^ratelimit\.((.*?)\.)\w+?$)");
 
   // cluster.(<cluster_name>.)*
-  //addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
-  addRe2(CLUSTER_NAME,  "^cluster\\.(([^\\.]+)\\.).*");
+  // addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
+  addRe2(CLUSTER_NAME, "^cluster\\.(([^\\.]+)\\.).*");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
   addRegex(HTTP_CONN_MANAGER_PREFIX, R"(^listener(?=\.).*?\.http\.((.*?)\.))", ".http.");

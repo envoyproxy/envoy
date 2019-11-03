@@ -10,7 +10,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -33,8 +32,8 @@ TEST(TagExtractorTest, TwoSubexpressions) {
 TEST(TagExtractorTest, RE2Variants) {
   re2::RE2 re("^cluster\\.((.*?)\\.)");
   re2::StringPiece match1, match2;
-  ASSERT_TRUE(re2::RE2::PartialMatch("cluster.test_cluster.upstream_cx_total", re, &match1,
-                                     &match2));
+  ASSERT_TRUE(
+      re2::RE2::PartialMatch("cluster.test_cluster.upstream_cx_total", re, &match1, &match2));
   EXPECT_EQ("test_cluster.", std::string(match1));
   EXPECT_EQ("test_cluster", std::string(match2));
 
@@ -43,8 +42,8 @@ TEST(TagExtractorTest, RE2Variants) {
   EXPECT_EQ("test_cluster", std::string(match1));
 
   re2::RE2 alternate_re2("^cluster\\.(([^\\.]+)\\.).*");
-  ASSERT_TRUE(re2::RE2::FullMatch("cluster.test_cluster.upstream_cx_total", alternate_re2,
-                                  &match1, &match2));
+  ASSERT_TRUE(re2::RE2::FullMatch("cluster.test_cluster.upstream_cx_total", alternate_re2, &match1,
+                                  &match2));
   EXPECT_EQ("test_cluster.", std::string(match1));
   EXPECT_EQ("test_cluster", std::string(match2));
 
@@ -70,7 +69,8 @@ TEST(TagExtractorTest, SingleSubexpression) {
 }
 
 TEST(TagExtractorTest, substrMismatch) {
-  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.", ".foo.");
+  TagExtractorStdRegexImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.",
+                                         ".foo.");
   EXPECT_TRUE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
   EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
 }
@@ -82,8 +82,9 @@ TEST(TagExtractorTest, noSubstrMismatch) {
 }
 
 TEST(TagExtractorTest, EmptyName) {
-  EXPECT_THROW_WITH_MESSAGE(TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"),
-                            EnvoyException, "tag_name cannot be empty");
+  EXPECT_THROW_WITH_MESSAGE(
+      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"), EnvoyException,
+      "tag_name cannot be empty");
 }
 
 TEST(TagExtractorTest, BadRegex) {

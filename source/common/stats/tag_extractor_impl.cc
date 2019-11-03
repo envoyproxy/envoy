@@ -48,8 +48,7 @@ std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
 
 TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
                                                      const std::string& regex,
-                                                     const std::string& substr,
-                                                     bool use_re2) {
+                                                     const std::string& substr, bool use_re2) {
 
   if (name.empty()) {
     throw EnvoyException("tag_name cannot be empty");
@@ -71,8 +70,7 @@ bool TagExtractorImpl::substrMismatch(absl::string_view stat_name) const {
 
 TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(const std::string& name, const std::string regex,
                                                    const std::string& substr)
-    : TagExtractorImpl(name, regex, substr),
-      regex_(Regex::Utility::parseStdRegex(regex)) {}
+    : TagExtractorImpl(name, regex, substr), regex_(Regex::Utility::parseStdRegex(regex)) {}
 
 bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                                           IntervalSet<size_t>& remove_characters) const {
@@ -115,8 +113,7 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
 
 TagExtractorRe2Impl::TagExtractorRe2Impl(const std::string& name, const std::string regex,
                                          const std::string& substr)
-    : TagExtractorImpl(name, regex, substr),
-      regex_(regex) {}
+    : TagExtractorImpl(name, regex, substr), regex_(regex) {}
 
 bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
@@ -132,7 +129,8 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
 
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (re2::RE2::FullMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
-                          &remove_subexpr, &value_subexpr) && !remove_subexpr.empty()) {
+                          &remove_subexpr, &value_subexpr) &&
+      !remove_subexpr.empty()) {
 
     // value_subexpr is the optional second submatch. It is usually inside the first submatch
     // (remove_subexpr) to allow the expression to strip off extra characters that should be removed

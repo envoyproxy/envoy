@@ -45,9 +45,8 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   int num_found = 0;
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     if (desc.name_ == name) {
-      addExtractor(
-          Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
-                                                      desc.use_re2_));
+      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_,
+                                                               desc.substr_, desc.use_re2_));
       ++num_found;
     }
   }
@@ -102,9 +101,8 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       names.emplace(desc.name_);
-      addExtractor(
-          Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
-                                                      desc.use_re2_));
+      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_,
+                                                               desc.substr_, desc.use_re2_));
     }
   }
   return names;

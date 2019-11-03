@@ -1,5 +1,5 @@
-// Note: this should be run with --compilation_mode=opt, and would benefit from a
-// quiescent system with disabled cstate power management.
+// Note: this should be run with --compilation_mode=opt, and would benefit from
+// a quiescent system with disabled cstate power management.
 
 #include <regex>
 
@@ -7,14 +7,15 @@
 
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
-
 #include "re2/re2.h"
 
+// NOLINT(namespace-envoy)
+
 static const char* cluster_inputs[] = {
-  "cluster.no_trailing_dot",
-  "cluster.match.",
-  "cluster.match.normal",
-  "cluster.match.and.a.whole.lot.of.things.coming.after.the.matches.really.too.much.stuff",
+    "cluster.no_trailing_dot",
+    "cluster.match.",
+    "cluster.match.normal",
+    "cluster.match.and.a.whole.lot.of.things.coming.after.the.matches.really.too.much.stuff",
 };
 
 static const char cluster_re_pattern[] = "^cluster\\.((.*?)\\.)";

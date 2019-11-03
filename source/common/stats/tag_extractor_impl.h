@@ -7,7 +7,6 @@
 #include "envoy/stats/tag_extractor.h"
 
 #include "absl/strings/string_view.h"
-
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -53,26 +52,26 @@ protected:
 };
 
 class TagExtractorStdRegexImpl : public TagExtractorImpl {
- public:
+public:
   TagExtractorStdRegexImpl(const std::string& name, const std::string regex,
                            const std::string& substr = "");
 
   bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
 
- private:
+private:
   const std::regex regex_;
 };
 
 class TagExtractorRe2Impl : public TagExtractorImpl {
- public:
+public:
   TagExtractorRe2Impl(const std::string& name, const std::string regex,
                       const std::string& substr = "");
 
   bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
 
- private:
+private:
   re2::RE2 regex_;
 };
 
