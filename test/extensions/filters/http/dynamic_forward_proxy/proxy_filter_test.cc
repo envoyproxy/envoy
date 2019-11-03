@@ -210,10 +210,10 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   EXPECT_CALL(callbacks_.route_->route_entry_,
               perFilterConfig(HttpFilterNames::get().DynamicForwardProxy))
       .WillOnce(Return(&config));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 80, _))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar:82"), 80, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
 
-  Http::TestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar"}};
+  Http::TestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar:82"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(headers, false));
 
