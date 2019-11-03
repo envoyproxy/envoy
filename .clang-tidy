@@ -66,6 +66,9 @@ CheckOptions:
   - key:             readability-identifier-naming.EnumCase
     value:           'CamelCase'
 
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           'CamelCase'
+
   - key:             readability-identifier-naming.ParameterCase
     value:           'lower_case'
 

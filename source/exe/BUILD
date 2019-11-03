@@ -14,7 +14,7 @@ load(
     "envoy_all_extensions",
     "envoy_windows_extensions",
 )
-load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -43,7 +43,6 @@ envoy_cc_library(
     ] + select({
         "//bazel:windows_x86_64": envoy_windows_extensions(),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//bazel:boringssl_disabled": envoy_all_extensions(NOBORINGSSL_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )

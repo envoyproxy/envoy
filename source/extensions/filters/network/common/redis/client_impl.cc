@@ -136,7 +136,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
-  putOutlierEvent(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT);
+  putOutlierEvent(Upstream::Outlier::Result::LocalOriginTimeout);
   if (connected_) {
     host_->cluster().stats().upstream_rq_timeout_.inc();
     host_->stats().rq_timeout_.inc();
@@ -152,7 +152,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
   } catch (ProtocolError&) {
-    putOutlierEvent(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_FAILED);
+    putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
@@ -173,7 +173,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     if (!pending_requests_.empty()) {
       Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
       if (event == Network::ConnectionEvent::RemoteClose) {
-        putOutlierEvent(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED);
+        putOutlierEvent(Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
     }
 
@@ -248,7 +248,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  putOutlierEvent(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS);
+  putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,

@@ -9,7 +9,6 @@
 #include "common/common/macros.h"
 #include "common/http/headers.h"
 
-#include "extensions/filters/listener/http_inspector/http_protocol_header.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
@@ -26,7 +25,13 @@ Config::Config(Stats::Scope& scope)
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
-Filter::Filter(const ConfigSharedPtr config) : config_(config) {}
+Filter::Filter(const ConfigSharedPtr config) : config_(config) {
+  http_parser_init(&parser_, HTTP_REQUEST);
+}
+
+http_parser_settings Filter::settings_{
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+};
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "http inspector: new connection accepted");
@@ -132,34 +137,39 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     protocol_ = "HTTP/2";
     return ParseState::Done;
   } else {
-    const size_t pos = data.find_first_of("\r\n");
+    absl::string_view new_data = data.substr(parser_.nread);
+    const size_t pos = new_data.find_first_of("\r\n");
+
     if (pos != absl::string_view::npos) {
-      const absl::string_view request_line = data.substr(0, pos);
-      const std::vector<absl::string_view> fields =
-          absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
+      // Include \r or \n
+      new_data = new_data.substr(0, pos + 1);
+      ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+      ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
+                HTTP_PARSER_ERRNO(&parser_));
 
-      // Method SP Request-URI SP HTTP-Version
-      if (fields.size() != 3) {
-        ENVOY_LOG(trace, "http inspector: invalid http1x request line");
-        // done(false);
+      // Errors in parsing HTTP.
+      if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
         return ParseState::Error;
       }
 
-      if (http1xMethods().count(fields[0]) == 0 || httpProtocols().count(fields[2]) == 0) {
-        ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not valid", fields[0],
-                  fields[2]);
-        // done(false);
-        return ParseState::Error;
+      if (parser_.http_major == 1 && parser_.http_minor == 1) {
+        protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
+      } else {
+        // Set other HTTP protocols to HTTP/1.0
+        protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
       }
-
-      ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
-                fields[1], fields[2]);
-
-      protocol_ = fields[2];
-      // done(true);
       return ParseState::Done;
     } else {
-      return ParseState::Continue;
+      ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+      ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
+                HTTP_PARSER_ERRNO(&parser_));
+
+      // Errors in parsing HTTP.
+      if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+        return ParseState::Error;
+      } else {
+        return ParseState::Continue;
+      }
     }
   }
 }
@@ -187,54 +197,6 @@ void Filter::done(bool success) {
   } else {
     config_->stats().http_not_found_.inc();
   }
-}
-
-const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
-  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
-                         Http::Headers::get().ProtocolStrings.Http10String,
-                         Http::Headers::get().ProtocolStrings.Http11String);
-}
-
-const absl::flat_hash_set<std::string>& Filter::http1xMethods() const {
-  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
-                         {HttpInspector::ExtendedHeader::get().MethodValues.Acl,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Baseline_Control,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Bind,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Checkin,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Checkout,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Connect,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Copy,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Delete,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Get,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Head,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Label,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Link,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Lock,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Merge,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Mkactivity,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Mkcalendar,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Mkcol,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Mkredirectref,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Mkworkspace,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Move,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Options,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Orderpatch,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Patch,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Post,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Proppatch,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Purge,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Put,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Rebind,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Report,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Search,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Trace,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Unbind,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Uncheckout,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Unlink,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Unlock,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Update,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Updateredirectref,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Version_Control});
 }
 
 } // namespace HttpInspector

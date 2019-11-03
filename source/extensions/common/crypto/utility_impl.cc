@@ -1,4 +1,4 @@
-#include "common/crypto/utility.h"
+#include "extensions/common/crypto/utility_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
@@ -7,19 +7,12 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
-#include "openssl/bytestring.h"
-#include "openssl/hmac.h"
-#include "openssl/sha.h"
 
 namespace Envoy {
 namespace Common {
 namespace Crypto {
 
-namespace Utility {
-
-const EVP_MD* getHashFunction(absl::string_view name);
-
-std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) {
+std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer) {
   std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
   EVP_MD_CTX* ctx(EVP_MD_CTX_new());
   auto rc = EVP_DigestInit(ctx, EVP_sha256());
@@ -37,7 +30,8 @@ std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) {
   return digest;
 }
 
-std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string_view message) {
+std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
+                                                absl::string_view message) {
   std::vector<uint8_t> hmac(SHA256_DIGEST_LENGTH);
   const auto ret =
       HMAC(EVP_sha256(), key.data(), key.size(), reinterpret_cast<const uint8_t*>(message.data()),
@@ -46,9 +40,9 @@ std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string
   return hmac;
 }
 
-const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& key,
-                                         const std::vector<uint8_t>& signature,
-                                         const std::vector<uint8_t>& text) {
+const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, CryptoObject& key,
+                                                      const std::vector<uint8_t>& signature,
+                                                      const std::vector<uint8_t>& text) {
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
@@ -83,13 +77,13 @@ const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& k
   return {false, absl::StrCat("Failed to verify digest. Error code: ", ok)};
 }
 
-CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) {
+CryptoObjectPtr UtilityImpl::importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
 
   return std::make_unique<PublicKeyObject>(EVP_parse_public_key(&cbs));
 }
 
-const EVP_MD* getHashFunction(absl::string_view name) {
+const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {
   const std::string hash = absl::AsciiStrToLower(name);
 
   // Hash algorithms set refers
@@ -109,7 +103,10 @@ const EVP_MD* getHashFunction(absl::string_view name) {
   }
 }
 
-} // namespace Utility
+// Register the crypto utility singleton.
+static Crypto::ScopedUtilitySingleton* utility_ =
+    new Crypto::ScopedUtilitySingleton(std::make_unique<Crypto::UtilityImpl>());
+
 } // namespace Crypto
 } // namespace Common
 } // namespace Envoy
