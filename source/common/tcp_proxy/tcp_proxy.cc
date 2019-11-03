@@ -118,6 +118,10 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   for (const envoy::config::filter::accesslog::v2::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
+
+  if (!config.hash_policy().empty()) {
+    hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
+  }
 }
 
 const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
