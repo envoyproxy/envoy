@@ -292,4 +292,8 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
         urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
     ),
+    fuzzit_linux = dict(
+        sha256 = "9ca76ac1c22d9360936006efddf992977ebf8e4788ded8e5f9d511285c9ac774",
+        urls = ["https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.76/fuzzit_Linux_x86_64.zip"],
+    ),
 )

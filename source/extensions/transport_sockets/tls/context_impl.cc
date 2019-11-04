@@ -20,6 +20,7 @@
 
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
@@ -88,7 +89,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
       throw EnvoyException(fmt::format("Failed to initialize cipher suites {}. The following "
                                        "ciphers were rejected when tried individually: {}",
-                                       config.cipherSuites(), StringUtil::join(bad_ciphers, ", ")));
+                                       config.cipherSuites(), absl::StrJoin(bad_ciphers, ", ")));
     }
 
     if (!SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {

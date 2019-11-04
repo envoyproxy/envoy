@@ -253,7 +253,6 @@ envoy_cc_library(
     deps = [
         ":instance_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
 
