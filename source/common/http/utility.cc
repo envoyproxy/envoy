@@ -389,6 +389,9 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
 }
 
 bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
+  static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
+  static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
+
   // Remove any headers nominated by the Connection header. The TE header
   // is sanitized and removed only if it's empty after removing unsupported values
   // See https://github.com/envoyproxy/envoy/issues/8623
@@ -400,7 +403,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
       absl::StrSplit(connection_header_value.getStringView(), ',');
 
   // If we have 10 or more nominated headers, fail this request
-  if (connection_header_tokens.size() >= 10) {
+  if (connection_header_tokens.size() >= MAX_ALLOWED_NOMINATED_HEADERS) {
     ENVOY_LOG_MISC(trace, "Too many nominated headers in request");
     return false;
   }
@@ -408,7 +411,10 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
   // Split the connection header and evaluate each nominated header
   for (const auto& token : connection_header_tokens) {
 
-    const absl::string_view token_sv = StringUtil::trim(token);
+    const auto token_sv = StringUtil::trim(token);
+
+    // Build the LowerCaseString for header lookup
+    const LowerCaseString lcs_header_to_remove{std::string(token_sv)};
 
     // If the Connection token value is not a nominated header, ignore it here since
     // the connection header is removed elsewhere when the H1 request is upgraded to H2
@@ -419,48 +425,39 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
       continue;
     }
 
-    // Build the LowerCaseString for header lookup
-    const std::string header_to_remove = std::string(token_sv);
-    const LowerCaseString lcs_header_to_remove(header_to_remove);
-
     // By default we will remove any nominated headers
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
     HeaderEntry* nominated_header = NULL;
 
-    if (StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().Connection.get())) {
+    if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
       // The connection header itself is *not removed*
       ENVOY_LOG_MISC(trace, "Skipping self nominated header [{}]", token_sv);
       keep_header = true;
       headers_to_remove.emplace(token_sv);
 
-    } else if (StringUtil::CaseInsensitiveCompare()(token_sv,
-                                                    Http::Headers::get().ForwardedFor.get()) ||
-               StringUtil::CaseInsensitiveCompare()(token_sv,
-                                                    Http::Headers::get().ForwardedHost.get()) ||
-               StringUtil::CaseInsensitiveCompare()(token_sv,
-                                                    Http::Headers::get().ForwardedProto.get()) ||
+    } else if ((lcs_header_to_remove == Http::Headers::get().ForwardedFor) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedHost) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedProto) ||
                !token_sv.find(':')) {
       // If pseudo headers or X-Forwarded* headers are nominated, this could be
       // an invalid request. Reject the request
       return false;
-
     } else {
       // Examine the value of all other nominated headers
       nominated_header = headers.get(lcs_header_to_remove);
     }
 
     if (nominated_header) {
-      const HeaderString& nominated_header_value = nominated_header->value();
-      auto nominated_header_value_sv = nominated_header_value.getStringView();
+      auto nominated_header_value_sv = nominated_header->value().getStringView();
 
-      const bool is_te_header =
-          StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().TE.get());
+      const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
 
       // reject the request if the TE header is too large
-      if (is_te_header && (nominated_header_value_sv.size() >= 256)) {
+      if (is_te_header && (nominated_header_value_sv.size() >= MAX_ALLOWED_TE_VALUE_SIZE)) {
+        ENVOY_LOG_MISC(trace, "TE header contains a value that exceeds the allowable length");
         return false;
       }
 
