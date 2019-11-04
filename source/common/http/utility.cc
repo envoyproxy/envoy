@@ -454,23 +454,27 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
 
     if (nominated_header) {
       const HeaderString& nominated_header_value = nominated_header->value();
-      auto nominated_heaader_value_sv = nominated_header_value.getStringView();
+      auto nominated_header_value_sv = nominated_header_value.getStringView();
 
       const bool is_te_header =
           StringUtil::CaseInsensitiveCompare()(token_sv, Http::Headers::get().TE.get());
 
       // reject the request if the TE header is too large
-      if (is_te_header && (nominated_heaader_value_sv.size() >= 256)) {
+      if (is_te_header && (nominated_header_value_sv.size() >= 256)) {
         return false;
       }
 
       // If the TE header contains "trailers" we will reset the header to this value since it's
       // the only permitted value
-      if (is_te_header && (nominated_heaader_value_sv.find(
-                               Http::Headers::get().TEValues.Trailers) != std::string::npos)) {
-        nominated_header->value().clear();
-        nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
-                                          Http::Headers::get().TEValues.Trailers.size());
+      if (is_te_header && (nominated_header_value_sv.find(Http::Headers::get().TEValues.Trailers) !=
+                           std::string::npos)) {
+
+        // Reset the TE header to just trailers only if other values exist
+        if (nominated_header_value_sv.find(',') != std::string::npos) {
+          nominated_header->value().clear();
+          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
+                                            Http::Headers::get().TEValues.Trailers.size());
+        }
         continue;
       }
     }
