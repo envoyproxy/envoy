@@ -21,8 +21,8 @@ int main(int argc, char* argv[]) {
               << std::endl;
     return EXIT_FAILURE;
   }
-
   try {
+
     Envoy::Event::Libevent::Global::initialize();
     Envoy::Thread::MutexBasicLockable lock;
     Envoy::Logger::Context logging_context(static_cast<spdlog::level::level_enum>(2),
