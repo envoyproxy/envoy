@@ -375,7 +375,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
     // NOTE: high_value has to have the property that the lowest 32 bits % 100
     // is less than 100. If it's greater than 100 the test will pass whether or
     // not the uint32 conversion is handled properly.
-    uint64_t high_value = 1UL << 60;
+    uint64_t high_value = 1ULL << 60;
     std::string high_value_str = std::to_string(high_value);
     loader_->mergeValues({{"foo", high_value_str}});
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));

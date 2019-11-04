@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "@envoy_api//envoy/data/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -76,6 +77,8 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -93,5 +96,8 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )

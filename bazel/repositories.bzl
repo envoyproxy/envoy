@@ -6,14 +6,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
-NOBORINGSSL_SKIP_TARGETS = {
-    # The lua filter depends on BoringSSL
-    "lua": "envoy.filters.http.lua",
-
-    # These two extensions are supposed to be replaced with alternative extensions.
-    "tls": "envoy.transport_sockets.tls",
-    "tls_inspector": "envoy.filters.listener.tls_inspector",
-}
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -162,6 +154,7 @@ def envoy_dependencies(skip_targets = []):
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
+    _fuzzit_linux()
 
     _python_deps()
     _cc_deps()
@@ -244,6 +237,12 @@ def _com_github_eile_tclap():
     _repository_impl(
         name = "com_github_eile_tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
+        patch_args = ["-p1"],
+        # If and when we pick up tclap 1.4 or later release,
+        # this entire issue was refactored away 6 years ago;
+        # https://sourceforge.net/p/tclap/code/ci/5d4ffbf2db794af799b8c5727fb6c65c079195ac/
+        # https://github.com/envoyproxy/envoy/pull/8572#discussion_r337554195
+        patches = ["@envoy//bazel:tclap-win64-ull-sizet.patch"],
     )
     native.bind(
         name = "tclap",
@@ -341,6 +340,10 @@ def _com_github_nghttp2_nghttp2():
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
+        # This patch cannot be picked up due to ABI rules. Better
+        # solve is likely at the next version-major. Discussion at;
+        # https://github.com/nghttp2/nghttp2/pull/1395
+        # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
         **location
     )
@@ -644,6 +647,12 @@ def _org_llvm_releases_compiler_rt():
     _repository_impl(
         name = "org_llvm_releases_compiler_rt",
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
+    )
+
+def _fuzzit_linux():
+    _repository_impl(
+        name = "fuzzit_linux",
+        build_file_content = "exports_files([\"fuzzit\"])",
     )
 
 def _com_github_grpc_grpc():

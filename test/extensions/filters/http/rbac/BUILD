@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/rbac:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/config/filter/http/rbac/v2:pkg_cc_proto",
     ],
 )
 

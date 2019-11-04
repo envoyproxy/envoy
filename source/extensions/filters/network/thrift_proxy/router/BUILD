@@ -39,7 +39,6 @@ envoy_cc_library(
         ":router_interface",
         "//include/envoy/router:router_ratelimit_interface",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -79,5 +78,6 @@ envoy_cc_library(
         ":router_ratelimit_interface",
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )

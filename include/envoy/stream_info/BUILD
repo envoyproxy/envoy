@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
