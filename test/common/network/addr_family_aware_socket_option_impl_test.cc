@@ -1,4 +1,4 @@
-#include <sys/socket.h>
+#include "envoy/common/platform.h"
 
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/io_socket_handle_impl.h"

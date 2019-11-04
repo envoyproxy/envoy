@@ -25,10 +25,7 @@
 
 #elif WIN32
 
-#include <WinSock2.h>
-// <winsock2.h> includes <windows.h>, so undef some interfering symbols
-#undef DELETE
-#undef GetMessage
+#include "envoy/common/platform.h"
 
 #define htole16(x) (x)
 #define htole32(x) (x)

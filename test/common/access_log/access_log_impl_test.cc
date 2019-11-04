@@ -1309,7 +1309,8 @@ public:
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(*factory_config);
-    return std::make_unique<SampleExtensionFilter>(filter_config->getInteger("rate"));
+    return std::make_unique<SampleExtensionFilter>(
+        static_cast<uint32_t>(filter_config->getInteger("rate")));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

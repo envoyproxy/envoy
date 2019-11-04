@@ -1,7 +1,5 @@
 #include "common/grpc/common.h"
 
-#include <arpa/inet.h>
-
 #include <atomic>
 #include <cstdint>
 #include <cstring>
