@@ -237,6 +237,22 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   hds_delegate_->onReceiveMessage(std::move(message));
 }
 
+// Tests OnReceiveMessage given a HealthCheckSpecifier message without interval field
+TEST_F(HdsTest, TestDefaultIntervalOnReceiveMessage) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  // notice that interval field is intentionally left undefined
+
+  // Process message
+  EXPECT_CALL(*server_response_timer_, enableTimer(std::chrono::milliseconds(1000), _))
+      .Times(AtLeast(1));
+  hds_delegate_->onReceiveMessage(std::move(message));
+}
+
 // Tests that SendResponse responds to the server in a timely fashion
 // given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalSendResponse) {
