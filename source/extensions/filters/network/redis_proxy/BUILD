@@ -128,6 +128,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
 )
 

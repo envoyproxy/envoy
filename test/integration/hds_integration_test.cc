@@ -727,5 +727,31 @@ TEST_P(HdsIntegrationTest, TestUpdateChangesTimer) {
   cleanupHdsConnection();
 }
 
+// Tests Envoy HTTP health checking a single endpoint when interval hasn't been defined
+TEST_P(HdsIntegrationTest, TestDefaultTimer) {
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+
+  // Server asks for health checking
+  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_.clear_interval();
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  healthcheckEndpoints();
+
+  // an update should be received after interval
+  ASSERT_TRUE(
+      hds_stream_->waitForGrpcMessage(*dispatcher_, response_, std::chrono::milliseconds(2500)));
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
 } // namespace
 } // namespace Envoy

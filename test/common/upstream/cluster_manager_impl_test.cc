@@ -21,7 +21,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 }
 
 std::string clustersJson(const std::vector<std::string>& clusters) {
-  return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
+  return fmt::sprintf("\"clusters\": [%s]", absl::StrJoin(clusters, ","));
 }
 
 class ClusterManagerImplTest : public testing::Test {
@@ -1009,11 +1009,11 @@ dynamic_warming_clusters:
 
   factory_.tls_.shutdownThread();
 
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()));
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster4.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()test/common/upstream/cluster_manager_impl_test.cc
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));test/common/upstream/cluster_manager_impl_test.cc
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));test/common/upstream/cluster_manager_impl_test.cc
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));test/common/upstream/cluster_manager_impl_test.cc
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster4.get()));test/common/upstream/cluster_manager_impl_test.cc
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster5.get()));
 }
 

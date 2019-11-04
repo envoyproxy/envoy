@@ -182,5 +182,6 @@ envoy_cc_library(
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
         "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
