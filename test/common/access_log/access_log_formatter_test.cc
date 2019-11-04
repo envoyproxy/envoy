@@ -1012,7 +1012,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                "%FILTER_STATE(serialized):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("\"test_value\"|type_url: \"UnknownType\" value: \"\\336\\255\\276\\357\"|type_url|-",
+    EXPECT_EQ("\"test_value\"|-|type_url|-",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 

@@ -653,8 +653,9 @@ std::string FilterStateFormatter::format(const Http::HeaderMap&, const Http::Hea
   std::string value;
   const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
   if (!status.ok()) {
-    // If the message contains an unknown Any, MessageToJsonString will fail.
-    value = proto->ShortDebugString();
+    // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
+    // TODO(lizan): add support of unknown Any.
+    return UnspecifiedValueString;
   }
   if (max_length_.has_value() && value.length() > max_length_.value()) {
     return value.substr(0, max_length_.value());
