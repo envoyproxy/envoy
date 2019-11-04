@@ -49,7 +49,7 @@ public:
   void setResponseFlag(Envoy::StreamInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }
-  uint64_t getResponseFlags() const override { return response_flags_; }
+  uint64_t responseFlags() const override { return response_flags_; }
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }

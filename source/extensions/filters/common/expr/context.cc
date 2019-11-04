@@ -130,7 +130,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Trailers) {
     return CelValue::CreateMap(&trailers_);
   } else if (value == Flags) {
-    return CelValue::CreateInt64(info_.getResponseFlags());
+    return CelValue::CreateInt64(info_.responseFlags());
   }
   return {};
 }

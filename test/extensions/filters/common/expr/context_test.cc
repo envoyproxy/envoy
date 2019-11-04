@@ -195,7 +195,7 @@ TEST(Context, ResponseAttributes) {
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
-  EXPECT_CALL(info, getResponseFlags()).WillRepeatedly(Return(0x1));
+  EXPECT_CALL(info, responseFlags()).WillRepeatedly(Return(0x1));
 
   {
     auto value = response[CelValue::CreateString(Undefined)];

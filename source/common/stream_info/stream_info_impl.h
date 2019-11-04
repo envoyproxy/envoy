@@ -123,7 +123,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   bool hasAnyResponseFlag() const override { return response_flags_ != 0; }
 
-  uint64_t getResponseFlags() const override { return response_flags_; }
+  uint64_t responseFlags() const override { return response_flags_; }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;

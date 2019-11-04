@@ -360,7 +360,7 @@ public:
   /**
    * @return response flags encoded as an integer.
    */
-  virtual uint64_t getResponseFlags() const PURE;
+  virtual uint64_t responseFlags() const PURE;
 
   /**
    * @return upstream host description.
