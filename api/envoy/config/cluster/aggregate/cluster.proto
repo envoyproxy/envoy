@@ -14,5 +14,5 @@ import "validate/validate.proto";
 // <arch_overview_aggregate_cluster>` for more information.
 message ClusterConfig {
   // Load balancing clusters in aggregated cluster.
-  repeated string clusters = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 }
