@@ -151,10 +151,10 @@ public:
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
-  struct TCPRoute : public RouteEntry, public Route {
-    TCPRoute(const Config& parent,
-             const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-                 config);
+  struct RouteImpl : public RouteEntry, public Route {
+    RouteImpl(const Config& parent,
+              const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
+                  config);
 
     // RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -172,7 +172,7 @@ private:
     Network::PortRangeList destination_port_ranges_;
     std::string cluster_name_;
   };
-  using TCPRouteConstSharedPtr = std::shared_ptr<const TCPRoute>;
+  using RouteImplConstSharedPtr = std::shared_ptr<const RouteImpl>;
 
   class WeightedClusterEntry : public RouteEntry, public Route {
   public:
@@ -202,7 +202,7 @@ private:
   };
   using WeightedClusterEntryConstSharedPtr = std::shared_ptr<const WeightedClusterEntry>;
 
-  std::vector<TCPRouteConstSharedPtr> routes_;
+  std::vector<RouteImplConstSharedPtr> routes_;
   std::vector<WeightedClusterEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;

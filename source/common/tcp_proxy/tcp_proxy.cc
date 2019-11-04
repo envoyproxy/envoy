@@ -31,7 +31,7 @@ const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
 
-Config::TCPRoute::TCPRoute(
+Config::RouteImpl::RouteImpl(
     const Config& parent,
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config)
     : parent_(parent) {
@@ -98,14 +98,14 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   if (config.has_deprecated_v1()) {
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
              route_desc : config.deprecated_v1().routes()) {
-      routes_.emplace_back(std::make_shared<const TCPRoute>(*this, route_desc));
+      routes_.emplace_back(std::make_shared<const RouteImpl>(*this, route_desc));
     }
   }
 
   if (!config.cluster().empty()) {
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute default_route;
     default_route.set_cluster(config.cluster());
-    routes_.emplace_back(std::make_shared<const TCPRoute>(*this, default_route));
+    routes_.emplace_back(std::make_shared<const RouteImpl>(*this, default_route));
   }
 
   // Weighted clusters will be enabled only if both the default cluster and
@@ -152,10 +152,10 @@ RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& conn
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute
         per_connection_route;
     per_connection_route.set_cluster(per_connection_cluster.value());
-    return std::make_shared<const TCPRoute>(*this, per_connection_route);
+    return std::make_shared<const RouteImpl>(*this, per_connection_route);
   }
 
-  for (const TCPRouteConstSharedPtr& route : routes_) {
+  for (const RouteImplConstSharedPtr& route : routes_) {
     if (!route->source_port_ranges_.empty() &&
         !Network::Utility::portInRangeList(*connection.remoteAddress(),
                                            route->source_port_ranges_)) {
