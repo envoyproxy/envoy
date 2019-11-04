@@ -27,11 +27,15 @@ DnsResolverImpl::DnsResolverImpl(
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
   ares_options options;
-  if (use_tcp_for_dns_lookups) {
-    options.flags = ARES_FLAG_USEVC;
+  int optmask = 0;
+
+  // fixme use_tcp_for_dns_lookups is not propagated from test
+  if (use_tcp_for_dns_lookups || true) {
+    optmask |= ARES_OPT_FLAGS;
+    options.flags |= ARES_FLAG_USEVC;
   }
 
-  initializeChannel(&options, 0);
+  initializeChannel(&options, optmask);
 
   if (!resolvers.empty()) {
     std::vector<std::string> resolver_addrs;

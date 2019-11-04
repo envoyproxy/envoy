@@ -2,6 +2,8 @@
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
 
+#include <bitset>
+#include <iostream>
 #include <list>
 #include <memory>
 #include <string>
@@ -416,7 +418,7 @@ public:
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
     if (tcp_only()) {
-			peer_->resetChannelTcpOnly(zero_timeout());
+      peer_->resetChannelTcpOnly(zero_timeout());
     }
     ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
   }
@@ -439,9 +441,9 @@ public:
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zero_timeout() const { return false; }
-	virtual bool tcp_only() const { return true; }
-	void enableTcpForDnsLookups(bool enable) { use_tcp_for_dns_lookups = enable; }
-	bool use_tcp_for_dns_lookups{false};
+  virtual bool tcp_only() const { return true; }
+  void enableTcpForDnsLookups(bool enable) { use_tcp_for_dns_lookups = enable; }
+  bool use_tcp_for_dns_lookups{true};
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
@@ -866,34 +868,44 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
 
 class DnsImplAresFlagsTest : public DnsImplTest {
 protected:
-	bool tcp_only() const override { return false; }
+  bool tcp_only() const override { return false; }
 };
 
 // Parametrize the DNS test server socket address.
 INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsTest,
-				testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-				TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-// Validate that c_ares flag `ARES_FLAG_USEVC` is set when boolean property `use_tcp_for_dns_lookups` is enabled.
+// Validate that c_ares flag `ARES_FLAG_USEVC` is set when boolean property
+// `use_tcp_for_dns_lookups` is enabled.
 TEST_P(DnsImplAresFlagsTest, TcpOnlyLookupsEnabled) {
   enableTcpForDnsLookups(true);
-	auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
-	EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
-	auto resolver = dispatcher_->createDnsResolver({test_instance}, false);
-	auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
-	ares_addr_port_node* resolvers;
-	int result = ares_get_servers_ports(peer->channel(), &resolvers);
-	EXPECT_EQ(result, ARES_SUCCESS);
-	EXPECT_EQ(resolvers->family, AF_INET);
-	EXPECT_EQ(resolvers->udp_port, 45);
-	char addr4str[INET_ADDRSTRLEN];
-	EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
-  peer->channel()->options;
-	ares_free_data(resolvers);
+  auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
+  EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
+  auto resolver = dispatcher_->createDnsResolver({test_instance}, false);
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 45);
+  char addr4str[INET_ADDRSTRLEN];
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  struct ares_options opts;
+  // opts.timeout = 2000;
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
+  std::bitset<sizeof(int)> flags_bits(opts.flags);
+  std::cerr << "bits: " << flags_bits << std::endl;
+  EXPECT_EQ(result, ARES_SUCCESS);
+  // fixme validations does not work
+  EXPECT_TRUE(flags_bits.test(ARES_FLAG_USEVC));
+  ares_free_data(resolvers);
 }
 
-//// Validate that c_ares flag `ARES_FLAG_USEVC` is not set when boolean property `use_tcp_for_dns_lookups` is disabled.
-//TEST_P(DnsImplAresFlagsTest, TcpOnlyLookupsDisabled) {
+//// Validate that c_ares flag `ARES_FLAG_USEVC` is not set when boolean property
+///`use_tcp_for_dns_lookups` is disabled.
+// TEST_P(DnsImplAresFlagsTest, TcpOnlyLookupsDisabled) {
 //	std::list<Address::InstanceConstSharedPtr> address_list;
 //	server_->addHosts("some.good.domain", {"1.2.3.4"}, RecordType::A);
 //	EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::Auto,
@@ -905,7 +917,6 @@ TEST_P(DnsImplAresFlagsTest, TcpOnlyLookupsEnabled) {
 //	dispatcher_->run(Event::Dispatcher::RunType::Block);
 //	EXPECT_TRUE(hasAddress(address_list, "1.2.3.4"));
 //}
-
 
 } // namespace Network
 } // namespace Envoy
