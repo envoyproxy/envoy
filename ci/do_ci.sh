@@ -177,7 +177,7 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only ${TEST_TARGETS}
   echo "Building and testing envoy-filter-example tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \
     //:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test
   exit 0
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
