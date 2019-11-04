@@ -104,7 +104,8 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
   runResetCallbacks(reason);
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
-    // of propagating original reset reason.
+    // of propagating original reset reason. In QUICHE if a stream stops reading
+    // before FIN or RESET received, it resets the steam with QUIC_STREAM_NO_ERROR.
     StopReading();
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));

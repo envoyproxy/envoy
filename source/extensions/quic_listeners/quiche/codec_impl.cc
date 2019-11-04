@@ -16,6 +16,8 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
 void QuicHttpServerConnectionImpl::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
   for (auto& it : quic_server_session_.stream_map()) {
     if (!it.second->is_static()) {
+      // Only call watermark callbacks on non QUIC static streams which are
+      // crypto stream and Google QUIC headers stream.
       ENVOY_LOG(debug, "runHighWatermarkCallbacks on stream {}", it.first);
       dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runHighWatermarkCallbacks();
     }

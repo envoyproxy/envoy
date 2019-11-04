@@ -11,7 +11,7 @@ namespace Quic {
 
 // A class, together with a stand alone buffer, used to achieve the purpose of WatermarkBuffer.
 // Itself doesn't have buffer or bookkeep buffered bytes. But provided with buffered_bytes,
-// it re-acts upon crossing high/low watermarks.
+// it reacts upon crossing high/low watermarks.
 // It's no-op if provided low and high watermark are 0.
 class EnvoyQuicSimulatedWatermarkBuffer {
 public:
