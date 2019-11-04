@@ -191,6 +191,7 @@ public:
    * This allows logging escaped messages, but preserves end-of-line characters.
    *
    * @param source the log line with trailing whitespace
+   * @return a string with all c-style escape sequences escaped, except trailing whitespace
    */
   static std::string escapeLogLine(absl::string_view source);
 
@@ -222,8 +223,6 @@ private:
  */
 class Context {
 public:
-  Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock);
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
           Thread::BasicLockable& lock, bool should_escape);
   ~Context();

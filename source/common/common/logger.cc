@@ -89,17 +89,11 @@ std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
 
 DelegatingLogSinkPtr DelegatingLogSink::init() {
   DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
-
   delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
-
   return delegating_sink;
 }
 
 static Context* current_context = nullptr;
-
-Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock)
-    : Context(log_level, log_format, lock, false) {}
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock, bool should_escape)

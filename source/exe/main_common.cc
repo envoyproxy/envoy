@@ -85,8 +85,9 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         restarter_->logLock());
+    logging_context_ =
+        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                          restarter_->logLock(), options_.logFormatEscaped());
     break;
   }
 }
