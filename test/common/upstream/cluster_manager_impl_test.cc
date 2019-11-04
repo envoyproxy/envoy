@@ -1014,6 +1014,7 @@ dynamic_warming_clusters:
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster4.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster5.get()));
 }
 
 TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
