@@ -1009,12 +1009,11 @@ dynamic_warming_clusters:
 
   factory_.tls_.shutdownThread();
 
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()test/common/upstream/cluster_manager_impl_test.cc
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));test/common/upstream/cluster_manager_impl_test.cc
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));test/common/upstream/cluster_manager_impl_test.cc
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));test/common/upstream/cluster_manager_impl_test.cc
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster4.get()));test/common/upstream/cluster_manager_impl_test.cc
-  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster5.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cds_cluster.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster3.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster4.get()));
 }
 
 TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
