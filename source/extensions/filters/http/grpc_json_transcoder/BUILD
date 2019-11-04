@@ -7,7 +7,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_select_google_grpc",
 )
 
 envoy_package()
@@ -51,5 +50,6 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
+        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
     ],
 )

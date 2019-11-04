@@ -1,13 +1,12 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
+#!/usr/bin/env python3
 
 import argparse
 import common
-import fileinput
+import functools
 import multiprocessing
 import os
 import os.path
+import pathlib
 import re
 import subprocess
 import stat
@@ -73,6 +72,7 @@ GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
+BUILDOZER_PATH = os.getenv("BUILDOZER_BIN", "$GOPATH/bin/buildozer")
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
                                       "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
@@ -153,6 +153,25 @@ UNOWNED_EXTENSIONS = {
 # yapf: enable
 
 
+# Map a line transformation function across each line of a file.
+# .bak temporaries.
+def replaceLines(path, line_xform):
+  # We used to use fileinput in the older Python 2.7 script, but this doesn't do
+  # inplace mode and UTF-8 in Python 3, so doing it the manual way.
+  output_lines = [line_xform(line) for line in readLines(path)]
+  pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+
+
+# Obtain all the lines in a given file.
+def readLines(path):
+  return readFile(path).split('\n')
+
+
+# Read a UTF-8 encoded file as a str.
+def readFile(path):
+  return pathlib.Path(path).read_text(encoding='utf-8')
+
+
 # lookPath searches for the given executable in all directories in PATH
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
@@ -176,7 +195,7 @@ def executableByOthers(executable):
   return bool(st.st_mode & stat.S_IXOTH)
 
 
-# Check whether all needed external tools (clang-format, buildifier) are
+# Check whether all needed external tools (clang-format, buildifier, buildozer) are
 # available.
 def checkTools():
   error_messages = []
@@ -196,23 +215,28 @@ def checkTools():
         "    export CLANG_FORMAT=/opt/bin/clang-format-9\n"
         "    export CLANG_FORMAT=/usr/local/opt/llvm@9/bin/clang-format".format(CLANG_FORMAT_PATH))
 
-  buildifier_abs_path = lookPath(BUILDIFIER_PATH)
-  if buildifier_abs_path:
-    if not executableByOthers(buildifier_abs_path):
-      error_messages.append("command {} exists, but cannot be executed by other "
-                            "users".format(BUILDIFIER_PATH))
-  elif pathExists(BUILDIFIER_PATH):
-    if not executableByOthers(BUILDIFIER_PATH):
-      error_messages.append("command {} exists, but cannot be executed by other "
-                            "users".format(BUILDIFIER_PATH))
-  else:
-    error_messages.append(
-        "Command {} not found. If you have buildifier installed, but the binary "
-        "name is different or it's not available in $GOPATH/bin, please use "
-        "BUILDIFIER_BIN environment variable to specify the path. Example:\n"
-        "    export BUILDIFIER_BIN=/opt/bin/buildifier\n"
-        "If you don't have buildifier installed, you can install it by:\n"
-        "    go get -u github.com/bazelbuild/buildtools/buildifier".format(BUILDIFIER_PATH))
+  def checkBazelTool(name, path, var):
+    bazel_tool_abs_path = lookPath(path)
+    if bazel_tool_abs_path:
+      if not executableByOthers(bazel_tool_abs_path):
+        error_messages.append("command {} exists, but cannot be executed by other "
+                              "users".format(path))
+    elif pathExists(path):
+      if not executableByOthers(path):
+        error_messages.append("command {} exists, but cannot be executed by other "
+                              "users".format(path))
+    else:
+
+      error_messages.append(
+          "Command {} not found. If you have buildifier installed, but the binary "
+          "name is different or it's not available in $GOPATH/bin, please use "
+          "{} environment variable to specify the path. Example:\n"
+          "    export {}=/opt/bin/buildifier\n"
+          "If you don't have buildifier installed, you can install it by:\n"
+          "    go get -u github.com/bazelbuild/buildtools/{}".format(path, var, var, name))
+
+  checkBazelTool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
+  checkBazelTool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
 
   return error_messages
 
@@ -223,25 +247,21 @@ def checkNamespace(file_path):
       return []
 
   nolint = "NOLINT(namespace-%s)" % namespace_check.lower()
-  with open(file_path) as f:
-    text = f.read()
-    if not re.search("^\s*namespace\s+%s\s*{" % namespace_check, text, re.MULTILINE) and \
-       not nolint in text:
-      return [
-          "Unable to find %s namespace or %s for file: %s" % (namespace_check, nolint, file_path)
-      ]
+  text = readFile(file_path)
+  if not re.search("^\s*namespace\s+%s\s*{" % namespace_check, text, re.MULTILINE) and \
+     not nolint in text:
+    return ["Unable to find %s namespace or %s for file: %s" % (namespace_check, nolint, file_path)]
   return []
 
 
 def packageNameForProto(file_path):
   package_name = None
   error_message = []
-  with open(file_path) as f:
-    result = PROTO_PACKAGE_REGEX.search(f.read())
-    if result is not None and len(result.groups()) == 1:
-      package_name = result.group(1)
-    if package_name is None:
-      error_message = ["Unable to find package name for proto file: %s" % file_path]
+  result = PROTO_PACKAGE_REGEX.search(readFile(file_path))
+  if result is not None and len(result.groups()) == 1:
+    package_name = result.group(1)
+  if package_name is None:
+    error_message = ["Unable to find package name for proto file: %s" % file_path]
 
   return [package_name, error_message]
 
@@ -282,20 +302,18 @@ def whitelistedForGrpcInit(file_path):
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
-  with open(file_path) as f:
-    text = f.read()
-    if pattern in text:
-      error_messages = [file_path + ": " + error_message]
-      for i, line in enumerate(text.splitlines()):
-        if pattern in line:
-          error_messages.append("  %s:%s" % (file_path, i + 1))
-      return error_messages
-    return []
+  text = readFile(file_path)
+  if pattern in text:
+    error_messages = [file_path + ": " + error_message]
+    for i, line in enumerate(text.splitlines()):
+      if pattern in line:
+        error_messages.append("  %s:%s" % (file_path, i + 1))
+    return error_messages
+  return []
 
 
 def errorIfNoSubstringFound(pattern, file_path, error_message):
-  with open(file_path) as f:
-    return [] if pattern in f.read() else [file_path + ": " + error_message]
+  return [] if pattern in readFile(file_path) else [file_path + ": " + error_message]
 
 
 def isApiFile(file_path):
@@ -346,8 +364,7 @@ VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
 def checkCurrentReleaseNotes(file_path, error_messages):
   in_current_release = False
 
-  file_handle = fileinput.input(file_path)
-  for line_number, line in enumerate(file_handle):
+  for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
@@ -362,7 +379,6 @@ def checkCurrentReleaseNotes(file_path, error_messages):
     if line.startswith("*") and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
       reportError("Version history line malformed. "
                   "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
-  file_handle.close()
 
 
 def checkFileContents(file_path, checker):
@@ -374,7 +390,7 @@ def checkFileContents(file_path, checker):
     # notes have a different format.
     checkCurrentReleaseNotes(file_path, error_messages)
 
-  for line_number, line in enumerate(fileinput.input(file_path)):
+  for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
@@ -565,7 +581,7 @@ def checkBuildLine(line, file_path, reportError):
     reportError("Superfluous '@envoy//' prefix")
 
 
-def fixBuildLine(line, file_path):
+def fixBuildLine(file_path, line):
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
       not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
@@ -573,8 +589,7 @@ def fixBuildLine(line, file_path):
 
 
 def fixBuildPath(file_path):
-  for line in fileinput.input(file_path, inplace=True):
-    sys.stdout.write(fixBuildLine(line, file_path))
+  replaceLines(file_path, functools.partial(fixBuildLine, file_path))
 
   error_messages = []
 
@@ -599,12 +614,10 @@ def checkBuildPath(file_path):
 
   if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
     found = False
-    finput = fileinput.input(file_path)
-    for line in finput:
+    for line in readLines(file_path):
       if "api_proto_package(" in line:
         found = True
         break
-    finput.close()
     if not found:
       error_messages += ["API build file does not provide api_proto_package()"]
 
@@ -615,10 +628,10 @@ def checkBuildPath(file_path):
 
 
 def fixSourcePath(file_path):
-  for line in fileinput.input(file_path, inplace=True):
-    sys.stdout.write(fixSourceLine(line))
+  replaceLines(file_path, fixSourceLine)
 
   error_messages = []
+
   if not file_path.endswith(DOCS_SUFFIX):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += fixHeaderOrder(file_path)
@@ -660,14 +673,14 @@ def executeCommand(command,
   try:
     output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
     if output:
-      return output.split("\n")
+      return output.decode('utf-8').split("\n")
     return []
   except subprocess.CalledProcessError as e:
     if (e.returncode != 0 and e.returncode != 1):
       return ["ERROR: something went wrong while executing: %s" % e.cmd]
     # In case we can't find any line numbers, record an error message first.
     error_messages = ["%s for file: %s" % (error_message, file_path)]
-    for line in e.output.splitlines():
+    for line in e.output.decode('utf-8').splitlines():
       for num in regex.findall(line):
         error_messages.append("  %s:%s" % (file_path, num))
     return error_messages
@@ -831,7 +844,9 @@ if __name__ == "__main__":
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
-  build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths
+  build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
+      "./bazel/external/", "./bazel/toolchains/", "./bazel/BUILD"
+  ]
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
@@ -872,8 +887,8 @@ if __name__ == "__main__":
     results = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
-    os.path.walk(target_path, checkFormatVisitor,
-                 (pool, results, owned_directories, error_messages))
+    for root, _, files in os.walk(target_path):
+      checkFormatVisitor((pool, results, owned_directories, error_messages), root, files)
 
     # Close the pool to new tasks, wait for all of the running tasks to finish,
     # then collect the error messages.

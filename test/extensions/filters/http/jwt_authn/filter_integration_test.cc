@@ -73,7 +73,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name(HttpFilterNames::get().JwtAuthn);
-  TestUtility::jsonConvert(proto_config, *filter.mutable_config());
+  filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessage(filter);
 }
 

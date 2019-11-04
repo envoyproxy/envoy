@@ -35,5 +35,6 @@ envoy_extension_cc_test(
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )

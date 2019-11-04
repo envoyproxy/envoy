@@ -36,5 +36,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/ratelimit:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/network/rate_limit/v2:pkg_cc_proto",
     ],
 )

@@ -32,7 +32,7 @@ Docker compose
 ~~~~~~~~~~~~~~
 
 To run the docker compose file, and set up both the Python and the gRPC containers
-run::
+run:
 
   $ pwd
   envoy/examples/grpc-bridge

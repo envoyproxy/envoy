@@ -19,5 +19,6 @@ envoy_extension_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
     ],
 )

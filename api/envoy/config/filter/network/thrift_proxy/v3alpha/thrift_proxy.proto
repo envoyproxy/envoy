@@ -79,6 +79,10 @@ message ThriftProxy {
 
 // ThriftFilter configures a Thrift filter.
 message ThriftFilter {
+  reserved 2;
+
+  reserved "config";
+
   // The name of the filter to instantiate. The name must match a supported
   // filter. The built-in filters are:
   //
@@ -90,8 +94,6 @@ message ThriftFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 3;
   }
 }

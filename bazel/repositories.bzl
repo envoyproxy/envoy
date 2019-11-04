@@ -6,14 +6,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
-NOBORINGSSL_SKIP_TARGETS = {
-    # The lua filter depends on BoringSSL
-    "lua": "envoy.filters.http.lua",
-
-    # These two extensions are supposed to be replaced with alternative extensions.
-    "tls": "envoy.transport_sockets.tls",
-    "tls_inspector": "envoy.filters.listener.tls_inspector",
-}
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -162,6 +154,7 @@ def envoy_dependencies(skip_targets = []):
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
+    _fuzzit_linux()
 
     _python_deps()
     _cc_deps()
@@ -315,13 +308,10 @@ def _com_github_libevent_libevent():
 
 def _net_zlib():
     location = REPOSITORY_LOCATIONS["net_zlib"]
+
     http_archive(
         name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
-        # The patch is only needed due to https://github.com/madler/zlib/pull/420
-        # TODO(htuch): remove this when zlib #420 merges.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
         **location
     )
     native.bind(
@@ -647,6 +637,12 @@ def _org_llvm_releases_compiler_rt():
     _repository_impl(
         name = "org_llvm_releases_compiler_rt",
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
+    )
+
+def _fuzzit_linux():
+    _repository_impl(
+        name = "fuzzit_linux",
+        build_file_content = "exports_files([\"fuzzit\"])",
     )
 
 def _com_github_grpc_grpc():

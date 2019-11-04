@@ -81,15 +81,6 @@ public:
   using TagIterFn = std::function<bool(const Tag&)>;
 
   /**
-   * Iterates over all tags, calling a functor for each one. The
-   * functor can return 'true' to continue or 'false' to stop the
-   * iteration.
-   *
-   * @param fn The functor to call for each Tag.
-   */
-  virtual void iterateTags(const TagIterFn& fn) const PURE;
-
-  /**
    * Indicates whether this metric has been updated since the server was started.
    */
   virtual bool used() const PURE;
