@@ -28,8 +28,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   const size_t MaxRequestNameSize = 96 * 1024;
   for (uint32_t i = 0; i < num_encode_frames; ++i) {
     requests.emplace_back(new helloworld::HelloRequest());
-    requests.back()->set_name_bytes(provider.ConsumeRandomLengthString(
-        provider.ConsumeIntegralInRange<size_t>(0, MaxRequestNameSize)));
+    requests.back()->set_name_bytes(provider.ConsumeRandomLengthString(MaxRequestNameSize));
     // Encode the proto to bytes.
     const std::string request_buffer = requests.back()->SerializeAsString();
     // Encode the gRPC header.
@@ -44,8 +43,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // Add random crud at the end to see if we can make the decoder unhappy in
   // non-standard ways.
   {
-    const std::string crud = provider.ConsumeRandomLengthString(
-        provider.ConsumeIntegralInRange<size_t>(0, MaxRequestNameSize));
+    const std::string crud = provider.ConsumeRandomLengthString(MaxRequestNameSize);
     wire_buffer.add(crud.data(), crud.size());
   }
 
