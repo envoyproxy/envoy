@@ -2120,7 +2120,7 @@ envoy_cc_library(
         ":quic_core_http_http_constants_lib",
         ":quic_core_http_http_decoder_lib",
         ":quic_core_http_http_encoder_lib",
-        ":quic_core_http_spdy_stream_body_buffer_lib",
+        ":quic_core_http_spdy_stream_body_manager_lib",
         ":quic_core_http_spdy_utils_lib",
         ":quic_core_packets_lib",
         ":quic_core_proto_cached_network_parameters_proto_header",
@@ -2143,7 +2143,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_http_spdy_stream_body_buffer_lib",
+    name = "quic_core_http_spdy_stream_body_manager_lib",
     srcs = ["quiche/quic/core/http/quic_spdy_stream_body_manager.cc"],
     hdrs = ["quiche/quic/core/http/quic_spdy_stream_body_manager.h"],
     copts = quiche_copts,
