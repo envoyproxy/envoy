@@ -209,14 +209,18 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 
   const std::string name_data = token.substr(start, end_request - start);
-  const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
-  if (!keys.empty()) {
-    // The main value is the first key
-    main = keys.at(0);
-    if (keys.size() > 1) {
-      // Sub items contain additional keys
-      sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
+  if (!separator.empty()) {
+    const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
+    if (!keys.empty()) {
+      // The main value is the first key
+      main = keys.at(0);
+      if (keys.size() > 1) {
+        // Sub items contain additional keys
+        sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
+      }
     }
+  } else {
+    main = name_data;
   }
 }
 
@@ -287,9 +291,10 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         std::vector<std::string> path;
         const size_t start = FILTER_STATE_TOKEN.size();
 
-        parseCommand(token, start, ":", key, path, max_length);
-        if (!path.empty()) {
-          throw EnvoyException("Invalid filter state configuration. Key contains ':'.");
+        parseCommand(token, start, "", key, path, max_length);
+        if (key.empty()) {
+          throw EnvoyException(
+              fmt::format("Invalid filter state configuration, key cannot be empty. {}", path[0]));
         }
 
         formatters.push_back(std::make_unique<FilterStateFormatter>(key, max_length));

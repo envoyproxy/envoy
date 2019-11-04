@@ -1009,10 +1009,10 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                       std::make_unique<TestSerializedUnknownFilterState>(),
                                       StreamInfo::FilterState::StateType::ReadOnly);
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
-                               "%FILTER_STATE(serialized):8%|%FILTER_STATE(nonexisting)%";
+                               "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("\"test_value\"|-|type_url|-",
+    EXPECT_EQ("\"test_value\"|-|\"test_va|-",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
@@ -1107,7 +1107,7 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%TRAILER(:TEST):10",
       "%DYNAMIC_METADATA(TEST",
       "%FILTER_STATE(TEST",
-      "%FILTER_STATE(TEST:FOO)%",
+      "%FILTER_STATE()%",
       "%START_TIME(%85n)%",
       "%START_TIME(%#__88n)%"};
 
