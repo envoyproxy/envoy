@@ -293,8 +293,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         parseCommand(token, start, "", key, path, max_length);
         if (key.empty()) {
-          throw EnvoyException(
-              fmt::format("Invalid filter state configuration, key cannot be empty. {}", path[0]));
+          throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
         }
 
         formatters.push_back(std::make_unique<FilterStateFormatter>(key, max_length));
