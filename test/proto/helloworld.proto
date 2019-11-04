@@ -46,7 +46,7 @@ service Greeter {
 message HelloRequest {
   string name = 1;
 
-  // Use this if you are including UTF-8.
+  // Use this if you are including non-UTF-8.
   bytes name_bytes = 2;
 }
 
