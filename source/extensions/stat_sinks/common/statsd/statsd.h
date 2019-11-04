@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/histogram.h"

@@ -1,8 +1,8 @@
 #include "test/common/http/http2/http2_frame.h"
 
-#include <arpa/inet.h>
-
 #include <type_traits>
+
+#include "envoy/common/platform.h"
 
 namespace {
 

@@ -19,7 +19,10 @@ build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
-build --copt=-fPIC
+build --enable_platform_specific_config
+
+# Enable position independent code, this option is not supported on Windows and default on on macOS.
+build:linux --copt=-fPIC
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
