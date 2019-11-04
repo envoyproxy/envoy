@@ -33,6 +33,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options);
   static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
   static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
+  static std::unique_ptr<Socket::Options> buildReusePortOptions();
 };
 } // namespace Network
 } // namespace Envoy

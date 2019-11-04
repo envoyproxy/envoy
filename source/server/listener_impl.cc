@@ -37,6 +37,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+      reuse_port_(config.has_reuse_port()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -57,6 +58,10 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (config.has_freebind()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
+  if (reuse_port_) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
+  }
+
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
@@ -313,6 +318,15 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
     // set in the worker after listen()/evconnlistener_new() is called.
     socket_->addOptions(listen_socket_options_);
   }
+}
+
+Network::SocketSharedPtr ListenerImpl::createReusePortSocket() {
+  ASSERT(reusePort());
+
+  return parent_.factory_.createListenSocket(socket_->localAddress(),
+                socket_type_,
+                listen_socket_options_,
+                bind_to_port_);
 }
 
 } // namespace Server

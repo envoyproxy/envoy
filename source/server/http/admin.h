@@ -335,6 +335,8 @@ private:
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return parent_.mutable_socket(); }
     const Network::Socket& socket() const override { return parent_.mutable_socket(); }
+    bool reusePort() override { return false; }
+    Network::SocketSharedPtr createReusePortSocket() override { ASSERT(false); return nullptr; }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }

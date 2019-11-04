@@ -100,18 +100,22 @@ ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
           POOL_GAUGE_PREFIX(config.listenerScope(), parent.statPrefix()))}),
       config_(config) {}
 
-ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
-                                                            Network::ListenerConfig& config)
-    : ActiveTcpListener(
-          parent, parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort()),
-          config) {}
 
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
-                                                            Network::ListenerPtr&& listener,
                                                             Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), parent_(parent),
-      listener_(std::move(listener)), listener_filters_timeout_(config.listenerFiltersTimeout()),
+      listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {
+
+  if (config.reusePort()) {
+    socket_ = config.createReusePortSocket();
+    ENVOY_LOG(trace, "create network listener on fd {}", socket_->ioHandle().fd());
+    listener_ = parent.dispatcher_.createListener(*socket_, *this, config.bindToPort());
+  } else {
+    ENVOY_LOG(trace, "create network listener on fd {}", config.socket().ioHandle().fd());
+    listener_ = parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort());
+  }
+
   config.connectionBalancer().registerHandler(*this);
 }
 

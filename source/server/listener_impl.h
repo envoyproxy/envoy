@@ -81,6 +81,8 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
   const Network::Socket& socket() const override { return *socket_; }
+  bool reusePort() override { return reuse_port_; }
+  Network::SocketSharedPtr createReusePortSocket() override;
   bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
@@ -167,6 +169,7 @@ private:
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   const bool bind_to_port_;
+  const bool reuse_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;

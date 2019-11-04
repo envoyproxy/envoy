@@ -103,8 +103,6 @@ private:
                             public Network::BalancedConnectionHandler {
   public:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
-    ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
-                      Network::ListenerConfig& config);
     ~ActiveTcpListener() override;
     void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections, bool rebalanced);
@@ -146,6 +144,9 @@ private:
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.
     std::atomic<uint64_t> num_listener_connections_{};
+
+    Network::SocketSharedPtr socket_; // not null if 'reuse_socket' is set for listener.
+
   };
 
   /**

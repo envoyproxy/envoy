@@ -42,6 +42,14 @@ public:
   virtual Socket& socket() PURE;
   virtual const Socket& socket() const PURE;
 
+
+  /**
+   * @return bool if 'true', each worker thread creates a socket with SO_REUSEPORT;
+   *         otherwise, 'false'.
+   */
+  virtual bool reusePort() PURE;
+  virtual Network::SocketSharedPtr createReusePortSocket() PURE;
+
   /**
    * @return bool specifies whether the listener should actually listen on the port.
    *         A listener that doesn't listen on a port can only receive connections

@@ -42,7 +42,7 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Listener {
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
@@ -238,4 +238,6 @@ message Listener {
   // If no configuration is specified, Envoy will not attempt to balance active connections between
   // worker threads.
   ConnectionBalanceConfig connection_balance_config = 20;
+
+  google.protobuf.BoolValue reuse_port = 21;
 }
