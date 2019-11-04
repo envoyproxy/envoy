@@ -80,7 +80,7 @@ public:
  * Example:
  *      // Register some factories.
  *      REGISTER_FACTORY(LicoriceFactory, CandyFactory);
- *      REGISTER_FACTORY(NougayFactory, CandyFactory);
+ *      REGISTER_FACTORY(NougatFactory, CandyFactory);
  *
  *      // Register the factory registry.
  *      REGISTER_EXTENSION_FACTORY(CandyFactory, "candies");
