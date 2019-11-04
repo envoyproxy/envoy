@@ -338,6 +338,30 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   }
 }
 
+TEST(ConfigTest, HashWithSourceIpConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  hash_policy:
+  - source_ip: {}
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_NE(nullptr, config_obj.hashPolicy());
+}
+
+TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(nullptr, config_obj.hashPolicy());
+}
+
 TEST(ConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
@@ -1305,6 +1329,56 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
+}
+
+class TcpProxyHashingTest : public testing::Test {
+public:
+  TcpProxyHashingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    hash_policy:
+    - source_ip: {}
+    )EOF";
+
+    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  }
+
+  void initializeFilter() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  ConfigSharedPtr config_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  std::unique_ptr<Filter> filter_;
+};
+
+// Test TCP proxy use source IP to hash.
+TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
+  setup();
+  initializeFilter();
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            EXPECT_TRUE(context->computeHashKey().has_value());
+            return nullptr;
+          }));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222);
 
   filter_->onNewConnection();
 }

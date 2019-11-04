@@ -5,12 +5,10 @@ tasks:
     build_targets:
       - "//source/exe:envoy-static"
   rbe:
-    platform: rbe_ubuntu1604
+    platform: ubuntu1804
     test_targets:
       - "//test/..."
     test_flags:
       - "--config=remote-clang"
-  macos:
-    platform: macos
-    test_targets:
-      - "//test/..."
+      - "--config=remote-ci"
+      - "--jobs=75"

@@ -15,6 +15,8 @@
 #include "common/config/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -97,7 +99,7 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   for (const Stats::Tag& tag : tags) {
     tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
   }
-  return "|#" + StringUtil::join(tag_strings, ",");
+  return "|#" + absl::StrJoin(tag_strings, ",");
 }
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
