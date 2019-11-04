@@ -22,14 +22,14 @@ const std::string& VersionInfo::revisionStatus() {
 
 const std::string& VersionInfo::version() {
 #ifdef NDEBUG
-  const absl::string_view release_type = "RELEASE";
+  static const absl::string_view release_type = "RELEASE";
 #else
-  const absl::string_view release_type = "DEBUG";
+  static const absl::string_view release_type = "DEBUG";
 #endif
 #ifdef ENVOY_SSL_VERSION
-  const absl::string_view ssl_version = ENVOY_SSL_VERSION;
+  static const absl::string_view ssl_version = ENVOY_SSL_VERSION;
 #else
-  const absl::string_view ssl_version = "no-ssl";
+  static const absl::string_view ssl_version = "no-ssl";
 #endif
   CONSTRUCT_ON_FIRST_USE(std::string,
                          fmt::format("{}/{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER,
