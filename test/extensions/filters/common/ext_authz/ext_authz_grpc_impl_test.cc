@@ -74,7 +74,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
   auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::GrpcStatus::Ok);
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::OK;
 
@@ -98,7 +98,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   const std::string empty_body{};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
   auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::GrpcStatus::Ok, envoy::type::StatusCode::OK, empty_body, expected_headers);
+      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::StatusCode::OK, empty_body, expected_headers);
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
@@ -121,7 +121,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 
   auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
 
@@ -145,7 +145,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
 
   auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::GrpcStatus::Unknown);
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
 
@@ -170,7 +170,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const std::string expected_body{"test"};
   const auto expected_headers =
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
-  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
+  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied,
                                                       envoy::type::StatusCode::Unauthorized,
                                                       expected_body, expected_headers);
   auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,

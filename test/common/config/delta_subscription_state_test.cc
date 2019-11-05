@@ -174,7 +174,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
         populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
     EXPECT_EQ("nonce1", ack.nonce_);
-    EXPECT_EQ(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The next response updates 1 and 2, and adds 3.
   {
@@ -182,7 +182,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
         {{"name1", "version1B"}, {"name2", "version2B"}, {"name3", "version3A"}});
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug2", "nonce2");
     EXPECT_EQ("nonce2", ack.nonce_);
-    EXPECT_EQ(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The next response tries but fails to update all 3, and so should produce a NACK.
   {
@@ -190,7 +190,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
         {{"name1", "version1C"}, {"name2", "version2C"}, {"name3", "version3B"}});
     UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug3", "nonce3");
     EXPECT_EQ("nonce3", ack.nonce_);
-    EXPECT_NE(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The last response successfully updates all 3.
   {
@@ -198,7 +198,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
         {{"name1", "version1D"}, {"name2", "version2D"}, {"name3", "version3C"}});
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug4", "nonce4");
     EXPECT_EQ("nonce4", ack.nonce_);
-    EXPECT_EQ(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
 }
 
