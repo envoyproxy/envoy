@@ -4,6 +4,7 @@ Version history
 1.13.0 (pending)
 ================
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
+* tls: remove TLS 1.0 and 1.1 from client defaults
 
 1.12.0 (October 31, 2019)
 =========================
@@ -106,7 +107,6 @@ Version history
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>` is now 1 hour.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
-* tls: remove TLS 1.0 and 1.1 from client defaults
 * thrift_proxy: fixed crashing bug on invalid transport/protocol framing.
 * thrift_proxy: added support for stripping service name from method when using the multiplexed protocol.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the certificate validation context.
