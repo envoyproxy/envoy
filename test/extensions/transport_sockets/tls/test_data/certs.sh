@@ -143,6 +143,12 @@ generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
 generate_selfsigned_x509_cert selfsigned_ecdsa_p384
 rm -f selfsigned_ecdsa_p384_cert.cfg
 
+# Generate long_validity_cert.pem as a self-signed, with expiry that exceeds 32bit time_t.
+cp -f selfsigned_cert.cfg long_validity_cert.cfg
+generate_rsa_key long_validity
+generate_x509_cert long_validity ca 18250
+rm -f long_validity_cert.cfg
+
 # Generate expired_cert.pem as a self-signed, expired cert (will fail on macOS 10.13+ because of negative days value).
 cp -f selfsigned_cert.cfg expired_cert.cfg
 generate_rsa_key expired

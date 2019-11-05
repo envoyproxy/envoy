@@ -1,20 +1,19 @@
 #include "common/network/dns_impl.h"
 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -48,7 +47,7 @@ DnsResolverImpl::DnsResolverImpl(
                                            resolver->ip()->addressAsString(),
                                            resolver->ip()->port()));
     }
-    const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
+    const std::string resolvers_csv = absl::StrJoin(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
     RELEASE_ASSERT(result == ARES_SUCCESS, "");
   }
