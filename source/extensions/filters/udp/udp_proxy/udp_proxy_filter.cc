@@ -14,6 +14,7 @@ void UdpProxyFilter::onData(Network::UdpRecvData& data) {
   const auto active_session_it = sessions_.find(data.addresses_);
   ActiveSession* active_session;
   if (active_session_it == sessions_.end()) {
+    // TODO(mattklein123): Session circuit breaker.
     // TODO(mattklein123): Instead of looking up the cluster each time, keep track of it via
     // cluster manager callbacks.
     Upstream::ThreadLocalCluster* cluster = config_->getCluster();
@@ -64,8 +65,8 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
 
 void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   // TODO(mattklein123): Refresh idle timer.
-  Api::IoCallUint64Result rc = Network::Utility::writeToSocket(
-      *io_handle_, buffer, addresses_.local_->ip(), *host_->address());
+  Api::IoCallUint64Result rc =
+      Network::Utility::writeToSocket(*io_handle_, buffer, nullptr, *host_->address());
   // TODO(mattklein123): Increment stat on failure.
   ASSERT(rc.ok());
 }
