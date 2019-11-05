@@ -1186,7 +1186,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(NoHost)) {
   EXPECT_EQ(access_log_data_, "UH");
 }
 
-TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(WithMetadataMatch)) {
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
   auto v1 = ProtobufWkt::Value();
   v1.set_string_value("v1");
   auto v2 = ProtobufWkt::Value();
@@ -1212,14 +1212,97 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(WithMetadataMatch)) {
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-  const auto& effective_metadata_criteria = filter_->metadataMatchCriteria();
-  EXPECT_TRUE(effective_metadata_criteria != nullptr);
+  const auto effective_criteria = filter_->metadataMatchCriteria();
+  EXPECT_NE(nullptr, effective_criteria);
 
-  const auto& metadata_criteria = effective_metadata_criteria->metadataMatchCriteria();
-  EXPECT_EQ(metadata_criteria.size(), criteria.size());
+  const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+  EXPECT_EQ(effective_criterions.size(), criteria.size());
   for (size_t i = 0; i < criteria.size(); ++i) {
-    EXPECT_EQ(metadata_criteria[i]->name(), criteria[i].name());
-    EXPECT_EQ(metadata_criteria[i]->value(), criteria[i].value());
+    EXPECT_EQ(effective_criterions[i]->name(), criteria[i].name());
+    EXPECT_EQ(effective_criterions[i]->value(), criteria[i].value());
+  }
+}
+
+TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+    - name: cluster2
+      weight: 2
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k2: v2
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k0: v0
+)EOF";
+
+  config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+
+  ProtobufWkt::Value v0, v1, v2;
+  v0.set_string_value("v0");
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv0(v0), hv1(v1), hv2(v2);
+
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+
+  // Expect filter to try to open a connection to cluster1.
+  {
+    Upstream::LoadBalancerContext* context;
+
+    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster1", _, _))
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+    EXPECT_NE(nullptr, context);
+
+    const auto effective_criteria = context->metadataMatchCriteria();
+    EXPECT_NE(nullptr, effective_criteria);
+
+    const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, effective_criterions.size());
+
+    EXPECT_EQ("k0", effective_criterions[0]->name());
+    EXPECT_EQ(hv0, effective_criterions[0]->value());
+
+    EXPECT_EQ("k1", effective_criterions[1]->name());
+    EXPECT_EQ(hv1, effective_criterions[1]->value());
+  }
+
+  // Expect filter to try to open a connection to cluster2.
+  {
+    Upstream::LoadBalancerContext* context;
+
+    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster2", _, _))
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+    EXPECT_NE(nullptr, context);
+
+    const auto effective_criteria = context->metadataMatchCriteria();
+    EXPECT_NE(nullptr, effective_criteria);
+
+    const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, effective_criterions.size());
+
+    EXPECT_EQ("k0", effective_criterions[0]->name());
+    EXPECT_EQ(hv0, effective_criterions[0]->value());
+
+    EXPECT_EQ("k2", effective_criterions[1]->name());
+    EXPECT_EQ(hv2, effective_criterions[1]->value());
   }
 }
 
