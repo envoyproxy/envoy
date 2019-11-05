@@ -6,6 +6,7 @@
 
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
+#include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 #pragma GCC diagnostic pop
@@ -110,6 +111,13 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerTest,
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+
+  auto envoy_quic_dispatcher = ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
+  quic::QuicBufferedPacketStore* buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id));
+
   EnvoyQuicClock clock(*dispatcher_);
   quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
       &clock, quic::AllSupportedVersions()[0].transport_version,
@@ -143,6 +151,9 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
       client_socket_->ioHandle().sendto(first_slice, /*flags=*/0, *listen_socket_->localAddress());
   ASSERT_EQ(encrypted_packet->length(), send_rc.rc_);
 
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id));
+
   EXPECT_CALL(listener_config_, filterChainManager());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_));
   EXPECT_CALL(filter_chain_, networkFilterFactories());
@@ -158,6 +169,9 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id));
+
   Buffer::InstancePtr result_buffer(new Buffer::OwnedImpl());
   const uint64_t bytes_to_read = 11;
   uint64_t bytes_read = 0;
@@ -166,6 +180,9 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
   do {
     Api::IoCallUint64Result result =
         result_buffer->read(client_socket_->ioHandle(), bytes_to_read - bytes_read);
+
+    EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+    EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id));
 
     if (result.ok()) {
       bytes_read += result.rc_;
