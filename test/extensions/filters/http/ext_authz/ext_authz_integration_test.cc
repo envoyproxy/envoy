@@ -1,7 +1,9 @@
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/service/auth/v2/external_auth.pb.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -12,10 +14,11 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class ExtAuthzIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                public HttpIntegrationTest {
+class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                    public HttpIntegrationTest {
 public:
-  ExtAuthzIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  ExtAuthzGrpcIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -23,50 +26,47 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
-  void initializeFilterAndDownstreamProtocol(const std::string& filter_config,
-                                             Http::CodecClient::Type downstream_protocol) {
-    config_helper_.addFilter(filter_config);
-
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  void initializeWithDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ext_authz_cluster->set_name("ext_authz_cluster");
+      ext_authz_cluster->set_name("ext_authz");
       ext_authz_cluster->mutable_http2_protocol_options();
+
+      TestUtility::loadFromYaml(base_filter_config_, proto_config_);
+      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz",
+                     fake_upstreams_.back()->localAddress());
+
+      envoy::api::v2::listener::Filter ext_authz_filter;
+      ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
+      ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+      config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
     });
 
     setDownstreamProtocol(downstream_protocol);
     HttpIntegrationTest::initialize();
   }
 
-  void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
-    if (fake_upstream_connection_ != nullptr) {
-      AssertionResult result = fake_upstream_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_upstream_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+  void initiateClientConnection(uint64_t request_body_length) {
+    auto conn = makeClientConnection(lookupPort("http"));
+    codec_client_ = makeHttpConnection(std::move(conn));
+    Http::TestHeaderMapImpl headers{
+        {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+    TestUtility::feedBufferWithRandomCharacters(request_body_, request_body_length);
+    response_ = codec_client_->makeRequestWithBody(headers, request_body_.toString());
   }
 
-  ABSL_MUST_USE_RESULT
-  AssertionResult waitForExtAuthzConnection() {
-    return fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
-  }
+  void waitForExtAuthzRequest(const std::string& expected_check_request_yaml) {
+    AssertionResult result =
+        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+    RELEASE_ASSERT(result, result.message());
 
-  ABSL_MUST_USE_RESULT
-  AssertionResult waitForExtAuthzStream() {
-    return fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
-  }
-
-  ABSL_MUST_USE_RESULT
-  AssertionResult waitForExtAuthzRequest(const std::string& expected_check_request_yaml) {
+    // Check for the validity of the received CheckRequest.
     envoy::service::auth::v2::CheckRequest check_request;
-    VERIFY_ASSERTION(ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request));
+    result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+    RELEASE_ASSERT(result, result.message());
 
     EXPECT_EQ("POST", ext_authz_request_->headers().Method()->value().getStringView());
     EXPECT_EQ("/envoy.service.auth.v2.Authorization/Check",
@@ -89,40 +89,64 @@ public:
 
     EXPECT_EQ(check_request.DebugString(), expected_check_request.DebugString());
 
-    return AssertionSuccess();
+    result = ext_authz_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
   }
 
-  void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol, uint64_t body_size) {
-    TestUtility::feedBufferWithRandomCharacters(data_, body_size);
-    const uint64_t max_request_bytes = 1024;
-    const std::string filter_config = fmt::format(R"EOF(
-name: envoy.ext_authz
-config:
-  grpc_service:
-    envoy_grpc:
-      cluster_name: ext_authz_cluster
+  void waitForSuccessfulUpstreamResponse() {
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
 
-  with_request_body:
-    max_request_bytes: {}
-    allow_partial_message: true
-)EOF",
-                                                  max_request_bytes);
+    upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(response_size_, true);
+    response_->waitForEndStream();
 
-    initializeFilterAndDownstreamProtocol(filter_config, downstream_protocol);
-    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(request_body_.length(), upstream_request_->bodyLength());
 
-    const std::string body_string = data_.toString();
-    const uint64_t body_length = data_.length();
-    const std::string expected_body_string =
-        body_length > max_request_bytes ? body_string.substr(0, max_request_bytes) : body_string;
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ("200", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ(response_size_, response_->body().size());
+  }
 
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        lookupPort("http"), "POST", "/test", body_string, downstream_protocol_, version_);
+  void sendExtAuthzResponse() {
+    ext_authz_request_->startGrpcStream();
+    envoy::service::auth::v2::CheckResponse check_response;
+    check_response.mutable_status()->set_code(Grpc::Status::GrpcStatus::Ok);
+    ext_authz_request_->sendGrpcMessage(check_response);
+    ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+  }
 
-    ASSERT_TRUE(waitForExtAuthzConnection());
-    ASSERT_TRUE(waitForExtAuthzStream());
-    ASSERT_TRUE(waitForExtAuthzRequest(
-        fmt::format(R"EOF(
+  const std::string expectedRequestBody() {
+    const std::string request_body_string = request_body_.toString();
+    const uint64_t request_body_length = request_body_.length();
+    return request_body_length > max_request_bytes_
+               ? request_body_string.substr(0, max_request_bytes_)
+               : request_body_string;
+  }
+
+  void cleanup() {
+    if (fake_ext_authz_connection_ != nullptr) {
+      if (clientType() != Grpc::ClientType::GoogleGrpc) {
+        AssertionResult result = fake_ext_authz_connection_->close();
+        RELEASE_ASSERT(result, result.message());
+      }
+      AssertionResult result = fake_ext_authz_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+    cleanupUpstreamAndDownstream();
+  }
+
+  void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol,
+                                  uint64_t request_size) {
+    initializeWithDownstreamProtocol(downstream_protocol);
+    initiateClientConnection(request_size);
+    waitForExtAuthzRequest(fmt::format(R"EOF(
 attributes:
   request:
     http:
@@ -133,51 +157,60 @@ attributes:
       body: "{}"
       {}
 )EOF",
-                    body_length, expected_body_string,
-                    downstream_protocol == Http::CodecClient::Type::HTTP1 ?
-                                                                          R"EOF(
+                                       request_body_.length(), expectedRequestBody(),
+                                       downstream_protocol == Http::CodecClient::Type::HTTP1 ?
+                                                                                             R"EOF(
       protocol: HTTP/1.1
 )EOF"
-                                                                          :
-                                                                          R"EOF(
+                                                                                             :
+                                                                                             R"EOF(
       scheme: http
       protocol: HTTP/2
-)EOF")));
-
-    EXPECT_TRUE(response->complete());
+)EOF"));
+    sendExtAuthzResponse();
+    waitForSuccessfulUpstreamResponse();
     cleanup();
   }
 
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
-  Buffer::OwnedImpl data_;
+  IntegrationStreamDecoderPtr response_;
+
+  Buffer::OwnedImpl request_body_;
+  const uint64_t response_size_ = 512;
+  const uint64_t max_request_bytes_ = 1024;
+  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config_{};
+  const std::string base_filter_config_ = R"EOF(
+    with_request_body:
+      max_request_bytes: 1024
+      allow_partial_message: true
+  )EOF";
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.
-TEST_P(ExtAuthzIntegrationTest, HTTP1DownstreamRequestWithBody) {
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP1, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1 and the size of the request body is larger than max_request_bytes.
-TEST_P(ExtAuthzIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP1, 2048);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2.
-TEST_P(ExtAuthzIntegrationTest, HTTP2DownstreamRequestWithBody) {
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2 and the size of the request body is larger than max_request_bytes.
-TEST_P(ExtAuthzIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
+TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 2048);
 }
 
