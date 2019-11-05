@@ -4,6 +4,7 @@ Version history
 1.13.0 (pending)
 ================
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
+* tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 
 1.12.0 (October 31, 2019)
 =========================

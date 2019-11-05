@@ -25,6 +25,7 @@ envoy_cc_library(
     deps = [
         ":private_key_interface",
         "//include/envoy/registry",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 

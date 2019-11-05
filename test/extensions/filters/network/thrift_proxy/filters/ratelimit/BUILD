@@ -39,5 +39,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
         "//test/extensions/filters/network/thrift_proxy:mocks",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg_cc_proto",
     ],
 )

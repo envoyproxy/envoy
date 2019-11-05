@@ -4,11 +4,11 @@
 
 #include "common/common/perf_annotation.h"
 
-#include <unistd.h>
-
 #include <chrono>
 #include <iostream>
 #include <string>
+
+#include "envoy/common/platform.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/utility.h"

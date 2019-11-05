@@ -49,21 +49,21 @@ public:
 // The next four "L" bytes represent the message length in BigEndian format.
 enum class State {
   // Waiting for decoding the flags (1 byte) of the GRPC data frame.
-  FH_FLAG,
+  FhFlag,
   // Waiting for decoding the 1st byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_0,
+  FhLen0,
   // Waiting for decoding the 2nd byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_1,
+  FhLen1,
   // Waiting for decoding the 3rd byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_2,
+  FhLen2,
   // Waiting for decoding the 4th byte of the length (4 bytes in total) of the
   // GRPC data frame.
-  FH_LEN_3,
+  FhLen3,
   // Waiting for decoding the data.
-  DATA,
+  Data,
 };
 
 class FrameInspector {
@@ -90,7 +90,7 @@ protected:
   virtual void frameData(uint8_t*, uint64_t) {}
   virtual void frameDataEnd() {}
 
-  State state_{State::FH_FLAG};
+  State state_{State::FhFlag};
   uint32_t length_{0};
   uint64_t count_{0};
 };
@@ -112,7 +112,7 @@ public:
   uint32_t length() const { return frame_.length_; }
 
   // Indicates whether it has buffered any partial data.
-  bool hasBufferedData() const { return state_ != State::FH_FLAG; }
+  bool hasBufferedData() const { return state_ != State::FhFlag; }
 
 protected:
   bool frameStart(uint8_t) override;

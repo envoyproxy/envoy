@@ -15,6 +15,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -118,7 +119,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     default:
       // Unsupported type or null value.
       ENVOY_LOG_MISC(debug, "unsupported value type for metadata [{}]",
-                     StringUtil::join(params, ", "));
+                     absl::StrJoin(params, ", "));
       return std::string();
     }
   };

@@ -1,8 +1,8 @@
-#include <unistd.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
+
+#include "envoy/common/platform.h"
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"

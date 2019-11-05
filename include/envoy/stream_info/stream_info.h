@@ -359,6 +359,11 @@ public:
   virtual bool hasAnyResponseFlag() const PURE;
 
   /**
+   * @return response flags encoded as an integer.
+   */
+  virtual uint64_t responseFlags() const PURE;
+
+  /**
    * @return upstream host description.
    */
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;

@@ -15,16 +15,22 @@ def envoy_copts(repository, test = False):
         "-std=c++14",
     ]
 
+    # Windows options for cleanest service compilation;
+    #   General MSVC C++ options
+    #   Streamline windows.h behavior for Win8+ API (for ntohll, see;
+    #     https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx )
+    #   Minimize Win32 API, dropping GUI-oriented features
     msvc_options = [
         "-WX",
         "-Zc:__cplusplus",
         "-std:c++14",
         "-DWIN32",
-        "-DWIN32_LEAN_AND_MEAN",
-        # need win8 for ntohll
-        # https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
         "-D_WIN32_WINNT=0x0602",
         "-DNTDDI_VERSION=0x06020000",
+        "-DWIN32_LEAN_AND_MEAN",
+        "-DNOUSER",
+        "-DNOMCX",
+        "-DNOIME",
     ]
 
     return select({

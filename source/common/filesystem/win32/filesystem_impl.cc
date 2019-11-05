@@ -1,18 +1,6 @@
 #include <fcntl.h>
 #include <io.h>
 #include <sys/stat.h>
-#include <windows.h>
-
-// <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
-// interfere with our code. DELETE shows up in the base.pb.h header generated from
-// api/envoy/api/core/base.proto. Since it's a generated header, we can't #undef DELETE at
-// the top of that header to avoid the collision. Similarly, GetMessage shows up in generated
-// protobuf code so we can't #undef the symbol there.
-#undef DELETE
-#undef GetMessage
-
-#include "common/common/assert.h"
-#include "common/filesystem/filesystem_impl.h"
 
 #include <fstream>
 #include <iostream>
@@ -21,7 +9,9 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Filesystem {

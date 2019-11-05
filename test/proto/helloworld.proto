@@ -45,6 +45,9 @@ service Greeter {
 // The request message containing the user's name.
 message HelloRequest {
   string name = 1;
+
+  // Use this if you are including non-UTF-8.
+  bytes name_bytes = 2;
 }
 
 // The response message containing the greetings
