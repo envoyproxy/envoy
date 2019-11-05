@@ -73,6 +73,7 @@ export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --local_cpu_resources=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
   --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
+  --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge

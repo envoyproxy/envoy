@@ -51,6 +51,5 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

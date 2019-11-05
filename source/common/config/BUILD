@@ -4,7 +4,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
@@ -93,6 +92,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -168,6 +168,7 @@ envoy_cc_library(
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -240,7 +241,6 @@ envoy_cc_library(
     srcs = ["remote_data_fetcher.cc"],
     hdrs = ["remote_data_fetcher.h"],
     deps = [
-        "//bazel:crypto_utility_lib",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
@@ -320,7 +320,9 @@ envoy_cc_library(
         "//source/common/stats:tag_producer_lib",
         "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 

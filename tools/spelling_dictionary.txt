@@ -757,6 +757,7 @@ parseable
 parsers
 passphrase
 passthrough
+pathname
 pausable
 pcall
 pcap

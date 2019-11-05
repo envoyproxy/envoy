@@ -30,6 +30,8 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +43,7 @@ envoy_extension_cc_test(
         ":utility_lib",
         "//source/extensions/filters/http/fault:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
     ],
 )
 

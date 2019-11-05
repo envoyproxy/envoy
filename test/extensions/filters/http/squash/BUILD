@@ -45,5 +45,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/squash:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/squash/v2:pkg_cc_proto",
     ],
 )
