@@ -583,9 +583,6 @@ static_listeners:
   last_updated:
     seconds: 1001001001
     nanos: 1000000
-dynamic_active_listeners:
-dynamic_warming_listeners:
-dynamic_draining_listeners:
 )EOF");
 
   // Update foo listener. Should be blocked.
@@ -625,9 +622,6 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(
 static_listeners:
-dynamic_active_listeners:
-dynamic_warming_listeners:
-dynamic_draining_listeners:
 )EOF");
 
   // Add foo listener.
@@ -649,20 +643,20 @@ filter_chains: {}
   checkConfigDump(R"EOF(
 version_info: version1
 static_listeners:
-dynamic_active_listeners:
-dynamic_warming_listeners:
-  version_info: "version1"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-  last_updated:
-    seconds: 1001001001
-    nanos: 1000000
-dynamic_draining_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version1
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 1001001001
+        nanos: 1000000
 )EOF");
 
   // Update duplicate should be a NOP.
@@ -691,21 +685,21 @@ per_connection_buffer_limit_bytes: 10
   checkConfigDump(R"EOF(
 version_info: version2
 static_listeners:
-dynamic_active_listeners:
-dynamic_warming_listeners:
-  version_info: "version2"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-    per_connection_buffer_limit_bytes: 10
-  last_updated:
-    seconds: 2002002002
-    nanos: 2000000
-dynamic_draining_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version2
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+        per_connection_buffer_limit_bytes: 10
+      last_updated:
+        seconds: 2002002002
+        nanos: 2000000
 )EOF");
 
   // Start workers.
@@ -735,32 +729,33 @@ dynamic_draining_listeners:
   checkConfigDump(R"EOF(
 version_info: version3
 static_listeners:
-dynamic_active_listeners:
-  version_info: "version3"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-  last_updated:
-    seconds: 3003003003
-    nanos: 3000000
-dynamic_warming_listeners:
-dynamic_draining_listeners:
-  version_info: "version2"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-    per_connection_buffer_limit_bytes: 10
-  last_updated:
-    seconds: 2002002002
-    nanos: 2000000
+dynamic_listeners:
+  - name: foo
+    active_state:
+      version_info: version3
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 3003003003
+        nanos: 3000000
+    draining_state:
+      version_info: version2
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+        per_connection_buffer_limit_bytes: 10
+      last_updated:
+        seconds: 2002002002
+        nanos: 2000000
 )EOF");
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -813,43 +808,46 @@ filter_chains: {}
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
   checkConfigDump(R"EOF(
 version_info: version5
-static_listeners:
-dynamic_active_listeners:
-  - version_info: "version3"
-    listener:
-      name: "foo"
-      address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 1234
-      filter_chains: {}
-    last_updated:
-      seconds: 3003003003
-      nanos: 3000000
-  - version_info: "version4"
-    listener:
-      name: "bar"
-      address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 1235
-      filter_chains: {}
-    last_updated:
-      seconds: 4004004004
-      nanos: 4000000
-dynamic_warming_listeners:
-  - version_info: "version5"
-    listener:
-      name: "baz"
-      address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 1236
-      filter_chains: {}
-    last_updated:
-      seconds: 5005005005
-      nanos: 5000000
-dynamic_draining_listeners:
+dynamic_listeners:
+  - name: foo
+    active_state:
+      version_info: version3
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 3003003003
+        nanos: 3000000
+  - name: bar
+    active_state:
+      version_info: version4
+      listener:
+        name: bar
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1235
+        filter_chains: {}
+      last_updated:
+        seconds: 4004004004
+        nanos: 4000000
+  - name: baz
+    warming_state:
+      version_info: version5
+      listener:
+        name: baz
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1236
+        filter_chains: {}
+      last_updated:
+        seconds: 5005005005
+        nanos: 5000000
 )EOF");
 
   // Update a duplicate baz that is currently warming.
@@ -1056,6 +1054,7 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
 }
 
 TEST_F(ListenerManagerImplTest, CantBindSocket) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1077,6 +1076,71 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true),
                EnvoyException);
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+  - name: foo
+    error_state:
+      failed_configuration:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains:
+          - {}
+      last_update_attempt:
+        seconds: 1001001001
+        nanos: 1000000
+      details: can't bind
+)EOF");
+
+  ListenerManager::FailureStates empty_failure_state;
+  // Fake a new update, just to sanity check the clearing code.
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(empty_failure_state));
+
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
+}
+
+// Verify that errors tracked on endListenerUpdate show up in the config dump/
+TEST_F(ListenerManagerImplTest, ConfigDumpWithExternalError) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Make sure the config dump is empty by default.
+  ListenerManager::FailureStates empty_failure_state;
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(empty_failure_state));
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
+
+  // Now have an external update with errors and make sure it gets dumped.
+  ListenerManager::FailureStates non_empty_failure_state;
+  non_empty_failure_state.push_back(std::make_unique<envoy::admin::v2alpha::UpdateFailureState>());
+  auto& state = non_empty_failure_state.back();
+  state->set_details("foo");
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(non_empty_failure_state));
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+  error_state:
+    details: "foo"
+)EOF");
+
+  // And clear again.
+  ListenerManager::FailureStates empty_failure_state2;
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(empty_failure_state2));
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
 }
 
 TEST_F(ListenerManagerImplTest, ListenerDraining) {
