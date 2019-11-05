@@ -250,6 +250,11 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
   static std::string category() { return "filters.listener"; }
 };
 
@@ -273,6 +278,11 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
   static std::string category() { return "filters.udp_listener"; }
 };
 
@@ -352,6 +362,11 @@ public:
    */
   virtual std::string name() PURE;
 
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
   static std::string category() { return "filters.network"; }
 
   /**
@@ -387,6 +402,11 @@ public:
    */
   virtual std::string name() PURE;
 
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
   static std::string category() { return "filters.upstream_network"; }
 };
 
@@ -462,6 +482,11 @@ public:
    */
   virtual std::string name() PURE;
 
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
   static std::string category() { return "filters.http"; }
 
   /**

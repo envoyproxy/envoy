@@ -145,6 +145,11 @@ public:
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
   static std::string category() { return "transport_sockets.upstream"; }
 };
 
@@ -172,6 +177,11 @@ public:
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
 
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
   static std::string category() { return "transport_sockets.downstream"; }
 };
 
