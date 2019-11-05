@@ -205,7 +205,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define deprecated_features=disabled \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
-  setup_clang_libstdcxx_toolchain
+  setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
 
