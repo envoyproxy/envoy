@@ -131,6 +131,17 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     routes_.emplace_back(std::make_shared<const RouteImpl>(*this, default_route));
   }
 
+  if (config.has_metadata_match()) {
+    const auto& filter_metadata = config.metadata_match().filter_metadata();
+
+    const auto filter_it = filter_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+    if (filter_it != filter_metadata.end()) {
+      cluster_metadata_match_criteria_ =
+          std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    }
+  }
+
   // Weighted clusters will be enabled only if both the default cluster and
   // deprecated v1 routes are absent.
   if (routes_.empty() && config.has_weighted_clusters()) {
@@ -141,17 +152,6 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
           std::make_shared<const WeightedClusterEntry>(*this, cluster_desc));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
-    }
-  }
-
-  if (config.has_metadata_match()) {
-    const auto& filter_metadata = config.metadata_match().filter_metadata();
-
-    const auto filter_it = filter_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
-
-    if (filter_it != filter_metadata.end()) {
-      cluster_metadata_match_criteria_ =
-          std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
     }
   }
 
