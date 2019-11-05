@@ -15,6 +15,7 @@
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
+#include "common/local_reply/local_reply.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -143,6 +144,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
+  LocalReply::LocalReply* localReply() const override { return local_reply_.get(); }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -191,6 +193,7 @@ private:
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
+  LocalReply::LocalReplyPtr local_reply_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

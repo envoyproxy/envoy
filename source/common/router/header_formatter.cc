@@ -292,8 +292,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       Http::HeaderMapImpl empty_map;
       std::string formatted;
       for (const auto& formatter : formatters) {
-        absl::StrAppend(&formatted,
-                        formatter->format(empty_map, empty_map, empty_map, stream_info));
+        absl::StrAppend(&formatted, formatter->format(empty_map, empty_map, empty_map, stream_info,
+                                                      std::string()));
       }
       return formatted;
     };

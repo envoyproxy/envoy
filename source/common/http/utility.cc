@@ -306,8 +306,32 @@ void Utility::sendLocalReply(
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
     Code response_code, absl::string_view body_text,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
+  sendLocalReply(
+      is_grpc, encode_headers, encode_data, [&](Code&) -> void {},
+      [&](HeaderMapPtr&& response_headers, absl::string_view& body) -> std::string {
+        if (!body.empty()) {
+          response_headers->insertContentLength().value(body.size());
+          response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+          return body.data();
+        }
+        return {};
+      },
+      is_reset, response_code, body_text, grpc_status, is_head_request);
+}
+
+void Utility::sendLocalReply(
+    bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
+    std::function<void(Code& code)> rewrite_response,
+    std::function<std::string(HeaderMapPtr&& headers, absl::string_view& body_text)>
+        format_response,
+    const bool& is_reset, Code response_code, absl::string_view body_text,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
+
+  // rewrite_response will rewrite response code (more might be added in future)
+  rewrite_response(response_code);
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (is_grpc) {
     HeaderMapPtr response_headers{new HeaderMapImpl{
@@ -328,9 +352,9 @@ void Utility::sendLocalReply(
 
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
+  std::string formatted_body{};
   if (!body_text.empty()) {
-    response_headers->insertContentLength().value(body_text.size());
-    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+    formatted_body = format_response(std::move(response_headers), body_text);
   }
 
   if (is_head_request) {
@@ -338,10 +362,10 @@ void Utility::sendLocalReply(
     return;
   }
 
-  encode_headers(std::move(response_headers), body_text.empty());
+  encode_headers(std::move(response_headers), formatted_body.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
-  if (!body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(body_text);
+  if (!formatted_body.empty() && !is_reset) {
+    Buffer::OwnedImpl buffer(formatted_body);
     encode_data(buffer, true);
   }
 }

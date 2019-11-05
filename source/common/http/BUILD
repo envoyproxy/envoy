@@ -122,6 +122,7 @@ envoy_cc_library(
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/router:rds_interface",
+        "//source/common/local_reply:local_reply_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],

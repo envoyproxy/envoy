@@ -128,6 +128,11 @@ public:
                                          false,
                                          256});
     }
+
+    local_reply_ = std::make_unique<LocalReply::LocalReply>(
+        LocalReply::LocalReply{{},
+                               std::make_unique<Envoy::AccessLog::FormatterImpl>("%RESP_BODY%"),
+                               Http::Headers::get().ContentTypeValues.Text});
   }
 
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters) {
@@ -315,6 +320,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  LocalReply::LocalReply* localReply() const override { return local_reply_.get(); }
 
   DangerousDeprecatedTestTime test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -369,6 +375,7 @@ public:
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
   bool merge_slashes_ = false;
+  LocalReply::LocalReplyPtr local_reply_;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
 

@@ -10,15 +10,18 @@
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
+#include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
+#include "common/local_reply/local_reply.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
@@ -52,6 +55,53 @@ FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryM
     }
   }
   return upgrade_map.end();
+}
+
+std::unordered_map<std::string, std::string>
+convertJsonFormatToMap(ProtobufWkt::Struct json_format) {
+  std::unordered_map<std::string, std::string> output;
+  for (const auto& pair : json_format.fields()) {
+    if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
+      throw EnvoyException("Only string values are supported in the JSON access log format.");
+    }
+    output.emplace(pair.first, pair.second.string_value());
+  }
+  return output;
+}
+
+AccessLog::FormatterPtr createFormatter(const Protobuf::Message& config,
+                                        Server::Configuration::FactoryContext& context) {
+  const auto& local_reply_config = MessageUtil::downcastAndValidate<
+      const envoy::config::filter::network::http_connection_manager::v2::LocalReplyConfig&>(
+      config, context.messageValidationVisitor());
+  AccessLog::FormatterPtr formatter;
+
+  if (local_reply_config.has_format()) {
+    if (local_reply_config.format().format_case() == envoy::type::StringOrJson::kStringFormat) {
+      formatter = std::make_unique<Envoy::AccessLog::FormatterImpl>(
+          local_reply_config.format().string_format());
+    } else if (local_reply_config.format().format_case() ==
+               envoy::type::StringOrJson::kJsonFormat) {
+      auto json_format_map = convertJsonFormatToMap(local_reply_config.format().json_format());
+      formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map);
+    } else {
+      formatter = std::make_unique<Envoy::AccessLog::FormatterImpl>("%RESP_BODY%");
+    }
+  } else {
+    formatter = std::make_unique<Envoy::AccessLog::FormatterImpl>("%RESP_BODY%");
+  }
+
+  return formatter;
+}
+
+std::string getContentType(
+    const envoy::config::filter::network::http_connection_manager::v2::LocalReplyConfig& config) {
+  if (config.has_format() &&
+      config.format().format_case() == envoy::type::StringOrJson::kJsonFormat) {
+    return Http::Headers::get().ContentTypeValues.Json;
+  } else {
+    return Http::Headers::get().ContentTypeValues.Text;
+  }
 }
 
 std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
@@ -376,6 +426,30 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
+
+  // local_reply
+  std::list<LocalReply::ResponseMapperPtr> mappers;
+  if (config.has_local_reply_config() && !config.local_reply_config().mapper().empty()) {
+
+    for (auto& mapper : config.local_reply_config().mapper()) {
+      if (mapper.has_filter() && mapper.has_rewriter()) {
+        AccessLog::FilterPtr filter = AccessLog::FilterFactory::fromProto(
+            mapper.filter(), context.runtime(), context.random(),
+            context.messageValidationVisitor());
+
+        LocalReply::ResponseRewriterPtr rewriter = std::make_unique<LocalReply::ResponseRewriter>(
+            LocalReply::ResponseRewriter{PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                mapper.rewriter(), status_code, absl::optional<uint32_t>())});
+
+        LocalReply::ResponseMapperPtr mapper = std::make_unique<LocalReply::ResponseMapper>(
+            LocalReply::ResponseMapper{std::move(filter), std::move(rewriter)});
+        mappers.emplace_back(std::move(mapper));
+      }
+    }
+  }
+  local_reply_ = std::make_unique<LocalReply::LocalReply>(LocalReply::LocalReply{
+      std::move(mappers), createFormatter(config.local_reply_config(), context),
+      getContentType(config.local_reply_config())});
 }
 
 void HttpConnectionManagerConfig::processFilter(

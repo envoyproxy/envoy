@@ -20,9 +20,10 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   Http::TestHeaderMapImpl request_headers;
   Http::TestHeaderMapImpl response_headers;
   Http::TestHeaderMapImpl response_trailers;
+  std::string body{};
   for (auto _ : state) {
     output_bytes +=
-        formatter->format(request_headers, response_headers, response_trailers, *stream_info)
+        formatter->format(request_headers, response_headers, response_trailers, *stream_info, body)
             .length();
   }
   benchmark::DoNotOptimize(output_bytes);

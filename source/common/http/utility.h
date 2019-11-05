@@ -213,6 +213,32 @@ void sendLocalReply(bool is_grpc,
                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request = false);
 
+/**
+ * Create a locally generated response using the provided lambdas with rewrite function.
+ * @param is_grpc tells if this is a response to a gRPC request.
+ * @param encode_headers supplies the function to encode response headers.
+ * @param encode_data supplies the function to encode the response body.
+ * @param rewrite_response supplies the function to rewrite locally generated response
+ * e.g. change status code
+ * @param format_response supplies the function to change format of locally generated reply
+ * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
+ *                 responsibility of the caller to ensure that this is set to false if onDestroy()
+ *                 is invoked in the context of sendLocalReply().
+ * @param response_code supplies the HTTP response code.
+ * @param body_text supplies the optional body text which is sent using the text/plain content
+ *                  type.
+ * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+ */
+void sendLocalReply(bool is_grpc,
+                    std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+                    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
+                    std::function<void(Code& code)> rewrite_response,
+                    std::function<std::string(HeaderMapPtr&& headers, absl::string_view& body_text)>
+                        format_response,
+                    const bool& is_reset, Code response_code, absl::string_view body_text,
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    bool is_head_request = false);
+
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
   Network::Address::InstanceConstSharedPtr address_;

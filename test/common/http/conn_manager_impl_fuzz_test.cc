@@ -130,6 +130,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
+  LocalReply::LocalReply* localReply() const override { return local_reply_.get(); }
 
   const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager config_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
@@ -167,6 +168,10 @@ public:
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
+  LocalReply::LocalReplyPtr local_reply_ = std::make_unique<LocalReply::LocalReply>(
+      LocalReply::LocalReply{{},
+                             std::make_unique<Envoy::AccessLog::FormatterImpl>("%RESP_BODY%"),
+                             Http::Headers::get().ContentTypeValues.Text});
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks

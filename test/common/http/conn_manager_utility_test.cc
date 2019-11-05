@@ -91,6 +91,7 @@ public:
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(shouldNormalizePath, bool());
   MOCK_CONST_METHOD0(shouldMergeSlashes, bool());
+  MOCK_CONST_METHOD0(localReply, LocalReply::LocalReply*());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -108,7 +109,12 @@ public:
     percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
     tracing_config_ = {
         Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256};
+    local_reply_ = std::make_unique<LocalReply::LocalReply>(
+        LocalReply::LocalReply{{},
+                               std::make_unique<Envoy::AccessLog::FormatterImpl>("%RESP_BODY%"),
+                               Http::Headers::get().ContentTypeValues.Text});
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
+    ON_CALL(config_, localReply()).WillByDefault(Return(local_reply_.get()));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
   }
@@ -145,6 +151,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  LocalReply::LocalReplyPtr local_reply_;
   std::string canary_node_{"canary"};
   std::string empty_node_;
   std::string via_;
