@@ -139,8 +139,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
   Buffer::RawSlice first_slice{reinterpret_cast<void*>(const_cast<char*>(encrypted_packet->data())),
                                encrypted_packet->length()};
   // Send a full CHLO to finish 0-RTT handshake.
-  auto send_rc =
-      client_socket_->ioHandle().sendto(first_slice, /*flags=*/0, *listen_socket_->localAddress());
+  auto send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &first_slice, 1,
+                                                 nullptr, *listen_socket_->localAddress());
   ASSERT_EQ(encrypted_packet->length(), send_rc.rc_);
 
   EXPECT_CALL(listener_config_, filterChainManager());
