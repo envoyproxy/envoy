@@ -19,10 +19,6 @@ class SquashFilterConfigFactory
 public:
   SquashFilterConfigFactory() : FactoryBase(HttpFilterNames::get().Squash) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string&,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::squash::v2::Squash& proto_config,
