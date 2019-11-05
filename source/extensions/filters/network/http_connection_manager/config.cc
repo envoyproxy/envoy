@@ -12,7 +12,6 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
-#include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/date_provider_impl.h"
@@ -20,7 +19,6 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
@@ -114,13 +112,6 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
         context.runtime(), context.localInfo(), context.clusterManager(),
         &context.overloadManager(), context.dispatcher().timeSource())});
   };
-}
-
-Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
-  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
 /**
@@ -404,15 +395,10 @@ void HttpConnectionManagerConfig::processFilter(
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           string_name);
-  Http::FilterFactoryCb callback;
-  if (Config::Utility::allowDeprecatedV1Config(context_.runtime(), *filter_config)) {
-    callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
-                                           context_);
-  } else {
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        proto_config, context_.messageValidationVisitor(), factory);
-    callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  }
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      proto_config, context_.messageValidationVisitor(), factory);
+  Http::FilterFactoryCb callback =
+      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   is_terminal = factory.isTerminalFilter();
   filter_factories.push_back(callback);
 }
