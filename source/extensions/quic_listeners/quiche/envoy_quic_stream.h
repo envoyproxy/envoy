@@ -6,6 +6,7 @@
 #include "common/http/codec_helper.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
+#include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -16,6 +17,8 @@ class EnvoyQuicStream : public Http::StreamEncoder,
                         public Http::StreamCallbackHelper,
                         protected Logger::Loggable<Logger::Id::quic_stream> {
 public:
+  // |buffer_limit| is the high watermark of the stream send buffer, and the low
+  // watermark will be half of it.
   EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)
       : send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
@@ -29,7 +32,6 @@ public:
     bool status_changed{false};
     if (disable) {
       ++read_disable_counter_;
-      ASSERT(read_disable_counter_ == 1);
       if (read_disable_counter_ == 1) {
         status_changed = true;
       }
@@ -41,7 +43,10 @@ public:
       }
     }
 
-    if (status_changed && !in_encode_data_callstack_) {
+    if (status_changed && !in_decode_data_callstack_) {
+      // Avoid calling this while decoding data because transient disabling and
+      // enabling reading may trigger another decoding data inside the
+      // callstack which messes up stream state.
       switchStreamBlockState(disable);
     }
   }
@@ -51,11 +56,26 @@ public:
     addCallbacks_(callbacks);
   }
   void removeCallbacks(Http::StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
-  uint32_t bufferLimit() override { return quic::kStreamReceiveWindowLimit; }
+  uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
 
   // Needs to be called during quic stream creation before the stream receives
   // any headers and data.
   void setDecoder(Http::StreamDecoder& decoder) { decoder_ = &decoder; }
+
+  void maybeCheckWatermark(uint64_t buffered_data_old, uint64_t buffered_data_new,
+                           QuicFilterManagerConnectionImpl& connection) {
+    if (buffered_data_new == buffered_data_old) {
+      return;
+    }
+    // If buffered bytes changed, update stream and session's watermark book
+    // keeping.
+    if (buffered_data_new > buffered_data_old) {
+      send_buffer_simulation_.checkHighWatermark(buffered_data_new);
+    } else {
+      send_buffer_simulation_.checkLowWatermark(buffered_data_new);
+    }
+    connection.adjustBytesToSend(buffered_data_new - buffered_data_old);
+  }
 
 protected:
   virtual void switchStreamBlockState(bool should_block) PURE;
@@ -69,23 +89,25 @@ protected:
     return decoder_;
   }
 
-  EnvoyQuicSimulatedWatermarkBuffer& sendBufferSimulation() { return send_buffer_simulation_; }
-  // True once end of stream is propergated to Envoy. Envoy doesn't expect to be
+  // True once end of stream is propagated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
   bool end_stream_decoded_{false};
-  int32_t read_disable_counter_{0};
+  uint32_t read_disable_counter_{0u};
   // If true, switchStreamBlockState() should be deferred till this variable
   // becomes false.
-  bool in_encode_data_callstack_{false};
+  bool in_decode_data_callstack_{false};
 
 private:
   // Not owned.
   Http::StreamDecoder* decoder_{nullptr};
-  // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
-  // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
-  // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
-  // send buffer.
+  // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
+  // upon crossing high and low watermarks.
+  // Its high watermark is also the buffer limit of stream read/write filters in
+  // HCM.
+  // There is no receive buffer simulation because Quic stream's
+  // OnBodyDataAvailable() hands all the ready-to-use request data from stream sequencer to HCM
+  // directly and buffers them in filters if needed. Itself doesn't buffer request data.
   EnvoyQuicSimulatedWatermarkBuffer send_buffer_simulation_;
 };
 

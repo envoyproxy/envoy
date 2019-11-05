@@ -15,8 +15,12 @@ void QuicHttpConnectionImplBase::runWatermarkCallbacksForEachStream(
     if (!it.second->is_static()) {
       auto stream = dynamic_cast<EnvoyQuicStream*>(it.second.get());
       if (high_watermark) {
+      // Only call watermark callbacks on non QUIC static streams which are
+      // crypto stream and Google QUIC headers stream.
+      ENVOY_LOG(debug, "runHighWatermarkCallbacks on stream {}", it.first);
         stream->runHighWatermarkCallbacks();
       } else {
+      ENVOY_LOG(debug, "runLowWatermarkCallbacks on stream {}", it.first);
         stream->runLowWatermarkCallbacks();
       }
     }
@@ -53,6 +57,9 @@ QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
       quic_client_session_.CreateOutgoingBidirectionalStream());
   ASSERT(stream != nullptr, "Fail to create QUIC stream.");
   stream->setDecoder(response_decoder);
+  if (quic_client_session_.aboveHighWatermark()) {
+    stream->runHighWatermarkCallbacks();
+  }
   return *stream;
 }
 

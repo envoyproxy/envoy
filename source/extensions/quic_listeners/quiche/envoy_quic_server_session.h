@@ -20,6 +20,9 @@ namespace Envoy {
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
+// TODO(danzh) Lifetime of quic connection and filter manager connection can be
+// simplified by changing the inheritance to a member variable instantiated
+// before quic_connection_.
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public QuicFilterManagerConnectionImpl {
 public:

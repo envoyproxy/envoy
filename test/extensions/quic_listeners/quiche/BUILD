@@ -114,6 +114,8 @@ envoy_cc_test(
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@com_googlesource_quiche//:quic_test_tools_server_session_base_peer",
+        "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
     ],
 )
 
@@ -224,11 +226,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "envoy_quic_simulated_watermark_buffer_test",
+    srcs = ["envoy_quic_simulated_watermark_buffer_test.cc"],
+    tags = ["nofips"],
+    deps = ["//source/extensions/quic_listeners/quiche:envoy_quic_simulated_watermark_buffer_lib"],
+)
+
 envoy_cc_test_library(
     name = "test_utils_lib",
     hdrs = ["test_utils.h"],
     tags = ["nofips"],
-    deps = [
-        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
-    ],
+    deps = ["@com_googlesource_quiche//:quic_core_http_spdy_session_lib"],
 )

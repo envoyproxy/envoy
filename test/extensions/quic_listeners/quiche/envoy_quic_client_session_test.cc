@@ -84,7 +84,6 @@ public:
                                crypto_config, push_promise_index, dispatcher, send_buffer_limit) {}
 
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override {
-    std::cerr << "========= CreateQuicCryptoStream \n";
     return std::make_unique<TestQuicCryptoClientStream>(
         server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(),
         crypto_config(), this);
@@ -98,10 +97,6 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_enable_version_99, GetParam());
-          std::cerr << "============= version use crypto frame "
-                    << quic::QuicVersionUsesCryptoFrames(
-                           quic::CurrentSupportedVersions()[0].transport_version)
-                    << "\n";
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),

@@ -66,19 +66,14 @@ std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClient
   return stream;
 }
 
-quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId id) {
-  if (!ShouldCreateIncomingStream(id)) {
-    return nullptr;
-  }
-  auto stream = new EnvoyQuicClientStream(id, this, quic::READ_UNIDIRECTIONAL);
-  ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(stream));
-  return stream;
+quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {
+  // Disallow server initiated stream.
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* pending) {
-  auto stream = new EnvoyQuicClientStream(pending, this, quic::READ_UNIDIRECTIONAL);
-  ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(stream));
-  return stream;
+quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
+  // Disallow server initiated stream.
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Quic

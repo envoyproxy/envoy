@@ -38,6 +38,8 @@ public:
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  // Using this for purpose other than logging is not safe. Because QUIC connection id can be
+  // 18 bytes, so there might be collision when it's hashed to 8 bytes.
   uint64_t id() const override { return id_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {
@@ -96,6 +98,8 @@ public:
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
+  // Update the book keeping of the aggregated buffered bytes cross all the
+  // streams, and run watermark check.
   void adjustBytesToSend(int64_t delta);
 
 protected:
@@ -129,6 +133,10 @@ private:
   std::string transport_failure_reason_;
   const uint64_t id_;
   uint32_t bytes_to_send_{0};
+  // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
+  // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
+  // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
+  // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
 };
 

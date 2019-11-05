@@ -117,7 +117,7 @@ public:
 
 protected:
   quic::QuicConfig quic_config_;
-  quic::QuicServerId server_id_;
+  quic::QuicServerId server_id_{"example.com", 443, false};
   quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
   quic::QuicCryptoClientConfig crypto_config_;
