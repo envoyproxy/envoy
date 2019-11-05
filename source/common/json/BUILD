@@ -9,12 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "config_schemas_lib",
-    srcs = ["config_schemas.cc"],
-    hdrs = ["config_schemas.h"],
-)
-
-envoy_cc_library(
     name = "json_loader_lib",
     srcs = ["json_loader.cc"],
     hdrs = ["json_loader.h"],

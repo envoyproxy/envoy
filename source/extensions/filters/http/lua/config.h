@@ -18,10 +18,6 @@ class LuaFilterConfig : public Common::FactoryBase<envoy::config::filter::http::
 public:
   LuaFilterConfig() : FactoryBase(HttpFilterNames::get().Lua) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const envoy::config::filter::http::lua::v2::Lua& proto_config,
