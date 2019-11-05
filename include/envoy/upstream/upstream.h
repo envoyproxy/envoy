@@ -990,7 +990,7 @@ public:
    * will accept the connection.
    * @param accept_cb supplies the callback to invoke in the serving thread to take ownership of the
    * retried connection_essence, if any, or handle the retrieve failure. #return true if the
-   * asychronous operation to retrieve a connection was started, or false if the retrieve operation
+   * asynchronous operation to retrieve a connection was started, or false if the retrieve operation
    * is rejected because there are no available connections in the pool.
    */
   virtual bool RetrieveConnection(HostConstSharedPtr host, Event::Dispatcher& dispatcher,
