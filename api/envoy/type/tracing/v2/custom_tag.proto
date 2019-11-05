@@ -57,33 +57,17 @@ message CustomTag {
   // * `list`/`struct`: populate with the corresponding JSON string
   //   converted from the protobuf message;
   // * otherwise means that no valid metadata is found.
-  // [#next-free-field: 7]
   message Metadata {
-    // Specify the source where to pull the metadata from.
-    oneof source {
-      option (validate.required) = true;
-
-      // Obtain metadata from the dynamic metadata associated with the request.
-      google.protobuf.Empty request = 1;
-
-      // Obtain metadata from :ref:`the route<envoy_api_field_route.Route.metadata>`.
-      google.protobuf.Empty route = 2;
-
-      // Obtain metadata from :ref:`the upstream cluster<envoy_api_field_Cluster.metadata>`.
-      google.protobuf.Empty cluster = 3;
-
-      // Obtain metadata from :ref:`the upstream
-      // host<envoy_api_field_endpoint.LbEndpoint.metadata>`.
-      google.protobuf.Empty host = 4;
-    }
+    // Specify what kind of metadata to obtain tag value from.
+    metadata.v2.MetadataKind kind = 1;
 
     // Metadata key to define the path to retrieve the tag value.
-    metadata.v2.MetadataKey metadata_key = 5;
+    metadata.v2.MetadataKey metadata_key = 2;
 
     // When no valid metadata is found,
     // the tag value would be populated with this default value if specified,
     // otherwise no tag would be populated.
-    string default_value = 6;
+    string default_value = 3;
   }
 
   // Used to populate the tag name.

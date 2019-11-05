@@ -293,7 +293,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
                                      const envoy::type::tracing::v2::CustomTag::Metadata& metadata)
-    : GeneralCustomTag(tag), source_(metadata.source_case()),
+    : GeneralCustomTag(tag), kind_(metadata.kind().kind_case()),
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
@@ -332,18 +332,18 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
 const envoy::api::v2::core::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   const StreamInfo::StreamInfo& info = ctx.stream_info;
-  switch (source_) {
-  case envoy::type::tracing::v2::CustomTag::Metadata::kRequest:
+  switch (kind_) {
+  case envoy::type::metadata::v2::MetadataKind::kRequest:
     return &info.dynamicMetadata();
-  case envoy::type::tracing::v2::CustomTag::Metadata::kRoute: {
+  case envoy::type::metadata::v2::MetadataKind::kRoute: {
     const Router::RouteEntry* route_entry = info.routeEntry();
     return route_entry ? &route_entry->metadata() : nullptr;
   }
-  case envoy::type::tracing::v2::CustomTag::Metadata::kCluster: {
+  case envoy::type::metadata::v2::MetadataKind::kCluster: {
     const auto& hostPtr = info.upstreamHost();
     return hostPtr ? &hostPtr->cluster().metadata() : nullptr;
   }
-  case envoy::type::tracing::v2::CustomTag::Metadata::kHost: {
+  case envoy::type::metadata::v2::MetadataKind::kHost: {
     const auto& hostPtr = info.upstreamHost();
     return hostPtr ? hostPtr->metadata().get() : nullptr;
   }

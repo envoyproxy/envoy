@@ -249,7 +249,7 @@ tracing:
       default_value: rvalue
   - tag: mtag
     metadata:
-      request: {}
+      kind: { request: {} }
       metadata_key:
         filter: com.bar.foo
         path: [ { key: xx }, { key: yy } ]

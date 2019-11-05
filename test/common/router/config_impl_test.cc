@@ -5434,7 +5434,7 @@ virtual_hosts:
               default_value: rvalue
           - tag: mtag
             metadata:
-              route: {}
+              kind: { route: {} }
               metadata_key:
                 filter: com.bar.foo
                 path: [ { key: xx }, { key: yy } ]

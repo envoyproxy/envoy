@@ -59,3 +59,39 @@ message MetadataKey {
   // unless the list is the last segment.
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
+
+
+// Describes what kind of metadata.
+message MetadataKind {
+  // Represents dynamic metadata associated with the request.
+  message Request {
+  }
+
+  // Represents metadata from :ref:`the route<envoy_api_field_route.Route.metadata>`.
+  message Route {
+  }
+
+  // Represents metadata from :ref:`the upstream cluster<envoy_api_field_Cluster.metadata>`.
+  message Cluster {
+  }
+
+  // Represents metadata from :ref:`the upstream host<envoy_api_field_endpoint.LbEndpoint.metadata>`.
+  message Host {
+  }
+
+  oneof kind {
+    option (validate.required) = true;
+
+    // Request kind of metadata.
+    Request request = 1;
+
+    // Route kind of metadata.
+    Route route = 2;
+
+    // Cluster kind of metadata.
+    Cluster cluster = 3;
+
+    // Host kind of metadata.
+    Host host = 4;
+  }
+}
