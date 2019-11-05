@@ -60,7 +60,6 @@ message MetadataKey {
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
-
 // Describes what kind of metadata.
 message MetadataKind {
   // Represents dynamic metadata associated with the request.
@@ -75,7 +74,8 @@ message MetadataKind {
   message Cluster {
   }
 
-  // Represents metadata from :ref:`the upstream host<envoy_api_field_endpoint.LbEndpoint.metadata>`.
+  // Represents metadata from :ref:`the upstream
+  // host<envoy_api_field_endpoint.LbEndpoint.metadata>`.
   message Host {
   }
 
