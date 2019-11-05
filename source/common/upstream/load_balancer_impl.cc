@@ -794,6 +794,8 @@ void LoadBalancerSubsetInfoImpl::validateSelector(const SubsetSelector& selector
     throw EnvoyException("fallback_keys_subset should be a subset of selector keys");
   }
 
+  // Enforce that the fallback_keys_subset_ set is smaller than the selector_keys_ set. Otherwise
+  // we could end up with a infinite recursion of SubsetLoadBalancer::chooseHost().
   if (selector.selector_keys_.size() == selector.fallback_keys_subset_.size()) {
     throw EnvoyException("fallback_keys_subset cannot be equal to keys");
   }
