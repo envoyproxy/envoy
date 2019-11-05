@@ -10,6 +10,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/type/http_status.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -18,6 +19,7 @@
 #include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
@@ -34,22 +36,46 @@ namespace ExtAuthz {
 enum class FilterRequestType { Internal, External, Both };
 
 /**
+ * All stats for the Ext Authz filter. @see stats_macros.h
+ */
+
+#define ALL_EXT_AUTHZ_FILTER_STATS(COUNTER)                                                        \
+  COUNTER(ok)                                                                                      \
+  COUNTER(denied)                                                                                  \
+  COUNTER(error)                                                                                   \
+  COUNTER(failure_mode_allowed)
+
+/**
+ * Wrapper struct for ext_authz filter stats. @see stats_macros.h
+ */
+struct ExtAuthzFilterStats {
+  ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Configuration for the External Authorization (ext_authz) filter.
  */
 class FilterConfig {
 public:
   FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context)
+               Runtime::Loader& runtime, Http::Context& http_context,
+               const std::string& stats_prefix)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
-        scope_(scope), runtime_(runtime), http_context_(http_context), pool_(scope.symbolTable()),
+        scope_(scope), runtime_(runtime), http_context_(http_context),
+        filter_enabled_(config.has_filter_enabled()
+                            ? absl::optional<Runtime::FractionalPercent>(
+                                  Runtime::FractionalPercent(config.filter_enabled(), runtime_))
+                            : absl::nullopt),
+        pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
-        ext_authz_ok_(pool_.add("ext_authz.ok")), ext_authz_denied_(pool_.add("ext_authz.denied")),
+        stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
+        ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
         ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
 
@@ -67,18 +93,22 @@ public:
 
   Http::Code statusOnError() const { return status_on_error_; }
 
+  bool filterEnabled() { return filter_enabled_.has_value() ? filter_enabled_->enabled() : true; }
+
   Runtime::Loader& runtime() { return runtime_; }
 
   Stats::Scope& scope() { return scope_; }
 
   Http::Context& httpContext() { return http_context_; }
 
-  void incCounter(Stats::Scope& scope, Stats::StatName name) {
-    scope.counterFromStatName(name).inc();
-  }
-
   const std::vector<std::string>& metadataContextNamespaces() {
     return metadata_context_namespaces_;
+  }
+
+  const ExtAuthzFilterStats& stats() const { return stats_; }
+
+  void incCounter(Stats::Scope& scope, Stats::StatName name) {
+    scope.counterFromStatName(name).inc();
   }
 
 private:
@@ -88,6 +118,11 @@ private:
       return code;
     }
     return Http::Code::Forbidden;
+  }
+
+  ExtAuthzFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    const std::string final_prefix = prefix + "ext_authz.";
+    return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
   const bool allow_partial_message_;
@@ -100,11 +135,19 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
 
+  const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+
+  // TODO(nezdolik): stop using pool as part of deprecating cluster scope stats.
   Stats::StatNamePool pool_;
 
   const std::vector<std::string> metadata_context_namespaces_;
 
+  // The stats for the filter.
+  ExtAuthzFilterStats stats_;
+
 public:
+  // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
+  // (ExtAuthzFilterStats stats_).
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
@@ -154,7 +197,7 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
-      : config_(config), client_(std::move(client)) {}
+      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -192,6 +235,8 @@ private:
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  // The stats for the filter.
+  ExtAuthzFilterStats stats_;
 
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};

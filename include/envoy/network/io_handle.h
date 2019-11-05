@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/io_error.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {

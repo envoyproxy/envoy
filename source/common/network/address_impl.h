@@ -1,14 +1,12 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/un.h>
 
 #include <array>
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 

@@ -39,6 +39,7 @@ public:
     return metadata_match_criteria_.get();
   }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  bool stripServiceName() const override { return strip_service_name_; };
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
@@ -70,6 +71,7 @@ private:
       return parent_.metadataMatchCriteria();
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
+    bool stripServiceName() const override { return parent_.stripServiceName(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -88,6 +90,7 @@ private:
   uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  const bool strip_service_name_;
 };
 
 using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;

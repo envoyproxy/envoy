@@ -3,9 +3,6 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
-    "envoy_cc_platform_dep",
-    "envoy_cc_posix_library",
-    "envoy_cc_win32_library",
     "envoy_package",
 )
 load(
@@ -97,6 +94,7 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
 )
 

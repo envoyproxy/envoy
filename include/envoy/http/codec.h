@@ -240,7 +240,7 @@ struct Http1Settings {
   };
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
-  HeaderKeyFormat header_key_format_;
+  HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
 };
 
 /**

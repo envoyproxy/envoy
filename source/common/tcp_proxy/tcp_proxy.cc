@@ -118,6 +118,10 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   for (const envoy::config::filter::accesslog::v2::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
+
+  if (!config.hash_policy().empty()) {
+    hash_policy_ = std::make_unique<Network::HashPolicyImpl>(config.hash_policy());
+  }
 }
 
 const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
@@ -348,7 +352,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   } else {
     config_->stats().downstream_cx_no_route_.inc();
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    onInitFailure(UpstreamFailureReason::NO_ROUTE);
+    onInitFailure(UpstreamFailureReason::NoRoute);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -359,7 +363,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
-    onInitFailure(UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED);
+    onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -367,7 +371,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   if (connect_attempts_ >= max_connect_attempts) {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
-    onInitFailure(UpstreamFailureReason::CONNECT_FAILED);
+    onInitFailure(UpstreamFailureReason::ConnectFailed);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -382,7 +386,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
-    onInitFailure(UpstreamFailureReason::NO_HEALTHY_UPSTREAM);
+    onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -446,7 +450,7 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
 void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
-      Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT);
+      Upstream::Outlier::Result::LocalOriginTimeout);
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
 
   // Raise LocalClose, which will trigger a reconnect if needed/configured.
@@ -519,7 +523,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       if (event == Network::ConnectionEvent::RemoteClose) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
-            Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED);
+            Upstream::Outlier::Result::LocalOriginConnectFailed);
       }
 
       initializeUpstreamConnection();
@@ -534,7 +538,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->connection().readDisable(false);
 
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
-        Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL);
+        Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
     getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
     ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",

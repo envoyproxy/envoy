@@ -6,6 +6,7 @@
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "test/integration/autonomous_upstream.h"
@@ -96,7 +97,8 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   initialize();
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  uint32_t http_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(http_port);
   Http::TestHeaderMapImpl request_headers{{":method", "HEAD"},
                                           {":path", "/test/long/url"},
                                           {":scheme", "http"},
@@ -126,6 +128,12 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
 
   // Validate that the listeners have been stopped.
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+
+  // Validate that port is closed and can be bound by other sockets.
+  EXPECT_NO_THROW(Network::TcpListenSocket(
+      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                           http_port),
+      nullptr, true));
 }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
@@ -290,7 +298,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
 TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
-  config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: {} }");
+  config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
@@ -752,7 +761,8 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -786,7 +796,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
@@ -822,7 +833,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
@@ -856,7 +868,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 
 // Test that if the route cache is cleared, it doesn't cause problems.
 TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
-  config_helper_.addFilter("{ name: clear-route-cache, config: {} }");
+  config_helper_.addFilter("{ name: clear-route-cache, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -893,7 +906,8 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectHealthy) {
-  config_helper_.addFilter("{ name: process-context-filter, config: {} }");
+  config_helper_.addFilter("{ name: process-context-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
 
   ProcessObjectForFilter healthy_object(true);
   process_object_ = healthy_object;
@@ -913,7 +927,8 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
 }
 
 TEST_P(IntegrationTest, ProcessObjectUnealthy) {
-  config_helper_.addFilter("{ name: process-context-filter, config: {} }");
+  config_helper_.addFilter("{ name: process-context-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
 
   ProcessObjectForFilter unhealthy_object(false);
   process_object_ = unhealthy_object;

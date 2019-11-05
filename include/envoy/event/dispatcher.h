@@ -215,6 +215,16 @@ public:
    * current thread of execution is on the same thread upon which the dispatcher loop is running.
    */
   virtual bool isThreadSafe() const PURE;
+
+  /**
+   * Returns a recently cached MonotonicTime value.
+   */
+  virtual MonotonicTime approximateMonotonicTime() const PURE;
+
+  /**
+   * Updates approximate monotonic time to current value.
+   */
+  virtual void updateApproximateMonotonicTime() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

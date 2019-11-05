@@ -23,8 +23,8 @@ import "validate/validate.proto";
 message GrpcService {
   message EnvoyGrpc {
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
-    // in the :ref:`Cluster <envoy_api_msg_api.v3alpha.Cluster>` :ref:`tls_context
-    // <envoy_api_field_api.v3alpha.Cluster.tls_context>`.
+    // in the :ref:`Cluster <envoy_api_msg_api.v3alpha.Cluster>` :ref:`transport_socket
+    // <envoy_api_field_api.v3alpha.Cluster.transport_socket>`.
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
   }
 
@@ -77,11 +77,13 @@ message GrpcService {
       }
 
       message MetadataCredentialsFromPlugin {
+        reserved 2;
+
+        reserved "config";
+
         string name = 1;
 
         oneof config_type {
-          google.protobuf.Struct config = 2;
-
           google.protobuf.Any typed_config = 3;
         }
       }

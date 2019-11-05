@@ -13,7 +13,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/api/v3alpha/lds.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
-import "envoy/config/overload/v2alpha/overload.proto";
+import "envoy/config/overload/v3alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
 
 import "google/protobuf/duration.proto";
@@ -126,7 +126,7 @@ message Bootstrap {
   Admin admin = 12;
 
   // Optional overload manager configuration.
-  overload.v2alpha.OverloadManager overload_manager = 15;
+  overload.v3alpha.OverloadManager overload_manager = 15;
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
