@@ -211,7 +211,8 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
         return true;
       }));
   // Stop iteration to avoid calling getRead/WriteBuffer().
-  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(*read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
 
   quic::QuicBufferedPacketStore* buffered_packets =
