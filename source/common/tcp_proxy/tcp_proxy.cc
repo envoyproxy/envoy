@@ -49,6 +49,29 @@ Config::RouteImpl::RouteImpl(
   }
 }
 
+bool Config::RouteImpl::matches(Network::Connection& connection) const {
+  if (!source_port_ranges_.empty() &&
+      !Network::Utility::portInRangeList(*connection.remoteAddress(), source_port_ranges_)) {
+    return false;
+  }
+
+  if (!source_ips_.empty() && !source_ips_.contains(*connection.remoteAddress())) {
+    return false;
+  }
+
+  if (!destination_port_ranges_.empty() &&
+      !Network::Utility::portInRangeList(*connection.localAddress(), destination_port_ranges_)) {
+    return false;
+  }
+
+  if (!destination_ips_.empty() && !destination_ips_.contains(*connection.localAddress())) {
+    return false;
+  }
+
+  // if we made it past all checks, the route matches
+  return true;
+}
+
 Config::WeightedClusterEntry::WeightedClusterEntry(
     const Config& parent,
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight&
@@ -155,30 +178,10 @@ RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& conn
     return std::make_shared<const RouteImpl>(*this, per_connection_route);
   }
 
-  for (const RouteImplConstSharedPtr& route : routes_) {
-    if (!route->source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(*connection.remoteAddress(),
-                                           route->source_port_ranges_)) {
-      continue;
+  for (const RouteConstSharedPtr& route : routes_) {
+    if (route->matches(connection)) {
+      return route;
     }
-
-    if (!route->source_ips_.empty() && !route->source_ips_.contains(*connection.remoteAddress())) {
-      continue;
-    }
-
-    if (!route->destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(*connection.localAddress(),
-                                           route->destination_port_ranges_)) {
-      continue;
-    }
-
-    if (!route->destination_ips_.empty() &&
-        !route->destination_ips_.contains(*connection.localAddress())) {
-      continue;
-    }
-
-    // if we made it past all checks, the route matches
-    return route;
   }
 
   // no match, no more routes to try
