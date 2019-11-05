@@ -348,6 +348,47 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   }
 }
 
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: cluster
+  deprecated_v1:
+    routes:
+    - cluster: catch_all
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("catch_all", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
 TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -384,7 +425,48 @@ TEST(ConfigTest, WeightedClustersConfig) {
   EXPECT_EQ(std::string("cluster2"), config_obj.getRouteFromEntries(connection)->clusterName());
 }
 
-TEST(ConfigTest, RouteMetadataMatchConfig) {
+TEST(ConfigTest, WeightedClusterWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("cluster1", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+TEST(ConfigTest, TopLevelMetadataMatchConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
   cluster: foo
@@ -398,16 +480,96 @@ TEST(ConfigTest, RouteMetadataMatchConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
 
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
   const auto* criteria = config_obj.metadataMatchCriteria();
   EXPECT_NE(nullptr, criteria);
 
   const auto& criterions = criteria->metadataMatchCriteria();
   EXPECT_EQ(2, criterions.size());
 
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
   v2.set_string_value("v2");
   HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("foo", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  connection.stream_info_.filterState().setData(
+      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("filter_state_cluster", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
 
   EXPECT_EQ("k1", criterions[0]->name());
   EXPECT_EQ(hv1, criterions[0]->value());
