@@ -86,7 +86,9 @@ detect issues during their execution on ClusterFuzz. A soak period of 5 days pro
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
 
-### Confidentiality, integrity and availability
+### Threat model
+
+#### Confidentiality, integrity and availability
 
 We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
 highest priority concerns. Availability, in particular in areas relating to DoS and resource
@@ -109,6 +111,42 @@ story. We will not act on any security disclosure that relates to a lack of safe
 time, we will work towards improved safe-by-default configuration, but due to backwards
 compatibility and performance concerns, this will require following the breaking change deprecation
 policy.
+
+#### Core and extensions
+
+Anything in the Envoy core may be used in both untrusted and trusted deployments. As a consequence,
+it should be hardened with this model in mind.  Security issues related to core code will usually
+trigger the security release process as described in this document.
+
+Some [extensions](EXTENSION_POLICY.md) are also widely used and deserve the same treatment as core.
+Examples include HTTP connection manager, TCP proxy, buffer filter, router filter, CORS, dynamic
+forward proxy, anything intended to enforce access control policies (RBAC, external authorization)
+and all transport socket extensions.
+
+Other extensions are only expected to be used in trusted environments today.  These include, but are
+not limited to most non-HTTP network filters (e.g.  Thrift, Dynamo, Mongo, Redis, Kafka, Dubbo,
+Zookeeper, MySQL), HTTP inspector, Lua and Squash. We will not treat any issues in these extensions
+as warranting invocation of the security release process.
+
+Please consult the PST if you have questions on which extensions are considered safe to use in the
+presence of untrusted traffic.
+
+#### Data and control plane
+
+We divide our threat model into data and control plane, reflecting the internal division in Envoy of
+these concepts from an architectural perspective. Our highest priority in risk assessment is the
+threat posed by untrusted downstream client traffic on the data plane. This reflects the use of
+Envoy in an edge serving capacity and also the use of Envoy as an inbound destination in a service
+mesh deployment. In addition, we also consider any vulnerability that might be exploited by
+untrusted upstreams as a serious consideration, given the use of Envoy as an egress proxy.
+
+The control plane management server is generally trusted. We do not consider wire-level exploits
+against the xDS transport protocol to be a concern as a result. However, the configuration delivered
+to Envoy over xDS may originate from untrusted sources and may not be fully sanitized. An example of
+this might be a service operator that hosts multiple tenants on an Envoy, where tenants may specify
+a regular expression on a header match in `RouteConfiguration`. In this case, we expect that Envoy
+is resilient against the risks posed by malicious configuration from a confidentiality, integrity
+and availability perspective, as described above.
 
 ### Fix Team Organization
 
