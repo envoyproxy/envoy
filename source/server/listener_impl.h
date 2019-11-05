@@ -66,7 +66,7 @@ public:
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   Network::Address::SocketType socketType() const { return socket_type_; }
-  const envoy::api::v2::Listener& config() { return config_; }
+  const envoy::api::v2::Listener& config() const { return config_; }
   const Network::SocketSharedPtr& getSocket() const { return socket_; }
   void debugLog(const std::string& message);
   void initialize();
@@ -74,7 +74,7 @@ public:
   void setSocket(const Network::SocketSharedPtr& socket);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
-  const std::string& versionInfo() { return version_info_; }
+  const std::string& versionInfo() const { return version_info_; }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
