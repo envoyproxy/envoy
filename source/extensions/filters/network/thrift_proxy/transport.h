@@ -98,6 +98,8 @@ public:
    */
   virtual std::string name() PURE;
 
+  static std::string category() { return "thrift_proxy.transports"; }
+
   /**
    * Convenience method to lookup a factory by type.
    * @param TransportType the transport type

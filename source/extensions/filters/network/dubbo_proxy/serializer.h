@@ -94,6 +94,8 @@ public:
    */
   virtual std::string name() PURE;
 
+  static std::string category() { return "dubbo_proxy.serializers"; }
+
   /**
    * Convenience method to lookup a factory by type.
    * @param TransportType the transport type

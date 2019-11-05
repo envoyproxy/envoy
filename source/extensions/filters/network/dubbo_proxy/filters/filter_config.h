@@ -49,6 +49,8 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "dubbo_proxy.filters"; }
 };
 
 } // namespace DubboFilters

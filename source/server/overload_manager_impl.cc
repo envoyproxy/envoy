@@ -1,6 +1,5 @@
 #include "server/overload_manager_impl.h"
 
-#include "envoy/registry/extensions_registry.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -249,8 +248,6 @@ void OverloadManagerImpl::Resource::onFailure(const EnvoyException& error) {
   ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.what());
   failed_updates_counter_.inc();
 }
-
-REGISTER_EXTENSION_FACTORY(Configuration::ResourceMonitorFactory, "resource_monitors");
 
 } // namespace Server
 } // namespace Envoy

@@ -142,6 +142,8 @@ public:
    * @return std::string the identifying name for a particular implementation of a cluster factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "clusters"; }
 };
 
 } // namespace Upstream

@@ -66,6 +66,8 @@ public:
    * monitor produced by the factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "resource_monitors"; }
 };
 
 } // namespace Configuration

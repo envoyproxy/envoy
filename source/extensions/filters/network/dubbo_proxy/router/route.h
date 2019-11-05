@@ -84,6 +84,8 @@ public:
    */
   virtual std::string name() PURE;
 
+  static std::string category() { return "dubbo_proxy.route_matchers"; }
+
   /**
    * Convenience method to lookup a factory by type.
    * @param RouteMatcherType the protocol type.

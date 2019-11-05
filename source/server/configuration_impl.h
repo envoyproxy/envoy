@@ -54,6 +54,8 @@ public:
    * factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "stats_sinks"; }
 };
 
 /**

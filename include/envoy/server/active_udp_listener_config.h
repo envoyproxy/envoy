@@ -27,6 +27,8 @@ public:
    * Used to identify which udp listener to create: quic or raw udp.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "udp_listeners"; }
 };
 
 } // namespace Server

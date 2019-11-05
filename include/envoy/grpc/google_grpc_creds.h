@@ -39,6 +39,8 @@ public:
    * a Google gRPC credentials factory.
    */
   virtual std::string name() const PURE;
+
+  static std::string category() { return "grpc_credentials"; }
 };
 
 } // namespace Grpc

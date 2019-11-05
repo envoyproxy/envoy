@@ -8,7 +8,6 @@
 
 #include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/network/connection.h"
-#include "envoy/registry/extensions_registry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/tracer_config.h"
@@ -155,9 +154,6 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
     Config::translateRuntime(bootstrap.runtime(), layered_runtime_);
   }
 }
-
-REGISTER_EXTENSION_FACTORY(Configuration::StatsSinkFactory, "stats_sinks");
-REGISTER_EXTENSION_FACTORY(Configuration::TracerFactory, "tracers");
 
 } // namespace Configuration
 } // namespace Server

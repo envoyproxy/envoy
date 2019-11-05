@@ -144,6 +144,8 @@ public:
   virtual Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
+
+  static std::string category() { return "transport_sockets.upstream"; }
 };
 
 /**
@@ -169,6 +171,8 @@ public:
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
+
+  static std::string category() { return "transport_sockets.downstream"; }
 };
 
 } // namespace Configuration

@@ -1,7 +1,5 @@
 #include "common/upstream/cluster_factory_impl.h"
 
-#include "envoy/registry/extensions_registry.h"
-
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
@@ -121,8 +119,6 @@ ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& cluster,
       context.outlierEventLogger()));
   return new_cluster_pair;
 }
-
-REGISTER_EXTENSION_FACTORY(ClusterFactory, "clusters");
 
 } // namespace Upstream
 } // namespace Envoy

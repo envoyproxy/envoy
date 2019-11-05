@@ -249,6 +249,8 @@ public:
   virtual Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+
+  static std::string category() { return "filters.listener"; }
 };
 
 /**
@@ -270,6 +272,8 @@ public:
   virtual Network::UdpListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+
+  static std::string category() { return "filters.udp_listener"; }
 };
 
 /**
@@ -348,6 +352,8 @@ public:
    */
   virtual std::string name() PURE;
 
+  static std::string category() { return "filters.network"; }
+
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
@@ -380,6 +386,8 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "filters.upstream_network"; }
 };
 
 /**
@@ -453,6 +461,8 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

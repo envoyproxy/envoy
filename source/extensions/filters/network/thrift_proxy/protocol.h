@@ -514,6 +514,8 @@ public:
    */
   virtual std::string name() PURE;
 
+  static std::string category() { return "thrift_proxy.protocols"; }
+
   /**
    * Convenience method to lookup a factory by type.
    * @param ProtocolType the protocol type

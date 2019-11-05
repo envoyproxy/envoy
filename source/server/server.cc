@@ -14,7 +14,7 @@
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
-#include "envoy/registry/extensions_registry.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -250,7 +250,7 @@ void InstanceImpl::initialize(const Options& options,
             restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
-  for (const auto& ext : Envoy::Registry::ExtensionFactoryRegistryRegistry::factories()) {
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::factories()) {
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
 

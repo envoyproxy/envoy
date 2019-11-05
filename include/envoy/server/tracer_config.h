@@ -40,6 +40,8 @@ public:
    * factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "tracers"; }
 };
 
 } // namespace Configuration

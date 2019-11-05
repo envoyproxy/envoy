@@ -18,6 +18,51 @@
 namespace Envoy {
 namespace Registry {
 
+template <class Base> class FactoryRegistry;
+
+/**
+ * Helper class to call `registeredNames` for a specialized
+ * FactoryRegistry.
+ */
+class BaseFactoryCategoryNames {
+public:
+  virtual ~BaseFactoryCategoryNames() = default;
+  virtual std::vector<absl::string_view> registeredNames() const PURE;
+};
+
+template <class Base> class FactoryCategoryNames : public BaseFactoryCategoryNames {
+public:
+  using FactoryRegistry = Envoy::Registry::FactoryRegistry<Base>;
+
+  std::vector<absl::string_view> registeredNames() const override {
+    return FactoryRegistry::registeredNames();
+  }
+};
+
+/**
+ * FactoryCategoryRegistry registers factory registries by their
+ * declared category. The category is exposed by a static category()
+ * method on the factory base type.
+ */
+class FactoryCategoryRegistry {
+public:
+  using MapType = absl::flat_hash_map<std::string, BaseFactoryCategoryNames*>;
+
+  static MapType& factories() {
+    static auto* factories = new MapType();
+    return *factories;
+  }
+
+  static bool isRegistered(absl::string_view category) { return factories().contains(category); }
+
+  static void registerCategory(absl::string_view category, BaseFactoryCategoryNames* factoryNames) {
+    auto result = factories().emplace(std::make_pair(category, factoryNames));
+    if (!result.second) {
+      throw EnvoyException(fmt::format("Double registration for category: '{}'", category));
+    }
+  }
+};
+
 // Forward declaration of test class for friend declaration below.
 template <typename T> class InjectFactory;
 
@@ -67,6 +112,16 @@ public:
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+    }
+
+    // Also register this factory with its category.
+    //
+    // Each time a factory registers, the registry will attempt to
+    // register its category here. This means that we have to ignore
+    // multiple attempts to register the same category and can't detect
+    // duplicate categories.
+    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
+      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
     }
   }
 

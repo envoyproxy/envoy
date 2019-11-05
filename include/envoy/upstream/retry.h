@@ -86,6 +86,8 @@ public:
 
   virtual std::string name() const PURE;
 
+  static std::string category() { return "retry_priorities"; }
+
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };
 
@@ -103,6 +105,8 @@ public:
    * @return name name of this factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "retry_host_predicates"; }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };

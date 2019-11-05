@@ -1,7 +1,7 @@
 #include "server/ssl_context_manager.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/registry/extensions_registry.h"
+#include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Server {
@@ -47,8 +47,6 @@ Ssl::ContextManagerPtr createContextManager(const std::string& factory_name,
 
   return std::make_unique<SslContextManagerNoTlsStub>();
 }
-
-REGISTER_EXTENSION_FACTORY(Ssl::ContextManagerFactory, "ssl_contexts");
 
 } // namespace Server
 } // namespace Envoy

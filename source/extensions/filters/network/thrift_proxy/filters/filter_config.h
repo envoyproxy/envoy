@@ -46,6 +46,8 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "thrift_proxy.filters"; }
 };
 
 } // namespace ThriftFilters

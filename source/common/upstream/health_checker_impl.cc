@@ -1,6 +1,5 @@
 #include "common/upstream/health_checker_impl.h"
 
-#include "envoy/registry/extensions_registry.h"
 #include "envoy/server/health_checker_config.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -801,8 +800,6 @@ std::ostream& operator<<(std::ostream& out, HealthTransition changed_state) {
   }
   return out;
 }
-
-REGISTER_EXTENSION_FACTORY(Server::Configuration::CustomHealthCheckerFactory, "health_checkers");
 
 } // namespace Upstream
 } // namespace Envoy

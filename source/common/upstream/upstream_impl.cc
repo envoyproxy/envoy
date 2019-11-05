@@ -12,7 +12,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
-#include "envoy/registry/extensions_registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -1435,9 +1434,6 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
     host->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
   }
 }
-
-REGISTER_EXTENSION_FACTORY(Server::Configuration::UpstreamTransportSocketConfigFactory,
-                           "transport_sockets.upstream");
 
 } // namespace Upstream
 } // namespace Envoy

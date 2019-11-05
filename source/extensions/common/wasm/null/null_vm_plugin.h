@@ -35,6 +35,8 @@ public:
    */
   virtual const std::string name() const PURE;
 
+  static std::string category() { return "null_vms"; }
+
   /**
    * Create an instance of the plugin.
    */
