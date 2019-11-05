@@ -348,6 +348,74 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   }
 }
 
+TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+    - name: cluster2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW(constructConfigFromV2Yaml(yaml, factory_context), EnvoyException);
+}
+
+TEST(ConfigTest, WeightedClustersConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+    - name: cluster2
+      weight: 2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+  EXPECT_EQ(std::string("cluster1"), config_obj.getRouteFromEntries(connection)->clusterName());
+
+  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+  EXPECT_EQ(std::string("cluster2"), config_obj.getRouteFromEntries(connection)->clusterName());
+}
+
+TEST(ConfigTest, RouteMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  const auto* criteria = config_obj.metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
 TEST(ConfigTest, HashWithSourceIpConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
