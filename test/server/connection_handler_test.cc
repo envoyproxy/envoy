@@ -25,6 +25,7 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -46,7 +47,8 @@ public:
                  Network::Address::SocketType socket_type,
                  std::chrono::milliseconds listener_filters_timeout,
                  bool continue_on_listener_filters_timeout)
-        : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
+        : parent_(parent), reuse_port_(false), reuse_port_socket_(new Network::MockListenSocket()),
+          tag_(tag), bind_to_port_(bind_to_port),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
@@ -65,6 +67,13 @@ public:
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::Socket& socket() override { return socket_; }
     const Network::Socket& socket() const override { return socket_; }
+    bool reusePort() override { return reuse_port_; }
+    Network::SocketSharedPtr createReusePortSocket() override {
+      if (reuse_port_) {
+        return reuse_port_socket_;
+      }
+      return nullptr;
+    }
     bool bindToPort() override { return bind_to_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
@@ -89,6 +98,8 @@ public:
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
+    bool reuse_port_;
+    Network::SocketSharedPtr reuse_port_socket_;
     uint64_t tag_;
     bool bind_to_port_;
     const bool hand_off_restored_destination_connections_;
@@ -250,6 +261,34 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
 
   handler_->disableListeners();
   handler_->addListener(*test_listener);
+}
+
+TEST_F(ConnectionHandlerTest, RemoveReusePortListener) {
+  InSequence s;
+
+  Network::MockListener* listener = new NiceMock<Network::MockListener>();
+  Network::ListenerCallbacks* listener_callbacks;
+  TestListener* test_listener = addListener(1, true, false, "test_listener");
+  test_listener->reuse_port_ = true;
+
+  // TestListener is not a mock, createReusePortSocket() should return reuse_port_socket_ here
+  EXPECT_CALL(dispatcher_, createListener_(Ref(*test_listener->reuse_port_socket_), _, _))
+      .WillOnce(
+          Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
+          }));
+
+  // ListenerConfig::socket() is still used to get the local address
+  EXPECT_CALL(test_listener->socket_, localAddress()).Times(1);
+  handler_->addListener(*test_listener);
+
+  // Test stop/remove of reuse port listener.
+  EXPECT_CALL(*listener, onDestroy());
+  handler_->stopListeners(1);
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  handler_->removeListeners(1);
 }
 
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {

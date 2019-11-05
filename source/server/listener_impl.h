@@ -160,6 +160,9 @@ private:
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
 
+  void applyListenSocketOptions(Network::Socket& socket,
+                                envoy::api::v2::core::SocketOption::SocketState state);
+
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;

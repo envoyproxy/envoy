@@ -67,6 +67,11 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
   const Network::Socket& socket() const override { return socket_; }
+  bool reusePort() override { return false; }
+  Network::SocketSharedPtr createReusePortSocket() override {
+    ASSERT_TRUE(false); // should be never called
+    return nullptr;
+  }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
@@ -917,6 +922,11 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
   const Network::Socket& socket() const override { return socket_; }
+  bool reusePort() override { return false; }
+  Network::SocketSharedPtr createReusePortSocket() override {
+    ASSERT_TRUE(false); // should be never called
+    return nullptr;
+  }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }

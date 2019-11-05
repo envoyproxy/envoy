@@ -116,7 +116,10 @@ private:
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
-    void destroy() override { listener_.reset(); }
+    void destroy() override {
+      listener_.reset();
+      socket_.reset();
+    }
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
@@ -146,7 +149,6 @@ private:
     std::atomic<uint64_t> num_listener_connections_{};
 
     Network::SocketSharedPtr socket_; // not null if 'reuse_socket' is set for listener.
-
   };
 
   /**

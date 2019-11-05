@@ -303,6 +303,8 @@ public:
   MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
   MOCK_METHOD0(socket, Socket&());
   MOCK_CONST_METHOD0(socket, const Socket&());
+  MOCK_METHOD0(reusePort, bool());
+  MOCK_METHOD0(createReusePortSocket, Network::SocketSharedPtr());
   MOCK_METHOD0(bindToPort, bool());
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());

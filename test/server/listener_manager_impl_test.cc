@@ -3206,6 +3206,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
                    ENVOY_SOCKET_TCP_FASTOPEN, /* expected_value */ 1);
 }
 
+// Validate that when reuse_port is set in the Listener, we see the socket option
+// propagated to setsockopt().
+TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabled) {
+  auto listener = createIPv4Listener("ReusePortListener");
+  listener.mutable_reuse_port()->set_value(true);
+  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                   ENVOY_SOCKET_SO_REUSEPORT, /* expected_value */ 1,
+                   /* expected_num_options */ 1);
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: SockoptsListener
@@ -3427,6 +3437,48 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_NO_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
+}
+
+// verify 'reuse_port' in listener config works
+TEST_F(ListenerManagerImplTest, AddReusePortListener) {
+
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  checkStats(1, 0, 0, 1, 0, 0);
+
+  EXPECT_CALL(*worker_, addListener(_, _))
+      .WillOnce(Invoke([this](Network::ListenerConfig& listener,
+                              MockWorker::AddListenerCompletion completion) -> void {
+        EXPECT_EQ(nullptr, worker_->add_listener_completion_);
+        worker_->add_listener_completion_ = completion;
+
+        EXPECT_TRUE(listener.reusePort());
+      }));
+
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(1, 0, 0, 0, 1, 0);
+  EXPECT_CALL(*listener_foo, onDestroy());
 }
 
 } // namespace

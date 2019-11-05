@@ -239,5 +239,9 @@ message Listener {
   // worker threads.
   ConnectionBalanceConfig connection_balance_config = 20;
 
+  // When this flag is set true, listeners sets *SO_REUSEPORT* socket option and
+  // create one socket for each worker thread, this makes inbound connections
+  // distributed among worker threads evenly. When this flag is set to false,
+  // all worker threads shares same socket.
   google.protobuf.BoolValue reuse_port = 21;
 }

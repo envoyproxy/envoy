@@ -37,7 +37,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
-      reuse_port_(config.has_reuse_port()),
+      reuse_port_(config.has_reuse_port() ? config.reuse_port().value() : false),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -303,30 +303,41 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
-    bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
-    const std::string message =
-        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
-    if (!ok) {
-      ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
-    } else {
-      ENVOY_LOG(debug, "{}", message);
-    }
-
-    // Add the options to the socket_ so that STATE_LISTENING options can be
-    // set in the worker after listen()/evconnlistener_new() is called.
-    socket_->addOptions(listen_socket_options_);
+    applyListenSocketOptions(*socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
   }
 }
 
 Network::SocketSharedPtr ListenerImpl::createReusePortSocket() {
   ASSERT(reusePort());
 
-  return parent_.factory_.createListenSocket(socket_->localAddress(),
-                socket_type_,
-                listen_socket_options_,
-                bind_to_port_);
+  auto socket = parent_.factory_.createListenSocket(socket_->localAddress(), socket_type_,
+                                                    listen_socket_options_, bind_to_port_);
+
+  applyListenSocketOptions(*socket, envoy::api::v2::core::SocketOption::STATE_BOUND);
+
+  return socket;
+}
+
+void ListenerImpl::applyListenSocketOptions(Network::Socket& socket,
+                                            envoy::api::v2::core::SocketOption::SocketState state) {
+
+  if (!listen_socket_options_) {
+    return;
+  }
+
+  bool ok = Network::Socket::applyOptions(listen_socket_options_, socket, state);
+  const std::string message =
+      fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+  if (!ok) {
+    ENVOY_LOG(warn, "{}", message);
+    throw EnvoyException(message);
+  } else {
+    ENVOY_LOG(debug, "{}", message);
+  }
+
+  // Add the options to the socket_ so that STATE_LISTENING options can be
+  // set in the worker after listen()/evconnlistener_new() is called.
+  socket_->addOptions(listen_socket_options_);
 }
 
 } // namespace Server

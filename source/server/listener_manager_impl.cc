@@ -352,7 +352,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       draining_listener_socket = existing_draining_listener->listener_->getSocket();
     }
 
-    // Still need to create a socket here, considering if port is 0, a random number
+    // If port is 0,sStill need to create a socket here, considering a random number
     // will be assigned, all worker threads should use the assigned number
     new_listener->setSocket(draining_listener_socket
                                 ? draining_listener_socket
