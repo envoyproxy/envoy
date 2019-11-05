@@ -516,6 +516,14 @@ public:
    */
   virtual MetadataMatchCriteriaConstPtr
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
+
+  /**
+   * Creates a new MetadataMatchCriteria with criteria vector reduced to given names
+   * @param names names of metadata keys to preserve
+   * @return MetadataMatchCriteriaConstPtr the result criteria.
+   */
+  virtual MetadataMatchCriteriaConstPtr
+  filterMatchCriteria(const std::set<std::string>& names) const PURE;
 };
 
 class TlsContextMatchCriteria {

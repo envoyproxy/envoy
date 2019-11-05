@@ -19,6 +19,9 @@ public:
         new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
   }
 
+  MetadataMatchCriteriaConstPtr
+  filterMatchCriteria(const std::set<std::string>& names) const override;
+
   // MetadataMatchCriteria
   const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
     return metadata_match_criteria_;

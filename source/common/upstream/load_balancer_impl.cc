@@ -775,5 +775,29 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
   return hosts_to_use[random_.random() % hosts_to_use.size()];
 }
 
+void LoadBalancerSubsetInfoImpl::validateSelector(const SubsetSelector& selector) const {
+  if (selector.fallback_policy_ !=
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
+    if (!selector.fallback_keys_subset_.empty()) {
+      throw EnvoyException("fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+    }
+    return;
+  }
+
+  if (selector.fallback_keys_subset_.empty()) {
+    throw EnvoyException("fallback_keys_subset cannot be empty");
+  }
+
+  if (!std::includes(selector.selector_keys_.begin(), selector.selector_keys_.end(),
+                     selector.fallback_keys_subset_.begin(),
+                     selector.fallback_keys_subset_.end())) {
+    throw EnvoyException("fallback_keys_subset should be a subset of selector keys");
+  }
+
+  if (selector.selector_keys_.size() == selector.fallback_keys_subset_.size()) {
+    throw EnvoyException("fallback_keys_subset cannot be equal to keys");
+  }
+}
+
 } // namespace Upstream
 } // namespace Envoy

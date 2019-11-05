@@ -494,9 +494,13 @@ public:
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(
+        auto selector =
             SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
-                           subset.fallback_policy()}));
+                           subset.fallback_policy(),
+                           std::set<std::string>(subset.fallback_keys_subset().begin(),
+                                                 subset.fallback_keys_subset().end())};
+        validateSelector(selector);
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(selector));
       }
     }
   }
@@ -516,6 +520,7 @@ public:
   bool listAsAny() const override { return list_as_any_; }
 
 private:
+  void validateSelector(const SubsetSelector& selector) const;
   const bool enabled_;
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;

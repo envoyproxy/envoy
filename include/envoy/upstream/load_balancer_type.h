@@ -29,6 +29,7 @@ struct SubsetSelector {
   std::set<std::string> selector_keys_;
   envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
       fallback_policy_;
+  std::set<std::string> fallback_keys_subset_;
 };
 
 using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;

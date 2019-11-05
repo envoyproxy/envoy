@@ -1563,6 +1563,98 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
             envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 }
 
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetFallbackValid) {
+  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto selector1 = subset_config.mutable_subset_selectors()->Add();
+  selector1->add_keys("key1");
+  selector1->add_keys("key2");
+  selector1->add_keys("key3");
+  selector1->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector1->add_fallback_keys_subset("key1");
+  selector1->add_fallback_keys_subset("key3");
+
+  auto selector2 = subset_config.mutable_subset_selectors()->Add();
+  selector2->add_keys("key1");
+  selector2->add_keys("key3");
+  selector2->add_keys("key4");
+  selector2->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector2->add_fallback_keys_subset("key4");
+
+  auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
+
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy_,
+            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys_,
+            std::set<std::string>({"key1", "key2", "key3"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_keys_subset_,
+            std::set<std::string>({"key1", "key3"}));
+
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy_,
+            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys_,
+            std::set<std::string>({"key1", "key3", "key4"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_keys_subset_,
+            std::set<std::string>({"key4"}));
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetForOtherPolicyInvalid) {
+  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+  selector->add_fallback_keys_subset("key1");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetNotASubsetInvalid) {
+  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector->add_fallback_keys_subset("key3");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset should be a subset of selector keys");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEmptyInvalid) {
+  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset cannot be empty");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEqualKeysInvalid) {
+  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector->add_fallback_keys_subset("key2");
+  selector->add_fallback_keys_subset("key1");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset cannot be equal to keys");
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
