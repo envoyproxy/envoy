@@ -187,7 +187,6 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   if (value == Address) {
     if (local_) {
       return CelValue::CreateString(info_.downstreamLocalAddress()->asStringView());
-
     } else {
       return CelValue::CreateString(info_.downstreamRemoteAddress()->asStringView());
     }
