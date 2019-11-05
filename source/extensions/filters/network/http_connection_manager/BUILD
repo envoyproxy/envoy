@@ -27,7 +27,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",

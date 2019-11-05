@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/fmt.h"
-#include "common/config/filter_json.h"
 
 #include "extensions/filters/network/mongo_proxy/proxy.h"
 
@@ -40,14 +39,6 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
         stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
         context.drainDecision(), context.dispatcher().timeSource(), emit_dynamic_metadata, stats));
   };
-}
-
-Network::FilterFactoryCb
-MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                                   Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::mongo_proxy::v2::MongoProxy proto_config;
-  Config::FilterJson::translateMongoProxy(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
 /**
