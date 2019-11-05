@@ -256,7 +256,7 @@ public:
   absl::string_view value(const CustomTagContext&) const override { return default_value_; }
   const envoy::api::v2::core::Metadata* metadata(const CustomTagContext& ctx) const;
   std::string toString() const override {
-    return fmt::format("METADATA|{}|{}|{}|{}|{}", source_, tag_, metadata_key_.filter_,
+    return fmt::format("METADATA|{}|{}|{}|{}|{}", kind_, tag_, metadata_key_.filter_,
                        absl::StrJoin(metadata_key_.path_, "."), default_value_);
   }
 
