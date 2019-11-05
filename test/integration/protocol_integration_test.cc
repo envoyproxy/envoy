@@ -422,6 +422,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
 
   // Note how we're expecting each upstream request to hit the same upstream.
   auto upstream_idx = waitForNextUpstreamRequest({0, 1});
+  ASSERT_LT(upstream_idx, fake_upstreams_.size());
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
   if (fake_upstreams_[upstream_idx]->httpType() == FakeHttpConnection::Type::HTTP1) {
