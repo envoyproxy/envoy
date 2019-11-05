@@ -22,16 +22,16 @@ namespace MongoProxy {
 class Message {
 public:
   enum class OpCode {
-    OP_REPLY = 1,
-    OP_MSG = 1000,
-    OP_UPDATE = 2001,
-    OP_INSERT = 2002,
-    OP_QUERY = 2004,
-    OP_GET_MORE = 2005,
-    OP_DELETE = 2006,
-    OP_KILL_CURSORS = 2007,
-    OP_COMMAND = 2010,
-    OP_COMMANDREPLY = 2011
+    Reply = 1,
+    Msg = 1000,
+    Update = 2001,
+    Insert = 2002,
+    Query = 2004,
+    GetMore = 2005,
+    Delete = 2006,
+    KillCursors = 2007,
+    Command = 2010,
+    CommandReply = 2011
   };
 
   virtual ~Message() = default;

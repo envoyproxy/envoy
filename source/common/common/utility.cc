@@ -362,15 +362,6 @@ size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
   return strlen(src);
 }
 
-std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
-  std::ostringstream buf;
-  std::copy(source.begin(), source.end(),
-            std::ostream_iterator<std::string>(buf, delimiter.c_str()));
-  std::string ret = buf.str();
-  // copy will always end with an extra delimiter, we remove it here.
-  return ret.substr(0, ret.length() - delimiter.length());
-}
-
 std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {
   return std::string(source.data() + start, end - start);
 }

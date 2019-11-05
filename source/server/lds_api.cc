@@ -11,6 +11,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Server {
 

@@ -40,5 +40,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ratelimit:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
     ],
 )

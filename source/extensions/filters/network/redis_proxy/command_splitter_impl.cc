@@ -338,6 +338,8 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
     break;
   }
   case Common::Redis::RespType::Null:
+  case Common::Redis::RespType::CompositeArray: // TODO(hyang): remove this after composite array is
+                                                // actually used.
     break;
   }
 

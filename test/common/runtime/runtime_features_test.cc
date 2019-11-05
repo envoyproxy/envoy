@@ -22,7 +22,7 @@ protected:
   NiceMock<MockLoader> runtime_;
 };
 
-TEST_F(FeatureFlagTest, BasicTest) {
+TEST_F(FeatureFlagTest, FeatureFlagBasicTest) {
   envoy::api::v2::core::RuntimeFeatureFlag feature_flag_proto;
   std::string yaml(R"EOF(
 runtime_key: "foo.bar"
@@ -52,12 +52,58 @@ default_value: false
   EXPECT_EQ(true, test_feature2.enabled());
 }
 
-TEST_F(FeatureFlagTest, EmptyProtoTest) {
+TEST_F(FeatureFlagTest, FeatureFlagEmptyProtoTest) {
   envoy::api::v2::core::RuntimeFeatureFlag empty_proto;
   FeatureFlag test(empty_proto, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_, getBoolean("", true));
   EXPECT_EQ(true, test.enabled());
+}
+
+TEST_F(FeatureFlagTest, FractionalPercentBasicTest) {
+  envoy::api::v2::core::RuntimeFractionalPercent runtime_fractional_percent_proto;
+  std::string yaml(R"EOF(
+runtime_key: "foo.bar"
+default_value:
+  numerator: 100
+  denominator: HUNDRED
+)EOF");
+  TestUtility::loadFromYamlAndValidate(yaml, runtime_fractional_percent_proto);
+  FractionalPercent test_fractional_percent(runtime_fractional_percent_proto, runtime_);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("foo.bar",
+                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+  EXPECT_EQ(true, test_fractional_percent.enabled());
+
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("foo.bar",
+                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(false));
+  EXPECT_EQ(false, test_fractional_percent.enabled());
+
+  envoy::api::v2::core::RuntimeFractionalPercent runtime_fractional_percent_proto2;
+  yaml = (R"EOF(
+runtime_key: "foo.bar"
+default_value:
+  numerator: 0
+  denominator: HUNDRED
+)EOF");
+  TestUtility::loadFromYamlAndValidate(yaml, runtime_fractional_percent_proto2);
+  FractionalPercent test_fractional_percent2(runtime_fractional_percent_proto2, runtime_);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("foo.bar",
+                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
+      .WillOnce(Return(true));
+  EXPECT_EQ(true, test_fractional_percent2.enabled());
+
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("foo.bar",
+                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
+      .WillOnce(Return(false));
+  EXPECT_EQ(false, test_fractional_percent2.enabled());
 }
 
 } // namespace
