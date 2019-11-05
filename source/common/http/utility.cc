@@ -418,10 +418,10 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
 
     // If the Connection token value is not a nominated header, ignore it here since
     // the connection header is removed elsewhere when the H1 request is upgraded to H2
-    if (StringUtil::CaseInsensitiveCompare()(token_sv, cv.Close) ||
-        StringUtil::CaseInsensitiveCompare()(token_sv, cv.Http2Settings) ||
-        StringUtil::CaseInsensitiveCompare()(token_sv, cv.KeepAlive) ||
-        StringUtil::CaseInsensitiveCompare()(token_sv, cv.Upgrade)) {
+    if ((lcs_header_to_remove == LowerCaseString(cv.Close)) ||
+        (lcs_header_to_remove == LowerCaseString(cv.Http2Settings)) ||
+        (lcs_header_to_remove == LowerCaseString(cv.KeepAlive)) ||
+        (lcs_header_to_remove == LowerCaseString(cv.Upgrade))) {
       continue;
     }
 
