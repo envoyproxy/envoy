@@ -11,6 +11,7 @@ import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
+import "envoy/type/format.proto";
 import "envoy/type/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -23,7 +24,7 @@ import "validate/validate.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -467,6 +468,36 @@ message HttpConnectionManager {
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
+
+  // [#not-implemented-hide:]
+  // Configuration of local reply returned by Envoy. Allows to specify mappings and format of
+  // response.
+  LocalReplyConfig local_reply_config = 36;
+}
+
+message LocalReplyConfig {
+  // Configuration of list of mappers which allows to filter and change local response.
+  // The client will iterate through mappers until first match.
+  repeated ResponseMapper mapper = 1;
+
+  // Allows to define custom format of local reply.
+  // It is allowed to use :ref:`command operators <config_access_log_command_operators>`
+  // which will be resolved to actual data.
+  type.StringOrJson format = 2;
+}
+
+message ResponseMapper {
+  // Filter is used to determine if the response should be changed.
+  accesslog.v2.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
+
+  // Rewriter defines which values in local reply should be changed.
+  ResponseRewriter rewriter = 2 [(validate.rules).message = {required: true}];
+}
+
+// Configuration of new value for matched local response.
+message ResponseRewriter {
+  // Status code for matched response.
+  google.protobuf.UInt32Value status_code = 1;
 }
 
 message Rds {

@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package envoy.type;
+
+option java_outer_classname = "FormatProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.type";
+
+import "google/protobuf/struct.proto";
+
+// [#protodoc-title: Format]
+
+// Allows to define one of format: flat plain text or structured json.
+message StringOrJson {
+  oneof format {
+    // Allows to specify flat plain text format.
+    //
+    // .. code-block:: yaml
+    //
+    //   string_format: "My custom message"
+    //
+    string string_format = 1;
+
+    // Allows to specify structured data as json.
+    //
+    // .. code-block:: yaml
+    //
+    //  json_format:
+    //    protocol: "HTTP/1.1"
+    //    message: "My message"
+    //
+    // The following JSON object would be created:
+    //
+    // .. code-block:: json
+    //
+    //  {
+    //    "protocol": "HTTP/1.1",
+    //    "message": "My message"
+    //  }
+    //
+    google.protobuf.Struct json_format = 2;
+  }
+}

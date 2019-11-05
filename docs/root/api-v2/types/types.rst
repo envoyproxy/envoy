@@ -5,6 +5,7 @@ Types
   :glob:
   :maxdepth: 2
 
+  ../type/format.proto
   ../type/hash_policy.proto
   ../type/http.proto
   ../type/http_status.proto
