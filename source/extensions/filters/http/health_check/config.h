@@ -15,10 +15,6 @@ class HealthCheckFilterConfig
 public:
   HealthCheckFilterConfig() : FactoryBase(HttpFilterNames::get().HealthCheck) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string&,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,

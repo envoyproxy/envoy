@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/api/v2/core/address.pb.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 
 #include "absl/strings/string_view.h"

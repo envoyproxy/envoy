@@ -8,7 +8,7 @@ index 35c77d1d..47bd63f5 100644
    # Set it to "int" to match the behavior of AC_TYPE_SSIZE_T (autotools).
 -  set(ssize_t int)
 +  if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
-+    set(ssize_t int64_t)
++    set(ssize_t ptrdiff_t)
 +  else()
 +    set(ssize_t int)
 +  endif()
