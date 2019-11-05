@@ -59,11 +59,11 @@ class Drainer;
 class UpstreamDrainManager;
 
 /**
- * RouteEntry is an individual resolved route entry.
+ * Route is an individual resolved route for a connection.
  */
-class RouteEntry {
+class Route {
 public:
-  virtual ~RouteEntry() = default;
+  virtual ~Route() = default;
 
   /**
    * @return const std::string& the upstream cluster that owns the route.
@@ -75,19 +75,6 @@ public:
    * selecting an upstream host
    */
   virtual const Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
-};
-
-/**
- * Route holds the RouteEntry for a connection.
- */
-class Route {
-public:
-  virtual ~Route() = default;
-
-  /**
-   * @return the route entry or nullptr if there is no route for the connection.
-   */
-  virtual const RouteEntry* routeEntry() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
@@ -151,19 +138,16 @@ public:
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
-  struct RouteImpl : public RouteEntry, public Route {
+  struct RouteImpl : public Route {
     RouteImpl(const Config& parent,
               const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
                   config);
 
-    // RouteEntry
+    // Route
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_.metadataMatchCriteria();
     }
-
-    // Route
-    const RouteEntry* routeEntry() const override { return this; }
 
     const Config& parent_;
     Network::Address::IpList source_ips_;
@@ -174,7 +158,7 @@ private:
   };
   using RouteImplConstSharedPtr = std::shared_ptr<const RouteImpl>;
 
-  class WeightedClusterEntry : public RouteEntry, public Route {
+  class WeightedClusterEntry : public Route {
   public:
     WeightedClusterEntry(const Config& parent,
                          const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::
@@ -182,7 +166,7 @@ private:
 
     uint64_t clusterWeight() const { return cluster_weight_; }
 
-    // RouteEntry
+    // Route
     const std::string& clusterName() const override { return cluster_name_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
       if (metadata_match_criteria_) {
@@ -190,9 +174,6 @@ private:
       }
       return parent_.metadataMatchCriteria();
     }
-
-    // Route
-    const RouteEntry* routeEntry() const override { return this; }
 
   private:
     const Config& parent_;
@@ -256,8 +237,8 @@ public:
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_ && route_->routeEntry()) {
-      return route_->routeEntry()->metadataMatchCriteria();
+    if (route_) {
+      return route_->metadataMatchCriteria();
     }
     return nullptr;
   }

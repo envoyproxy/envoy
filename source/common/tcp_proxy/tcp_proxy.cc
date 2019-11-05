@@ -364,8 +364,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   route_ = pickRoute();
 
-  const std::string& cluster_name =
-      route_ && route_->routeEntry() ? route_->routeEntry()->clusterName() : EMPTY_STRING;
+  const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
 
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 

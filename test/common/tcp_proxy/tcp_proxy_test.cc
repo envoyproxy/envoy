@@ -192,7 +192,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.10");
     EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -200,8 +200,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.11");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -209,7 +208,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
     EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -217,8 +216,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -226,7 +224,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.11.11.11");
     EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -234,8 +232,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.12.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -243,7 +240,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11");
     EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -251,8 +248,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -260,7 +256,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("128.255.255.255");
     EXPECT_EQ(std::string("with_destination_ip_list"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -268,7 +264,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 12345);
     EXPECT_EQ(std::string("with_destination_ports"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -276,8 +272,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -286,7 +281,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23459);
     EXPECT_EQ(std::string("with_source_ports"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -294,8 +289,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23458);
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -305,7 +299,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("20.0.0.0", 20000);
     EXPECT_EQ(std::string("with_everything"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -314,8 +308,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("30.0.0.0", 20000);
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -323,7 +316,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("::1");
     EXPECT_EQ(std::string("with_v6_destination"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -332,7 +325,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.local_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::");
     EXPECT_EQ(std::string("with_v6_destination"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -343,7 +336,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2003:0:0:0:0::5");
     EXPECT_EQ(std::string("with_v6_source_and_destination"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -351,8 +344,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("2004::");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv6Instance>("::");
-    EXPECT_EQ(std::string("catch_all"),
-              config_obj.getRouteFromEntries(connection)->routeEntry()->clusterName());
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 }
 
@@ -557,8 +549,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DefaultRoutes)) {
   configure(config);
 
   NiceMock<Network::MockConnection> connection;
-  EXPECT_EQ(std::string("fake_cluster"),
-            config_->getRouteFromEntries(connection)->routeEntry()->clusterName());
+  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection)->clusterName());
 }
 
 // Tests that half-closes are proxied and don't themselves cause any connection to be closed.
