@@ -393,7 +393,7 @@ void InstanceImpl::initialize(const Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
 
-  // TODO Add config option to enable use of UpstreamConnectionPoolThread.  Disable by default.
+  // TODO Add config option to enable use of UpstreamConnectionPoolThread. Disable by default.
   upstream_connection_pool_thread_ =
       std::make_unique<Upstream::UpstreamConnectionPoolThread>(*api_);
   upstream_connection_pool_thread_->start();

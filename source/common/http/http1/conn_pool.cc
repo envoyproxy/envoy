@@ -32,7 +32,8 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            const Http::Http1Settings& settings,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
-      upstream_pool_(upstream_pool), socket_options_(options), transport_socket_options_(transport_socket_options),
+      upstream_pool_(upstream_pool), socket_options_(options),
+      transport_socket_options_(transport_socket_options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })),
       settings_(settings) {}
 
@@ -254,7 +255,7 @@ void ConnPoolImpl::onUpstreamReady() {
     while (!ready_clients_.empty()) {
       ActiveClient& client = *ready_clients_.front();
       if (!client.canDetach()) {
-        // TODO do this transfer in a more elegant way.  Perhaps have delay
+        // TODO do this transfer in a more elegant way. Perhaps have delay
         // reuse clients in a separate list and go through some process to move
         // them to either ready_clients_ or upstream_pool_.
         break;

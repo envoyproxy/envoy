@@ -104,7 +104,7 @@ public:
   /**
    * Clears the callbacks associated with this transport socket in preparation
    * for transferring ownership of the transport socket object, possibly across
-   * threads.  Only supported if canDetach() returns true.
+   * threads. Only supported if canDetach() returns true.
    */
   virtual void clearTransportSocketCallbacks() PURE;
 

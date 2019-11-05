@@ -150,7 +150,8 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Http::Http1Settings& settings,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-      : ConnPoolImpl(dispatcher, host, priority, upstream_pool, options, settings, transport_socket_options) {}
+      : ConnPoolImpl(dispatcher, host, priority, upstream_pool, options, settings,
+                     transport_socket_options) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data,

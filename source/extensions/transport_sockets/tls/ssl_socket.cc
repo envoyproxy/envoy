@@ -84,7 +84,7 @@ void SslSocket::clearTransportSocketCallbacks() {
 
 bool SslSocket::canDetach() const {
   // Private key method providers have references to the connection's
-  // dispatcher.  For that reason, we currently do not support changing the
+  // dispatcher. For that reason, we currently do not support changing the
   // dispatcher associated with the transport socket if private key method
   // providers are in use.
   return ctx_->getPrivateKeyMethodProviders().empty();
