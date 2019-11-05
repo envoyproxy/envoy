@@ -28,13 +28,13 @@ function setup_gcc_toolchain() {
 function setup_clang_toolchain() {
   ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
-    if [[ "${ENVOY_STDLIB}" == "libc++" ]];
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
       export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
     else
       export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
     fi
   else
-    if [[ "${ENVOY_STDLIB}" == "libc++" ]];
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
       export BAZEL_BUILD_OPTIONS="--config=remote-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
     else
       export BAZEL_BUILD_OPTIONS="--config=remote-clang ${BAZEL_BUILD_OPTIONS}"
