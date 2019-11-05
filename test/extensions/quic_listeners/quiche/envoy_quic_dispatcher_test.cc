@@ -41,7 +41,7 @@ namespace quic {
 namespace test {
 
 // TODO(bencebeky): Remove this class and move necessary methods
-// to quiche/quic/test_tools/quic_dispatcher.h.
+// to quiche/quic/test_tools/quic_dispatcher_peer.h.
 class QuicDispatcherPeer {
 public:
   static quic::QuicTimeWaitListManager* time_wait_list_manager(QuicDispatcher* dispatcher) {
