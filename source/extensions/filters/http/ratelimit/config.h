@@ -20,10 +20,6 @@ class RateLimitFilterConfig
 public:
   RateLimitFilterConfig() : FactoryBase(HttpFilterNames::get().RateLimit) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string&,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::rate_limit::v2::RateLimit& proto_config,

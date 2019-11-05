@@ -37,5 +37,16 @@ Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& hea
 
 Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block);
 
+spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers);
+
+// Called when Envoy wants to reset the underlying QUIC stream.
+quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason);
+
+// Called when a RST_STREAM frame is received.
+Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode rst_err);
+
+// Called when underlying QUIC connection is closed either locally or by peer.
+Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);
+
 } // namespace Quic
 } // namespace Envoy

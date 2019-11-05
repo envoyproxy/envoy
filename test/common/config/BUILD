@@ -257,21 +257,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "rds_json_test",
-    srcs = ["rds_json_test.cc"],
-    deps = [
-        "//source/common/config:rds_json_lib",
-        "//source/common/json:json_loader_lib",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "runtime_utility_test",
     srcs = ["runtime_utility_test.cc"],
     deps = [
@@ -307,17 +292,6 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "filter_json_test",
-    srcs = ["filter_json_test.cc"],
-    deps = [
-        "//source/common/config:filter_json_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )
 

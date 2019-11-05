@@ -169,16 +169,6 @@ public:
       const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
-   * Convert a v1 RDS JSON config to v2 RDS
-   * envoy::config::filter::network::http_connection_manager::v2::Rds.
-   * @param json_rds source v1 RDS JSON config.
-   * @param rds destination v2 RDS envoy::config::filter::network::http_connection_manager::v2::Rds.
-   */
-  static void
-  translateRdsConfig(const Json::Object& json_rds,
-                     envoy::config::filter::network::http_connection_manager::v2::Rds& rds);
-
-  /**
    * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
    * @param api_config_source ApiConfigSource.
    * @return RateLimitSettings.
@@ -287,11 +277,6 @@ public:
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
-
-  /**
-   * Return whether v1-style JSON filter config loading is allowed via 'deprecated_v1: true'.
-   */
-  static bool allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config);
 
   /**
    * Verify any any filter designed to be terminal is configured to be terminal, and vice versa.
