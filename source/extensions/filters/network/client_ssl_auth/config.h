@@ -19,11 +19,6 @@ class ClientSslAuthConfigFactory
 public:
   ClientSslAuthConfigFactory() : FactoryBase(NetworkFilterNames::get().ClientSslAuth) {}
 
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,

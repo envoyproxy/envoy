@@ -23,12 +23,6 @@ public:
                                              Server::Configuration::FactoryContext& context) PURE;
 
   Http::FilterFactoryCb
-  createFilterFactory(const Json::Object&, const std::string& stat_prefix,
-                      Server::Configuration::FactoryContext& context) override {
-    return createFilter(stat_prefix, context);
-  }
-
-  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) override {
     return createFilter(stat_prefix, context);
