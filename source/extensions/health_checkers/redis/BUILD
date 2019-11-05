@@ -19,7 +19,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/health_checker/redis/v2:pkg_cc_proto",
     ],
 )

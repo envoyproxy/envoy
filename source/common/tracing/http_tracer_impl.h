@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -260,7 +261,7 @@ public:
   }
 
 protected:
-  envoy::type::tracing::v2::CustomTag::Metadata::SourceCase source_;
+  envoy::type::metadata::v2::MetadataKind::KindCase kind_;
   Envoy::Config::MetadataKey metadata_key_;
   std::string default_value_;
 };

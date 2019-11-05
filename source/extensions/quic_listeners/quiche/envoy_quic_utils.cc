@@ -1,7 +1,5 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
-#include <sys/socket.h>
-
 namespace Envoy {
 namespace Quic {
 

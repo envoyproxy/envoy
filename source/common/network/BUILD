@@ -211,7 +211,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

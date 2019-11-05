@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:google_grpc_creds_lib",
         "//source/extensions/grpc_credentials:well_known_names",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/grpc_credential/v2alpha:pkg_cc_proto",
     ],
 )

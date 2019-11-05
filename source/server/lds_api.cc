@@ -11,6 +11,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -75,8 +77,8 @@ void LdsApiImpl::onConfigUpdate(
   }
   init_target_.ready();
   if (!exception_msgs.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+    throw EnvoyException(
+        fmt::format("Error adding/updating listener(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
 }
 

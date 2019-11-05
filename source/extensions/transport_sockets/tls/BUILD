@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 
@@ -103,7 +104,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 
