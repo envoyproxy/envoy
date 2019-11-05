@@ -7,6 +7,7 @@
 #include "test/test_common/logging.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -32,7 +33,7 @@ protected:
     for (const auto& item : items) {
       accum.push_back(absl::StrCat(item.second, ": ", item.first));
     }
-    return StringUtil::join(accum, " ");
+    return absl::StrJoin(accum, " ");
   }
 
   RecentLookups recent_lookups_;

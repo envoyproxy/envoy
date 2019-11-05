@@ -63,8 +63,10 @@ enum ResponseFlag {
   StreamIdleTimeout = 0x10000,
   // Request specified x-envoy-* header values that failed strict header checks.
   InvalidEnvoyRequestHeaders = 0x20000,
+  // Downstream request had an HTTP protocol error
+  DownstreamProtocolError = 0x40000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = InvalidEnvoyRequestHeaders
+  LastFlag = DownstreamProtocolError
 };
 
 /**
@@ -354,6 +356,11 @@ public:
    * @return whether any response flag is set or not.
    */
   virtual bool hasAnyResponseFlag() const PURE;
+
+  /**
+   * @return response flags encoded as an integer.
+   */
+  virtual uint64_t responseFlags() const PURE;
 
   /**
    * @return upstream host description.

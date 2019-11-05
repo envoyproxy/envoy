@@ -1,20 +1,5 @@
 #include "common/network/utility.h"
 
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-
-#if defined(__linux__)
-#include <linux/netfilter_ipv4.h>
-#endif
-
-#ifndef IP6T_SO_ORIGINAL_DST
-// From linux/netfilter_ipv6/ip6_tables.h
-#define IP6T_SO_ORIGINAL_DST 80
-#endif
-
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <cstdint>
 #include <list>
 #include <sstream>
@@ -22,18 +7,18 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
-#include "common/common/utility.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/network/io_socket_error_impl.h"
-
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
+#include "common/network/address_impl.h"
+#include "common/network/io_socket_error_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "absl/strings/match.h"
 

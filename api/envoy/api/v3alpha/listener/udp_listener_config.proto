@@ -13,6 +13,10 @@ import "google/protobuf/struct.proto";
 // Listener :ref:`configuration overview <config_listeners>`
 
 message UdpListenerConfig {
+  reserved 2;
+
+  reserved "config";
+
   // Used to look up UDP listener factory, matches "raw_udp_listener" or
   // "quic_listener" to create a specific udp listener.
   // If not specified, treat as "raw_udp_listener".
@@ -21,8 +25,6 @@ message UdpListenerConfig {
   // Used to create a specific listener factory. To some factory, e.g.
   // "raw_udp_listener", config is not needed.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 3;
   }
 }

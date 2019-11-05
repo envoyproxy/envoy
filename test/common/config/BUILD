@@ -8,11 +8,9 @@ load(
     "envoy_proto_library",
 )
 load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
-    "envoy_windows_extensions",
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
-load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -97,7 +95,28 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "new_grpc_mux_impl_test",
+    srcs = ["new_grpc_mux_impl_test.cc"],
+    deps = [
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -110,6 +129,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -216,7 +236,6 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -250,21 +269,6 @@ envoy_cc_test(
         "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:registry_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "rds_json_test",
-    srcs = ["rds_json_test.cc"],
-    deps = [
-        "//source/common/config:rds_json_lib",
-        "//source/common/json:json_loader_lib",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -308,15 +312,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "filter_json_test",
-    srcs = ["filter_json_test.cc"],
-    deps = [
-        "//source/common/config:filter_json_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
 envoy_proto_library(
     name = "dummy_config_proto",
     srcs = ["dummy_config.proto"],
@@ -334,13 +329,15 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
+    extension_name = "envoy.extensions.common.crypto.utility_lib",
     deps = [
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

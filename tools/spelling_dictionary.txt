@@ -85,6 +85,7 @@ FAQ
 FASTOPEN
 FCDS
 FFFF
+FIN
 FIPS
 FQDN
 FREEBIND
@@ -758,6 +759,7 @@ parseable
 parsers
 passphrase
 passthrough
+pathname
 pausable
 pcall
 pcap
@@ -1021,6 +1023,7 @@ un
 unacked
 unary
 uncomment
+uncommented
 unconfigurable
 unconfigured
 uncontended

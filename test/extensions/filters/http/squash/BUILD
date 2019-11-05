@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.squash",
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "//source/common/config:filter_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/squash:squash_filter_lib",
@@ -45,5 +44,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/squash:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/squash/v2:pkg_cc_proto",
     ],
 )

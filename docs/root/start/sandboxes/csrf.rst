@@ -36,7 +36,7 @@ The following documentation runs through the setup of both services.
 
 Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
 
-A simple way to achieve this is via the `Docker Toolbox <https://www.docker.com/products/docker-toolbox>`_.
+A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
 **Step 2: Clone the Envoy repo and start all of our containers**
 

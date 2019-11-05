@@ -23,8 +23,11 @@ master commit at which the binary was compiled, and `latest` corresponds to a bi
 Currently there are three build images:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) with GCC 7 and Clang 8 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 7 and Clang 8 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) with GCC 7 and Clang 9 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 7 and Clang 9 compiler, this image is experimental and not well tested.
+
+The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+repository.
 
 We use the Clang compiler for all CI runs with tests. We have an additional CI run with GCC which builds binary only.
 
@@ -134,7 +137,7 @@ Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](ht
 which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
 on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy. If Envoy cannot be built (`error: /Library/Developer/CommandLineTools/usr/bin/libtool: no output file specified (specify with -o output)`),
-ensure that XCode is installed.
+ensure that Xcode is installed.
 
 # Coverity Scan Build Flow
 
