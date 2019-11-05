@@ -572,7 +572,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
   // We should end up with only one frame here.
   std::vector<Grpc::Frame> decoded_frames;
   if (!decoder_.decode(data, decoded_frames)) {
-    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "gRPC wire protocol decode error", false);
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "gRPC wire protocol decode error",
+                  false);
   }
   for (auto& frame : decoded_frames) {
     if (frame.length_ > 0) {
@@ -586,8 +587,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
 
       if (frame.flags_ != Grpc::GRPC_FH_DEFAULT ||
           !health_check_response_->ParseFromZeroCopyStream(&stream)) {
-        onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "invalid grpc.health.v1 RPC payload",
-                      false);
+        onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal,
+                      "invalid grpc.health.v1 RPC payload", false);
         return;
       }
     }

@@ -118,7 +118,8 @@ struct GoogleAsyncClientStats {
   // .streams_total
   Stats::Counter* streams_total_;
   // .streams_closed_<gRPC status code>
-  std::array<Stats::Counter*, Status::WellKnownGrpcStatus::UserDefinedGrpcStatus + 1> streams_closed_;
+  std::array<Stats::Counter*, Status::WellKnownGrpcStatus::UserDefinedGrpcStatus + 1>
+      streams_closed_;
 };
 
 // Interface to allow the gRPC stub to be mocked out by tests.

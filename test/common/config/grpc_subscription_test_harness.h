@@ -52,7 +52,8 @@ public:
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
                          bool expect_node = false) override {
-    expectSendMessage(cluster_names, version, expect_node, Grpc::Status::WellKnownGrpcStatus::Ok, "");
+    expectSendMessage(cluster_names, version, expect_node, Grpc::Status::WellKnownGrpcStatus::Ok,
+                      "");
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
@@ -111,8 +112,8 @@ public:
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-      expectSendMessage(last_cluster_names_, version_, false, Grpc::Status::WellKnownGrpcStatus::Internal,
-                        "bad config");
+      expectSendMessage(last_cluster_names_, version_, false,
+                        Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
     subscription_->grpcMux()->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);

@@ -97,8 +97,9 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
   const std::string empty_body{};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::StatusCode::OK, empty_body, expected_headers);
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok,
+                                    envoy::type::StatusCode::OK, empty_body, expected_headers);
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
@@ -170,9 +171,9 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const std::string expected_body{"test"};
   const auto expected_headers =
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
-  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied,
-                                                      envoy::type::StatusCode::Unauthorized,
-                                                      expected_body, expected_headers);
+  auto check_response = TestCommon::makeCheckResponse(
+      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::StatusCode::Unauthorized,
+      expected_body, expected_headers);
   auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,
                                                       expected_body, expected_headers);
 

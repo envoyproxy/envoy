@@ -226,10 +226,14 @@ TEST(GrpcContextTest, GrpcToHttpStatus) {
 
 TEST(GrpcContextTest, HttpToGrpcStatus) {
   const std::vector<std::pair<uint64_t, Status::GrpcStatus>> test_set = {
-      {400, Status::WellKnownGrpcStatus::Internal},         {401, Status::WellKnownGrpcStatus::Unauthenticated},
-      {403, Status::WellKnownGrpcStatus::PermissionDenied}, {404, Status::WellKnownGrpcStatus::Unimplemented},
-      {429, Status::WellKnownGrpcStatus::Unavailable},      {502, Status::WellKnownGrpcStatus::Unavailable},
-      {503, Status::WellKnownGrpcStatus::Unavailable},      {504, Status::WellKnownGrpcStatus::Unavailable},
+      {400, Status::WellKnownGrpcStatus::Internal},
+      {401, Status::WellKnownGrpcStatus::Unauthenticated},
+      {403, Status::WellKnownGrpcStatus::PermissionDenied},
+      {404, Status::WellKnownGrpcStatus::Unimplemented},
+      {429, Status::WellKnownGrpcStatus::Unavailable},
+      {502, Status::WellKnownGrpcStatus::Unavailable},
+      {503, Status::WellKnownGrpcStatus::Unavailable},
+      {504, Status::WellKnownGrpcStatus::Unavailable},
       {500, Status::WellKnownGrpcStatus::Unknown},
   };
   for (const auto& test_case : test_set) {

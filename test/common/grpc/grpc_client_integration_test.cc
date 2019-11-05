@@ -318,7 +318,8 @@ TEST_P(GrpcClientIntegrationTest, UnauthenticatedError) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
-  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Unauthenticated, "error message", empty_metadata_);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Unauthenticated, "error message",
+                             empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -328,8 +329,9 @@ TEST_P(GrpcClientIntegrationTest, MaximumKnownPlusOne) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
-  stream->sendServerTrailers(static_cast<Status::GrpcStatus>(Status::WellKnownGrpcStatus::MaximumKnown + 1),
-                             "error message", empty_metadata_);
+  stream->sendServerTrailers(
+      static_cast<Status::GrpcStatus>(Status::WellKnownGrpcStatus::MaximumKnown + 1),
+      "error message", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
