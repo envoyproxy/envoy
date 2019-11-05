@@ -869,16 +869,21 @@ public:
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
-protected:
   /**
-   * Invoked by extensionProtocolOptionsTyped.
-   * @param name std::string containing the well-known name of the extension for which protocol
-   *        options are desired
-   * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
-   *         upstream connections.
+   * @return auto sni flag. if this is true, sni value will be set automatically
    */
-  virtual ProtocolOptionsConfigConstSharedPtr
-  extensionProtocolOptions(const std::string& name) const PURE;
+  virtual bool auto_sni() const PURE
+
+      protected :
+      /**
+       * Invoked by extensionProtocolOptionsTyped.
+       * @param name std::string containing the well-known name of the extension for which protocol
+       *        options are desired
+       * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
+       *         upstream connections.
+       */
+      virtual ProtocolOptionsConfigConstSharedPtr
+      extensionProtocolOptions(const std::string& name) const PURE;
 };
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;

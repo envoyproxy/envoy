@@ -624,8 +624,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
-      max_requests_per_connection_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
+      auto_sni_(config.has_tls_context() ? config.tls_context().auto_sni : false)
+          max_requests_per_connection_(
+              PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,

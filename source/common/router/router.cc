@@ -428,6 +428,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
   cluster_ = cluster->info();
 
+  if (cluster_->auto_sni()) {
+    // add sni value dynamically on tls_context section from authority
+    // if sni cache includes passed authority, skip this operation
+  }
+
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
@@ -565,7 +570,6 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       callbacks_->streamInfo().filterState());
 
