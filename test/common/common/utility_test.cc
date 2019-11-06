@@ -185,20 +185,6 @@ TEST(StringUtil, strlcpy) {
   }
 }
 
-TEST(StringUtil, join) {
-  EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
-  EXPECT_EQ("", StringUtil::join({}, ","));
-
-  EXPECT_EQ("helloworld", StringUtil::join({"hello", "world"}, ""));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ""));
-  EXPECT_EQ("", StringUtil::join({}, ""));
-
-  EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
-  EXPECT_EQ("", StringUtil::join({}, ",,"));
-}
-
 TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("hello world"), "hello world");
   EXPECT_EQ(StringUtil::escape("hello\nworld\n"), "hello\\nworld\\n");

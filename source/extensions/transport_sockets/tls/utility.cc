@@ -123,14 +123,18 @@ SystemTime Utility::getValidFrom(const X509& cert) {
   int days, seconds;
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notBefore(&cert));
   ASSERT(rc == 1);
-  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
+  // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate valid-from date
+  // beyond 2038-01-19T03:14:08Z.
+  return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
 SystemTime Utility::getExpirationTime(const X509& cert) {
   int days, seconds;
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notAfter(&cert));
   ASSERT(rc == 1);
-  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
+  // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate not-after date
+  // beyond 2038-01-19T03:14:08Z.
+  return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
 } // namespace Tls

@@ -142,6 +142,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
+    _com_googlesource_chromium_v8()
     _com_googlesource_quiche()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
@@ -237,6 +238,12 @@ def _com_github_eile_tclap():
     _repository_impl(
         name = "com_github_eile_tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
+        patch_args = ["-p1"],
+        # If and when we pick up tclap 1.4 or later release,
+        # this entire issue was refactored away 6 years ago;
+        # https://sourceforge.net/p/tclap/code/ci/5d4ffbf2db794af799b8c5727fb6c65c079195ac/
+        # https://github.com/envoyproxy/envoy/pull/8572#discussion_r337554195
+        patches = ["@envoy//bazel:tclap-win64-ull-sizet.patch"],
     )
     native.bind(
         name = "tclap",
@@ -334,6 +341,10 @@ def _com_github_nghttp2_nghttp2():
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
+        # This patch cannot be picked up due to ABI rules. Better
+        # solve is likely at the next version-major. Discussion at;
+        # https://github.com/nghttp2/nghttp2/pull/1395
+        # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
         **location
     )
@@ -604,6 +615,20 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
     native.bind(
         name = "curl",
         actual = "@envoy//bazel/foreign_cc:curl",
+    )
+
+def _com_googlesource_chromium_v8():
+    location = REPOSITORY_LOCATIONS["com_googlesource_chromium_v8"]
+    genrule_repository(
+        name = "com_googlesource_chromium_v8",
+        genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
+        build_file = "@envoy//bazel/external:wee8.BUILD",
+        patches = ["@envoy//bazel/external:wee8.patch"],
+        **location
+    )
+    native.bind(
+        name = "wee8",
+        actual = "@com_googlesource_chromium_v8//:wee8",
     )
 
 def _com_googlesource_quiche():

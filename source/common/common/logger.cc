@@ -8,6 +8,9 @@
 
 #include "common/common/lock_guard.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/escaping.h"
+#include "absl/strings/strip.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -55,16 +58,33 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
 
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
-  if (!formatter_) {
-    lock.Release();
-    sink_->log(absl::string_view(msg.payload.data(), msg.payload.size()));
-    return;
-  }
+  absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
 
+  // This memory buffer must exist in the scope of the entire function,
+  // otherwise the string_view will refer to memory that is already free.
   fmt::memory_buffer formatted;
-  formatter_->format(msg, formatted);
+  if (formatter_) {
+    formatter_->format(msg, formatted);
+    msg_view = absl::string_view(formatted.data(), formatted.size());
+  }
   lock.Release();
-  sink_->log(absl::string_view(formatted.data(), formatted.size()));
+
+  if (should_escape_) {
+    sink_->log(escapeLogLine(msg_view));
+  } else {
+    sink_->log(msg_view);
+  }
+}
+
+std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
+  // Split the actual message from the trailing whitespace.
+  auto eol_it = std::find_if_not(msg_view.rbegin(), msg_view.rend(), absl::ascii_isspace);
+  absl::string_view msg_leading = msg_view.substr(0, msg_view.rend() - eol_it);
+  absl::string_view msg_trailing_whitespace =
+      msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
+
+  // Escape the message, but keep the whitespace unescaped.
+  return absl::StrCat(absl::CEscape(msg_leading), msg_trailing_whitespace);
 }
 
 DelegatingLogSinkPtr DelegatingLogSink::init() {
@@ -76,8 +96,9 @@ DelegatingLogSinkPtr DelegatingLogSink::init() {
 static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock)
-    : log_level_(log_level), log_format_(log_format), lock_(lock), save_context_(current_context) {
+                 Thread::BasicLockable& lock, bool should_escape)
+    : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
+      save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -93,6 +114,7 @@ Context::~Context() {
 
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
+  Registry::getSink()->set_should_escape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
 }

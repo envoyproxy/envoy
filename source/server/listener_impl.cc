@@ -172,11 +172,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                    (matcher.transport_protocol().empty() &&
                     (!matcher.server_names().empty() || !matcher.application_protocols().empty()));
           }) &&
-      not std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
-                      [](const auto& filter) {
-                        return filter.name() ==
-                               Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
-                      });
+      !std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
+                   [](const auto& filter) {
+                     return filter.name() ==
+                            Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
+                   });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
     const std::string message =
