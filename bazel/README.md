@@ -157,6 +157,8 @@ bazel build --config=libc++ //source/exe:envoy-static
 Or use our configuration with Remote Execution or Docker sandbox, pass `--config=remote-clang-libc++` or
 `--config=docker-clang-libc++` respectively.
 
+If you want to make libc++ as default, add a line `build --config=libc++` to the `user.bazelrc` file in Envoy source root.
+
 ## Using a compiler toolchain in a non-standard location
 
 By setting the `CC` and `LD_LIBRARY_PATH` in the environment that Bazel executes from as
