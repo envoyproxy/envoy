@@ -215,9 +215,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
+          // First remove all headers requested by the ext_authz filter,
+          // to ensure that they will override existing headers
+          for (const auto& header : headers) {
+            response_headers.remove(header.first);
+          }
+          // Then set all of the requested headers, allowing the
+          // same header to be set multiple times, e.g. `Set-Cookie`
           for (const auto& header : headers) {
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
-            response_headers.remove(header.first);
             response_headers.addCopy(header.first, header.second);
           }
         },
