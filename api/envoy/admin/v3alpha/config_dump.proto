@@ -34,6 +34,17 @@ message ConfigDump {
   repeated google.protobuf.Any configs = 1;
 }
 
+message UpdateFailureState {
+  // What the component configuration would have been if the update had succeeded.
+  google.protobuf.Any failed_configuration = 1;
+
+  // Time of the latest failed update attempt.
+  google.protobuf.Timestamp last_update_attempt = 2;
+
+  // Details about the last failed update attempt.
+  string details = 3;
+}
+
 // This message describes the bootstrap configuration that Envoy was started with. This includes
 // any CLI overrides that were merged. Bootstrap configuration information can be used to recreate
 // the static portions of an Envoy configuration by reusing the output as the bootstrap
@@ -48,19 +59,17 @@ message BootstrapConfigDump {
 // Envoy's listener manager fills this message with all currently known listeners. Listener
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
-// [#next-free-field: 6]
 message ListenersConfigDump {
   // Describes a statically loaded listener.
   message StaticListener {
     // The listener config.
     api.v3alpha.Listener listener = 1;
 
-    // The timestamp when the Listener was last updated.
+    // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 2;
   }
 
-  // Describes a dynamically loaded cluster via the LDS API.
-  message DynamicListener {
+  message DynamicListenerState {
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_api.v3alpha.DiscoveryResponse.version_info>` field at the
     // time that the listener was loaded. In the future, discrete per-listener versions may be
@@ -70,8 +79,34 @@ message ListenersConfigDump {
     // The listener config.
     api.v3alpha.Listener listener = 2;
 
-    // The timestamp when the Listener was last updated.
+    // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 3;
+  }
+
+  // Describes a dynamically loaded listener via the LDS API.
+  // [#next-free-field: 6]
+  message DynamicListener {
+    // The name or unique id of this listener, pulled from the DynamicListenerState config.
+    string name = 1;
+
+    // The listener state for any active listener by this name.
+    // These are listeners that are available to service data plane traffic.
+    DynamicListenerState active_state = 2;
+
+    // The listener state for any warming listener by this name.
+    // These are listeners that are currently undergoing warming in preparation to service data
+    // plane traffic. Note that if attempting to recreate an Envoy configuration from a
+    // configuration dump, the warming listeners should generally be discarded.
+    DynamicListenerState warming_state = 3;
+
+    // The listener state for any draining listener by this name.
+    // These are listeners that are currently undergoing draining in preparation to stop servicing
+    // data plane traffic. Note that if attempting to recreate an Envoy configuration from a
+    // configuration dump, the draining listeners should generally be discarded.
+    DynamicListenerState draining_state = 4;
+
+    // Set if the last update failed, cleared after the next successful update.
+    UpdateFailureState error_state = 5;
   }
 
   // This is the :ref:`version_info <envoy_api_field_api.v3alpha.DiscoveryResponse.version_info>` in
@@ -82,21 +117,8 @@ message ListenersConfigDump {
   // The statically loaded listener configs.
   repeated StaticListener static_listeners = 2;
 
-  // The dynamically loaded active listeners. These are listeners that are available to service
-  // data plane traffic.
-  repeated DynamicListener dynamic_active_listeners = 3;
-
-  // The dynamically loaded warming listeners. These are listeners that are currently undergoing
-  // warming in preparation to service data plane traffic. Note that if attempting to recreate an
-  // Envoy configuration from a configuration dump, the warming listeners should generally be
-  // discarded.
-  repeated DynamicListener dynamic_warming_listeners = 4;
-
-  // The dynamically loaded draining listeners. These are listeners that are currently undergoing
-  // draining in preparation to stop servicing data plane traffic. Note that if attempting to
-  // recreate an Envoy configuration from a configuration dump, the draining listeners should
-  // generally be discarded.
-  repeated DynamicListener dynamic_draining_listeners = 5;
+  // State for any warming, active, or draining listeners.
+  repeated DynamicListener dynamic_listeners = 3;
 }
 
 // Envoy's cluster manager fills this message with all currently known clusters. Cluster

@@ -11,12 +11,33 @@ namespace Common {
 namespace Redis {
 namespace Utility {
 
-Redis::RespValue makeAuthCommand(const std::string& password);
+class AuthRequest : public Redis::RespValue {
+public:
+  AuthRequest(const std::string& password);
+};
 
 class ReadOnlyRequest : public Redis::RespValue {
 public:
   ReadOnlyRequest();
   static const ReadOnlyRequest& instance();
+};
+
+class AskingRequest : public Redis::RespValue {
+public:
+  AskingRequest();
+  static const AskingRequest& instance();
+};
+
+class GetRequest : public Redis::RespValue {
+public:
+  GetRequest();
+  static const GetRequest& instance();
+};
+
+class SetRequest : public Redis::RespValue {
+public:
+  SetRequest();
+  static const SetRequest& instance();
 };
 
 } // namespace Utility

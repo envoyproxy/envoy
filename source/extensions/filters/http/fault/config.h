@@ -19,10 +19,6 @@ class FaultFilterFactory
 public:
   FaultFilterFactory() : FactoryBase(HttpFilterNames::get().Fault) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::fault::v2::HTTPFault& proto_config,
