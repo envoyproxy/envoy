@@ -430,19 +430,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   if (cluster_->auto_sni()) {
     auto url_obj = Http::Utility::Url{};
-    if (!url_obj.initialize(headers.Path()->value().getStringView())) {
-      throw EnvoyException(fmt::format("cluster: failed to parse inbound url"));
+    auto url_str = headers.Path()->value().getStringView();
+    if (!url_obj.initialize(url_str)) {
+      throw EnvoyException(fmt::format("cluster: failed to parse inbound URL {}", url_str));
     }
 
     if (cluster_->upstreamTlsContext() == absl::nullopt) {
       throw EnvoyException(
           fmt::format("cluster: tls_context is needed on cluster config if you set auto_sni true"));
     }
-    if (!url_obj.is_raw_ipv4_address() &&
-        (cluster_->upstreamTlsContext().value().sni().size() == 0 ||
-         cluster_->upstreamTlsContext().value().sni() != url_obj.host_and_port())) {
-      cluster_->upstreamTlsContext().value().clear_sni();
-      cluster_->upstreamTlsContext().value().set_sni(std::string(url_obj.host_and_port()));
+    auto& tls_context = cluster_->upstreamTlsContext().value();
+    if (!url_obj.is_raw_ipv4_address() && (tls_context.sni().size() == 0 || tls_context.sni() != url_obj.host_and_port())) {
+      tls_context.clear_sni();
+      tls_context.set_sni(std::string(url_obj.host_and_port()));
     }
   }
 

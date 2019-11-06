@@ -46,7 +46,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 45]
+// [#next-free-field: 46]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -766,7 +766,7 @@ message Cluster {
   // from the LRS stream here.]
   core.ConfigSource lrs_server = 42;
 
-  // set sni value automatically, dynamic settings of sni field on tls_context
+  // set sni value automatically, dynamic setting of sni field on tls_context
   bool auto_sni = 45;
 }
 
