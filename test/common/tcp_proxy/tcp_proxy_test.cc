@@ -348,6 +348,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
   }
 }
 
+// Tests that a deprecated_v1 route gets the top-level endpoint selector.
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -389,6 +390,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) 
   EXPECT_EQ(hv2, criterions[1]->value());
 }
 
+// Tests that it's not possible to define a weighted cluster with 0 weight.
 TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -403,6 +405,7 @@ TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
   EXPECT_THROW(constructConfigFromV2Yaml(yaml, factory_context), EnvoyException);
 }
 
+// Tests that it is possible to define a list of weighted clusters.
 TEST(ConfigTest, WeightedClustersConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -425,6 +428,8 @@ TEST(ConfigTest, WeightedClustersConfig) {
   EXPECT_EQ(std::string("cluster2"), config_obj.getRouteFromEntries(connection)->clusterName());
 }
 
+// Tests that it is possible to define a list of weighted clusters with independent endpoint
+// selectors.
 TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -504,6 +509,8 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
   }
 }
 
+// Tests that an individual endpoint selector of a weighted cluster gets merged with the top-level
+// endpoint selector.
 TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -607,6 +614,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
   }
 }
 
+// Tests that a weighted cluster gets the top-level endpoint selector.
 TEST(ConfigTest, WeightedClustersWithTopLevelMetadataMatchConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -648,6 +656,7 @@ TEST(ConfigTest, WeightedClustersWithTopLevelMetadataMatchConfig) {
   EXPECT_EQ(hv2, criterions[1]->value());
 }
 
+// Tests that it is possible to define the top-level endpoint selector.
 TEST(ConfigTest, TopLevelMetadataMatchConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -680,6 +689,7 @@ TEST(ConfigTest, TopLevelMetadataMatchConfig) {
   EXPECT_EQ(hv2, criterions[1]->value());
 }
 
+// Tests that a regular cluster gets the top-level endpoint selector.
 TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -718,6 +728,7 @@ TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
   EXPECT_EQ(hv2, criterions[1]->value());
 }
 
+// Tests that a per connection cluster gets the top-level endpoint selector.
 TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
@@ -1223,6 +1234,8 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
   }
 }
 
+// Tests that the endpoint selector of a weighted cluster gets included into the
+// LoadBalancerContext.
 TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   const std::string yaml = R"EOF(
   stat_prefix: name
