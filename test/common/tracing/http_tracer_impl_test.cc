@@ -196,7 +196,7 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+  EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
   EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(nullptr));
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
@@ -218,13 +218,18 @@ cases:
     metadata:
       kind: { route: {} }
       metadata_key: { filter: m.rot, path: [ {key: not-found } ] }
+      default_value: _c
+  value: _c
 - custom_tag:
     tag: c
     metadata:
-      kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ {key: not-found } ] }
-      default_value: _c
-  value: _c
+      kind: { cluster: {} }
+      metadata_key: { filter: m.cluster, path: [ {key: not-found } ] }
+- custom_tag:
+    tag: d
+    metadata:
+      kind: { host: {} }
+      metadata_key: { filter: m.host, path: [ {key: not-found } ] }
 )EOF");
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
@@ -346,13 +351,19 @@ ree:
   NiceMock<Router::MockRouteEntry> route_entry;
   EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry));
   (*route_entry.metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
+  std::shared_ptr<envoy::api::v2::core::Metadata> host_metadata =
+      std::make_shared<envoy::api::v2::core::Metadata>();
+  (*host_metadata->mutable_filter_metadata())["m.host"].MergeFrom(fake_struct);
+  (*stream_info.host_->cluster_.metadata_.mutable_filter_metadata())["m.cluster"].MergeFrom(
+      fake_struct);
+
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
-  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*stream_info.host_, metadata()).WillRepeatedly(Return(host_metadata));
 
   EXPECT_CALL(config, customTags());
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
@@ -392,49 +403,49 @@ cases:
       kind: { request: {} }
       metadata_key: { filter: m.req, path: [ { key: not-found } ] }
 - custom_tag:
-    tag: ee-1,
+    tag: dd-4,
     metadata:
-      kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ { key: ree }, { key: nuu } ] }
-      default_value: _e
+      kind: { request: {} }
+      metadata_key: { filter: m.req, path: [ { key: ree }, { key: nuu } ] }
+      default_value: _d
   value: "1"
 - custom_tag:
-    tag: ee-2,
+    tag: dd-5,
     metadata:
       kind: { route: {} }
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: boo } ] }
   value: "true"
 - custom_tag:
-    tag: ee-3,
+    tag: dd-6,
     metadata:
       kind: { route: {} }
       metadata_key: { filter: m.rot, path: [ { key: ree }, { key: poo } ] }
   value: "false"
 - custom_tag:
-    tag: ee-4,
+    tag: dd-7,
     metadata:
-      kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ { key: ree }, { key: emp } ] }
-      default_value: _e
+      kind: { cluster: {} }
+      metadata_key: { filter: m.cluster, path: [ { key: ree }, { key: emp } ] }
+      default_value: _d
   value: ''
 - custom_tag:
-    tag: ee-5,
+    tag: dd-8,
     metadata:
-      kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ { key: ree }, { key: lii } ] }
-      default_value: _e
+      kind: { cluster: {} }
+      metadata_key: { filter: m.cluster, path: [ { key: ree }, { key: lii } ] }
+      default_value: _d
   value: "[\"something\"]"
 - custom_tag:
-    tag: ee-6,
+    tag: dd-9,
     metadata:
-      kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ { key: ree }, { key: stt } ] }
+      kind: { host: {} }
+      metadata_key: { filter: m.host, path: [ { key: ree }, { key: stt } ] }
   value: "{\"some\":\"thing\"}"
 - custom_tag:
-    tag: ee-7,
+    tag: dd-10,
     metadata:
-      kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ { key: not-found } ] }
+      kind: { host: {} }
+      metadata_key: { filter: m.host, path: [ { key: not-found } ] }
 )EOF");
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
