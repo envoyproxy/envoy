@@ -1,0 +1,22 @@
+From 7bdbe7ecbadaff7a902ea10259fd35535686d103 Mon Sep 17 00:00:00 2001
+From: yang-g <yangg@google.com>
+Date: Tue, 22 Oct 2019 10:17:40 -0700
+Subject: [PATCH] unref error when fail to load file
+
+---
+ .../lib/security/security_connector/load_system_roots_linux.cc  | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/core/lib/security/security_connector/load_system_roots_linux.cc b/src/core/lib/security/security_connector/load_system_roots_linux.cc
+index 82d5bf6bcdd..61b0b9be5b9 100644
+--- a/src/core/lib/security/security_connector/load_system_roots_linux.cc
++++ b/src/core/lib/security/security_connector/load_system_roots_linux.cc
+@@ -66,6 +66,8 @@ grpc_slice GetSystemRootCerts() {
+         grpc_load_file(kLinuxCertFiles[i], 1, &valid_bundle_slice);
+     if (error == GRPC_ERROR_NONE) {
+       return valid_bundle_slice;
++    } else {
++      GRPC_ERROR_UNREF(error);
+     }
+   }
+   return grpc_empty_slice();

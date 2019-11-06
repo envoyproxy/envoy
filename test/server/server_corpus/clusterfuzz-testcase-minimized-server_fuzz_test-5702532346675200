@@ -1,0 +1,1 @@
+hds_config {   api_type: GRPC   grpc_services {     google_grpc {       target_uri: "ipv6:[::]:  8                         "       channel_credentials {         ssl_credentials {         }       }       stat_prefix: " "     }   } } 

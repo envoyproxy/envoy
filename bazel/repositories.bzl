@@ -681,6 +681,8 @@ def _com_github_grpc_grpc():
             "@envoy//bazel:grpc-protoinfo-3.patch",
             # Pre-integration of https://github.com/grpc/grpc/pull/18950
             "@envoy//bazel:grpc-rename-gettid.patch",
+            # Fixes https://github.com/grpc/grpc/issues/20640
+            "@envoy//bazel:grpc-direct-leak.patch",
         ],
         patch_args = ["-p1"],
     )
