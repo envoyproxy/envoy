@@ -125,8 +125,13 @@ and all transport socket extensions.
 
 Other extensions are only expected to be used in trusted environments today.  These include, but are
 not limited to most non-HTTP network filters (e.g.  Thrift, Dynamo, Mongo, Redis, Kafka, Dubbo,
-Zookeeper, MySQL), HTTP inspector, Lua and Squash. We will not treat any issues in these extensions
+Zookeeper, MySQL), HTTP inspector and Squash. We will not treat any issues in these extensions
 as warranting invocation of the security release process.
+
+Envoy currently has two dynamic filter extensions that support loadable code; WASM and Lua. In both
+cases, we assume that the dynamically loaded code is trusted. We expect the runtime for Lua to be
+robust to untrusted data plane traffic with the assumption of a trusted script. WASM is still in
+development, but will eventually have a similar security stance.
 
 Please consult the PST if you have questions on which extensions are considered safe to use in the
 presence of untrusted traffic.
