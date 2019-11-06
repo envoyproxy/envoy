@@ -376,7 +376,9 @@ void SymbolTableImpl::debugPrint() const {
 #endif
 
 SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
-  ASSERT(!absl::EndsWith(name, "."));
+  while (absl::EndsWith(name, ".")) {
+    name.remove_suffix(1);
+  }
   Encoding encoding;
   addTokensToEncoding(name, encoding);
   auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
