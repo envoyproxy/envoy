@@ -487,6 +487,30 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   expectEndpointToMatchRoute();
 }
 
+// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       DEPRECATED_FEATURE_TEST(EndpointShouldMatchRouteWithTopLevelMetadataMatch)) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      cluster: fallback
+      deprecated_v1:
+        routes:
+        - cluster: cluster_0
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            role: master
+            version: v1
+            stage: prod
+    )EOF",                   // TcpProxy config
+      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointToMatchRoute();
+}
+
 // Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
 // cluster.
 TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterWithMetadataMatch) {
@@ -570,6 +594,30 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
       R"EOF(
       stat_prefix: tcp_stats
       cluster: cluster_0
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            role: master
+            version: v1
+            stage: prod
+    )EOF",                    // TcpProxy config
+      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       DEPRECATED_FEATURE_TEST(EndpointShouldNotMatchRouteWithTopLevelMetadataMatch)) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      cluster: fallback
+      deprecated_v1:
+        routes:
+        - cluster: cluster_0
       metadata_match:
         filter_metadata:
           envoy.lb:
