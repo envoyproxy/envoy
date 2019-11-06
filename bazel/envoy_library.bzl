@@ -29,6 +29,21 @@ def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
         **kargs
     )
 
+EXTENSION_SECURITY_POSTURES = [
+    # Untrusted extension
+    "untrusted",
+    # Trusted extensions
+    "trusted",
+]
+
+def envoy_extension(
+        name,
+        security_posture,
+        **kwargs):
+    if security_posture not in EXTENSION_SECURITY_POSTURES:
+        fail("Unknown extension security posture: " + security_posture)
+    envoy_cc_library(name, **kwargs)
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
         name,
