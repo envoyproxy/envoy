@@ -14,7 +14,7 @@ envoy_package()
 
 envoy_cc_extension(
     name = "config",
-    security_posture = "trusted",
+    security_posture = "trustedf",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
