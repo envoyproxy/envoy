@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Quic {
 
-// A client QuicConnection instance manages its own I/O events.
+// A client QuicConnection instance managing its own file events.
 class EnvoyQuicClientConnection : public EnvoyQuicConnection, public Network::UdpPacketProcessor {
 public:
   // A connection socket will be created with given |local_addr|. If binding

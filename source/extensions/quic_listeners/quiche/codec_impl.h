@@ -76,20 +76,22 @@ private:
   EnvoyQuicClientSession& quic_client_session_;
 };
 
+// A factory to create QuicHttpClientConnection.
 class QuicHttpClientConnectionFactory : public Http::QuicHttpConnectionFactory {
 public:
   Http::Connection* createQuicHttpConnection(Network::Connection& connection,
                                              Http::ConnectionCallbacks& callbacks) override;
 
-  std::string name() const override { return "client_codec"; }
+  std::string name() const override { return Http::QuicCodecNames::get().Client; }
 };
 
+// A factory to create QuicHttpServerConnection.
 class QuicHttpServerConnectionFactory : public Http::QuicHttpConnectionFactory {
 public:
   Http::Connection* createQuicHttpConnection(Network::Connection& connection,
                                              Http::ConnectionCallbacks& callbacks) override;
 
-  std::string name() const override { return "server_codec"; }
+  std::string name() const override { return Http::QuicCodecNames::get().Server; }
 };
 
 DECLARE_FACTORY(QuicHttpClientConnectionFactory);

@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Http {
 
+// A factory to create Http::Connection instance for QUIC. It has two registered
+// subclasses QuicHttpClientConnectionFactory and QuicHttpServerConnectionFactory.
 class QuicHttpConnectionFactory {
 public:
   virtual ~QuicHttpConnectionFactory() {}
