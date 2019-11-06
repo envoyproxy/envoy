@@ -1,4 +1,6 @@
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"      // for proto link
+#include "envoy/service/auth/v2alpha/external_auth.pb.h" // for proto link
 
 #include "common/grpc/common.h"
 #include "common/http/headers.h"

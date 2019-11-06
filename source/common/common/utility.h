@@ -330,14 +330,6 @@ public:
   static size_t strlcpy(char* dst, const char* src, size_t size);
 
   /**
-   * Join elements of a vector into a string delimited by delimiter.
-   * @param source supplies the strings to join.
-   * @param delimiter supplies the delimiter to join them together.
-   * @return string combining elements of `source` with `delimiter` in between each element.
-   */
-  static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
-
-  /**
    * Version of substr() that operates on a start and end index instead of a start index and a
    * length.
    * @return string substring starting at start, and ending right before end.

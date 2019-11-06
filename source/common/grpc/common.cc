@@ -1,7 +1,5 @@
 #include "common/grpc/common.h"
 
-#include <arpa/inet.h>
-
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -50,14 +48,16 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers,
+                                                         bool allow_user_defined) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
 
   uint64_t grpc_status_code;
   if (!grpc_status_header || grpc_status_header->value().empty()) {
     return absl::nullopt;
   }
-  if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code)) {
+  if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
+      (grpc_status_code > Status::WellKnownGrpcStatus::MaximumKnown && !allow_user_defined)) {
     return {Status::WellKnownGrpcStatus::InvalidCode};
   }
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};

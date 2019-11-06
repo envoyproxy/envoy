@@ -1253,7 +1253,8 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: test_header_filter
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.filter.accesslog.v2.HeaderFilter
       header:
         name: test-header
 typed_config:
@@ -1308,7 +1309,8 @@ public:
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(*factory_config);
-    return std::make_unique<SampleExtensionFilter>(filter_config->getInteger("rate"));
+    return std::make_unique<SampleExtensionFilter>(
+        static_cast<uint32_t>(filter_config->getInteger("rate")));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -1326,8 +1328,10 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: sample_extension_filter
-    config:
-      rate: 5
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        rate: 5
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
@@ -1352,8 +1356,10 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: unregistered_extension_filter
-    config:
-      foo: bar
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        foo: bar
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null

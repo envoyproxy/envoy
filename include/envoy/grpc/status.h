@@ -48,9 +48,6 @@ public:
     // Maximum value of valid status codes.
     MaximumKnown = Unauthenticated,
 
-    // user defined grpc status code.
-    UserDefinedGrpcStatus = MaximumKnown + 1,
-
     // This is a non-GRPC error code, indicating the status code in gRPC headers
     // was invalid.
     InvalidCode = -1,

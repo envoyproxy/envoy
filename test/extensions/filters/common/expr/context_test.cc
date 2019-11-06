@@ -195,6 +195,7 @@ TEST(Context, ResponseAttributes) {
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
+  EXPECT_CALL(info, responseFlags()).WillRepeatedly(Return(0x1));
 
   {
     auto value = response[CelValue::CreateString(Undefined)];
@@ -249,6 +250,12 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(header.has_value());
     ASSERT_TRUE(header.value().IsString());
     EXPECT_EQ("b", header.value().StringOrDie().value());
+  }
+  {
+    auto value = response[CelValue::CreateString(Flags)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(0x1, value.value().Int64OrDie());
   }
 }
 

@@ -112,7 +112,7 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     // Technically this should be
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
     // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
-    // this as GrpcStatusMapping::Canceled.
+    // this as WellKnownGrpcStatus::Canceled.
     streamError(Status::WellKnownGrpcStatus::Canceled);
     return;
   }

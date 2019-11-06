@@ -841,6 +841,57 @@ TEST_F(HttpFilterTest, MetadataContext) {
             check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
 }
 
+// Test that filter can be disabled via the filter_enabled field.
+TEST_F(HttpFilterTest, FilterDisabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  )EOF");
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  // Make sure check is not called.
+  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test that filter can be enabled via the filter_enabled field.
+TEST_F(HttpFilterTest, FilterEnabled) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  )EOF");
+
+  prepareCheck();
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
+      .WillByDefault(Return(true));
+
+  // Make sure check is called once.
+  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+  // Engage the filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
 // -------------------
 // Parameterized Tests
 // -------------------

@@ -155,9 +155,13 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
-        sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
-        strip_prefix = "zlib-1.2.11",
-        urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+        # Use the dev branch of zlib to resolve fuzz bugs and out of bound
+        # errors resulting in crashes in zlib 1.2.11.
+        # TODO(asraa): Remove when zlib > 1.2.11 is released.
+        sha256 = "155a8f8c1a753fb05b16a1b0cc0a0a9f61a78e245f9e0da483d13043b3bcbf2e",
+        strip_prefix = "zlib-79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
+        # 2019-04-14 development branch
+        urls = ["https://github.com/madler/zlib/archive/79baebe50e4d6b73ae1f8b603f0ef41300110aa3.tar.gz"],
     ),
     com_github_jbeder_yaml_cpp = dict(
         sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
@@ -170,10 +174,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "b42ad9d286e267b265080e97bacb99c27bce39db93a6c34be9575ddd9a3edd7a",
-        strip_prefix = "jwt_verify_lib-945805866007edb9d2760915abaa672ed8b7da86",
-        # 2019-10-07
-        urls = ["https://github.com/google/jwt_verify_lib/archive/945805866007edb9d2760915abaa672ed8b7da86.tar.gz"],
+        sha256 = "480ff74bcdea9e177a803feb8f797c76abd38a80ec27d93b64f4d56e7cfd28a1",
+        strip_prefix = "jwt_verify_lib-9f10e2d60d42edeb6662e185707a7d6a4ebc5604",
+        # 2019-10-24
+        urls = ["https://github.com/google/jwt_verify_lib/archive/9f10e2d60d42edeb6662e185707a7d6a4ebc5604.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -263,6 +267,12 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "curl-7.66.0",
         urls = ["https://github.com/curl/curl/releases/download/curl-7_66_0/curl-7.66.0.tar.gz"],
     ),
+    com_googlesource_chromium_v8 = dict(
+        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
+        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
+        sha256 = "7c897863d31569b4a4e16277d94415f1c42f3e130c1ff3573b048b76b15b635f",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-7.9.317.14.tar.gz"],
+    ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz
         sha256 = "c60bca3cf7f58b91394a89da96080657ff0fbe4d5675be9b21e90da8f68bc06f",
@@ -287,5 +297,9 @@ REPOSITORY_LOCATIONS = dict(
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
         urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
+    ),
+    fuzzit_linux = dict(
+        sha256 = "9ca76ac1c22d9360936006efddf992977ebf8e4788ded8e5f9d511285c9ac774",
+        urls = ["https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.76/fuzzit_Linux_x86_64.zip"],
     ),
 )

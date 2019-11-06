@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+#include "envoy/common/platform.h"
 
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
@@ -293,7 +293,8 @@ TEST(GrpcContextTest, ValidateResponse) {
     Http::ResponseMessageImpl response(
         Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
     response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "100"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, EMPTY_STRING);
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
+                              "bad grpc-status trailer");
   }
   {
     Http::ResponseMessageImpl response(
@@ -311,7 +312,8 @@ TEST(GrpcContextTest, ValidateResponse) {
   {
     Http::ResponseMessageImpl response(Http::HeaderMapPtr{
         new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "100"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, EMPTY_STRING);
+    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
+                              "bad grpc-status header");
   }
   {
     Http::ResponseMessageImpl response(

@@ -1,7 +1,5 @@
 #include "common/network/base_listener_impl.h"
 
-#include <sys/un.h>
-
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"

@@ -235,6 +235,7 @@ envoy_cc_library(
     deps = [
         ":active_quic_listener_lib",
         "//include/envoy/registry",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
 

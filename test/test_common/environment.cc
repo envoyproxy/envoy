@@ -1,8 +1,5 @@
 #include "test/test_common/environment.h"
 
-#include <sys/un.h>
-#include <unistd.h>
-
 // TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
 // Clang >= 9.
 #if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
@@ -25,6 +22,7 @@
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "envoy/common/platform.h"
 
 #include "server/options_impl.h"
 

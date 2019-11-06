@@ -121,6 +121,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
         << fmt::format("Flag: {} was expected to be set", flag);
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+  EXPECT_EQ(0xFFF, stream_info.responseFlags());
 
   StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem());
   stream_info2.setResponseFlag(FailedLocalHealthCheck);

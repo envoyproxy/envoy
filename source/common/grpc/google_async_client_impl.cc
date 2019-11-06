@@ -2,6 +2,7 @@
 
 #include "envoy/stats/scope.h"
 
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
@@ -83,7 +84,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
-  for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::UserDefinedGrpcStatus; ++i) {
+  for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::MaximumKnown; ++i) {
     stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
   }
 }
@@ -184,20 +185,16 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   rw_->StartCall(&init_tag_);
   ++inflight_tags_;
 }
-#include <iostream>
+
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
-  if (grpc_status < 0) {
+  if (grpc_status < 0 || grpc_status > Status::WellKnownGrpcStatus::MaximumKnown) {
     ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
     // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
     // crash..
     grpc_status = Status::WellKnownGrpcStatus::InvalidCode;
     parent_.stats_.streams_closed_[Status::WellKnownGrpcStatus::Unknown]->inc();
-  } else if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown) {
-    // closed streams on stats is fixed length, so we can't handle custom grpc-status
-    // To prevent out-of-range exception, deal with this method
-    parent_.stats_.streams_closed_[Status::WellKnownGrpcStatus::UserDefinedGrpcStatus]->inc();
   } else {
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
@@ -356,8 +353,13 @@ void GoogleAsyncStreamImpl::metadataTranslate(
   // More painful copying, this time due to the mismatch in header
   // representation data structures in Envoy and Google gRPC.
   for (const auto& it : grpc_metadata) {
-    header_map.addCopy(Http::LowerCaseString(std::string(it.first.data(), it.first.size())),
-                       std::string(it.second.data(), it.second.size()));
+    auto key = Http::LowerCaseString(std::string(it.first.data(), it.first.size()));
+    if (absl::EndsWith(key.get(), "-bin")) {
+      auto value = Base64::encode(it.second.data(), it.second.size());
+      header_map.addCopy(key, value);
+      continue;
+    }
+    header_map.addCopy(key, std::string(it.second.data(), it.second.size()));
   }
 }
 

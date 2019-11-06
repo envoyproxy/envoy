@@ -5,7 +5,6 @@ load(
     "envoy_cc_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -59,6 +58,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )
 
