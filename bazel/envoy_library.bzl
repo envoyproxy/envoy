@@ -29,11 +29,15 @@ def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
         **kargs
     )
 
+# All Envoy extensions must be tagged with their security hardening stance with
+# respect to downstream and upstream data plane threats. These are verbose
+# labels intended to make clear the trust that operators may place in
+# extensions.
 EXTENSION_SECURITY_POSTURES = [
-    # Untrusted extension
-    "untrusted",
-    # Trusted extensions
-    "trusted",
+    "robust_to_untrusted_downstream",
+    "robust_to_untrusted_upstream",
+    "robust_to_untrusted_upstream_and_upstream",
+    "requires_trusted_downstream_and_upstream",
 ]
 
 def envoy_cc_extension(

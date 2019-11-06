@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -22,8 +23,9 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "kafka_request_codec_lib",
+    security_posture = "requires_trusted_downstream_and_upstream",
     srcs = ["request_codec.cc"],
     hdrs = [
         "request_codec.h",
