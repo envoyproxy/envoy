@@ -156,7 +156,6 @@ envoy_cc_library(
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:manager_interface",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/runtime:runtime_interface",
