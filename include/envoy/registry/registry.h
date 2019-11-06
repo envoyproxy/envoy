@@ -19,6 +19,7 @@ namespace Envoy {
 namespace Registry {
 
 template <class Base> class FactoryRegistry;
+template <class T, class Base> class RegisterFactory;
 
 /**
  * Helper class to call `registeredNames` for a specialized
@@ -39,27 +40,50 @@ public:
   }
 };
 
-/**
- * FactoryCategoryRegistry registers factory registries by their
- * declared category. The category is exposed by a static category()
- * method on the factory base type.
- */
-class FactoryCategoryRegistry {
-public:
-  using MapType = absl::flat_hash_map<std::string, BaseFactoryCategoryNames*>;
+class BaseFactoryCategoryRegistry {
+protected:
+  using MapType = std::map<std::string, BaseFactoryCategoryNames*>;
 
   static MapType& factories() {
     static auto* factories = new MapType();
     return *factories;
   }
+};
 
-  static bool isRegistered(absl::string_view category) { return factories().contains(category); }
+/**
+ * FactoryCategoryRegistry registers factory registries by their
+ * declared category. The category is exposed by a static category()
+ * method on the factory base type.
+ *
+ * Only RegisterFactory instances are able to register factory registries.
+ */
+class FactoryCategoryRegistry : public BaseFactoryCategoryRegistry {
+public:
+  using MapType = BaseFactoryCategoryRegistry::MapType;
 
-  static void registerCategory(absl::string_view category, BaseFactoryCategoryNames* factoryNames) {
+  /**
+   * @return a read-only reference to the map of registered factory
+   * registries.
+   */
+  static const MapType& registeredFactories() { return factories(); }
+
+  /**
+   * @return whether the given category name is already registered.
+   */
+  static bool isRegistered(const std::string& category) {
+    return factories().find(category) != factories().end();
+  }
+
+private:
+  // Allow RegisterFactory to register a category, but no-one else.
+  // This enforces correct use of the registration machinery.
+  template <class T, class Base> friend class RegisterFactory;
+
+  static void registerCategory(const std::string& category,
+                               BaseFactoryCategoryNames* factoryNames) {
     auto result = factories().emplace(std::make_pair(category, factoryNames));
-    if (!result.second) {
-      throw EnvoyException(fmt::format("Double registration for category: '{}'", category));
-    }
+    RELEASE_ASSERT(result.second == true,
+                   fmt::format("Double registration for category: '{}'", category));
   }
 };
 
@@ -112,16 +136,6 @@ public:
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
-    }
-
-    // Also register this factory with its category.
-    //
-    // Each time a factory registers, the registry will attempt to
-    // register its category here. This means that we have to ignore
-    // multiple attempts to register the same category and can't detect
-    // duplicate categories.
-    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
     }
   }
 
@@ -188,6 +202,16 @@ public:
   RegisterFactory() {
     ASSERT(!instance_.name().empty());
     FactoryRegistry<Base>::registerFactory(instance_, instance_.name());
+
+    // Also register this factory with its category.
+    //
+    // Each time a factory registers, the registry will attempt to
+    // register its category here. This means that we have to ignore
+    // multiple attempts to register the same category and can't detect
+    // duplicate categories.
+    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
+      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+    }
   }
 
   /**
@@ -200,9 +224,14 @@ public:
     } else {
       ASSERT(deprecated_names.size() != 0);
     }
+
     for (auto deprecated_name : deprecated_names) {
       ASSERT(!deprecated_name.empty());
       FactoryRegistry<Base>::registerFactory(instance_, deprecated_name);
+    }
+
+    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
+      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
     }
   }
 
