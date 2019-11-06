@@ -57,13 +57,6 @@ public:
 
   // There could be only one factory thus the name is static.
   static std::string name() { return "ssl_context_manager"; }
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "ssl_contexts"; }
 };
 
 } // namespace Ssl

@@ -18,13 +18,6 @@ class Registration {
 public:
   virtual ~Registration() = default;
   virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "singletons"; }
 };
 
 /**
@@ -52,7 +45,7 @@ public:
  */
 #define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
   static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
-  static Envoy::Registry::RegisterFactory<                                                         \
+  static Envoy::Registry::RegisterInternalFactory<                                                 \
       Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>, Envoy::Singleton::Registration>   \
       NAME##_singleton_registered_;
 

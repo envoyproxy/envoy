@@ -240,6 +240,25 @@ private:
 };
 
 /**
+ * RegisterInternalFactory is a special case for registering factories
+ * that are considered internal implementation details that should
+ * not be exposed to operators via the factory categories.
+ *
+ * There is no corresponding REGISTER_INTERNAL_FACTORY because
+ * this should be used sparingly and only in special cases.
+ */
+template <class T, class Base> class RegisterInternalFactory {
+public:
+  RegisterInternalFactory() {
+    ASSERT(!instance_.name().empty());
+    FactoryRegistry<Base>::registerFactory(instance_, instance_.name());
+  }
+
+private:
+  T instance_{};
+};
+
+/**
  * Macro used for static registration.
  */
 #define REGISTER_FACTORY(FACTORY, BASE)                                                            \
