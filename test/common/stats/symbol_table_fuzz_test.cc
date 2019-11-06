@@ -18,7 +18,15 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   while (provider.remaining_bytes() != 0) {
     std::string next_data = provider.ConsumeRandomLengthString(provider.remaining_bytes());
     StatName stat_name = pool.add(next_data);
-    FUZZ_ASSERT(next_data == symbol_table.toString(stat_name));
+
+    // We can add stat-names with trailing dots, but note that they will be
+    // trimmed by the Symbol Table implementation, so we must trim the input
+    // string before comparing.
+    absl::string_view trimmed_fuzz_data(next_data);
+    while (absl::EndsWith(trimmed_fuzz_data, ".")) {
+      trimmed_fuzz_data.remove_suffix(1);
+    }
+    FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(stat_name));
   }
 }
 
