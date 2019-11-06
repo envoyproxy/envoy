@@ -4,9 +4,12 @@
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
 from collections import defaultdict
+import json
 import functools
 import os
+import pathlib
 import re
+import string
 
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
@@ -32,6 +35,33 @@ UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 # Template for data plane API URLs.
 DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
     os.environ['ENVOY_BLOB_SHA'])
+
+# Template for formating extension descriptions.
+EXTENSION_TEMPLATE = string.Template("""$anchor
+This extension may be referenced by the qualified name *$extension*
+
+$security_posture
+
+""")
+
+# A map from the security postures (as defined in the envoy_cc_extension build
+# macro) to human readable text for extension docs.
+SECURITY_POSTURES = {
+    'robust_to_untrusted_downstream':
+        'This extension is hardened against untrusted downstream traffic. It '
+        'assumes that the upstream is trusted.',
+    'robust_to_untrusted_downstream_and_upstream':
+        'This extension is hardened against both untrusted downstream and '
+        'upstream traffic. This extension is not hardened and should only be '
+        'used in deployments where both the downstream and upstream are '
+        'trusted.',
+    'requires_trusted_downstream_and_upstream':
+        'This extension is not hardened and should only be used in deployments'
+        ' where both the downstream and upstream are trusted.',
+    'unknown': 'This extension has an unknown security posture and should only be '
+               'used in deployments where both the downstream and upstream are '
+               'trusted.',
+}
 
 
 class ProtodocError(Exception):
@@ -69,7 +99,11 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   Returns:
     A string with additional RST from annotations.
   """
-  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
+  formatted_extension = ''
+  if annotations.EXTENSION_ANNOTATION in comment.annotations:
+    extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
+    formatted_extension = FormatExtension(extension)
+  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension
 
 
 def MapLines(f, s):
@@ -116,6 +150,24 @@ def FormatHeader(style, text):
   return '%s\n%s\n\n' % (text, style * len(text))
 
 
+def FormatExtension(extension):
+  """Format extension metadata as RST.
+
+  Args:
+    extension: the name of the extension, e.g. com.acme.foo.
+
+  Returns:
+    RST formatted extension description.
+  """
+  extension_metadata = json.loads(pathlib.Path(
+      os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
+  anchor = FormatAnchor('extension_' + extension)
+  return EXTENSION_TEMPLATE.substitute(
+      anchor=anchor,
+      extension=extension,
+      security_posture=SECURITY_POSTURES[extension_metadata['security_posture']])
+
+
 def FormatHeaderFromFile(style, source_code_info, proto_name):
   """Format RST header based on special file level title
 
@@ -131,11 +183,15 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
   anchor = FormatAnchor(FileCrossRefLabel(proto_name))
   stripped_comment = annotations.WithoutAnnotations(
       StripLeadingSpace('\n'.join(c + '\n' for c in source_code_info.file_level_comments)))
+  formatted_extension = ''
+  if annotations.EXTENSION_ANNOTATION in source_code_info.file_level_annotations:
+    extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
+    formatted_extension = FormatExtension(extension)
   if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
     return anchor + FormatHeader(
-        style,
-        source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]), stripped_comment
-  return anchor + FormatHeader(style, proto_name), stripped_comment
+        style, source_code_info.file_level_annotations[
+            annotations.DOC_TITLE_ANNOTATION]) + formatted_extension, stripped_comment
+  return anchor + FormatHeader(style, proto_name) + formatted_extension, stripped_comment
 
 
 def FormatFieldTypeAsJson(type_context, field):

@@ -88,75 +88,9 @@ for these older bugs.
 
 ### Threat model
 
-#### Confidentiality, integrity and availability
-
-We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
-highest priority concerns. Availability, in particular in areas relating to DoS and resource
-exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
-Envoy in edge deployments.
-
-The Envoy availability stance around CPU and memory DoS, as well as Query-of-Death (QoD), is still
-evolving. We will continue to iterate and fix well known resource issues in the open, e.g. overload
-manager and watermark improvements. We will activate the security process for disclosures that
-appear to present a risk profile that is significantly greater than the current Envoy availability
-hardening status quo. Examples of disclosures that would elicit this response:
-* QoD; where a single query from a client can bring down an Envoy server.
-* Highly asymmetric resource exhaustion attacks, where very little traffic can cause resource
-  exhaustion, e.g. that delivered by a single client.
-
-Note that we do not currently consider the default settings for Envoy to be safe from an availability
-perspective. It is necessary for operators to explicitly configure watermarks, the overload manager,
-circuit breakers and other resource related features in Envoy to provide a robust availability
-story. We will not act on any security disclosure that relates to a lack of safe defaults. Over
-time, we will work towards improved safe-by-default configuration, but due to backwards
-compatibility and performance concerns, this will require following the breaking change deprecation
-policy.
-
-#### Core and extensions
-
-Anything in the Envoy core may be used in both untrusted and trusted deployments. As a consequence,
-it should be hardened with this model in mind.  Security issues related to core code will usually
-trigger the security release process as described in this document.
-
-Some [extensions](EXTENSION_POLICY.md) are also widely used and deserve the same treatment as core.
-Examples include HTTP connection manager, TCP proxy, buffer filter, router filter, CORS, dynamic
-forward proxy, anything intended to enforce access control policies (RBAC, external authorization)
-and all transport socket extensions.
-
-Other extensions are only expected to be used in trusted environments today.  These include, but are
-not limited to most non-HTTP network filters (e.g.  Thrift, Dynamo, Mongo, Redis, Kafka, Dubbo,
-Zookeeper, MySQL), HTTP inspector and Squash. We will not treat any issues in these extensions
-as warranting invocation of the security release process.
-
-Envoy currently has two dynamic filter extensions that support loadable code; WASM and Lua. In both
-cases, we assume that the dynamically loaded code is trusted. We expect the runtime for Lua to be
-robust to untrusted data plane traffic with the assumption of a trusted script. WASM is still in
-development, but will eventually have a similar security stance.
-
-Please consult the PST if you have questions on which extensions are considered safe to use in the
-presence of untrusted traffic.
-
-#### Data and control plane
-
-We divide our threat model into data and control plane, reflecting the internal division in Envoy of
-these concepts from an architectural perspective. Our highest priority in risk assessment is the
-threat posed by untrusted downstream client traffic on the data plane. This reflects the use of
-Envoy in an edge serving capacity and also the use of Envoy as an inbound destination in a service
-mesh deployment.
-
-In addition, we have an evolving position towards any vulnerability that might be exploitable by
-untrusted upstreams. We recognize that these constitute a serious security consideration, given the
-use of Envoy as an egress proxy. We will activate the security release process for disclosures that
-appear to present a risk profile that is significantly greater than the current Envoy upstream
-hardening status quo.
-
-The control plane management server is generally trusted. We do not consider wire-level exploits
-against the xDS transport protocol to be a concern as a result. However, the configuration delivered
-to Envoy over xDS may originate from untrusted sources and may not be fully sanitized. An example of
-this might be a service operator that hosts multiple tenants on an Envoy, where tenants may specify
-a regular expression on a header match in `RouteConfiguration`. In this case, we expect that Envoy
-is resilient against the risks posed by malicious configuration from a confidentiality, integrity
-and availability perspective, as described above.
+See https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model.
+Vulnerabilities are evaluated against this threat model when deciding whether to activate the Envoy
+security release process.
 
 ### Fix Team Organization
 

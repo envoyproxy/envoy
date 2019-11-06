@@ -34,19 +34,32 @@ def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
 # labels intended to make clear the trust that operators may place in
 # extensions.
 EXTENSION_SECURITY_POSTURES = [
+    # This extension is hardened against untrusted downstream traffic. It
+    # assumes that the upstream is trusted.
     "robust_to_untrusted_downstream",
-    "robust_to_untrusted_upstream",
-    "robust_to_untrusted_upstream_and_upstream",
+    # This extension is hardened against both untrusted downstream and upstream
+    # traffic.
+    "robust_to_untrusted_downstream_and_upstream",
+    # This extension is not hardened and should only be used in deployments
+    # where both the downstream and upstream are trusted.
     "requires_trusted_downstream_and_upstream",
+    # This is functionally equivaelnt to
+    # requires_trusted_downstream_and_upstream, but acts as a placeholder to
+    # allow us to identify extensions that need classifying.
+    "unknown",
 ]
 
 def envoy_cc_extension(
         name,
         security_posture,
+        # Only set this for internal, undocumented extensions.
+        undocumented = False,
+        tags = [],
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
-    envoy_cc_library(name, **kwargs)
+    tags = tags + ["secpos:" + security_posture]
+    envoy_cc_library(name, tags = tags, **kwargs)
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(

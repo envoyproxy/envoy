@@ -25,11 +25,11 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "kafka_request_codec_lib",
-    security_posture = "requires_trusted_downstream_and_upstream",
     srcs = ["request_codec.cc"],
     hdrs = [
         "request_codec.h",
     ],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":abstract_codec_lib",
         ":kafka_request_parser_lib",

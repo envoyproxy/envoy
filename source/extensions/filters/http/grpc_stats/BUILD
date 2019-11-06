@@ -4,16 +4,17 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["grpc_stats_filter.cc"],
     hdrs = ["grpc_stats_filter.h"],
+    security_posture = "unknown",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
