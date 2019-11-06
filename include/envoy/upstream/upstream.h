@@ -875,10 +875,10 @@ public:
   virtual bool auto_sni() const PURE;
 
   /**
-   * @return upstream tls context from cluster 
+   * @return upstream tls context from cluster
    */
-  virtual absl::optional<envoy::api::v2::auth::UpstreamTlsContext>& upstreamTlsContext() PURE;
-  
+  virtual absl::optional<envoy::api::v2::auth::UpstreamTlsContext>& upstreamTlsContext() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

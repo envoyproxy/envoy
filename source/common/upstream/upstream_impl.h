@@ -574,7 +574,9 @@ public:
   bool warmHosts() const override { return warm_hosts_; }
   bool auto_sni() const override { return auto_sni_; }
 
-  absl::optional<envoy::api::v2::auth::UpstreamTlsContext>& upstreamTlsContext() override { return tls_context_; }
+  absl::optional<envoy::api::v2::auth::UpstreamTlsContext>& upstreamTlsContext() const override {
+    return tls_context_;
+  }
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;

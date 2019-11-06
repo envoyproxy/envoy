@@ -428,14 +428,23 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
   cluster_ = cluster->info();
 
-  // if (cluster_->auto_sni()) {
+  if (cluster_->auto_sni()) {
+    auto url_obj = Http::Utility::Url{};
+    if (!url_obj.initialize(headers.Path()->value().getStringView())) {
+      throw EnvoyException(fmt::format("cluster: failed to parse inbound url"));
+    }
 
-  // }
-
-  // if (cluster_->auto_sni()) {
-    // add sni value dynamically on tls_context section from authority
-    // if sni cache includes passed authority, skip this operation
-  // }
+    if (cluster_->upstreamTlsContext() == absl::nullopt) {
+      throw EnvoyException(
+          fmt::format("cluster: tls_context is needed on cluster config if you set auto_sni true"));
+    }
+    if (!url_obj.is_raw_ipv4_address() &&
+        (cluster_->upstreamTlsContext().value().sni().size() == 0 ||
+         cluster_->upstreamTlsContext().value().sni() != url_obj.host_and_port())) {
+      cluster_->upstreamTlsContext().value().clear_sni();
+      cluster_->upstreamTlsContext().value().set_sni(std::string(url_obj.host_and_port()));
+    }
+  }
 
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);

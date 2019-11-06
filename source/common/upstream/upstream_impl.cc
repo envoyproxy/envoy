@@ -624,8 +624,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
-          max_requests_per_connection_(
-              PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
+      max_requests_per_connection_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
@@ -655,10 +655,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
       auto_sni_(config.auto_sni()),
-      tls_context_(config.has_tls_context()
-                        ? absl::make_optional<envoy::api::v2::auth::UpstreamTlsContext>(
-                              config.tls_context())
-                        : absl::nullopt),
+      tls_context_(
+          config.has_tls_context()
+              ? absl::make_optional<envoy::api::v2::auth::UpstreamTlsContext>(config.tls_context())
+              : absl::nullopt),
       cluster_type_(config.has_cluster_type()
                         ? absl::make_optional<envoy::api::v2::Cluster::CustomClusterType>(
                               config.cluster_type())
