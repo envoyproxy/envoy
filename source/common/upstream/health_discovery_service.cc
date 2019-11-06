@@ -178,7 +178,7 @@ void HdsDelegate::onReceiveMessage(
   hds_clusters_.clear();
 
   // Set response
-  auto server_response_ms = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+  auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);
 
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));

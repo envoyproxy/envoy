@@ -196,6 +196,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
+      // Create composite array for a single get.
       Common::Redis::RespValue single_get(base_request,
                                           Common::Redis::Utility::GetRequest::instance(), i, i);
       pending_request.handle_ = makeFragmentedRequest(
@@ -270,11 +271,12 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    // ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set->toString());
     const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
+      // Create composite array for a single set command.
       Common::Redis::RespValue single_set(base_request,
                                           Common::Redis::Utility::SetRequest::instance(), i, i + 1);
+      ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set.toString());
       pending_request.handle_ = makeFragmentedRequest(
           route, "set", base_request->asArray()[i].asString(), single_set, pending_request);
     }
@@ -339,6 +341,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
+    // Create the composite array for a single fragment.
     Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", base_request->asArray()[0].asString(),
               single_fragment.toString());

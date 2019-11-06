@@ -33,5 +33,6 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/header_to_metadata:header_to_metadata_filter_lib",
+        "@envoy_api//envoy/config/filter/http/header_to_metadata/v2:pkg_cc_proto",
     ],
 )

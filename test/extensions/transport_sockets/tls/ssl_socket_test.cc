@@ -3328,17 +3328,21 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  // Connection using defaults (client) and TLSv1.0 (server) succeeds.
+  TestUtilOptionsV2 unsupported_protocol_test_options(listener, client, false, GetParam());
+  unsupported_protocol_test_options.setExpectedServerStats("ssl.connection_error")
+      .setExpectedTransportFailureReasonContains("UNSUPPORTED_PROTOCOL");
+
+  // Connection using defaults (client) and TLSv1.0 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(tls_v1_test_options);
+  testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  // Connection using defaults (client) and TLSv1.1 (server) succeeds.
+  // Connection using defaults (client) and TLSv1.1 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  testUtilV2(tls_v1_1_test_options);
+  testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
@@ -4166,11 +4170,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4198,11 +4204,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            sync_mode: false
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4230,11 +4238,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4262,11 +4272,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          sync_mode: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            sync_mode: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4294,12 +4306,14 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          crypto_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            crypto_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4327,12 +4341,14 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: true
-          crypto_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: true
+            crypto_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4360,11 +4376,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4392,11 +4410,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4424,11 +4444,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          async_method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            async_method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4457,11 +4479,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          async_method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            async_method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4503,11 +4527,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key:
@@ -4541,20 +4567,24 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
 )EOF";
 
   TestUtilOptions failing_test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
@@ -4582,10 +4612,12 @@ TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          mode: ecdsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            mode: ecdsa
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
@@ -4615,20 +4647,24 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          async_method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            async_method_error: true
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          mode: ecdsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            mode: ecdsa
 )EOF";
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setPrivateKeyMethodExpected(true));
@@ -4655,20 +4691,24 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          async_method_error: true
-          mode: ecdsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            async_method_error: true
+            mode: ecdsa
 )EOF";
   TestUtilOptions failing_test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(failing_test_options.setPrivateKeyMethodExpected(true)

@@ -20,6 +20,9 @@ namespace Envoy {
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
+// TODO(danzh) Lifetime of quic connection and filter manager connection can be
+// simplified by changing the inheritance to a member variable instantiated
+// before quic_connection_.
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public QuicFilterManagerConnectionImpl {
 public:
@@ -30,7 +33,9 @@ public:
                          quic::QuicCryptoServerStream::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+
+  ~EnvoyQuicServerSession() override;
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
@@ -48,6 +53,8 @@ public:
   // quic::QuicSpdySession
   void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
 
+  using quic::QuicSession::stream_map;
+
 protected:
   // quic::QuicServerSessionBase
   quic::QuicCryptoServerStreamBase*
@@ -64,6 +71,7 @@ protected:
 private:
   void setUpRequestDecoder(EnvoyQuicStream& stream);
 
+  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};

@@ -4,8 +4,7 @@
 # CircleCI logs.
 set -e
 
-if [ -n "$CIRCLE_PULL_REQUEST" ]
-then
+if [[ -n "$CIRCLE_PULL_REQUEST" ]]; then
     echo 'Ignoring PR branch for docker push.'
     exit 0
 fi
@@ -13,8 +12,7 @@ fi
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 # push the envoy image on tags or merge to master
-if [ -n "$CIRCLE_TAG" ] || [ "$AZP_BRANCH" = 'refs/heads/master' ]
-then
+if [[ -n "$CIRCLE_TAG" ]] || [[ "$AZP_BRANCH" = 'refs/heads/master' ]]; then
     docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
     for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do

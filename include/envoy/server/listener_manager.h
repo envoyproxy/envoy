@@ -1,5 +1,8 @@
 #pragma once
 
+#include <vector>
+
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -39,8 +42,7 @@ public:
    * @return an LDS API provider.
    * @param lds_config supplies the management server configuration.
    */
-  virtual LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
-                                 bool is_delta) PURE;
+  virtual LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
 
   /**
    * Creates a socket.
@@ -102,6 +104,14 @@ public:
  */
 class ListenerManager {
 public:
+  // Indicates listeners to stop.
+  enum class StopListenersType {
+    // Listeners in the inbound direction are only stopped.
+    InboundOnly,
+    // All listeners are stopped.
+    All,
+  };
+
   virtual ~ListenerManager() = default;
 
   /**
@@ -129,8 +139,7 @@ public:
    * pieces of the server existing.
    * @param lds_config supplies the management server configuration.
    */
-  virtual void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
-                            bool is_delta) PURE;
+  virtual void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
@@ -161,15 +170,30 @@ public:
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
-   * is used for server draining.
+   * is used for server draining and /drain_listeners admin endpoint. This method directly stops the
+   * listeners on workers. Once a listener is stopped, any listener modifications are not allowed.
+   * @param stop_listeners_type indicates listeners to stop.
    */
-  virtual void stopListeners() PURE;
+  virtual void stopListeners(StopListenersType stop_listeners_type) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will
    * have exited.
    */
   virtual void stopWorkers() PURE;
+
+  /*
+   * Warn the listener manager of an impending update. This allows the listener to clear per-update
+   * state.
+   */
+  virtual void beginListenerUpdate() PURE;
+
+  /*
+   * Inform the listener manager that the update has completed, and informs the listener of any
+   * errors handled by the reload source.
+   */
+  using FailureStates = std::vector<std::unique_ptr<envoy::admin::v2alpha::UpdateFailureState>>;
+  virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 };
 
 } // namespace Server

@@ -267,7 +267,7 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     host_address_map_key = host_address;
   } else {
     const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
-    uint64_t ip_port_number;
+    uint32_t ip_port_number;
     if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
       return nullptr;
     }
@@ -290,7 +290,7 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     if (!ipv6) {
       // Only create an IPv4 address instance if we need a new Upstream::HostImpl.
       const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
-      uint64_t ip_port_number;
+      uint32_t ip_port_number;
       if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
         return nullptr;
       }

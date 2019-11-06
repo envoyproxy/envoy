@@ -65,5 +65,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
     ],
 )

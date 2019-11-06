@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+#include "envoy/common/platform.h"
 
 #include "common/grpc/common.h"
 #include "common/grpc/context_impl.h"
@@ -33,6 +33,11 @@ TEST(GrpcContextTest, ChargeStats) {
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.total").value());
+
+  context.chargeRequestMessageStat(cluster, request_names, 3);
+  context.chargeResponseMessageStat(cluster, request_names, 4);
+  EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.request_message_count").value());
+  EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.response_message_count").value());
 
   Http::TestHeaderMapImpl trailers;
   Http::HeaderEntry& status = trailers.insertGrpcStatus();

@@ -7,7 +7,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_select_google_grpc",
 )
 
 envoy_package()

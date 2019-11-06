@@ -1,21 +1,9 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 
-#include <sys/socket.h>
-
-#pragma GCC diagnostic push
-
-// QUICHE allows unused parameters.
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-
-#include "quiche/quic/core/quic_types.h"
-
-#pragma GCC diagnostic pop
-
-#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/network/utility.h"
+
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {

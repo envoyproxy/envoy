@@ -99,6 +99,11 @@ public:
   virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
 
   /**
+   * @return traffic direction of the listener.
+   */
+  virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
+
+  /**
    * @return the connection balancer for this listener. All listeners have a connection balancer,
    *         though the implementation may be a NOP balancer.
    */

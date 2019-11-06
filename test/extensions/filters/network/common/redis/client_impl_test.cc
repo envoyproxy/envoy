@@ -32,7 +32,7 @@ namespace Client {
 
 class RedisClientImplTest : public testing::Test, public Common::Redis::DecoderFactory {
 public:
-  // Commmon::Redis::DecoderFactory
+  // Common::Redis::DecoderFactory
   Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
     callbacks_ = &callbacks;
     return Common::Redis::DecoderPtr{decoder_};
@@ -163,7 +163,7 @@ TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
   }));
   upstream_read_filter_->onData(fake_data, false);
@@ -218,7 +218,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
   }));
   upstream_read_filter_->onData(fake_data, false);
@@ -262,14 +262,14 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
   }));
   upstream_read_filter_->onData(fake_data, false);
@@ -314,14 +314,14 @@ TEST_F(RedisClientImplTest, Basic) {
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
   }));
   upstream_read_filter_->onData(fake_data, false);
@@ -337,7 +337,7 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   setup();
 
   auth_password_ = "testing password";
-  Common::Redis::RespValue auth_request = Utility::makeAuthCommand(auth_password_);
+  Utility::AuthRequest auth_request(auth_password_);
   EXPECT_CALL(*encoder_, encode(Eq(auth_request), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   client_->initialize(auth_password_);
@@ -403,14 +403,14 @@ TEST_F(RedisClientImplTest, Cancel) {
     EXPECT_CALL(callbacks1, onResponse_(_)).Times(0);
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
   }));
   upstream_read_filter_->onData(fake_data, false);
@@ -440,7 +440,7 @@ TEST_F(RedisClientImplTest, FailAll) {
   onConnected();
 
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
@@ -497,7 +497,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
     throw Common::Redis::ProtocolError("error");
   }));
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_FAILED, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -520,7 +520,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   EXPECT_NE(nullptr, handle1);
 
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -577,7 +577,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   EXPECT_NE(nullptr, handle1);
 
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -607,7 +607,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   EXPECT_CALL(callbacks1, onResponse_(_));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   respond();
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
@@ -620,7 +620,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   EXPECT_NE(nullptr, handle1);
 
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -669,7 +669,7 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     EXPECT_CALL(callbacks1, onRedirection_(Ref(response1))).WillOnce(Return(false));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
@@ -681,7 +681,7 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     EXPECT_CALL(callbacks2, onRedirection_(Ref(response2))).WillOnce(Return(true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
@@ -730,7 +730,7 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     EXPECT_CALL(callbacks1, onRedirection_(Ref(response1))).WillOnce(Return(false));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
@@ -742,7 +742,7 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     EXPECT_CALL(callbacks2, onRedirection_(Ref(response2))).WillOnce(Return(true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
@@ -791,7 +791,7 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
     EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
@@ -804,7 +804,7 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
     EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
@@ -853,7 +853,7 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
     EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
@@ -866,7 +866,7 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
     EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
@@ -906,7 +906,7 @@ TEST_F(RedisClientImplTest, RemoveFailedHealthCheck) {
       }));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer()).Times(2);
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   callbacks_->onRespValue(std::move(response1));
 }
 
@@ -930,7 +930,7 @@ TEST_F(RedisClientImplTest, RemoveFailedHost) {
   onConnected();
 
   EXPECT_CALL(host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(callbacks1, onFailure()).WillOnce(Invoke([&]() { client_->close(); }));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));

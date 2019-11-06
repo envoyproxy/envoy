@@ -42,7 +42,6 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 21]
 // [#next-free-field: 21]
 message Listener {
   enum DrainType {

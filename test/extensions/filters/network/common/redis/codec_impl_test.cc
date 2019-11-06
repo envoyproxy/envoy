@@ -43,7 +43,8 @@ public:
     RespValue move(std::move(copy));
     EXPECT_TRUE(value == move);
 
-    RespValue move_assign = std::move(move);
+    RespValue move_assign;
+    move_assign = std::move(move);
     EXPECT_TRUE(value == move_assign);
   }
 
@@ -204,6 +205,10 @@ TEST_F(RedisRespValueTest, CompositeArrayTest) {
   EXPECT_FALSE(value1 == value2);
   EXPECT_FALSE(value1 == value3);
   EXPECT_TRUE(value1 == value4);
+
+  RespValue value5;
+  value5 = value1;
+  EXPECT_TRUE(value1 == value5);
 
   RespValue empty;
   empty.type(RespType::CompositeArray);

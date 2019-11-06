@@ -77,6 +77,7 @@ public:
   MOCK_CONST_METHOD0(componentLogLevels,
                      const std::vector<std::pair<std::string, spdlog::level::level_enum>>&());
   MOCK_CONST_METHOD0(logFormat, const std::string&());
+  MOCK_CONST_METHOD0(logFormatEscaped, bool());
   MOCK_CONST_METHOD0(logPath, const std::string&());
   MOCK_CONST_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_CONST_METHOD0(restartEpoch, uint64_t());
@@ -238,13 +239,11 @@ public:
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
-                         bool is_delta) override {
-    return LdsApiPtr{createLdsApi_(lds_config, is_delta)};
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+    return LdsApiPtr{createLdsApi_(lds_config)};
   }
 
-  MOCK_METHOD2(createLdsApi_,
-               LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
+  MOCK_METHOD1(createLdsApi_, LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config));
   MOCK_METHOD2(createNetworkFilterFactoryList,
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -275,14 +274,15 @@ public:
 
   MOCK_METHOD3(addOrUpdateListener, bool(const envoy::api::v2::Listener& config,
                                          const std::string& version_info, bool modifiable));
-  MOCK_METHOD2(createLdsApi,
-               void(const envoy::api::v2::core::ConfigSource& lds_config, bool is_delta));
+  MOCK_METHOD1(createLdsApi, void(const envoy::api::v2::core::ConfigSource& lds_config));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
-  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD1(stopListeners, void(StopListenersType listeners_type));
   MOCK_METHOD0(stopWorkers, void());
+  MOCK_METHOD0(beginListenerUpdate, void());
+  MOCK_METHOD1(endListenerUpdate, void(ListenerManager::FailureStates&&));
 };
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
@@ -334,8 +334,8 @@ public:
   MOCK_METHOD1(start, void(GuardDog& guard_dog));
   MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
   MOCK_METHOD0(stop, void());
-  MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
-  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD2(stopListener,
+               void(Network::ListenerConfig& listener, std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

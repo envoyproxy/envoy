@@ -572,7 +572,7 @@ private:
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
-  uint32_t buffer_limit_{0};
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::HeaderMap&)> modify_headers_;
 

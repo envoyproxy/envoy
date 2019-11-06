@@ -59,7 +59,12 @@ public:
   void onConnectionDestroy(Network::ConnectionEvent event, bool active_streams);
 
 private:
-  enum class Type { NotInitialized, iOS, Android, Unknown };
+  enum class Type {
+    NotInitialized,
+    iOS, // NOLINT(readability-identifier-naming)
+    Android,
+    Unknown
+  };
 
   Type type_{Type::NotInitialized};
   std::unique_ptr<UserAgentStats> stats_;

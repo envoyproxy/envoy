@@ -110,6 +110,22 @@ TEST_F(BufferFilterTest, ContentLengthPopulation) {
   EXPECT_EQ(headers.ContentLength()->value().getStringView(), "11");
 }
 
+TEST_F(BufferFilterTest, ContentLengthPopulationInTrailers) {
+  InSequence s;
+
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
+  ASSERT_EQ(headers.ContentLength(), nullptr);
+
+  Http::TestHeaderMapImpl trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers));
+  ASSERT_NE(headers.ContentLength(), nullptr);
+  EXPECT_EQ(headers.ContentLength()->value().getStringView(), "5");
+}
+
 TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
   InSequence s;
 
