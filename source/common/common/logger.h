@@ -167,19 +167,34 @@ public:
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
   void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override;
+  void set_should_escape(bool should_escape) { should_escape_ = should_escape; }
 
   /**
    * @return bool whether a lock has been established.
    */
   bool hasLock() const { return stderr_sink_->hasLock(); }
 
-  // Constructs a new DelegatingLogSink, sets up the default sink to stderr,
-  // and returns a shared_ptr to it. A shared_ptr is required for sinks used
-  // in spdlog::logger; it would not otherwise be required in Envoy. This method
-  // must own the construction process because StderrSinkDelegate needs access to
-  // the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
-  // available after construction.
+  /**
+   * Constructs a new DelegatingLogSink, sets up the default sink to stderr,
+   * and returns a shared_ptr to it.
+   *
+   * A shared_ptr is required for sinks used
+   * in spdlog::logger; it would not otherwise be required in Envoy. This method
+   * must own the construction process because StderrSinkDelegate needs access to
+   * the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
+   * available after construction.
+   */
   static DelegatingLogSinkPtr init();
+
+  /**
+   * Give a log line with trailing whitespace, this will escape all c-style
+   * escape sequences except for the trailing whitespace.
+   * This allows logging escaped messages, but preserves end-of-line characters.
+   *
+   * @param source the log line with trailing whitespace
+   * @return a string with all c-style escape sequences escaped, except trailing whitespace
+   */
+  static std::string escapeLogLine(absl::string_view source);
 
 private:
   friend class SinkDelegate;
@@ -193,6 +208,7 @@ private:
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
   absl::Mutex format_mutex_; // direct absl reference to break build cycle.
+  bool should_escape_{false};
 };
 
 /**
@@ -209,7 +225,7 @@ private:
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock);
+          Thread::BasicLockable& lock, bool should_escape);
   ~Context();
 
 private:
@@ -218,6 +234,7 @@ private:
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
+  bool should_escape_;
   Context* const save_context_;
 };
 
