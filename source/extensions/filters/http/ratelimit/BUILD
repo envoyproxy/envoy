@@ -36,11 +36,11 @@ envoy_cc_library(
     deps = [
         ":ratelimit_lib",
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
     ],
 )

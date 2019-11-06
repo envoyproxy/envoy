@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 . tools/shell_utils.sh
 
@@ -49,6 +49,9 @@ pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
 rm -rf bazel-bin/external/envoy_api
+
+# This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
+BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \

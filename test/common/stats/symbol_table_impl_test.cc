@@ -11,6 +11,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
@@ -604,7 +605,7 @@ TEST_P(StatNameTest, RecentLookups) {
     accum.emplace_back(absl::StrCat(count, ": ", name));
   });
   EXPECT_EQ(5, total);
-  std::string recent_lookups_str = StringUtil::join(accum, " ");
+  std::string recent_lookups_str = absl::StrJoin(accum, " ");
 
   EXPECT_EQ("1: direct.stat "
             "2: dynamic.stat1 " // Combines entries from set and symbol-table.

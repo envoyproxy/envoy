@@ -35,6 +35,7 @@ envoy_cc_mock(
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/network:transport_socket_mocks",
+        "@envoy_api//envoy/api/v2/cluster:pkg_cc_proto",
     ],
 )
 

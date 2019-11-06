@@ -23,6 +23,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/csrf/v2:pkg_cc_proto",
     ],
 )
@@ -36,5 +37,6 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/csrf:csrf_filter_lib",
+        "@envoy_api//envoy/config/filter/http/csrf/v2:pkg_cc_proto",
     ],
 )

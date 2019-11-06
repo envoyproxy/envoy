@@ -31,6 +31,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -415,6 +416,13 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   }
 }
 
+std::string getListenerDetails(Envoy::Server::Instance& server) {
+  const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
+  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")();
+  auto listener_info = Protobuf::down_cast<envoy::admin::v2alpha::ListenersConfigDump>(*details);
+  return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
+}
+
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names,
                                                        bool allow_unknown_static_fields,
@@ -442,8 +450,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
       if (!allow_lds_rejection) {
         RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
                            test_server_->counter(rejected)->value() == 0,
-                       "Lds update failed. For details, run test with -l trace and look for "
-                       "\"Error adding/updating listener(s)\" in the logs.");
+                       absl::StrCat("Lds update failed. Details\n",
+                                    getListenerDetails(test_server_->server())));
       }
       time_system_.sleep(std::chrono::milliseconds(10));
     }
@@ -595,10 +603,8 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
                                                 discovery_request.resource_names().cend());
   if (expected_resource_names != resource_names) {
     return AssertionFailure() << fmt::format(
-               "resources {} do not match expected {} in {}",
-               fmt::join(resource_names.begin(), resource_names.end(), ","),
-               fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
-               discovery_request.DebugString());
+               "resources {} do not match expected {} in {}", absl::StrJoin(resource_names, ","),
+               absl::StrJoin(expected_resource_names, ","), discovery_request.DebugString());
   }
   if (expected_version != discovery_request.version_info()) {
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",

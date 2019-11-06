@@ -55,6 +55,7 @@ private:
   std::vector<Http::LowerCaseString> request_headers_to_log_;
   std::vector<Http::LowerCaseString> response_headers_to_log_;
   std::vector<Http::LowerCaseString> response_trailers_to_log_;
+  std::vector<std::string> filter_states_to_log_;
 };
 
 } // namespace HttpGrpc

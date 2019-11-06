@@ -6,6 +6,7 @@
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/router/string_accessor_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -25,6 +26,16 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace AccessLog {
 namespace {
+
+class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto any = std::make_unique<ProtobufWkt::Any>();
+    any->set_type_url("UnknownType");
+    any->set_value("\xde\xad\xbe\xef");
+    return any;
+  }
+};
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
@@ -990,6 +1001,22 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+    stream_info.filter_state_.setData("testing",
+                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
+    stream_info.filter_state_.setData("serialized",
+                                      std::make_unique<TestSerializedUnknownFilterState>(),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
+    const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
+                               "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("\"test_value\"|-|\"test_va|-",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+  }
+
+  {
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
@@ -1079,6 +1106,8 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%TRAILER(X?Y?Z)%",
       "%TRAILER(:TEST):10",
       "%DYNAMIC_METADATA(TEST",
+      "%FILTER_STATE(TEST",
+      "%FILTER_STATE()%",
       "%START_TIME(%85n)%",
       "%START_TIME(%#__88n)%"};
 

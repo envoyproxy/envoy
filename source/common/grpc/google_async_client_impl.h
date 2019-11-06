@@ -3,6 +3,7 @@
 #include <queue>
 
 #include "envoy/api/api.h"
+#include "envoy/common/platform.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"

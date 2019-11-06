@@ -65,6 +65,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "hash_policy_interface",
+    hdrs = ["hash_policy.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":address_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "io_handle_interface",
     hdrs = ["io_handle.h"],
     deps = [
@@ -109,7 +118,6 @@ envoy_cc_library(
         ":connection_interface",
         ":listen_socket_interface",
         "//include/envoy/stats:stats_interface",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
