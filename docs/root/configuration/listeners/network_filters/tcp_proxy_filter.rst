@@ -74,7 +74,7 @@ To configure TCP proxy to route to a subset of hosts within a weighted cluster, 
             metadata_match:
               filter_metadata:
                 envoy.lb:
-                  role: database
+                  role: replica
             weight: 90
 
 Notice that for the above configuration to have effect,
