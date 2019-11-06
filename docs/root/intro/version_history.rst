@@ -5,6 +5,7 @@ Version history
 ================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * api: remove all support for v1
+* redis: performance improvement for larger split commands by avoiding string copies.
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 * tls: remove TLS 1.0 and 1.1 from client defaults
 

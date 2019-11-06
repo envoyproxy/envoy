@@ -137,3 +137,21 @@ envoy_extension_cc_test(
         "//test/integration:integration_lib",
     ],
 )
+
+envoy_extension_cc_test_binary(
+    name = "command_split_speed_test",
+    srcs = ["command_split_speed_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        ":redis_mocks",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
+        "//source/extensions/filters/network/redis_proxy:router_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)

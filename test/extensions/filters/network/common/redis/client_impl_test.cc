@@ -337,7 +337,7 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   setup();
 
   auth_password_ = "testing password";
-  Common::Redis::RespValue auth_request = Utility::makeAuthCommand(auth_password_);
+  Utility::AuthRequest auth_request(auth_password_);
   EXPECT_CALL(*encoder_, encode(Eq(auth_request), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   client_->initialize(auth_password_);
