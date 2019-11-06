@@ -372,6 +372,293 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
+class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
+public:
+  void setup(const std::string& tcp_proxy_config, const std::string& endpoint_role,
+             const std::string& endpoint_version, const std::string& endpoint_stage);
+
+  void expectEndpointToMatchRoute();
+  void expectEndpointNotToMatchRoute();
+};
+
+void TcpProxyMetadataMatchIntegrationTest::setup(const std::string& tcp_proxy_config,
+                                                 const std::string& endpoint_role,
+                                                 const std::string& endpoint_version,
+                                                 const std::string& endpoint_stage) {
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+
+    ASSERT(static_resources->listeners_size() == 1);
+    static_resources->mutable_listeners(0)
+        ->mutable_filter_chains(0)
+        ->mutable_filters(0)
+        ->mutable_typed_config()
+        ->PackFrom(TestUtility::parseYaml<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            tcp_proxy_config));
+
+    ASSERT(static_resources->clusters_size() == 1);
+    static_resources->clear_clusters();
+    static_resources->add_clusters()->CopyFrom(
+        TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+            R"EOF(
+            name: cluster_0
+            type: STATIC
+            lb_policy: ROUND_ROBIN
+            lb_subset_config:              # 'lb_subset_config' is the same across all tests
+              fallback_policy: NO_FALLBACK
+              subset_selectors:
+              - keys:
+                - role
+                - version
+                - stage
+            load_assignment:
+              cluster_name: cluster_0
+              endpoints:
+              - lb_endpoints:
+                - endpoint:
+                    address:
+                      socket_address:
+                        address: {}
+                        port_value: 0
+                  metadata:
+                    filter_metadata:
+                      envoy.lb:
+                        role: {}           # assigned 'role' value varies across tests
+                        version: {}        # assigned 'version' value varies across tests
+                        stage: {}          # assigned 'stage' value varies across tests
+          )EOF",
+            Network::Test::getLoopbackAddressString(version_), endpoint_role, endpoint_version,
+            endpoint_stage)));
+  });
+
+  TcpProxyIntegrationTest::initialize();
+}
+
+// Verifies successful connection.
+void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  tcp_client->waitForData("world");
+  tcp_client->write("hello", true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("cluster.cluster_0.lb_subsets_selected", 1);
+}
+
+// Verifies connection failure.
+void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyMetadataMatchIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test subset load balancing for a regular cluster when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldMatchSingleClusterWithTopLevelMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      cluster: cluster_0
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            role: master
+            version: v1
+            stage: prod
+    )EOF",                   // TcpProxy config
+      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
+// cluster.
+TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterWithMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      weighted_clusters:
+        clusters:
+        - name: cluster_0
+          metadata_match:
+            filter_metadata:
+              envoy.lb:
+                role: master
+                version: v1
+                stage: prod
+          weight: 1
+    )EOF",                   // TcpProxy config
+      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined both on a
+// weighted cluster and at the top level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldMatchWeightedClusterWithMetadataMatchAndTopLevelMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            version: v1
+            stage: dev
+      weighted_clusters:
+        clusters:
+        - name: cluster_0
+          metadata_match:
+            filter_metadata:
+              envoy.lb:
+                role: master
+                stage: prod  # should override `stage` value at top-level
+          weight: 1
+    )EOF",                   // TcpProxy config
+      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined at the top
+// level only.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldMatchWeightedClusterWithTopLevelMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            role: master
+            version: v1
+            stage: prod
+      weighted_clusters:
+        clusters:
+        - name: cluster_0
+          weight: 1
+    )EOF",                   // TcpProxy config
+      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a regular cluster when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchSingleClusterWithTopLevelMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      cluster: cluster_0
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            role: master
+            version: v1
+            stage: prod
+    )EOF",                    // TcpProxy config
+      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
+// cluster.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchWeightedClusterWithMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      weighted_clusters:
+        clusters:
+        - name: cluster_0
+          metadata_match:
+            filter_metadata:
+              envoy.lb:
+                role: master
+                version: v1
+                stage: prod
+          weight: 1
+    )EOF",                    // TcpProxy config
+      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined both on a
+// weighted cluster and at the top level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchWeightedClusterWithMetadataMatchAndTopLevelMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            version: v1
+            stage: dev
+      weighted_clusters:
+        clusters:
+        - name: cluster_0
+          metadata_match:
+            filter_metadata:
+              envoy.lb:
+                role: master
+                stage: prod  # should override `stage` value at top-level
+          weight: 1
+    )EOF",                  // TcpProxy config
+      "master", "v1", "dev" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined at the top
+// level only.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchWeightedClusterWithTopLevelMetadataMatch) {
+  setup(
+      R"EOF(
+      stat_prefix: tcp_stats
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            role: master
+            version: v1
+            stage: prod
+      weighted_clusters:
+        clusters:
+        - name: cluster_0
+          weight: 1
+    )EOF",                    // TcpProxy config
+      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
+  );
+
+  expectEndpointNotToMatchRoute();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxySslIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
