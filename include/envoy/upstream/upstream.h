@@ -872,18 +872,23 @@ public:
   /**
    * @return auto sni flag. if this is true, sni value will be set automatically
    */
-  virtual bool auto_sni() const PURE
+  virtual bool auto_sni() const PURE;
 
-      protected :
-      /**
-       * Invoked by extensionProtocolOptionsTyped.
-       * @param name std::string containing the well-known name of the extension for which protocol
-       *        options are desired
-       * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
-       *         upstream connections.
-       */
-      virtual ProtocolOptionsConfigConstSharedPtr
-      extensionProtocolOptions(const std::string& name) const PURE;
+  /**
+   * @return upstream tls context from cluster 
+   */
+  virtual absl::optional<envoy::api::v2::auth::UpstreamTlsContext>& upstreamTlsContext() PURE;
+  
+protected:
+  /**
+   * Invoked by extensionProtocolOptionsTyped.
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
+   *         upstream connections.
+   */
+  virtual ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const PURE;
 };
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;

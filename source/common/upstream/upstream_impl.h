@@ -574,6 +574,7 @@ public:
   bool warmHosts() const override { return warm_hosts_; }
   bool auto_sni() const override { return auto_sni_; }
 
+  absl::optional<envoy::api::v2::auth::UpstreamTlsContext>& upstreamTlsContext() override { return tls_context_; }
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
@@ -626,6 +627,7 @@ private:
   const bool drain_connections_on_host_removal_;
   const bool warm_hosts_;
   const bool auto_sni_;
+  mutable absl::optional<envoy::api::v2::auth::UpstreamTlsContext> tls_context_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;

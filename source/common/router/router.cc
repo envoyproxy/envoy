@@ -428,10 +428,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
   cluster_ = cluster->info();
 
-  if (cluster_->auto_sni()) {
+  // if (cluster_->auto_sni()) {
+
+  // }
+
+  // if (cluster_->auto_sni()) {
     // add sni value dynamically on tls_context section from authority
     // if sni cache includes passed authority, skip this operation
-  }
+  // }
 
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
