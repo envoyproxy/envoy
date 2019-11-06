@@ -280,6 +280,8 @@ public:
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD1(stopListeners, void(StopListenersType listeners_type));
   MOCK_METHOD0(stopWorkers, void());
+  MOCK_METHOD0(beginListenerUpdate, void());
+  MOCK_METHOD1(endListenerUpdate, void(ListenerManager::FailureStates&&));
 };
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {

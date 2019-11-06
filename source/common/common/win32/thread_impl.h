@@ -1,13 +1,8 @@
 #pragma once
 
-#include <windows.h>
-
-// <windows.h> defines some macros that interfere with our code, so undef them
-#undef DELETE
-#undef GetMessage
-
 #include <functional>
 
+#include "envoy/common/platform.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {

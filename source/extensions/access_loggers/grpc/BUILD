@@ -51,6 +51,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
         "@envoy_api//envoy/data/accesslog/v2:pkg_cc_proto",
     ],
 )

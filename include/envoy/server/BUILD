@@ -191,6 +191,7 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/ssl:context_interface",
         "//source/common/protobuf",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )

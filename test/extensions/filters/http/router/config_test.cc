@@ -1,9 +1,12 @@
+#include <string>
+
 #include "envoy/config/filter/http/router/v2/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/router/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,35 +19,31 @@ namespace HttpFilters {
 namespace RouterFilter {
 namespace {
 
-TEST(RouterFilterConfigTest, RouterFilterInJson) {
-  std::string json_string = R"EOF(
-  {
-    "dynamic_stats" : true,
-    "start_child_span" : true
-  }
+TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
+  const std::string yaml_string = R"EOF(
+  dynamic_stats: true
+  start_child_span: true
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::config::filter::http::router::v2::Router proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats.", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
 }
 
 TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
-  std::string json_string = R"EOF(
-  {
-    "dynamic_stats" : true,
-    "route" : {}
-  }
+  const std::string yaml_string = R"EOF(
+  dynamic_stats: true
+  route: {}
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  RouterFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+  envoy::config::filter::http::router::v2::Router proto_config;
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
+                          "route: Cannot find field");
 }
 
 TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
