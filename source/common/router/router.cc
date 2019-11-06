@@ -440,7 +440,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
           fmt::format("cluster: tls_context is needed on cluster config if you set auto_sni true"));
     }
     auto& tls_context = cluster_->upstreamTlsContext().value();
-    if (!url_obj.is_raw_ipv4_address() && (tls_context.sni().size() == 0 || tls_context.sni() != url_obj.host_and_port())) {
+    if (!url_obj.is_raw_ipv4_address() &&
+        (tls_context.sni().size() == 0 || tls_context.sni() != url_obj.host_and_port())) {
       tls_context.clear_sni();
       tls_context.set_sni(std::string(url_obj.host_and_port()));
     }

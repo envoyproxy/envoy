@@ -108,7 +108,8 @@ public:
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
   MOCK_CONST_METHOD0(warmHosts, bool());
   MOCK_CONST_METHOD0(auto_sni, bool());
-  MOCK_CONST_METHOD0(upstreamTlsContext, absl::optional<envoy::api::v2::auth::UpstreamTlsContext>&());
+  MOCK_CONST_METHOD0(upstreamTlsContext,
+                     absl::optional<envoy::api::v2::auth::UpstreamTlsContext>&());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
   MOCK_CONST_METHOD1(upstreamHttpProtocol, Http::Protocol(absl::optional<Http::Protocol>));
