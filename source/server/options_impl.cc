@@ -87,8 +87,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<uint32_t> file_flush_interval_msec("", "file-flush-interval-msec",
                                                      "Interval for log flushing in msec", false,
                                                      10000, "uint32_t", cmd);
-  TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s", "Hot restart drain time in seconds",
-                                         false, 600, "uint32_t", cmd);
+  TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s",
+                                         "Hot restart and LDS removal drain time in seconds", false,
+                                         600, "uint32_t", cmd);
   TCLAP::ValueArg<uint32_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
                                                    "Hot restart parent shutdown time in seconds",
                                                    false, 900, "uint32_t", cmd);
