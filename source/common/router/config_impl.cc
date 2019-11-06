@@ -61,8 +61,7 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge
       additional_request_chance_(hedge_policy.additional_request_chance()),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
-HedgePolicyImpl::HedgePolicyImpl()
-    : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
+HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
