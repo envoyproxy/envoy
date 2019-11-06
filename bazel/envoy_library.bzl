@@ -36,7 +36,7 @@ EXTENSION_SECURITY_POSTURES = [
     "trusted",
 ]
 
-def envoy_extension(
+def envoy_cc_extension(
         name,
         security_posture,
         **kwargs):
