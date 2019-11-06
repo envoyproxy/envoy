@@ -2,6 +2,7 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
+#include "common/router/string_accessor_impl.h"
 
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
@@ -50,6 +51,8 @@ public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
         .WillOnce([this](const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
                          GrpcCommon::GrpcAccessLoggerType logger_type) {
@@ -115,6 +118,17 @@ response: {{}}
   std::unique_ptr<HttpGrpcAccessLog> access_log_;
 };
 
+class TestSerializedFilterState : public StreamInfo::FilterState::Object {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto any = std::make_unique<ProtobufWkt::Any>();
+    ProtobufWkt::Duration value;
+    value.set_seconds(10);
+    any->PackFrom(value);
+    return any;
+  }
+};
+
 // Test HTTP log marshaling.
 TEST_F(HttpGrpcAccessLogTest, Marshalling) {
   InSequence s;
@@ -127,7 +141,11 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
     stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
-
+    stream_info.filter_state_.setData("string_accessor",
+                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
+    stream_info.filter_state_.setData("serialized", std::make_unique<TestSerializedFilterState>(),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
@@ -148,6 +166,13 @@ common_properties:
   metadata:
     filter_metadata:
       foo: {}
+  filter_state_objects:
+    string_accessor:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: test_value
+    serialized:
+      "@type": type.googleapis.com/google.protobuf.Duration
+      value: 10s
 request: {}
 response: {}
 )EOF");

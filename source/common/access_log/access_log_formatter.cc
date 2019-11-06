@@ -209,14 +209,18 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 
   const std::string name_data = token.substr(start, end_request - start);
-  const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
-  if (!keys.empty()) {
-    // The main value is the first key
-    main = keys.at(0);
-    if (keys.size() > 1) {
-      // Sub items contain additional keys
-      sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
+  if (!separator.empty()) {
+    const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
+    if (!keys.empty()) {
+      // The main value is the first key
+      main = keys.at(0);
+      if (keys.size() > 1) {
+        // Sub items contain additional keys
+        sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
+      }
     }
+  } else {
+    main = name_data;
   }
 }
 
@@ -224,7 +228,8 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
 std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
-  const std::string DYNAMIC_META_TOKEN = "DYNAMIC_METADATA(";
+  static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
+  static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
@@ -280,6 +285,18 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         parseCommand(token, start, ":", filter_namespace, path, max_length);
         formatters.emplace_back(
             FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
+      } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
+        std::string key;
+        absl::optional<size_t> max_length;
+        std::vector<std::string> path;
+        const size_t start = FILTER_STATE_TOKEN.size();
+
+        parseCommand(token, start, "", key, path, max_length);
+        if (key.empty()) {
+          throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
+        }
+
+        formatters.push_back(std::make_unique<FilterStateFormatter>(key, max_length));
       } else if (absl::StartsWith(token, "START_TIME")) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
@@ -617,6 +634,37 @@ std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http:
                                              const Http::HeaderMap&,
                                              const StreamInfo::StreamInfo& stream_info) const {
   return MetadataFormatter::format(stream_info.dynamicMetadata());
+}
+
+FilterStateFormatter::FilterStateFormatter(const std::string& key,
+                                           absl::optional<size_t> max_length)
+    : key_(key), max_length_(max_length) {}
+
+std::string FilterStateFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                         const Http::HeaderMap&,
+                                         const StreamInfo::StreamInfo& stream_info) const {
+  const StreamInfo::FilterState& filter_state = stream_info.filterState();
+  if (!filter_state.hasDataWithName(key_)) {
+    return UnspecifiedValueString;
+  }
+
+  const auto& object = filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
+  ProtobufTypes::MessagePtr proto = object.serializeAsProto();
+  if (proto == nullptr) {
+    return UnspecifiedValueString;
+  }
+
+  std::string value;
+  const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
+  if (!status.ok()) {
+    // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
+    // TODO(lizan): add support of unknown Any.
+    return UnspecifiedValueString;
+  }
+  if (max_length_.has_value() && value.length() > max_length_.value()) {
+    return value.substr(0, max_length_.value());
+  }
+  return value;
 }
 
 StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
