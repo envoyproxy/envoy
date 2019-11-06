@@ -69,7 +69,7 @@ private:
   std::unique_ptr<Upstream::LoadBalancerContext> owned_context_;
   Upstream::LoadBalancerContext* context_{nullptr};
   const Upstream::LoadBalancerBase::HostAvailability host_availability_;
-  uint32_t host_priority_;
+  const uint32_t host_priority_;
 };
 
 } // namespace Aggregate

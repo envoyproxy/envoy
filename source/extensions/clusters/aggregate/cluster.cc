@@ -67,7 +67,7 @@ void Cluster::startPreInit() {
     // Add callback for clusters initialized before aggregate cluster.
     tlc->prioritySet().addMemberUpdateCb(
         [this, cluster](const Upstream::HostVector&, const Upstream::HostVector&) {
-          ENVOY_LOG(info, "member update for cluster '{}' in aggregate cluster '{}'", cluster,
+          ENVOY_LOG(debug, "member update for cluster '{}' in aggregate cluster '{}'", cluster,
                     this->info()->name());
           refresh();
         });
@@ -90,7 +90,7 @@ void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predic
 
 void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   if (std::find(clusters_.begin(), clusters_.end(), cluster.info()->name()) != clusters_.end()) {
-    ENVOY_LOG(info, "adding or updating cluster '{}' for aggregate cluster '{}'",
+    ENVOY_LOG(debug, "adding or updating cluster '{}' for aggregate cluster '{}'",
               cluster.info()->name(), info()->name());
     refresh();
     cluster.prioritySet().addMemberUpdateCb(
@@ -99,11 +99,11 @@ void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
 }
 
 void Cluster::onClusterRemoval(const std::string& cluster_name) {
-  //  The onClusterRemoval callback is called before the thread local cluster was removed. There
-  //  will be a dangling pointer to the thread local cluster if delete cluster is not skipped when
-  //  we refresh the load balancer.
+  //  The onClusterRemoval callback is called before the thread local cluster is removed. There
+  //  will be a dangling pointer to the thread local cluster if the deleted cluster is not skipped
+  //  when we refresh the load balancer.
   if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
-    ENVOY_LOG(info, "removing cluster '{}' from aggreagte cluster '{}'", cluster_name,
+    ENVOY_LOG(debug, "removing cluster '{}' from aggreagte cluster '{}'", cluster_name,
               info()->name());
     refresh([cluster_name](const std::string& c) { return cluster_name == c; });
   }

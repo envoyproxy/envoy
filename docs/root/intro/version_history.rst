@@ -3,7 +3,6 @@ Version history
 
 1.13.0 (pending)
 ================
-* cluster: added aggregate cluster that allows load balancing between clusters.
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * api: remove all support for v1
 * cluster: added aggregate cluster that allows load balancing between clusters.
