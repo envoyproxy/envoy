@@ -36,9 +36,9 @@ namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of
 // GrpcMuxImpl is provided in [grpc_]subscription_impl_test.cc.
-class NewGrpcMuxImplTestBase : public testing::Test {
+class GrpcMuxImplTestBase : public testing::Test {
 public:
-  NewGrpcMuxImplTestBase()
+  GrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)) {}
@@ -63,13 +63,13 @@ public:
   Stats::Gauge& control_plane_connected_state_;
 };
 
-class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
+class GrpcMuxImplTest : public GrpcMuxImplTestBase {
 public:
   Event::SimulatedTimeSystem time_system_;
 };
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.
-TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
+TEST_F(GrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
