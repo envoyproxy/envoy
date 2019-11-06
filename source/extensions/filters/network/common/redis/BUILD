@@ -82,6 +82,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":codec_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 

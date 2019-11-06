@@ -21,22 +21,6 @@ namespace {
 // "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 
-// Create an asking command request.
-const Common::Redis::RespValue& askingRequest() {
-  static Common::Redis::RespValue request;
-  static bool initialized = false;
-
-  if (!initialized) {
-    Common::Redis::RespValue asking_cmd;
-    asking_cmd.type(Common::Redis::RespType::BulkString);
-    asking_cmd.asString() = "asking";
-    request.type(Common::Redis::RespType::Array);
-    request.asArray().push_back(asking_cmd);
-    initialized = true;
-  }
-  return request;
-}
-
 /**
  * Validate the received moved/ask redirection error and the original redis request.
  * @param[in] original_request supplies the incoming request associated with the command splitter
@@ -142,7 +126,8 @@ bool SingleServerRequest::onRedirection(const Common::Redis::RespValue& value) {
   // "asking" command; this is fine since the server either responds with an OK or an error message
   // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
-      !conn_pool_->makeRequestToHost(host_address, askingRequest(), null_pool_callbacks)) {
+      !conn_pool_->makeRequestToHost(
+          host_address, Common::Redis::Utility::AskingRequest::instance(), null_pool_callbacks)) {
     return false;
   }
   handle_ = conn_pool_->makeRequestToHost(host_address, *incoming_request_, *this);
@@ -248,24 +233,18 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
   std::vector<Common::Redis::RespValue> responses(request_ptr->num_pending_responses_);
   request_ptr->pending_response_->asArray().swap(responses);
 
-  std::vector<Common::Redis::RespValue> values(2);
-  values[0].type(Common::Redis::RespType::BulkString);
-  values[0].asString() = "get";
-  values[1].type(Common::Redis::RespType::BulkString);
-  Common::Redis::RespValue single_mget;
-  single_mget.type(Common::Redis::RespType::Array);
-  single_mget.asArray().swap(values);
-
-  for (uint64_t i = 1; i < incoming_request->asArray().size(); i++) {
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  for (unsigned int i = 1; i < base_request->asArray().size(); i++) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    single_mget.asArray()[1].asString() = incoming_request->asArray()[i].asString();
-    ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
-    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
+    const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
+      // Create composite array for a single get.
+      const Common::Redis::RespValue single_mget(
+          base_request, Common::Redis::Utility::GetRequest::instance(), i, i);
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ = makeRequest(route, "get", incoming_request->asArray()[i].asString(),
+      pending_request.handle_ = makeRequest(route, "get", base_request->asArray()[i].asString(),
                                             single_mget, pending_request);
     }
 
@@ -275,7 +254,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
   }
 
   if (request_ptr->num_pending_responses_ > 0) {
-    request_ptr->incoming_request_ = std::move(incoming_request);
+    request_ptr->incoming_request_ = std::move(base_request);
     return request_ptr;
   }
 
@@ -302,7 +281,8 @@ bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value
   // "asking" command; this is fine since the server either responds with an OK or an error message
   // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
-      !conn_pool->makeRequestToHost(host_address, askingRequest(), null_pool_callbacks)) {
+      !conn_pool->makeRequestToHost(host_address, Common::Redis::Utility::AskingRequest::instance(),
+                                    null_pool_callbacks)) {
     return false;
   }
 
@@ -323,7 +303,8 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   switch (value->type()) {
   case Common::Redis::RespType::Array:
   case Common::Redis::RespType::Integer:
-  case Common::Redis::RespType::SimpleString: {
+  case Common::Redis::RespType::SimpleString:
+  case Common::Redis::RespType::CompositeArray: {
     pending_response_->asArray()[index].type(Common::Redis::RespType::Error);
     pending_response_->asArray()[index].asString() = Response::get().UpstreamProtocolError;
     error_count_++;
@@ -338,8 +319,6 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
     break;
   }
   case Common::Redis::RespType::Null:
-  case Common::Redis::RespType::CompositeArray: // TODO(hyang): remove this after composite array is
-                                                // actually used.
     break;
   }
 
@@ -352,18 +331,12 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 }
 
 void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
-  static const uint32_t GET_COMMAND_SUBSTRINGS = 2;
-  uint32_t num_values = GET_COMMAND_SUBSTRINGS;
-  std::vector<Common::Redis::RespValue> values(num_values);
-
-  for (uint32_t i = 0; i < num_values; i++) {
-    values[i].type(Common::Redis::RespType::BulkString);
-  }
-  values[--num_values].asString() = incoming_request_->asArray()[index + 1].asString();
-  values[--num_values].asString() = "get";
-
-  request.type(Common::Redis::RespType::Array);
-  request.asArray().swap(values);
+  // 1st resp value in incoming_request_ is the command.
+  // index + 1 is the key for the request.
+  Common::Redis::RespValue::CompositeArray single_get(
+      incoming_request_, Common::Redis::Utility::GetRequest::instance(), index + 1, index + 1);
+  request.type(Common::Redis::RespType::CompositeArray);
+  std::swap(request.asCompositeArray(), single_get);
 }
 
 SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
@@ -382,29 +355,21 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
   request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
   request_ptr->pending_response_->type(Common::Redis::RespType::SimpleString);
 
-  std::vector<Common::Redis::RespValue> values(3);
-  values[0].type(Common::Redis::RespType::BulkString);
-  values[0].asString() = "set";
-  values[1].type(Common::Redis::RespType::BulkString);
-  values[2].type(Common::Redis::RespType::BulkString);
-  Common::Redis::RespValue single_mset;
-  single_mset.type(Common::Redis::RespType::Array);
-  single_mset.asArray().swap(values);
-
-  uint64_t fragment_index = 0;
-  for (uint64_t i = 1; i < incoming_request->asArray().size(); i += 2) {
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  unsigned fragment_index = 0;
+  for (unsigned i = 1; i < base_request->asArray().size(); i += 2) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    single_mset.asArray()[1].asString() = incoming_request->asArray()[i].asString();
-    single_mset.asArray()[2].asString() = incoming_request->asArray()[i + 1].asString();
-
-    ENVOY_LOG(debug, "redis: parallel set: '{}'", single_mset.toString());
-    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
+    const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
       pending_request.conn_pool_ = route->upstream();
-      pending_request.handle_ = makeRequest(route, "set", incoming_request->asArray()[i].asString(),
-                                            single_mset, pending_request);
+      // Create composite array for a single set command.
+      const Common::Redis::RespValue single_set(
+          base_request, Common::Redis::Utility::SetRequest::instance(), i, i + 1);
+      ENVOY_LOG(debug, "redis: parallel set: '{}'", single_set.toString());
+      pending_request.handle_ = makeRequest(route, "set", base_request->asArray()[i].asString(),
+                                            single_set, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -413,7 +378,7 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
   }
 
   if (request_ptr->num_pending_responses_ > 0) {
-    request_ptr->incoming_request_ = std::move(incoming_request);
+    request_ptr->incoming_request_ = std::move(base_request);
     return request_ptr;
   }
 
@@ -450,19 +415,14 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 }
 
 void MSETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
-  static const uint32_t SET_COMMAND_SUBSTRINGS = 3;
-  uint32_t num_values = SET_COMMAND_SUBSTRINGS;
-  std::vector<Common::Redis::RespValue> values(num_values);
-
-  for (uint32_t i = 0; i < num_values; i++) {
-    values[i].type(Common::Redis::RespType::BulkString);
-  }
-  values[--num_values].asString() = incoming_request_->asArray()[(index * 2) + 2].asString();
-  values[--num_values].asString() = incoming_request_->asArray()[(index * 2) + 1].asString();
-  values[--num_values].asString() = "set";
-
-  request.type(Common::Redis::RespType::Array);
-  request.asArray().swap(values);
+  // 1st resp value in the incoming_request_ is the mset
+  // index*2 + 1 is the key for the request.
+  // index*2 + 2 is the value for the request.
+  Common::Redis::RespValue::CompositeArray single_set(
+      incoming_request_, Common::Redis::Utility::SetRequest::instance(), index * 2 + 1,
+      index * 2 + 2);
+  request.type(Common::Redis::RespType::CompositeArray);
+  std::swap(request.asCompositeArray(), single_set);
 }
 
 SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
@@ -479,27 +439,21 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
   request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
   request_ptr->pending_response_->type(Common::Redis::RespType::Integer);
 
-  std::vector<Common::Redis::RespValue> values(2);
-  values[0].type(Common::Redis::RespType::BulkString);
-  values[0].asString() = incoming_request->asArray()[0].asString();
-  values[1].type(Common::Redis::RespType::BulkString);
-  Common::Redis::RespValue single_fragment;
-  single_fragment.type(Common::Redis::RespType::Array);
-  single_fragment.asArray().swap(values);
-
-  for (uint64_t i = 1; i < incoming_request->asArray().size(); i++) {
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  for (unsigned i = 1; i < base_request->asArray().size(); i++) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    single_fragment.asArray()[1].asString() = incoming_request->asArray()[i].asString();
-    ENVOY_LOG(debug, "redis: parallel {}: '{}'", incoming_request->asArray()[0].asString(),
+    // Create the composite array for a single fragment.
+    const Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
+    ENVOY_LOG(debug, "redis: parallel {}: '{}'", base_request->asArray()[0].asString(),
               single_fragment.toString());
-    const auto route = router.upstreamPool(incoming_request->asArray()[i].asString());
+    const auto route = router.upstreamPool(base_request->asArray()[i].asString());
     if (route) {
       pending_request.conn_pool_ = route->upstream();
       pending_request.handle_ =
-          makeRequest(route, single_fragment.asArray()[0].asString(),
-                      incoming_request->asArray()[i].asString(), single_fragment, pending_request);
+          makeRequest(route, base_request->asArray()[0].asString(),
+                      base_request->asArray()[i].asString(), single_fragment, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -508,7 +462,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
   }
 
   if (request_ptr->num_pending_responses_ > 0) {
-    request_ptr->incoming_request_ = std::move(incoming_request);
+    request_ptr->incoming_request_ = std::move(base_request);
     return request_ptr;
   }
 
@@ -544,18 +498,12 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 }
 
 void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
-  static const uint32_t BASE_COMMAND_SUBSTRINGS = 2;
-  uint32_t num_values = BASE_COMMAND_SUBSTRINGS;
-  std::vector<Common::Redis::RespValue> values(num_values);
-
-  for (uint32_t i = 0; i < num_values; i++) {
-    values[i].type(Common::Redis::RespType::BulkString);
-  }
-  values[--num_values].asString() = incoming_request_->asArray()[index + 1].asString();
-  values[--num_values].asString() = incoming_request_->asArray()[0].asString();
-
-  request.type(Common::Redis::RespType::Array);
-  request.asArray().swap(values);
+  // 1st resp value in incoming_request_ is the command.
+  // index + 1 is the key for the request.
+  Common::Redis::RespValue::CompositeArray single_fragment(
+      incoming_request_, incoming_request_->asArray()[0], index + 1, index + 1);
+  request.type(Common::Redis::RespType::CompositeArray);
+  std::swap(request.asCompositeArray(), single_fragment);
 }
 
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,

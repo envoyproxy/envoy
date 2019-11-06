@@ -1,7 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include <arpa/inet.h>
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

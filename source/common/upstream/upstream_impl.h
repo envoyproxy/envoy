@@ -237,7 +237,7 @@ protected:
 private:
   void setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status);
 
-  std::atomic<uint64_t> health_flags_{};
+  std::atomic<uint32_t> health_flags_{};
   ActiveHealthFailureType active_health_failure_type_{};
   std::atomic<uint32_t> weight_;
   std::atomic<bool> used_;

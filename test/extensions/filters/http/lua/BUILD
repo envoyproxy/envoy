@@ -58,6 +58,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/filter/http/lua/v2:pkg_cc_proto",
     ],
 )

@@ -145,7 +145,7 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan --build_tests_only"
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
@@ -174,7 +174,7 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan ${TEST_TARGETS}
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only ${TEST_TARGETS}
   echo "Building and testing envoy-filter-example tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \

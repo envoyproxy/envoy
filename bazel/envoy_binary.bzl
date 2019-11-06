@@ -71,6 +71,7 @@ def _envoy_linkopts():
         ],
     }) + select({
         "@envoy//bazel:boringssl_fips": [],
+        "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["-pie"],
     }) + _envoy_select_exported_symbols(["-Wl,-E"])
 

@@ -168,7 +168,7 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
                                                   const std::string& seconds_str) const {
   std::string formatted_time;
 
-  size_t previous = 0;
+  int32_t previous = 0;
   specifier_offsets.reserve(specifiers_.size());
   for (const auto& specifier : specifiers_) {
     std::string current_format =
@@ -353,7 +353,7 @@ uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   }
 
   *current = 0;
-  return current - out;
+  return static_cast<uint32_t>(current - out);
 }
 
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {

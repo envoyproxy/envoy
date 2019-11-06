@@ -1,11 +1,10 @@
 #pragma once
 
-#include <unistd.h>
-
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 
