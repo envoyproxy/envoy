@@ -33,16 +33,16 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
           // the stream to buffer all the data.
           // Ideally this limit should also correlate to peer's receive window
           // but not fully depends on that.
-          16 * 1024,
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }) {}
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
                                              quic::QuicSpdyClientSession* client_session,
                                              quic::StreamType type)
     : quic::QuicSpdyClientStream(pending, client_session, type),
       EnvoyQuicStream(
-          16 * 1024,
-          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+          16 * 1024, [this]() { runLowWatermarkCallbacks(); },
+          [this]() { runHighWatermarkCallbacks(); }) {}
 
 void EnvoyQuicClientStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
@@ -82,7 +82,7 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::HeaderMap& trailers) {
 }
 
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-    // Metadata Frame is not supported in QUIC.
+  // Metadata Frame is not supported in QUIC.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
@@ -225,9 +225,7 @@ void EnvoyQuicClientStream::OnCanWrite() {
 
 uint32_t EnvoyQuicClientStream::streamId() { return id(); }
 
-Network::Connection* EnvoyQuicClientStream::connection() {
-  return filterManagerConnection();
-}
+Network::Connection* EnvoyQuicClientStream::connection() { return filterManagerConnection(); }
 
 QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection() {
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());

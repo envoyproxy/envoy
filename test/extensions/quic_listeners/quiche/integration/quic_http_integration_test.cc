@@ -172,12 +172,12 @@ TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(QuicHttpIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(QuicHttpIntegrationTest, UpstreamThrottlingOnGiantResponseBody) {
+TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/1024 * 1024, false);
 }
 
-TEST_P(QuicHttpIntegrationTest, DownstreamThrottlingOnGiantPost) {
+TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/1024 * 1024, /*response_size=*/1024, false);
 }

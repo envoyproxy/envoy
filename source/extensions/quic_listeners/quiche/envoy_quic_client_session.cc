@@ -71,7 +71,8 @@ quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStr
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
+quic::QuicSpdyStream*
+EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
   // Disallow server initiated stream.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
