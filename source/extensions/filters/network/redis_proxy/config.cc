@@ -1,7 +1,5 @@
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include "common/config/filter_json.h"
-
 #include "extensions/common/redis/redirection_mgr_impl.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
@@ -92,14 +90,6 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
         filter_config));
   };
-}
-
-Network::FilterFactoryCb
-RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                                   Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
-  Config::FilterJson::translateRedisProxy(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
 /**
