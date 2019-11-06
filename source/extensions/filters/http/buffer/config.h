@@ -20,10 +20,6 @@ class BufferFilterFactory
 public:
   BufferFilterFactory() : FactoryBase(HttpFilterNames::get().Buffer) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::buffer::v2::Buffer& proto_config,

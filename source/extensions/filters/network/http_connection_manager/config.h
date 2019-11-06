@@ -35,11 +35,6 @@ public:
   HttpConnectionManagerFilterConfigFactory()
       : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&

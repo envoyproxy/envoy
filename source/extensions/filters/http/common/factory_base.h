@@ -14,13 +14,6 @@ namespace Common {
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
 class FactoryBase : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  // Server::Configuration::NamedHttpFilterConfigFactory
-  Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
-                                            Server::Configuration::FactoryContext&) override {
-    // Only used in v1 filters.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,

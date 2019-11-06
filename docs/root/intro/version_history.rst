@@ -3,7 +3,10 @@ Version history
 
 1.13.0 (pending)
 ================
+* access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
+* api: remove all support for v1
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
+* tls: remove TLS 1.0 and 1.1 from client defaults
 * tracing: added multiple kinds of custom tags for the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`route <envoy_api_field_route.Route.tracing>` level both.
 
 1.12.0 (October 31, 2019)
