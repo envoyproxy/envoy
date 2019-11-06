@@ -172,13 +172,9 @@ protected:
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
-  //  bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-  //                          const ConnPool::InstanceSharedPtr& conn_pool);
-  //  virtual void recreate(Common::Redis::RespValue& request, uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
 
-  //  Common::Redis::RespValuePtr incoming_request_;
   Common::Redis::RespValuePtr pending_response_;
   std::vector<PendingRequest> pending_requests_;
   uint32_t num_pending_responses_;
@@ -201,7 +197,6 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  //  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
@@ -223,7 +218,6 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  //  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 
   int64_t total_{0};
 };
@@ -245,7 +239,6 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  //  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
