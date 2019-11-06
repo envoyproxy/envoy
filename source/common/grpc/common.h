@@ -46,7 +46,7 @@ public:
    * Returns the GrpcStatus code from a given set of trailers, if present.
    * @param trailers the trailers to parse.
    * @param allow_user_status whether allow user defined grpc status.
-   *        if this value is false, custom grpc status is reguarded as invalid status
+   *        if this value is false, custom grpc status is regarded as invalid status
    * @return absl::optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid
    * status is found.
    */
