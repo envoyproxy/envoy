@@ -763,7 +763,8 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   test_server_->waitForGaugeGe("listener_manager.total_listeners_active", 1);
   // Before server is started, even though listeners are added to active list
   // we mark them as "warming" in config dump since they're not initialized yet.
-  EXPECT_EQ(getListenersConfigDump().dynamic_warming_listeners().size(), 1);
+  ASSERT_EQ(getListenersConfigDump().dynamic_listeners().size(), 1);
+  EXPECT_TRUE(getListenersConfigDump().dynamic_listeners(0).has_warming_state());
 
   // Remove listener.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));

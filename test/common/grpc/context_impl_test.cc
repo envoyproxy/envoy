@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+#include "envoy/common/platform.h"
 
 #include "common/grpc/common.h"
 #include "common/grpc/context_impl.h"

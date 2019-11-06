@@ -79,7 +79,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   for (size_t priority = 0; priority < healthy_per_priority_load.get().size(); ++priority) {
     aggregate_percentage_load += healthy_per_priority_load.get()[priority];
     if (hash <= aggregate_percentage_load) {
-      return {priority, HostAvailability::Healthy};
+      return {static_cast<uint32_t>(priority), HostAvailability::Healthy};
     }
   }
 
@@ -88,7 +88,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   for (size_t priority = 0; priority < degraded_per_priority_load.get().size(); ++priority) {
     aggregate_percentage_load += degraded_per_priority_load.get()[priority];
     if (hash <= aggregate_percentage_load) {
-      return {priority, HostAvailability::Degraded};
+      return {static_cast<uint32_t>(priority), HostAvailability::Degraded};
     }
   }
 
