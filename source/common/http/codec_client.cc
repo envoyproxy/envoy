@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/http/codec.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/config/utility.h"
 #include "common/http/exception.h"
@@ -148,7 +150,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
   switch (type) {
   case Type::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().statsScope(), *this,
+        *connection_, host->cluster().statsScope(), *this, host->cluster().http1Settings(),
         host->cluster().maxResponseHeadersCount());
     break;
   }

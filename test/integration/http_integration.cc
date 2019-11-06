@@ -342,10 +342,10 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
   EXPECT_EQ(response->body(), expected_body);
 }
 
-uint64_t
+absl::optional<uint64_t>
 HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices,
                                                 std::chrono::milliseconds connection_wait_timeout) {
-  uint64_t upstream_with_request;
+  absl::optional<uint64_t> upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
 
@@ -856,7 +856,8 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   if (network_backup) {
     config_helper_.addFilter(R"EOF(
   name: pause-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   }
   initialize();

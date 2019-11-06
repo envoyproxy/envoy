@@ -61,8 +61,7 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge
       additional_request_chance_(hedge_policy.additional_request_chance()),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
-HedgePolicyImpl::HedgePolicyImpl()
-    : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
+HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -882,13 +881,13 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
-    ssl_requirements_ = SslRequirements::NONE;
+    ssl_requirements_ = SslRequirements::None;
     break;
   case envoy::api::v2::route::VirtualHost::EXTERNAL_ONLY:
-    ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
+    ssl_requirements_ = SslRequirements::ExternalOnly;
     break;
   case envoy::api::v2::route::VirtualHost::ALL:
-    ssl_requirements_ = SslRequirements::ALL;
+    ssl_requirements_ = SslRequirements::All;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1040,9 +1039,9 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
   }
 
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::ALL && forwarded_proto_header->value() != "https") {
+  if (ssl_requirements_ == SslRequirements::All && forwarded_proto_header->value() != "https") {
     return SSL_REDIRECT_ROUTE;
-  } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
+  } else if (ssl_requirements_ == SslRequirements::ExternalOnly &&
              forwarded_proto_header->value() != "https" &&
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
     return SSL_REDIRECT_ROUTE;

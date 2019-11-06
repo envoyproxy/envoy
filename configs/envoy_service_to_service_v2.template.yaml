@@ -338,17 +338,20 @@ static_resources:
   {% for host in mapping['hosts'] -%}
   - name: egress_{{ host['name'] }}
     {% if host.get('ssl', False) %}
-    tls_context:
-      common_tls_context:
-        validation_context:
-          trusted_ca:
-            filename: certs/cacert.pem
-          {% if host.get('verify_subject_alt_name', False) %}
-          verify_subject_alt_name: "{{host['verify_subject_alt_name'] }}"
-          {% endif %}
-      {% if host.get('sni', False) %}
-      sni: "{{ host['sni'] }}"
-      {% endif %}
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pem
+            {% if host.get('verify_subject_alt_name', False) %}
+            verify_subject_alt_name: "{{host['verify_subject_alt_name'] }}"
+            {% endif %}
+        {% if host.get('sni', False) %}
+        sni: "{{ host['sni'] }}"
+        {% endif %}
     connect_timeout: 1s
     {% else %}
     connect_timeout: 0.25s
@@ -401,8 +404,11 @@ static_resources:
                 address: main_website.com
                 port_value: 443
                 protocol: TCP
-    tls_context:
-      sni: www.main_website.com
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        sni: www.main_website.com
   - name: local_service
     connect_timeout: 0.25s
     type: STATIC
@@ -486,13 +492,16 @@ static_resources:
                 protocol: TCP
     http2_protocol_options:
       max_concurrent_streams: 100
-    tls_context:
-      common_tls_context:
-        validation_context:
-          trusted_ca:
-            filename: certs/cacert.pem
-          verify_subject_alt_name:
-          - collector-grpc.lightstep.com
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pem
+            verify_subject_alt_name:
+            - collector-grpc.lightstep.com
   - name: cds_cluster
     connect_timeout: 0.25s
     type: STRICT_DNS

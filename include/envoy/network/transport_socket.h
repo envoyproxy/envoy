@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"

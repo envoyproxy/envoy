@@ -32,7 +32,7 @@ public:
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     if (grpc_request_) {
-      uint64_t delta = request_counter_.decode(data);
+      uint64_t delta = request_counter_.inspect(data);
       if (delta > 0) {
         maybeWriteFilterState();
         if (doStatTracking()) {
@@ -52,7 +52,7 @@ public:
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool) override {
     if (grpc_response_) {
-      uint64_t delta = response_counter_.decode(data);
+      uint64_t delta = response_counter_.inspect(data);
       if (delta > 0) {
         maybeWriteFilterState();
         if (doStatTracking()) {

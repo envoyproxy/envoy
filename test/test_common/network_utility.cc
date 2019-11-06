@@ -1,10 +1,9 @@
 #include "test/test_common/network_utility.h"
 
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <cstdint>
 #include <string>
+
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

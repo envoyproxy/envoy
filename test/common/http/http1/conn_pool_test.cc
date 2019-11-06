@@ -1,6 +1,8 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/http/codec.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/http/codec_client.h"
@@ -17,6 +19,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,6 +33,7 @@ using testing::NiceMock;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Http {
@@ -45,7 +49,7 @@ public:
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
-                     Upstream::ResourcePriority::Default, nullptr, nullptr),
+                     Upstream::ResourcePriority::Default, nullptr, Http1Settings(), nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
@@ -378,6 +382,63 @@ TEST_F(Http1ConnPoolImplTest, ConnectFailure) {
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
+}
+
+/**
+ * Tests that connection creation time is recorded correctly even in cases where
+ * there are multiple pending connection creation attempts to the same upstream.
+ */
+TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
+  constexpr uint64_t sleep1_ms = 20;
+  constexpr uint64_t sleep2_ms = 10;
+  constexpr uint64_t sleep3_ms = 5;
+  Event::SimulatedTimeSystem simulated_time;
+
+  // Allow concurrent creation of 2 upstream connections.
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+
+  InSequence s;
+
+  // Start the first connect attempt.
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
+
+  // Move time forward and start the second connect attempt.
+  simulated_time.sleep(std::chrono::milliseconds(sleep1_ms));
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r2(*this, 1, ActiveTestRequest::Type::Pending);
+
+  // Move time forward, signal that the first connect completed and verify the time to connect.
+  uint64_t upstream_cx_connect_ms1 = 0;
+  simulated_time.sleep(std::chrono::milliseconds(sleep2_ms));
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
+      .WillOnce(SaveArg<1>(&upstream_cx_connect_ms1));
+  r1.expectNewStream();
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(sleep1_ms + sleep2_ms, upstream_cx_connect_ms1);
+
+  // Move time forward, signal that the second connect completed and verify the time to connect.
+  uint64_t upstream_cx_connect_ms2 = 0;
+  simulated_time.sleep(std::chrono::milliseconds(sleep3_ms));
+  EXPECT_CALL(*conn_pool_.test_clients_[1].connect_timer_, disableTimer());
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
+      .WillOnce(SaveArg<1>(&upstream_cx_connect_ms2));
+  r2.expectNewStream();
+  conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(sleep2_ms + sleep3_ms, upstream_cx_connect_ms2);
+
+  // Cleanup, cause the connections to go away.
+  for (auto& test_client : conn_pool_.test_clients_) {
+    EXPECT_CALL(
+        cluster_->stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+    EXPECT_CALL(conn_pool_, onClientDestroy());
+    test_client.connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  }
+  dispatcher_.clearDeferredDeleteList();
 }
 
 /**

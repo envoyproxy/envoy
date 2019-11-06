@@ -125,7 +125,8 @@ private:
  */
 class RequestStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection, nullptr) {}
+  RequestStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
 
   // Http::StreamEncoder
@@ -193,7 +194,8 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
-                 uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 HeaderKeyFormatterPtr&& header_key_formatter);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -203,6 +205,7 @@ protected:
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   bool handling_upgrade_{};
+  const HeaderKeyFormatterPtr header_key_formatter_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -359,7 +362,6 @@ private:
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
-  HeaderKeyFormatterPtr header_key_formatter_;
 };
 
 /**
@@ -368,7 +370,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       ConnectionCallbacks& callbacks, const uint32_t max_response_headers_count);
+                       ConnectionCallbacks& callbacks, const Http1Settings& settings,
+                       const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;

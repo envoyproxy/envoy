@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
-    deps = ["//include/envoy/buffer:buffer_interface"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -79,6 +82,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":codec_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 

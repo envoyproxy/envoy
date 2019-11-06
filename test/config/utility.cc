@@ -81,7 +81,8 @@ const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
         name: envoy.tcp_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF";
@@ -90,7 +91,8 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
         name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.router
@@ -99,7 +101,8 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
             name: envoy.file_access_log
             filter:
               not_health_check_filter:  {}
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
               path: /dev/null
           route_config:
             virtual_hosts:
@@ -119,7 +122,8 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
         name: envoy.transport_sockets.quic
       filters:
         name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.router
@@ -147,28 +151,32 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
 const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
     R"EOF(
 name: envoy.buffer
-config:
+typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
 )EOF";
 
 const std::string ConfigHelper::SMALL_BUFFER_FILTER =
     R"EOF(
 name: envoy.buffer
-config:
+typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 1024
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
     R"EOF(
 name: envoy.health_check
-config:
+typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
     R"EOF(
 name: envoy.squash
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
   cluster: squash
   attachment_template:
     spec:
@@ -186,8 +194,6 @@ config:
     nanos: 0
 )EOF";
 
-// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
-//               work restores it here.
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
   return fmt::format(
@@ -205,7 +211,7 @@ dynamic_resources:
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      set_node_on_first_message_only: false
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster
@@ -223,7 +229,8 @@ static_resources:
     filter_chains:
       filters:
         name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
             name: envoy.router
@@ -547,6 +554,15 @@ void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeou
       });
 }
 
+void ConfigHelper::setDownstreamMaxConnectionDuration(std::chrono::milliseconds timeout) {
+  addConfigModifier(
+      [timeout](
+          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
+      });
+}
+
 void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -612,7 +628,10 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-  initializeTls(options, *filter_chain->mutable_tls_context()->mutable_common_tls_context());
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  initializeTls(options, *tls_context.mutable_common_tls_context());
+  filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+  filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
 bool ConfigHelper::setAccessLog(const std::string& filename) {
@@ -624,7 +643,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename) {
   loadHttpConnectionManager(hcm_config);
   envoy::config::accesslog::v2::FileAccessLog access_log_config;
   access_log_config.set_path(filename);
-  TestUtility::jsonConvert(access_log_config, *hcm_config.mutable_access_log(0)->mutable_config());
+  hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
   storeHttpConnectionManager(hcm_config);
   return true;
 }
@@ -691,7 +710,12 @@ bool ConfigHelper::loadHttpConnectionManager(
   RELEASE_ASSERT(!finalized_, "");
   auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
-    TestUtility::jsonConvert(*hcm_filter->mutable_config(), hcm);
+    auto* config = hcm_filter->mutable_typed_config();
+    ASSERT(config->Is<
+           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>());
+    hcm = MessageUtil::anyConvert<
+        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
+        *config);
     return true;
   }
   return false;
@@ -700,10 +724,10 @@ bool ConfigHelper::loadHttpConnectionManager(
 void ConfigHelper::storeHttpConnectionManager(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_config_struct =
-      getFilterFromListener("envoy.http_connection_manager")->mutable_config();
+  auto* hcm_config_any =
+      getFilterFromListener("envoy.http_connection_manager")->mutable_typed_config();
 
-  TestUtility::jsonConvert(hcm, *hcm_config_struct);
+  hcm_config_any->PackFrom(hcm);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {

@@ -123,11 +123,15 @@ void XfccIntegrationTest::initialize() {
       });
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    auto context = bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_tls_context();
-    auto* validation_context = context->mutable_common_tls_context()->mutable_validation_context();
+    auto transport_socket =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+    envoy::api::v2::auth::UpstreamTlsContext context;
+    auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     validation_context->add_verify_subject_alt_name("foo.lyft.com");
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(context);
   });
 
   if (tls_) {

@@ -110,7 +110,12 @@ public:
 
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
+
+    // Advance time and trigger update of Dispatcher::approximateMonotonicTime()
+    // because zero QuicTime is considered uninitialized.
     time_system_.sleep(std::chrono::milliseconds(1));
+    connection_helper_.GetClock()->Now();
+
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillByDefault(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
                                  const quic::QuicSocketAddress&, quic::PerPacketOptions*) {

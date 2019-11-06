@@ -235,10 +235,12 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
+    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            *config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
@@ -247,9 +249,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n");
-    TestUtility::jsonConvert(access_log_config, *access_log->mutable_config());
-
-    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
 
@@ -323,14 +324,16 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
+    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
-    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
+    config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -344,14 +347,16 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
+    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
+    config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();

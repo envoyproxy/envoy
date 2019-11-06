@@ -49,7 +49,7 @@ message Tracing {
     // [#comment: TODO(marco) when XRay is implemented, uncomment the following; - :ref:`XRayConfig
     // <envoy_api_msg_config.trace.v2.XRayConfig>`]
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
       google.protobuf.Any typed_config = 3;
     }

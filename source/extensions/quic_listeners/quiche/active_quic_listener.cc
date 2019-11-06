@@ -33,9 +33,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, std::move(listener),
-                                                            listener_config),
-      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()) {
+    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
+      udp_listener_(std::move(listener)), dispatcher_(dispatcher),
+      version_manager_(quic::CurrentSupportedVersions()) {
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(

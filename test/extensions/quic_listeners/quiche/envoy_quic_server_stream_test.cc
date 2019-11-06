@@ -247,6 +247,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 
   // Re-enable reading just once shouldn't unblock stream.
   quic_stream_->readDisable(false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // This data frame should also be buffered.
   std::string last_part_request = bodyToStreamPayload("ccc");
@@ -264,6 +265,8 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
         EXPECT_TRUE(finished_reading);
       }));
   quic_stream_->readDisable(false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 

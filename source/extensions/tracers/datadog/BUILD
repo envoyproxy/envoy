@@ -35,5 +35,6 @@ envoy_cc_library(
         ":datadog_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
+        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
