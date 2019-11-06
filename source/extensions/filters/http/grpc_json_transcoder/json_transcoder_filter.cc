@@ -465,7 +465,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   response_in_.finish();
 
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-      Grpc::Common::getGrpcStatus(trailers);
+      Grpc::Common::getGrpcStatus(trailers, true);
   if (grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers)) {
     return Http::FilterTrailersStatus::Continue;
   }

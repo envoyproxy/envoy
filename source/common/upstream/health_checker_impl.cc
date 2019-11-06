@@ -599,7 +599,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeTrailers(
     Http::HeaderMapPtr&& trailers) {
   auto maybe_grpc_status = Grpc::Common::getGrpcStatus(*trailers);
   auto grpc_status =
-      maybe_grpc_status ? maybe_grpc_status.value() : Grpc::Status::WellKnownGrpcStatus::Internal;
+      maybe_grpc_status
+          ? maybe_grpc_status.value()
+          : static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::WellKnownGrpcStatus::Internal);
   const std::string grpc_message =
       maybe_grpc_status ? Grpc::Common::getGrpcMessage(*trailers) : "invalid gRPC status";
   onRpcComplete(grpc_status, grpc_message, true);
