@@ -303,7 +303,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
 
 bool CompressorFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type && !config_->contentTypeValues().empty()) {
+  if (content_type != nullptr && !config_->contentTypeValues().empty()) {
     const absl::string_view value =
         StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
@@ -322,7 +322,7 @@ bool CompressorFilter::isEtagAllowed(Http::HeaderMap& headers) const {
 
 bool CompressorFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
-  if (content_length) {
+  if (content_length != nullptr) {
     uint64_t length;
     const bool is_minimum_content_length =
         absl::SimpleAtoi(content_length->value().getStringView(), &length) &&
@@ -341,7 +341,7 @@ bool CompressorFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
-  if (transfer_encoding) {
+  if (transfer_encoding != nullptr) {
     for (absl::string_view header_value :
          StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
@@ -361,7 +361,7 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const
 
 void CompressorFilter::insertVaryHeader(Http::HeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
-  if (vary) {
+  if (vary != nullptr) {
     if (!StringUtil::findToken(vary->value().getStringView(), ",",
                                Http::Headers::get().VaryValues.AcceptEncoding, true)) {
       std::string new_header;
@@ -381,7 +381,7 @@ void CompressorFilter::insertVaryHeader(Http::HeaderMap& headers) {
 // the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
 void CompressorFilter::sanitizeEtagHeader(Http::HeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.Etag();
-  if (etag) {
+  if (etag != nullptr) {
     absl::string_view value(etag->value().getStringView());
     if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
       headers.removeEtag();

@@ -89,7 +89,7 @@ private:
 
   struct CompressorRegistry {
     Thread::MutexBasicLockable mutex_;
-    std::map<CompressorFilterConfig*, uint32_t> compressors_ ABSL_GUARDED_BY(mutex_);
+    absl::flat_hash_map<CompressorFilterConfig*, uint32_t> compressors_ ABSL_GUARDED_BY(mutex_);
     uint32_t registration_count_ ABSL_GUARDED_BY(mutex_){0};
     std::map<std::string, uint32_t> encodings_ ABSL_GUARDED_BY(mutex_);
   };
