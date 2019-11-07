@@ -1,6 +1,9 @@
+To learn about this sandbox and for instructions on how to run it please head over
+to the [envoy docs](https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/grpc_bridge)
+
 # gRPC HTTP/1.1 to HTTP/2 bridge
 
-This is an example of a key-value store where a client CLI, written in Python, updates a remote store, written in Go, using the stubs generated for both languages. More info at [envoy docs](https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/grpc_bridge).
+This is an example of a key-value store where a client CLI, written in Python, updates a remote store, written in Go, using the stubs generated for both languages. 
  
 Running clients that uses gRPC Stubs and sends messages through a proxy
 that upgrades the HTTP requests from http/1.1 to http/2. This is a more detailed
@@ -43,4 +46,82 @@ $ ls -la client/kv/kv_pb2.py
 
 $ ls -la server/kv/kv.pb.go
 -rw-r--r--  1 mdesales  CORP\Domain Users  9994 Nov  6 21:59 server/kv/kv.pb.go
+```
+
+## Start Both Client and Server and Proxies
+
+* After the stubs are in place, start the containers described in `docker-compose.yaml`.
+
+```console
+$ docker-compose up --build
+```
+
+* Inspect the client and server envoy.yaml config on each respective dir and compare the port numbers
+
+Notice that you will be interacting with the client container, which hosts
+the client python CLI. The port numbers for the proxies and the containers are displayed
+by the `docker-compose ps`, so it's easier to compare with the envoy.yaml config for each
+of the containers how they match.
+
+Note that the client container to use is `grpc-bridge_grpc-client_1` and binds to no port
+as it will use the `python` CLI.
+
+```console
+$ docker-compose ps
+             Name                            Command               State                             Ports
+------------------------------------------------------------------------------------------------------------------------------------
+grpc-bridge_grpc-client-proxy_1   /docker-entrypoint.sh /usr ...   Up      10000/tcp, 0.0.0.0:9911->9911/tcp, 0.0.0.0:9991->9991/tcp
+grpc-bridge_grpc-client_1         /bin/sh -c tail -f /dev/null     Up
+grpc-bridge_grpc-server-proxy_1   /docker-entrypoint.sh /usr ...   Up      10000/tcp, 0.0.0.0:8811->8811/tcp, 0.0.0.0:8881->8881/tcp
+grpc-bridge_grpc-server_1         /bin/sh -c /bin/server           Up      0.0.0.0:8081->8081/tcp
+```
+
+## Use the Client CLI
+
+* Since the containers are running, you can use the client container to interact with the gRPC server through the proxies
+* The client has the methods `set key value` and `get key` to use the in-memory key-value store.
+
+```console
+$ docker exec grpc-bridge_grpc-client_1 /client/grpc-kv-client.py set foo bar
+setf foo to bar
+```
+
+* The server will display the gRPC call received by the server, and then the access logs from the proxy for the SET method.
+  * Note that the proxy is propagating the headers of the request
+
+```console
+grpc-server_1        | 2019/11/07 16:33:58 set: foo = bar
+grpc-server-proxy_1  | [2019-11-07T16:33:58.856Z] "POST /kv.KV/Set HTTP/1.1" 200 - 15 7 3 1 "172.24.0.3" "python-requests/2.22.0" "c11cf735-0647-4e67-965c-5b1e362a5532" "grpc" "172.24.0.2:8081"
+grpc-client-proxy_1  | [2019-11-07T16:33:58.855Z] "POST /kv.KV/Set HTTP/1.1" 200 - 15 7 5 3 "172.24.0.3" "python-requests/2.22.0" "c11cf735-0647-4e67-965c-5b1e362a5532" "grpc" "172.24.0.5:8811"
+```
+
+* Getting the value is no different
+
+```console
+$ docker exec grpc-bridge_grpc-client_1 /client/grpc-kv-client.py get foo
+bar
+```
+
+* The logs in the server will show the same for the GET method.
+  * Note that again the request ID is proxied through
+
+```console
+grpc-server_1        | 2019/11/07 16:34:50 get: foo
+grpc-server-proxy_1  | [2019-11-07T16:34:50.456Z] "POST /kv.KV/Get HTTP/1.1" 200 - 10 10 2 1 "172.24.0.3" "python-requests/2.22.0" "727d4dcd-a276-4bb2-b4cc-494ae7119c24" "grpc" "172.24.0.2:8081"
+grpc-client-proxy_1  | [2019-11-07T16:34:50.455Z] "POST /kv.KV/Get HTTP/1.1" 200 - 10 10 3 2 "172.24.0.3" "python-requests/2.22.0" "727d4dcd-a276-4bb2-b4cc-494ae7119c24" "grpc" "172.24.0.5:8811"
+```
+
+# Troubleshooting
+
+* Errors building the `client` or `server` are related for the missing gRPC stubs.
+* Make sure to produce the stubs before building
+  * The error below is when the server is missing the stubs in the kv dir.
+
+```console
+$ go build -o server
+go: finding github.com/envoyproxy/envoy/examples/grpc-bridge latest
+go: finding github.com/envoyproxy/envoy/examples latest
+go: finding github.com/envoyproxy/envoy/examples/grpc-bridge/server/kv latest
+go: finding github.com/envoyproxy/envoy/examples/grpc-bridge/server latest
+build github.com/envoyproxy/envoy: cannot load github.com/envoyproxy/envoy/examples/grpc-bridge/server/kv: no matching versions for query "latest"
 ```
