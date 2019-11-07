@@ -30,6 +30,12 @@ TEST(GrpcContextTest, GetGrpcStatus) {
 
   Http::TestHeaderMapImpl invalid_trailers{{"grpc-status", "-1"}};
   EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
+
+  Http::TestHeaderMapImpl user_defined_invalid_trailers{{"grpc-status", "1024"}};
+  EXPECT_EQ(Status::InvalidCode, Common::getGrpcStatus(invalid_trailers).value());
+
+  Http::TestHeaderMapImpl user_defined_trailers{{"grpc-status", "1024"}};
+  EXPECT_EQ(1024, Common::getGrpcStatus(user_defined_trailers, true).value());
 }
 
 TEST(GrpcContextTest, GetGrpcMessage) {

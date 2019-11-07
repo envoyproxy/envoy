@@ -51,7 +51,7 @@ public:
    * status is found.
    */
   static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers,
-                                                          bool allow_user_status = false);
+                                                          bool allow_user_defined = false);
 
   /**
    * Returns the grpc-message from a given set of trailers, if present.
