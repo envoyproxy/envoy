@@ -31,9 +31,9 @@ message PerRouteConfig {
     //
     // Note: this rewrite affects both DNS lookup and host header forwarding. However, this
     // option probably shouldn't be used with
-    // :ref:`HCM host rewrite <envoy_api_field_route.RouteAction.host_rewrite>` given that the
-    // value set here would be used for DNS lookups whereas the value set in the HCM would be used for
-    // host header forwarding which is probably not the desired outcome.
+    // :ref:`HCM host rewrite <envoy_api_field_api.v3alpha.route.RouteAction.host_rewrite>` given
+    // that the value set here would be used for DNS lookups whereas the value set in the HCM would
+    // be used for host header forwarding which is probably not the desired outcome.
     string host_rewrite = 1;
 
     // Indicates that before DNS lookup, the host header will be swapped with
@@ -42,9 +42,10 @@ message PerRouteConfig {
     //
     // Note: this rewrite affects both DNS lookup and host header forwarding. However, this
     // option probably shouldn't be used with
-    // :ref:`HCM host rewrite header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>` given that the
-    // value set here would be used for DNS lookups whereas the value set in the HCM would be used for
-    // host header forwarding which is probably not the desired outcome.
+    // :ref:`HCM host rewrite header
+    // <envoy_api_field_api.v3alpha.route.RouteAction.auto_host_rewrite_header>` given that the
+    // value set here would be used for DNS lookups whereas the value set in the HCM would be used
+    // for host header forwarding which is probably not the desired outcome.
     string auto_host_rewrite_header = 2;
   }
 }
