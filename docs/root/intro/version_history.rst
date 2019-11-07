@@ -5,6 +5,7 @@ Version history
 ================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * api: remove all support for v1
+* build: official released binary is now built against libc++.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * redis: performance improvement for larger split commands by avoiding string copies.
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
