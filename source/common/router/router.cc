@@ -416,6 +416,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     };
   }
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
+
   if (!cluster) {
     config_.stats_.no_cluster_.inc();
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
@@ -430,11 +431,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   if (cluster_->auto_sni()) {
     auto url_obj = Http::Utility::Url{};
-    auto url_str = headers.Path()->value().getStringView();
+    auto url_str = headers.Host()->value().getStringView();
     if (!url_obj.initialize(url_str)) {
       throw EnvoyException(fmt::format("cluster: failed to parse inbound URL {}", url_str));
     }
-
     if (cluster_->upstreamTlsContext() == absl::nullopt) {
       throw EnvoyException(
           fmt::format("cluster: tls_context is needed on cluster config if you set auto_sni true"));

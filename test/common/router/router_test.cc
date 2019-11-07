@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/metadata.h"
@@ -294,7 +296,6 @@ TEST_F(RouterTest, ClusterNotFound) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
-
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_cluster").value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
@@ -1041,6 +1042,37 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+}
+
+TEST_F(RouterTest, RewriteSniField) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+      }));
+
+  absl::optional<envoy::api::v2::auth::UpstreamTlsContext> upstream_tls_context(
+      envoy::api::v2::auth::UpstreamTlsContext{});
+  upstream_tls_context.value().set_sni(EMPTY_STRING);
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, auto_sni()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamTlsContext())
+      .WillRepeatedly(ReturnRef(upstream_tls_context));
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.removeHost();
+  headers.insertHost().value(std::string("https://api.sample.com"));
+  router_.decodeHeaders(headers, true);
 }
 
 TEST_F(RouterTest, ResetDuringEncodeHeaders) {
