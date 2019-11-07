@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -376,9 +377,7 @@ void SymbolTableImpl::debugPrint() const {
 #endif
 
 SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
-  while (absl::EndsWith(name, ".")) {
-    name.remove_suffix(1);
-  }
+  name = StringUtil::removeTrailingCharacters(name, '.');
   Encoding encoding;
   addTokensToEncoding(name, encoding);
   auto bytes = std::make_unique<Storage>(encoding.bytesRequired());

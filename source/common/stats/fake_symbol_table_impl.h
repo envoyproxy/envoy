@@ -142,9 +142,7 @@ private:
   }
 
   StoragePtr encodeHelper(absl::string_view name) const {
-    while (absl::EndsWith(name, ".")) {
-      name.remove_suffix(1);
-    }
+    name = StringUtil::removeTrailingCharacters(name, '.');
     auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
     uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());

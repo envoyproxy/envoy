@@ -22,10 +22,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // We can add stat-names with trailing dots, but note that they will be
     // trimmed by the Symbol Table implementation, so we must trim the input
     // string before comparing.
-    absl::string_view trimmed_fuzz_data(next_data);
-    while (absl::EndsWith(trimmed_fuzz_data, ".")) {
-      trimmed_fuzz_data.remove_suffix(1);
-    }
+    absl::string_view trimmed_fuzz_data = StringUtil::removeTrailingCharacters(next_data, '.');
     FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(stat_name));
   }
 }
