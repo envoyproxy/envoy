@@ -749,7 +749,6 @@ TEST_F(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   // str2 is copied.
@@ -779,7 +778,6 @@ TEST_F(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
 
 TEST_F(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   std::string str(1024, 'a');
   buffer.add(str);
   quic::QuicMemSlice slice{quic::QuicMemSliceImpl(buffer, str.length())};
