@@ -162,6 +162,8 @@ typed_config:
     nanos: 0
 )EOF";
 
+// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
+//               work restores it here.
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
   return fmt::format(
@@ -179,7 +181,7 @@ dynamic_resources:
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      set_node_on_first_message_only: true
+      set_node_on_first_message_only: false
 static_resources:
   clusters:
   - name: my_cds_cluster
