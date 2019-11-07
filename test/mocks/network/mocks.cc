@@ -97,10 +97,10 @@ MockUdpListenerCallbacks::~MockUdpListenerCallbacks() = default;
 MockDrainDecision::MockDrainDecision() = default;
 MockDrainDecision::~MockDrainDecision() = default;
 
-MockListenerFilter::MockListenerFilter() = default;
-MockListenerFilter::~MockListenerFilter() {
-  die_();
+MockListenerFilter::MockListenerFilter() {
+  // ON_CALL(*this, die_()).WillByDefault(testing::Invoke([](){}));
 }
+MockListenerFilter::~MockListenerFilter() { die_(); }
 
 MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
