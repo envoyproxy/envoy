@@ -2,7 +2,6 @@
 
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 
@@ -49,15 +48,6 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
                                                                   cache_manager, header_match_data,
                                                                   cluster_min_healthy_percentages));
   };
-}
-
-Http::FilterFactoryCb
-HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                             const std::string& stats_prefix,
-                                             Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
-  Config::FilterJson::translateHealthCheckFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 /**
