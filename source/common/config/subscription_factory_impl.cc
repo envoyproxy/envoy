@@ -43,28 +43,29 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       return std::make_unique<HttpSubscriptionImpl>(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_, random_,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
-          Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url),
-          callbacks, stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
+          Utility::apiConfigSourceRequestTimeout(api_config_source),
+          xdsCarrierMethod(type_url, api_config_source.api_type()), callbacks, stats,
+          Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::api::v2::core::ApiConfigSource::GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::make_shared<GrpcMuxSotw>(Utility::factoryForGrpcApiConfigSource(
-                                            cm_.grpcAsyncClientManager(), api_config_source, scope)
-                                            ->create(),
-                                        dispatcher_, deltaGrpcMethod(type_url), random_, scope,
-                                        Utility::parseRateLimitSettings(api_config_source),
-                                        local_info_,
-                                        api_config_source.set_node_on_first_message_only()),
+          std::make_shared<GrpcMuxSotw>(
+              Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                     api_config_source, scope)
+                  ->create(),
+              dispatcher_, xdsCarrierMethod(type_url, api_config_source.api_type()), random_, scope,
+              Utility::parseRateLimitSettings(api_config_source), local_info_,
+              api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated=*/false);
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::make_shared<GrpcMuxDelta>(Utility::factoryForGrpcApiConfigSource(
-                                             cm_.grpcAsyncClientManager(), api_config_source, scope)
-                                             ->create(),
-                                         dispatcher_, deltaGrpcMethod(type_url), random_, scope,
-                                         Utility::parseRateLimitSettings(api_config_source),
-                                         local_info_,
-                                         api_config_source.set_node_on_first_message_only()),
+          std::make_shared<GrpcMuxDelta>(
+              Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                     api_config_source, scope)
+                  ->create(),
+              dispatcher_, xdsCarrierMethod(type_url, api_config_source.api_type()), random_, scope,
+              Utility::parseRateLimitSettings(api_config_source), local_info_,
+              api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated=*/false);
     default:

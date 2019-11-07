@@ -12,8 +12,8 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
 const char UnknownMethod[] = "could_not_lookup_method_due_to_unknown_type_url";
-
 #define API_TYPE_URL_IS(x)                                                                         \
   (type_url == Grpc::Common::typeUrl(envoy::api::v2::x().GetDescriptor()->full_name()))
 #define DISCOVERY_TYPE_URL_IS(x)                                                                   \
@@ -84,6 +84,23 @@ const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
 }
 #undef API_TYPE_URL_IS
+} // namespace
+
+const Protobuf::MethodDescriptor&
+xdsCarrierMethod(absl::string_view type_url,
+                 envoy::api::v2::core::ApiConfigSource::ApiType api_type) {
+  switch (api_type) {
+  case envoy::api::v2::core::ApiConfigSource::REST:
+    return restMethod(type_url);
+  case envoy::api::v2::core::ApiConfigSource::GRPC:
+    return sotwGrpcMethod(type_url);
+  case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC:
+    return deltaGrpcMethod(type_url);
+  default:
+    return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+        "xdsCarrierMethod_does_not_recognize_this_xds_type");
+  }
+}
 
 } // namespace Config
 } // namespace Envoy
