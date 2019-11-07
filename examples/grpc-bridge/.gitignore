@@ -1,2 +1,2 @@
-bin/service
 .idea
+server/kv/kv.pb.go

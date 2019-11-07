@@ -1,20 +1,36 @@
 version: "3.7"
+
 services:
 
-  python:
+  # Requires the build of the stubs first
+  grpc-server:
+    image: envoyproxy/example-kv-server
     build:
-      context: .
-      dockerfile: Dockerfile-python
-    volumes:
-      - ./config/s2s-python-envoy.yaml:/etc/s2s-python-envoy.yaml
+      context: server
     expose:
-      - "9001"
+      - "8081"
+    ports:
+      - "8081:8081"
+    networks:
+      envoymesh:
+        aliases:
+          - kv-backend-service
 
-  grpc:
-    build:
-      context: .
-      dockerfile: Dockerfile-grpc
+  grpc-server-proxy:
+    image: envoyproxy/envoy:latest
+    command: /usr/local/bin/envoy -c /etc/server-envoy-proxy.yaml --service-cluster backend-proxy
     volumes:
-      - ./config/s2s-grpc-envoy.yaml:/etc/s2s-grpc-envoy.yaml
+      - ./server/envoy-proxy.yaml:/etc/server-envoy-proxy.yaml
+    networks:
+      envoymesh:
+        aliases:
+          - kv-backend-proxy
     expose:
-      - "9211"
+      - "8811"
+      - "8881"
+    ports:
+      - "8811:8811"
+      - "8881:8881"
+
+networks:
+  envoymesh: {}
