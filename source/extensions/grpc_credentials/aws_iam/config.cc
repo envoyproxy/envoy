@@ -119,9 +119,9 @@ AwsIamHeaderAuthenticator::buildMessageToSign(absl::string_view service_url,
   Http::Utility::extractHostPathFromUri(uri, host, path);
 
   Http::RequestMessageImpl message;
-  message.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  message.headers().insertHost().value(host);
-  message.headers().insertPath().value(path);
+  message.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  message.headers().setCopyHost(host);
+  message.headers().setCopyPath(path);
 
   return message;
 }

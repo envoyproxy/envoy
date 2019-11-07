@@ -352,6 +352,9 @@ private:
   virtual const HeaderEntry* name() const PURE;                                                    \
   virtual HeaderEntry* name() PURE;                                                                \
   virtual HeaderEntry& insert##name() PURE;                                                        \
+  virtual void setReference##name(const std::string& value) PURE;                                  \
+  virtual void setCopy##name(absl::string_view value) PURE;                                        \
+  virtual void setInteger##name(uint64_t value) PURE;                                              \
   virtual void remove##name() PURE;
 
 /**

@@ -33,6 +33,18 @@ public:                                                                         
     cached_byte_size_.reset();                                                                     \
     return maybeCreateInline(&inline_headers_.name##_, Headers::get().name);                       \
   }                                                                                                \
+  void setReference##name(const std::string& value) override {                                     \
+    addSize(value.size());                                                                         \
+    maybeCreateInline(&inline_headers_.name##_, Headers::get().name).value().setReference(value);  \
+  }                                                                                                \
+  void setCopy##name(absl::string_view value) override {                                           \
+    addSize(value.size());                                                                         \
+    maybeCreateInline(&inline_headers_.name##_, Headers::get().name).value().setCopy(value);       \
+  }                                                                                                \
+  void setInteger##name(uint64_t value) override {                                                 \
+    maybeCreateInline(&inline_headers_.name##_, Headers::get().name).value().setInteger(value);    \
+    addSize(inline_headers_.name##_->value().size());                                              \
+  }                                                                                                \
   void remove##name() override { removeInline(&inline_headers_.name##_); }
 
 #define DEFINE_INLINE_HEADER_STRUCT(name) HeaderEntryImpl* name##_;
