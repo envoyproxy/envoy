@@ -693,6 +693,12 @@ public:
   virtual uint64_t features() const PURE;
 
   /**
+   * @return const Http::Http1Settings& for HTTP/1.1 connections created on behalf of this cluster.
+   *         @see Http::Http1Settings.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
+
+  /**
    * @return const Http::Http2Settings& for HTTP/2 connections created on behalf of this cluster.
    *         @see Http::Http2Settings.
    */

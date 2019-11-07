@@ -11,7 +11,10 @@ configure_make(
         "--enable-shared=no",
         "--enable-frame-pointers",
         "--disable-libunwind",
-    ],
+    ] + select({
+        "//bazel:apple": ["AR=/usr/bin/ar"],
+        "//conditions:default": [],
+    }),
     lib_source = "@com_github_gperftools_gperftools//:all",
     linkopts = ["-lpthread"],
     make_commands = ["make install-libLTLIBRARIES install-perftoolsincludeHEADERS"],
@@ -92,8 +95,10 @@ envoy_cmake_external(
         "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
         "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_FLAGS_BAZEL": "-fPIC",
     },
     defines = ["CURL_STATICLIB"],
+    generate_crosstool_file = True,
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["libcurl.lib"],

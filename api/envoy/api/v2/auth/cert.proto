@@ -35,7 +35,8 @@ message TlsParameters {
     TLSv1_3 = 4;
   }
 
-  // Minimum TLS protocol version. By default, it's ``TLSv1_0``.
+  // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_0`` for
+  // servers.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maximum TLS protocol version. By default, it's ``TLSv1_3`` for servers in non-FIPS builds, and
@@ -110,7 +111,7 @@ message PrivateKeyProvider {
 
   // Private key method provider specific configuration.
   oneof config_type {
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
     google.protobuf.Any typed_config = 3;
   }
@@ -345,6 +346,12 @@ message CommonTlsContext {
 
 message UpstreamTlsContext {
   // Common TLS context settings.
+  //
+  // .. attention::
+  //
+  //   Server certificate verification is not enabled by default. Configure
+  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
+  //   verification.
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.

@@ -2,6 +2,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/io_handle.h"
 
 #include "common/common/logger.h"

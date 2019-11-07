@@ -73,15 +73,16 @@ void GrpcClientImpl::onSuccess(
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
   }
 
-  Http::HeaderMapPtr response_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
+  Http::HeaderMapPtr response_headers_to_add, request_headers_to_add;
   if (!response->headers().empty()) {
+    response_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
     for (const auto& h : response->headers()) {
       response_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
 
-  Http::HeaderMapPtr request_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
   if (!response->request_headers_to_add().empty()) {
+    request_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
     for (const auto& h : response->request_headers_to_add()) {
       request_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }

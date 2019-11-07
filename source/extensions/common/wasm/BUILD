@@ -32,5 +32,6 @@ envoy_cc_library(
         ":wasm_vm_interface",
         "//source/common/common:assert_lib",
         "//source/extensions/common/wasm/null:null_lib",
+        "//source/extensions/common/wasm/v8:v8_lib",
     ],
 )

@@ -82,6 +82,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 
