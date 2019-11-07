@@ -20,7 +20,7 @@ Address::InstanceConstSharedPtr BaseListenerImpl::getLocalAddress(int fd) {
   return Address::addressFromFd(fd);
 }
 
-BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr&& socket)
+BaseListenerImpl::BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket)
     : local_address_(nullptr), dispatcher_(dispatcher), socket_(std::move(socket)) {
   const auto ip = socket_->localAddress()->ip();
 

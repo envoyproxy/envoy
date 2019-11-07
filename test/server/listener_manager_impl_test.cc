@@ -66,12 +66,12 @@ public:
                        expected_value, expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
-      manager_->listeners().front().get().listenSocketFactory()->createListenSocket(
+      manager_->listeners().front().get().listenSocketFactory().createListenSocket(
           listener.name());
     } else {
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_THROW_WITH_MESSAGE(
-          manager_->listeners().front().get().listenSocketFactory()->createListenSocket(
+          manager_->listeners().front().get().listenSocketFactory().createListenSocket(
               listener.name()),
           EnvoyException, "MockListenerComponentFactory: Setting socket options failed");
       EXPECT_EQ(1U, manager_->listeners().size());
@@ -184,7 +184,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
   Network::ListenerConfig& listener = manager_->listeners().front().get();
-  listener.listenSocketFactory()->createListenSocket(listener.name());
+  listener.listenSocketFactory().createListenSocket(listener.name());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
@@ -948,7 +948,7 @@ filter_chains:
                                                         bind_to_port);
       }));
 
-  manager_->listeners().front().get().listenSocketFactory()->createListenSocket("foo");
+  manager_->listeners().front().get().listenSocketFactory().createListenSocket("foo");
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
@@ -985,7 +985,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
       .WillOnce(Throw(EnvoyException("can't bind")));
   EXPECT_CALL(*listener_foo, onDestroy());
-  EXPECT_THROW(manager_->listeners().front().get().listenSocketFactory()->createListenSocket("foo"),
+  EXPECT_THROW(manager_->listeners().front().get().listenSocketFactory().createListenSocket("foo"),
                EnvoyException);
 }
 
@@ -2916,7 +2916,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
       }));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
-  manager_->listeners().front().get().listenSocketFactory()->createListenSocket("TestListener");
+  manager_->listeners().front().get().listenSocketFactory().createListenSocket("TestListener");
 }
 
 // Validate that when transparent is set in the Listener, we see the socket option
@@ -2989,7 +2989,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
                    /* expected_value */ 6);
   manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
-  manager_->listeners().front().get().listenSocketFactory()->createListenSocket("SockoptsListener");
+  manager_->listeners().front().get().listenSocketFactory().createListenSocket("SockoptsListener");
 }
 
 // Set the resolver to the default IP resolver. The address resolver logic is unit tested in

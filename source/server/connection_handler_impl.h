@@ -85,7 +85,9 @@ public:
     // Network::ConnectionHandler::ActiveListener.
     uint64_t listenerTag() override { return listener_tag_; }
     Network::Listener* listener() override { return listener_.get(); }
-    void destroy() override { listener_.reset(); }
+    void destroy() override { 
+      std::cerr << "======= destroy listener " << listener_.get() << "\n";
+      listener_.reset(); }
 
     Network::ListenerPtr listener_;
     ListenerStats stats_;

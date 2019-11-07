@@ -27,8 +27,8 @@ public:
                               Network::Address::SocketType socket_type,
                               const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
+  // Network::ListenSocketFactory
   Network::Address::SocketType socketType() const override { return socket_type_; }
-
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
@@ -50,8 +50,12 @@ public:
                          Network::Address::InstanceConstSharedPtr local_address,
                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
+  // Network::ListenSocketFactory
   // If |socket_| is nullptr, create a new socket for it. Otherwise, always return |socket_|.
-  Network::SocketSharedPtr createListenSocket(std::string listener_name) override;
+  Network::SocketSharedPtr createListenSocket(const std::string& listener_name) override;
+  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+    return *socket_;
+  }
 
 private:
   Network::SocketSharedPtr socket_;
@@ -63,7 +67,12 @@ public:
                          Network::Address::InstanceConstSharedPtr local_address,
                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
-  Network::SocketSharedPtr createListenSocket(std::string listener_name) override;
+  // Network::ListenSocketFactory
+  Network::SocketSharedPtr createListenSocket(const std::string& listener_name) override;
+    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+    return absl::nullopt;
+  }
+
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -114,6 +123,7 @@ public:
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const envoy::api::v2::Listener& config() { return config_; }
+  const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
@@ -125,7 +135,7 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactorySharedPtr& listenSocketFactory() override { return socket_factory_; }
+  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
   bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;

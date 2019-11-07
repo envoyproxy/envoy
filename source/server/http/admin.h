@@ -320,6 +320,29 @@ private:
                                   AdminStream&);
   bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
+  class AdminListenSocketFactory : public Network::ListenSocketFactory {
+  public:
+    AdminListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
+
+    // Network::ListenSocketFactory 
+     Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return socket_->localAddress();
+  }
+
+  Network::SocketSharedPtr createListenSocket(const std::string& /*listener_name*/) override {
+    return socket_;
+  }
+
+  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+    return *socket_;
+  }
+
+  private:
+    Network::SocketSharedPtr socket_;
+  };
+
   class AdminListener : public Network::ListenerConfig {
   public:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
@@ -329,8 +352,7 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::Socket& socket() override { return parent_.mutable_socket(); }
-    const Network::Socket& socket() const override { return parent_.mutable_socket(); }
+    Network::ListenSocketFactory& listenSocketFactory() override { return *parent_.socket_factory_; }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
@@ -397,7 +419,8 @@ private:
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
-  Network::SocketPtr socket_;
+  Network::SocketSharedPtr socket_;
+  Network::ListenSocketFactorySharedPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
 };

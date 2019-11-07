@@ -63,7 +63,7 @@ TcpListenSocketFactory::TcpListenSocketFactory(
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Stream,
                                   options, bind_to_port) {}
 
-Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket(std::string listener_name) {
+Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket(const std::string& listener_name) {
   if (socket_ == nullptr) {
     socket_ = createListenSocketAndApplyOptions(listener_name);
   }
@@ -76,7 +76,7 @@ UdpListenSocketFactory::UdpListenSocketFactory(
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Datagram,
                                   options, bind_to_port) {}
 
-Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket(std::string listener_name) {
+Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket(const std::string& listener_name) {
   return createListenSocketAndApplyOptions(listener_name);
 }
 

@@ -22,7 +22,7 @@ class UdpListenerImpl : public BaseListenerImpl,
                         public UdpPacketProcessor,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
-  UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr&& socket,
+  UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                   UdpListenerCallbacks& cb, TimeSource& time_source);
 
   ~UdpListenerImpl() override;

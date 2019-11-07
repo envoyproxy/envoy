@@ -16,7 +16,7 @@ namespace Network {
  */
 class BaseListenerImpl : public virtual Listener {
 public:
-  BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr&& socket);
+  BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket);
 
 protected:
   virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);

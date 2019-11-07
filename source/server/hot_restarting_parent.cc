@@ -4,6 +4,7 @@
 
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
+#include "server/listener_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -95,9 +96,12 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::resolveUrl(request.pass_listen_socket().address());
   for (const auto& listener : server_->listenerManager().listeners()) {
-    if (*listener.get().socket().localAddress() == *addr && listener.get().bindToPort()) {
+    Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
+    if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
+      if (socket_factory.sharedSocket().has_value()) {
       wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-          listener.get().socket().ioHandle().fd());
+          socket_factory.sharedSocket()->get().ioHandle().fd());
+      }
       break;
     }
   }
