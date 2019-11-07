@@ -101,12 +101,6 @@ EXTENSIONS = {
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
 
     #
-    # SSL
-    #
-
-    "envoy.extensions.common.crypto.utility_lib":       "//source/extensions/common/crypto:utility_lib",
-
-    #
     # Stat sinks
     #
 
@@ -243,4 +237,5 @@ WINDOWS_EXTENSIONS = {
     #
 
     #"envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
 }
