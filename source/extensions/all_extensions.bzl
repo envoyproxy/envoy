@@ -19,4 +19,4 @@ def envoy_windows_extensions():
     all_extensions = dicts.add(_required_extensions, WINDOWS_EXTENSIONS)
 
     # These extensions can be removed on a site specific basis.
-    return [v for k, v in all_extensions.items()]
+    return all_extensions.values()
