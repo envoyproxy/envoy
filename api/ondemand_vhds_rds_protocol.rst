@@ -94,6 +94,8 @@ If Envoy's route configuration already contains a given virtual host, it will
 be overwritten by data received in the
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`
 but only if the updated virtual host is different from its current state.
+:ref:`Resource.aliases <envoy_api_msg_Resource.aliases>` field contains
+all host/authority header values used to create the on-demand request.
 During spontaneous updates configuration server will only send updates for
 virtual hosts that Envoy is aware of. The configuration server needs to
 keep track of virtual hosts known to Envoy.
@@ -109,6 +111,19 @@ set to the requested host entry and
 the resource unpopulated. This will allow Envoy to match the requested resource
 to the response.
 
+Request Path during Subscribing to a Virtual Host
+=================================================
+If a route for the contents of the host/authority header cannot be resolved:
+- A :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` as described above is queued for transmission.
+- A callback resuming the decoder filter chain of the current active stream is created. Together with the callback the contents of all host/authority headers used in the request is stored. 
+- The decoder filter chain of the current active stream is paused.
+If there's already a route available, the control is passed to the next filter in the filter chain.
+
+When a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` arrives:
+- Route configuration is updated.
+- All callbacks whose list of host/authority header values exactly matches the list in the :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`` are triggered.
+- The decoder filter chain is resumed. If a route for the host/authority header can be found, the active stream is recreated (to pick up the updated route configuration). If there's still no route, the control is passed to the next filter in the filter chain.
+  
 Unsubscribing from Virtual Hosts
 ================================
 
