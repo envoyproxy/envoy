@@ -6,7 +6,7 @@ Currently, in RDS, all routes for the cluster are sent to every Envoy instance
 in the mesh. This causes scaling issues as the size of the cluster grows. The
 majority of this complexity can be found in the virtual host configurations, of
 which most are not needed by any individual proxy. With a goal of being able
-to scale to one million vhosts in the future, the capability to filter a
+to scale to one million virtual hosts in the future, the capability to filter a
 proxy to only contain the required virtual hosts is a necessity.
 
 In order to fix this issue, we are implementing the on-demand Virtual Host
@@ -50,17 +50,14 @@ This protocol allows a separation of concerns with RDS where RDS is in charge
 of maintaining route configs while VHDS is in charge of communicating virtual
 hosts. In VHDS, Envoy will send a
 :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`
-with :ref:`type_url` set to 
+with the `type_url` set to 
 `type.googleapis.com/envoy.api.v2.route.VirtualHost` 
-and :ref:`resource_names <envoy_api_msg_DeltaDiscoveryRequest.resource_names>` 
+and `resource_name` 
 set to a list of virtual host resource names for which it would like
 configuration. The management server will respond with a
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`
-with the :ref:`resources <envoy_api_msg_DeltaDiscoveryResponse.resources>`
-field populated with the specified virtual hosts, the 
-:ref:`name <envoy_api_msg_DeltaDiscoveryResponse.name>`
-field populated with the virtual host name, and the 
-:ref:`alias <envoy_api_msg_DeltaDiscoveryResponse.alias>` field
+with the `resources` field populated with the specified virtual hosts, the 
+`name` field populated with the virtual host name, and the `alias` field
 populated with the explicit (no wildcard) domains of the virtual host. Future
 updates to these virtual hosts will be sent via spontaneous updates.
 
@@ -73,7 +70,7 @@ Virtual Host Naming Convention
 ==============================
 Virtual hosts in VHDS are identified by a combination of the name of the route
 configuration to which the virtual host belong as well as the host HTTP "host"
-header entry. Resources should be named as follows:
+header (authority for HTTP2) entry. Resources should be named as follows:
 
 <route configuration name>/<host entry>
 
@@ -84,8 +81,7 @@ Subscribing to Virtual Hosts
 ============================
 Envoy will send a
 :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` with the
-:ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>`
-field populated with the route config names
+`resource_names_subscribe` field populated with the route config names
 + domains of each of the resources that it would like to subscribe to. Each of
 the virtual hosts contained in the
 :ref:`DeltaDiscoveryRequest's <envoy_api_msg_DeltaDiscoveryRequest>`
@@ -94,22 +90,17 @@ If Envoy's route configuration already contains a given virtual host, it will
 be overwritten by data received in the
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`
 but only if the updated virtual host is different from its current state.
-:ref:`Resource.aliases <envoy_api_msg_Resource.aliases>` field contains
-all host/authority header values used to create the on-demand request.
-During spontaneous updates configuration server will only send updates for
-virtual hosts that Envoy is aware of. The configuration server needs to
-keep track of virtual hosts known to Envoy.
+`Resource.aliases` field contains all host/authority header values used
+to create the on-demand request. During spontaneous updates configuration
+server will only send updates for virtual hosts that Envoy is aware of. The
+configuration server needs to keep track of virtual hosts known to Envoy.
 
 If a virtual host is requested for which the management sever does not know
 about, then the management server should respond with a 
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` in which
-the :ref:`resources <envoy_api_msg_DeltaDiscoveryRequest.resources>` entry for
-that virtual host has the 
-:ref:`name <envoy_api_msg_DeltaDiscoveryResponse.name>` 
-and :ref:`alias <envoy_api_msg_DeltaDiscoveryResponse.alias>` 
-set to the requested host entry and
-the resource unpopulated. This will allow Envoy to match the requested resource
-to the response.
+the `resources` entry for that virtual host has the `name` and `alias` 
+set to the requested host entry and the resource unpopulated. This will allow
+Envoy to match the requested resource to the response.
 
 Request Path during Subscribing to a Virtual Host
 =================================================
@@ -121,7 +112,7 @@ If there's already a route available, the control is passed to the next filter i
 
 When a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` arrives:
 - Route configuration is updated.
-- All callbacks whose list of host/authority header values exactly matches the list in the :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`` are triggered.
+- All callbacks whose list of host/authority header values exactly matches the list in the :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` are triggered.
 - The decoder filter chain is resumed. If a route for the host/authority header can be found, the active stream is recreated (to pick up the updated route configuration). If there's still no route, the control is passed to the next filter in the filter chain.
   
 Unsubscribing from Virtual Hosts
@@ -135,11 +126,10 @@ initially sent Envoy.
 Virtual hosts can be unsubscribed from via a
 :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`
 with their route config names + domains provided in the
-:ref:`resource_names_unsubscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_
-names_unsubscribe>` field. Envoy will remove any route config names +
+`resource_names_unsubscribe` field. Envoy will remove any route config names +
 domains that it finds in the
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`
-:ref:`removed_resources <envoy_api_msg_DeltaDiscoveryResponse.removed_resources>` field.
+`removed_resources` field.
 
 Compatibility with Scoped RDS
 =============================
