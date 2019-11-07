@@ -31,6 +31,13 @@ repository.
 
 We use the Clang compiler for all CI runs with tests. We have an additional CI run with GCC which builds binary only.
 
+# C++ standard library
+
+As of November 2019 after [#8859](https://github.com/envoyproxy/envoy/pull/8859) the official released binary is
+[linked against libc++ on Linux](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#linking-against-libc-on-linux).
+To override the C++ standard library in your build, set environment variable `ENVOY_STDLIB` to `libstdc++` or `libc++` and
+run `./ci/do_ci.sh` as described below.
+
 # Building and running tests as a developer
 
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
