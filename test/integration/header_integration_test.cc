@@ -1379,14 +1379,14 @@ TEST_P(HeaderIntegrationTest, TestRejectNominatedXForwardedProto) {
           {":authority", "no-headers.com"},
           {"x-request-foo", "downstram"},
           {"connection", "te, x-forwarded-proto"},
-          {"te", "trailers"},
+          {"te", "TrAiLeRs"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "no-headers.com"},
           {":path", "/"},
           {":method", "GET"},
           {"x-request-foo", "downstram"},
-          {"te", "trailers"},
+          {"te", "TrAiLeRs"},
       },
       Http::TestHeaderMapImpl{
           {":status", "400"},
@@ -1395,6 +1395,34 @@ TEST_P(HeaderIntegrationTest, TestRejectNominatedXForwardedProto) {
       Http::TestHeaderMapImpl{
           {":status", "400"},
           {"connection", "close"},
+      });
+}
+
+TEST_P(HeaderIntegrationTest, TestRejectTrailersSubString) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"te", "semiswithtripletrailersareathing"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "semiswithtripletrailersareathing"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"server", "envoy"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"server", "envoy"},
       });
 }
 

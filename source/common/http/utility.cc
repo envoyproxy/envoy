@@ -418,15 +418,16 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
 
     // If the Connection token value is not a nominated header, ignore it here since
     // the connection header is removed elsewhere when the H1 request is upgraded to H2
-    if ((lcs_header_to_remove == LowerCaseString(cv.Close)) ||
-        (lcs_header_to_remove == LowerCaseString(cv.Http2Settings)) ||
-        (lcs_header_to_remove == LowerCaseString(cv.KeepAlive)) ||
-        (lcs_header_to_remove == LowerCaseString(cv.Upgrade))) {
+    if ((lcs_header_to_remove.get() == cv.Close) ||
+        (lcs_header_to_remove.get() == cv.Http2Settings) ||
+        (lcs_header_to_remove.get() == cv.KeepAlive) ||
+        (lcs_header_to_remove.get() == cv.Upgrade)) {
       continue;
     }
 
     // By default we will remove any nominated headers
     bool keep_header = false;
+    StringUtil::CaseUnorderedSet tokens_to_remove{};
 
     // Determine whether the nominated header contains invalid values
     HeaderEntry* nominated_header = NULL;
@@ -461,18 +462,35 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
         return false;
       }
 
-      // If the TE header contains "trailers" we will reset the header to this value since it's
-      // the only permitted value
-      if (is_te_header && (nominated_header_value_sv.find(Http::Headers::get().TEValues.Trailers) !=
-                           std::string::npos)) {
+      if (is_te_header) {
+        keep_header = true;
+        for (const auto& header_value : absl::StrSplit(nominated_header_value_sv, ',')) {
 
-        // Reset the TE header to just trailers only if other values exist
-        if (nominated_header_value_sv.find(',') != std::string::npos) {
-          nominated_header->value().clear();
-          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
-                                            Http::Headers::get().TEValues.Trailers.size());
+          const absl::string_view header_sv = StringUtil::trim(header_value);
+
+          // Remove everything from TE header except "trailers"
+          if (!StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                    Http::Headers::get().TEValues.Trailers)) {
+            ENVOY_LOG_MISC(trace, "Sanitizing nominated header [{}] value [{}]", token_sv,
+                           header_sv);
+            tokens_to_remove.emplace(header_sv);
+          }
         }
-        continue;
+      }
+
+      // We found tokens in an expected header that needed removal. If after removing them the
+      // set is empty, we will remove that header. Conversely, we will move on to examining the
+      // next nominated header
+      if (keep_header && !tokens_to_remove.empty()) {
+        const std::string new_value =
+            StringUtil::removeTokens(nominated_header_value_sv, ",", tokens_to_remove, ",");
+        if (new_value.empty()) {
+          keep_header = false;
+        } else {
+          nominated_header->value().clear();
+          nominated_header->value().setCopy(new_value.data(), new_value.size());
+          continue;
+        }
       }
     }
 
