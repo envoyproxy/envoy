@@ -37,7 +37,7 @@ public:
 private:
   void ensureMaxLen(uint32_t size);
 
-  uint32_t max_len_;
+  const uint32_t max_len_;
   uint32_t current_{};
 };
 

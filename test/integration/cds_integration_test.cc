@@ -19,10 +19,7 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
-using testing::AssertionFailure;
 using testing::AssertionResult;
-using testing::AssertionSuccess;
-using testing::IsSubstring;
 
 namespace Envoy {
 namespace {
@@ -94,7 +91,7 @@ public:
     acceptXdsConnection();
 
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster1_},
                                                    {cluster1_}, {}, "55");
 
@@ -125,7 +122,8 @@ public:
   bool test_skipped_{true};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest, DELTA_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
 // 2) Envoy is told of a cluster via CDS.

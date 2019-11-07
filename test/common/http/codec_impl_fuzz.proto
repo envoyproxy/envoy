@@ -4,17 +4,19 @@ package test.common.http;
 
 import "google/protobuf/empty.proto";
 
+import "validate/validate.proto";
 import "test/fuzz/common.proto";
 
 // Structured input for H2 codec_impl_fuzz_test.
 
 message NewStream {
-  test.fuzz.Headers request_headers = 1;
+  test.fuzz.Headers request_headers = 1 [(validate.rules).message.required = true];
   bool end_stream = 2;
 }
 
 message DirectionalAction {
   oneof directional_action_selector {
+    option (validate.required) = true;
     test.fuzz.Headers continue_headers = 1;
     test.fuzz.Headers headers = 2;
     uint32 data = 3;
@@ -30,6 +32,7 @@ message StreamAction {
   // Index into list of created streams (not HTTP/2 level stream ID).
   uint32 stream_id = 1;
   oneof stream_action_selector {
+    option (validate.required) = true;
     DirectionalAction request = 2;
     DirectionalAction response = 3;
   }
@@ -56,6 +59,7 @@ message SwapBufferAction {
 
 message Action {
   oneof action_selector {
+    option (validate.required) = true;
     // Create new stream.
     NewStream new_stream = 1;
     // Perform an action on an existing stream.

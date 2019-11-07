@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
+#include "common/http/header_utility.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -27,12 +28,25 @@ public:
                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                               Upstream::ResourcePriority priority);
-  ~RetryStateImpl();
+  ~RetryStateImpl() override;
 
-  static uint32_t parseRetryOn(absl::string_view config);
+  /**
+   * Returns the RetryPolicy extracted from the x-envoy-retry-on header.
+   * @param config is the value of the header.
+   * @return std::pair<uint32_t, bool> the uint32_t is a bitset representing the
+   *         valid retry policies in @param config. The bool is TRUE iff all the
+   *         policies specified in @param config are valid.
+   */
+  static std::pair<uint32_t, bool> parseRetryOn(absl::string_view config);
 
-  // Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
-  static uint32_t parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
+  /**
+   * Returns the RetryPolicy extracted from the x-envoy-retry-grpc-on header.
+   * @param config is the value of the header.
+   * @return std::pair<uint32_t, bool> the uint32_t is a bitset representing the
+   *         valid retry policies in @param config. The bool is TRUE iff all the
+   *         policies specified in @param config are valid.
+   */
+  static std::pair<uint32_t, bool> parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
@@ -95,6 +109,8 @@ private:
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
 };
 
 } // namespace Router

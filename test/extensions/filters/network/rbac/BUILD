@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/rbac:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/network/rbac/v2:pkg_cc_proto",
     ],
 )
 
@@ -38,6 +39,7 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_name = "envoy.filters.network.rbac",
     deps = [
+        "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/rbac:config",
         "//test/integration:integration_lib",
         "//test/test_common:environment_lib",

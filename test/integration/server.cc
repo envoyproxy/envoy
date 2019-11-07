@@ -8,6 +8,7 @@
 #include "common/common/thread.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -29,7 +30,9 @@ namespace Envoy {
 namespace Server {
 
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                                  Network::Address::IpVersion ip_version) {
+                                  Network::Address::IpVersion ip_version,
+                                  bool allow_unknown_static_fields,
+                                  bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
@@ -38,6 +41,9 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(std::chrono::seconds(1));
   test_options.setParentShutdownTime(std::chrono::seconds(2));
+  test_options.setAllowUnkownFields(allow_unknown_static_fields);
+  test_options.setRejectUnknownFieldsDynamic(reject_unknown_dynamic_fields);
+  test_options.setConcurrency(concurrency);
 
   return test_options;
 }
@@ -48,11 +54,13 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
+    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
-                process_object);
+                process_object, allow_unknown_static_fields, reject_unknown_dynamic_fields,
+                concurrency);
   return server;
 }
 
@@ -69,12 +77,15 @@ void IntegrationTestServer::waitUntilListenersReady() {
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
     bool deterministic, bool defer_listener_finalization,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
+    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ =
-      api_.threadFactory().createThread([version, deterministic, process_object, this]() -> void {
-        threadRoutine(version, deterministic, process_object);
+  thread_ = api_.threadFactory().createThread(
+      [version, deterministic, process_object, allow_unknown_static_fields,
+       reject_unknown_dynamic_fields, concurrency, this]() -> void {
+        threadRoutine(version, deterministic, process_object, allow_unknown_static_fields,
+                      reject_unknown_dynamic_fields, concurrency);
       });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
@@ -146,8 +157,11 @@ void IntegrationTestServer::serverReady() {
 
 void IntegrationTestServer::threadRoutine(
     const Network::Address::IpVersion version, bool deterministic,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
-  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
+    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version,
+                                                    allow_unknown_static_fields,
+                                                    reject_unknown_dynamic_fields, concurrency));
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
@@ -177,18 +191,19 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Runtime::RandomGeneratorPtr&& random_generator,
     absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
   {
-    Stats::FakeSymbolTableImpl symbol_table;
+    Init::ManagerImpl init_manager{"Server"};
+    Stats::SymbolTablePtr symbol_table = Stats::SymbolTableCreator::makeSymbolTable();
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
-    Stats::HeapStatDataAllocator stats_allocator(symbol_table);
+    Stats::AllocatorImpl stats_allocator(*symbol_table);
     Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());
     }
-    Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
-                                access_log_lock, component_factory, std::move(random_generator),
-                                tls, Thread::threadFactoryForTest(),
+    Server::InstanceImpl server(init_manager, options, time_system, local_address, hooks, restarter,
+                                stat_store, access_log_lock, component_factory,
+                                std::move(random_generator), tls, Thread::threadFactoryForTest(),
                                 Filesystem::fileSystemForTest(), std::move(process_context));
     // This is technically thread unsafe (assigning to a shared_ptr accessed
     // across threads), but because we synchronize below through serverReady(), the only

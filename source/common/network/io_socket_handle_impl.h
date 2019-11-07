@@ -2,6 +2,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/io_handle.h"
 
 #include "common/common/logger.h"
@@ -35,7 +36,8 @@ public:
                                  const Address::Instance& address) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
-                                  const Address::Instance& address) override;
+                                  const Address::Ip* self_ip,
+                                  const Address::Instance& peer_address) override;
 
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override;

@@ -27,10 +27,12 @@ struct CompletionState {
 
 class ContextImpl : public Verifier::Context {
 public:
-  ContextImpl(Http::HeaderMap& headers, Verifier::Callbacks* callback)
-      : headers_(headers), callback_(callback) {}
+  ContextImpl(Http::HeaderMap& headers, Tracing::Span& parent_span, Verifier::Callbacks* callback)
+      : headers_(headers), parent_span_(parent_span), callback_(callback) {}
 
   Http::HeaderMap& headers() const override { return headers_; }
+
+  Tracing::Span& parentSpan() const override { return parent_span_; }
 
   Verifier::Callbacks* callback() const override { return callback_; }
 
@@ -61,6 +63,7 @@ public:
 
 private:
   Http::HeaderMap& headers_;
+  Tracing::Span& parent_span_;
   Verifier::Callbacks* callback_;
   std::unordered_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
@@ -112,7 +115,7 @@ public:
     auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
-        ctximpl.headers(), extractor_->extract(ctximpl.headers()),
+        ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
           ctximpl.addPayload(name, payload);
         },
@@ -162,7 +165,7 @@ public:
     auto auth = auth_factory_.create(nullptr, absl::nullopt, true);
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
-        ctximpl.headers(), extractor_.extract(ctximpl.headers()),
+        ctximpl.headers(), ctximpl.parentSpan(), extractor_.extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
           ctximpl.addPayload(name, payload);
         },
@@ -309,8 +312,9 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
 
 } // namespace
 
-ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Callbacks* callback) {
-  return std::make_shared<ContextImpl>(headers, callback);
+ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Tracing::Span& parent_span,
+                                         Callbacks* callback) {
+  return std::make_shared<ContextImpl>(headers, parent_span, callback);
 }
 
 VerifierConstPtr Verifier::create(const JwtRequirement& requirement,

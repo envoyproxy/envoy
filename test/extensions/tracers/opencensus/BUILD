@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -19,7 +18,9 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/tracers/opencensus:opencensus_tracer_impl",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/tracing:tracing_mocks",
+        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
 

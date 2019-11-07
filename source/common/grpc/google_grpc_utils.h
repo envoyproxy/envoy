@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 
 #include "grpcpp/grpcpp.h"
 

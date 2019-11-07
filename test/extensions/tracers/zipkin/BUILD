@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -31,6 +30,7 @@ envoy_extension_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/tracers/zipkin:zipkin_lib",
         "//test/mocks:common_lib",

@@ -35,8 +35,7 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
 
     StatNameManagedStorage storage(gauge.first, temp_scope_->symbolTable());
     StatName stat_name = storage.statName();
-    absl::optional<std::reference_wrapper<const Gauge>> gauge_opt =
-        temp_scope_->findGauge(stat_name);
+    OptionalGauge gauge_opt = temp_scope_->findGauge(stat_name);
 
     Gauge::ImportMode import_mode = Gauge::ImportMode::Uninitialized;
     if (gauge_opt) {

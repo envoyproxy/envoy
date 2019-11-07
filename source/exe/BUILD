@@ -7,7 +7,6 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
-    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 load(
@@ -56,7 +55,8 @@ envoy_cc_library(
     ],
     deps = [
         ":envoy_main_common_lib",
-    ] + envoy_cc_platform_dep("platform_impl_lib"),
+        ":platform_impl_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -65,21 +65,23 @@ envoy_cc_library(
     hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_lib",
+        ":platform_impl_lib",
         ":process_wide_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
-        "//source/common/stats:fake_symbol_table_lib",
+        "//source/common/grpc:google_grpc_context_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
-            ":sigaction_lib",
+            "//source/common/signal:sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_impl_lib"),
+    }),
 )
 
 envoy_cc_library(
@@ -92,14 +94,29 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",
         "//source/server:proto_descriptors_lib",
-    ] + envoy_google_grpc_external_deps(),
+    ],
+)
+
+envoy_cc_library(
+    name = "platform_impl_lib",
+    deps = [":platform_header_lib"] +
+           envoy_cc_platform_dep("platform_impl_lib"),
+)
+
+envoy_cc_library(
+    name = "platform_header_lib",
+    hdrs = ["platform_impl.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/thread:thread_interface",
+    ],
 )
 
 envoy_cc_posix_library(
     name = "platform_impl_lib",
-    hdrs = ["posix/platform_impl.h"],
-    strip_include_prefix = "posix",
+    srcs = ["posix/platform_impl.cc"],
     deps = [
+        ":platform_header_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
@@ -107,24 +124,12 @@ envoy_cc_posix_library(
 
 envoy_cc_win32_library(
     name = "platform_impl_lib",
-    hdrs = ["win32/platform_impl.h"],
-    strip_include_prefix = "win32",
+    srcs = ["win32/platform_impl.cc"],
     deps = [
+        ":platform_header_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "sigaction_lib",
-    srcs = ["signal_action.cc"],
-    hdrs = ["signal_action.h"],
-    tags = ["backtrace"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:non_copyable",
-        "//source/server:backtrace_lib",
     ],
 )
 

@@ -28,19 +28,6 @@ ResponseParseResponse ResponseHeaderParser::parse(absl::string_view& data) {
   return ResponseParseResponse::nextParser(next_parser);
 }
 
-ResponseParseResponse SentinelResponseParser::parse(absl::string_view& data) {
-  const uint32_t min = std::min<uint32_t>(context_->remaining_response_size_, data.size());
-  data = {data.data() + min, data.size() - min};
-  context_->remaining_response_size_ -= min;
-  if (0 == context_->remaining_response_size_) {
-    const auto failure_data = std::make_shared<ResponseMetadata>(
-        context_->api_key_, context_->api_version_, context_->correlation_id_);
-    return ResponseParseResponse::parseFailure(failure_data);
-  } else {
-    return ResponseParseResponse::stillWaiting();
-  }
-}
-
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

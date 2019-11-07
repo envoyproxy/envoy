@@ -32,10 +32,18 @@ namespace Secret {
  */
 class SdsApi : public Config::SubscriptionCallbacks {
 public:
+  struct SecretData {
+    const std::string resource_name_;
+    std::string version_info_;
+    SystemTime last_updated_;
+  };
+
   SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
-         Config::SubscriptionFactory& subscription_factory,
+         Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          Init::Manager& init_manager, std::function<void()> destructor_cb);
+
+  SecretData secretData();
 
 protected:
   // Creates new secrets.
@@ -48,10 +56,10 @@ protected:
                       const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resource, validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resource).name();
   }
 
 private:
@@ -68,13 +76,17 @@ private:
   Cleanup clean_up_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Config::SubscriptionFactory& subscription_factory_;
+  TimeSource& time_source_;
+  SecretData secret_data_;
 };
 
 class TlsCertificateSdsApi;
 class CertificateValidationContextSdsApi;
+class TlsSessionTicketKeysSdsApi;
 using TlsCertificateSdsApiSharedPtr = std::shared_ptr<TlsCertificateSdsApi>;
 using CertificateValidationContextSdsApiSharedPtr =
     std::shared_ptr<CertificateValidationContextSdsApi>;
+using TlsSessionTicketKeysSdsApiSharedPtr = std::shared_ptr<TlsSessionTicketKeysSdsApi>;
 
 /**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.
@@ -90,21 +102,26 @@ public:
     Config::Utility::checkLocalInfo("TlsCertificateSdsApi", secret_provider_context.localInfo());
     return std::make_shared<TlsCertificateSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         *secret_provider_context.initManager(), destructor_cb);
   }
 
   TlsCertificateSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
                        const std::string& sds_config_name,
-                       Config::SubscriptionFactory& subscription_factory,
+                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                        Init::Manager& init_manager, std::function<void()> destructor_cb)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, validation_visitor, stats,
-               init_manager, std::move(destructor_cb)) {}
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::TlsCertificate* secret() const override {
     return tls_certificate_secrets_.get();
+  }
+  Common::CallbackHandle*
+  addValidationCallback(std::function<void(const envoy::api::v2::auth::TlsCertificate&)>) override {
+    return nullptr;
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
@@ -138,17 +155,19 @@ public:
                                     secret_provider_context.localInfo());
     return std::make_shared<CertificateValidationContextSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         *secret_provider_context.initManager(), destructor_cb);
   }
   CertificateValidationContextSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
                                      Config::SubscriptionFactory& subscription_factory,
+                                     TimeSource& time_source,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
                                      Stats::Store& stats, Init::Manager& init_manager,
                                      std::function<void()> destructor_cb)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, validation_visitor, stats,
-               init_manager, std::move(destructor_cb)) {}
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::CertificateValidationContext* secret() const override {
@@ -159,7 +178,8 @@ public:
   }
 
   Common::CallbackHandle* addValidationCallback(
-      std::function<void(const envoy::api::v2::auth::CertificateValidationContext&)> callback) {
+      std::function<void(const envoy::api::v2::auth::CertificateValidationContext&)> callback)
+      override {
     return validation_callback_manager_.add(callback);
   }
 
@@ -177,6 +197,67 @@ protected:
 private:
   CertificateValidationContextPtr certificate_validation_context_secrets_;
   Common::CallbackManager<const envoy::api::v2::auth::CertificateValidationContext&>
+      validation_callback_manager_;
+};
+
+/**
+ * TlsSessionTicketKeysSdsApi implementation maintains and updates dynamic tls session ticket keys
+ * secrets.
+ */
+class TlsSessionTicketKeysSdsApi : public SdsApi, public TlsSessionTicketKeysConfigProvider {
+public:
+  static TlsSessionTicketKeysSdsApiSharedPtr
+  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+         const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
+         std::function<void()> destructor_cb) {
+    // We need to do this early as we invoke the subscription factory during initialization, which
+    // is too late to throw.
+    Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi",
+                                    secret_provider_context.localInfo());
+    return std::make_shared<TlsSessionTicketKeysSdsApi>(
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
+        *secret_provider_context.initManager(), destructor_cb);
+  }
+
+  TlsSessionTicketKeysSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
+                             const std::string& sds_config_name,
+                             Config::SubscriptionFactory& subscription_factory,
+                             TimeSource& time_source,
+                             ProtobufMessage::ValidationVisitor& validation_visitor,
+                             Stats::Store& stats, Init::Manager& init_manager,
+                             std::function<void()> destructor_cb)
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
+
+  // SecretProvider
+  const envoy::api::v2::auth::TlsSessionTicketKeys* secret() const override {
+    return tls_session_ticket_keys_.get();
+  }
+
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    return update_callback_manager_.add(callback);
+  }
+
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::api::v2::auth::TlsSessionTicketKeys&)> callback) override {
+    return validation_callback_manager_.add(callback);
+  }
+
+protected:
+  void setSecret(const envoy::api::v2::auth::Secret& secret) override {
+    tls_session_ticket_keys_ =
+        std::make_unique<envoy::api::v2::auth::TlsSessionTicketKeys>(secret.session_ticket_keys());
+  }
+
+  void validateConfig(const envoy::api::v2::auth::Secret& secret) override {
+    validation_callback_manager_.runCallbacks(secret.session_ticket_keys());
+  }
+
+private:
+  Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
+  Common::CallbackManager<const envoy::api::v2::auth::TlsSessionTicketKeys&>
       validation_callback_manager_;
 };
 

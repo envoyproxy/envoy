@@ -31,6 +31,7 @@ cat <<EOF >sed_commands
 /^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/extensions/quic_listeners/quiche/platform/quic_thread_impl.h!
 /^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/extensions/quic_listeners/quiche/platform/quiche_test_impl.h!
 /^#include/ s!net/spdy/platform/impl/spdy_test_helpers_impl.h!test/extensions/quic_listeners/quiche/platform/spdy_test_helpers_impl.h!
+/^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/extensions/quic_listeners/quiche/platform/spdy_test_impl.h!
 
 # Rewrite include directives for platform impl files.
 /^#include/ s!net/(http2|spdy|quic|quiche/common)/platform/impl/!extensions/quic_listeners/quiche/platform/!
@@ -50,6 +51,10 @@ cat <<EOF >sed_commands
 /^#include/ s!third_party/zlib/zlib!zlib!
 
 /^import/ s!cached_network_parameters!quiche/quic/core/proto/cached_network_parameters!
+
+# Rewrite #pragma clang
+/^#pragma/ s!clang!GCC!
+/^#pragma/ s!-Weverything!-Wall!
 EOF
 
 for src_file in $(SRCS); do

@@ -1,14 +1,12 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/un.h>
 
 #include <array>
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 
@@ -56,6 +54,7 @@ class InstanceBase : public Instance {
 public:
   // Network::Address::Instance
   const std::string& asString() const override { return friendly_name_; }
+  absl::string_view asStringView() const override { return friendly_name_; }
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }

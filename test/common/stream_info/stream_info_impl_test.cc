@@ -121,6 +121,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
         << fmt::format("Flag: {} was expected to be set", flag);
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+  EXPECT_EQ(0xFFF, stream_info.responseFlags());
 
   StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem());
   stream_info2.setResponseFlag(FailedLocalHealthCheck);
@@ -199,6 +200,20 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   // check json contains the key and values we set
   EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
   EXPECT_TRUE(json.find("\"another_key\":\"another_value\"") != std::string::npos);
+}
+
+TEST_F(StreamInfoImplTest, DumpStateTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  std::string prefix = "";
+
+  for (int i = 0; i < 7; ++i) {
+    std::stringstream out;
+    stream_info.dumpState(out, i);
+    std::string state = out.str();
+    EXPECT_TRUE(absl::StartsWith(state, prefix));
+    EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
+    prefix = prefix + "  ";
+  }
 }
 
 } // namespace

@@ -16,51 +16,51 @@ namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
 enum class XidCodes {
-  CONNECT_XID = 0,
-  WATCH_XID = -1,
-  PING_XID = -2,
-  AUTH_XID = -4,
-  SET_WATCHES_XID = -8
+  ConnectXid = 0,
+  WatchXid = -1,
+  PingXid = -2,
+  AuthXid = -4,
+  SetWatchesXid = -8
 };
 
 enum class OpCodes {
-  CONNECT = 0,
-  CREATE = 1,
-  DELETE = 2,
-  EXISTS = 3,
-  GETDATA = 4,
-  SETDATA = 5,
-  GETACL = 6,
-  SETACL = 7,
-  GETCHILDREN = 8,
-  SYNC = 9,
-  PING = 11,
-  GETCHILDREN2 = 12,
-  CHECK = 13,
-  MULTI = 14,
-  CREATE2 = 15,
-  RECONFIG = 16,
-  CHECKWATCHES = 17,
-  REMOVEWATCHES = 18,
-  CREATECONTAINER = 19,
-  CREATETTL = 21,
-  CLOSE = -11,
-  SETAUTH = 100,
-  SETWATCHES = 101,
-  GETEPHEMERALS = 103,
-  GETALLCHILDRENNUMBER = 104
+  Connect = 0,
+  Create = 1,
+  Delete = 2,
+  Exists = 3,
+  GetData = 4,
+  SetData = 5,
+  GetAcl = 6,
+  SetAcl = 7,
+  GetChildren = 8,
+  Sync = 9,
+  Ping = 11,
+  GetChildren2 = 12,
+  Check = 13,
+  Multi = 14,
+  Create2 = 15,
+  Reconfig = 16,
+  CheckWatches = 17,
+  RemoveWatches = 18,
+  CreateContainer = 19,
+  CreateTtl = 21,
+  Close = -11,
+  SetAuth = 100,
+  SetWatches = 101,
+  GetEphemerals = 103,
+  GetAllChildrenNumber = 104
 };
 
-enum class WatcherType { CHILDREN = 1, DATA = 2, ANY = 3 };
+enum class WatcherType { Children = 1, Data = 2, Any = 3 };
 
 enum class CreateFlags {
-  PERSISTENT,
-  PERSISTENT_SEQUENTIAL,
-  EPHEMERAL,
-  EPHEMERAL_SEQUENTIAL,
-  CONTAINER,
-  PERSISTENT_WITH_TTL,
-  PERSISTENT_SEQUENTIAL_WITH_TTL
+  Persistent,
+  PersistentSequential,
+  Ephemeral,
+  EphemeralSequential,
+  Container,
+  PersistentWithTtl,
+  PersistentSequentialWithTtl
 };
 
 const char* createFlagsToString(CreateFlags flags);
@@ -95,6 +95,13 @@ public:
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
+  virtual void onResponseBytes(uint64_t bytes) PURE;
+  virtual void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
+                                 const std::chrono::milliseconds& latency) PURE;
+  virtual void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
+                          const std::chrono::milliseconds& latency) PURE;
+  virtual void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path,
+                            int64_t zxid, int32_t error) PURE;
 };
 
 /**
@@ -105,20 +112,32 @@ public:
   virtual ~Decoder() = default;
 
   virtual void onData(Buffer::Instance& data) PURE;
+  virtual void onWrite(Buffer::Instance& data) PURE;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit DecoderImpl(DecoderCallbacks& callbacks, uint32_t max_packet_bytes)
-      : callbacks_(callbacks), max_packet_bytes_(max_packet_bytes), helper_(max_packet_bytes) {}
+  explicit DecoderImpl(DecoderCallbacks& callbacks, uint32_t max_packet_bytes,
+                       TimeSource& time_source)
+      : callbacks_(callbacks), max_packet_bytes_(max_packet_bytes), helper_(max_packet_bytes),
+        time_source_(time_source) {}
 
   // ZooKeeperProxy::Decoder
   void onData(Buffer::Instance& data) override;
+  void onWrite(Buffer::Instance& data) override;
 
 private:
-  void decode(Buffer::Instance& data, uint64_t& offset);
+  enum class DecodeType { READ, WRITE };
+  struct RequestBegin {
+    OpCodes opcode;
+    MonotonicTime start_time;
+  };
+
+  void decode(Buffer::Instance& data, DecodeType dtype);
+  void decodeOnData(Buffer::Instance& data, uint64_t& offset);
+  void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
   void parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
@@ -140,10 +159,17 @@ private:
   void ensureMinLength(int32_t len, int32_t minlen) const;
   void ensureMaxLength(int32_t len) const;
   std::string pathOnlyRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len,
+                            const std::chrono::milliseconds& latency);
+  void parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,
+                       int32_t error);
+  bool maybeReadBool(Buffer::Instance& data, uint64_t& offset);
 
   DecoderCallbacks& callbacks_;
   const uint32_t max_packet_bytes_;
   BufferHelper helper_;
+  TimeSource& time_source_;
+  std::unordered_map<int32_t, RequestBegin> requests_by_xid_;
 };
 
 } // namespace ZooKeeperProxy

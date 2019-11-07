@@ -19,6 +19,7 @@ envoy_cc_test_library(
     srcs = [
         "main.cc",
         "test_listener.cc",
+        "test_runner.cc",
         "test_runner.h",
     ],
     hdrs = ["test_listener.h"],
@@ -38,6 +39,6 @@ envoy_cc_test_library(
         "//test/test_common:printers_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/exe:sigaction_lib"],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
     }),
 )

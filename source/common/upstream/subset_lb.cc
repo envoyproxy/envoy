@@ -435,41 +435,8 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
 }
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
-  const envoy::api::v2::core::Metadata& host_metadata = *host.metadata();
-  const auto filter_it =
-      host_metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
-
-  if (filter_it == host_metadata.filter_metadata().end()) {
-    return kvs.empty();
-  }
-
-  const ProtobufWkt::Struct& data_struct = filter_it->second;
-  const auto& fields = data_struct.fields();
-
-  for (const auto& kv : kvs) {
-    const auto entry_it = fields.find(kv.first);
-    if (entry_it == fields.end()) {
-      return false;
-    }
-
-    if (list_as_any_ && entry_it->second.kind_case() == ProtobufWkt::Value::kListValue) {
-      bool any_match = false;
-      for (const auto& v : entry_it->second.list_value().values()) {
-        if (ValueUtil::equal(v, kv.second)) {
-          any_match = true;
-          break;
-        }
-      }
-
-      if (!any_match) {
-        return false;
-      }
-    } else if (!ValueUtil::equal(entry_it->second, kv.second)) {
-      return false;
-    }
-  }
-
-  return true;
+  return Config::Metadata::metadataLabelMatch(
+      kvs, *host.metadata(), Config::MetadataFilters::get().ENVOY_LB, list_as_any_);
 }
 
 // Iterates over subset_keys looking up values from the given host's metadata. Each key-value pair
@@ -615,9 +582,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
                                                            HostPredicate predicate,
                                                            bool locality_weight_aware,
                                                            bool scale_locality_weight)
-    : PrioritySetImpl(), original_priority_set_(subset_lb.original_priority_set_),
-      predicate_(predicate), locality_weight_aware_(locality_weight_aware),
-      scale_locality_weight_(scale_locality_weight) {
+    : original_priority_set_(subset_lb.original_priority_set_), predicate_(predicate),
+      locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight) {
 
   for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
     empty_ &= getOrCreateHostSet(i).hosts().empty();

@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -40,7 +41,9 @@ public:
 
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
+  const std::string ErrorReason = "error.reason";
   const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcMessage = "grpc.message";
   const std::string GuidXClientTraceId = "guid:x-client-trace-id";
   const std::string GuidXRequestId = "guid:x-request-id";
   const std::string HttpProtocol = "http.protocol";
@@ -48,6 +51,7 @@ public:
   const std::string RequestSize = "request_size";
   const std::string ResponseFlags = "response_flags";
   const std::string ResponseSize = "response_size";
+  const std::string RetryCount = "retry.count";
   const std::string Status = "status";
   const std::string UpstreamCluster = "upstream_cluster";
   const std::string UserAgent = "user_agent";
@@ -97,11 +101,29 @@ public:
                             const Http::HeaderMap& request_headers);
 
   /**
-   * 1) Fill in span tags based on the response headers.
-   * 2) Finish active span.
+   * Adds information obtained from the downstream request headers as tags to the active span.
+   * Then finishes the span.
    */
-  static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                           const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
+  static void finalizeDownstreamSpan(Span& span, const Http::HeaderMap* request_headers,
+                                     const Http::HeaderMap* response_headers,
+                                     const Http::HeaderMap* response_trailers,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     const Config& tracing_config);
+
+  /**
+   * Adds information obtained from the upstream request headers as tags to the active span.
+   * Then finishes the span.
+   */
+  static void finalizeUpstreamSpan(Span& span, const Http::HeaderMap* response_headers,
+                                   const Http::HeaderMap* response_trailers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const Config& tracing_config);
+
+private:
+  static void setCommonTags(Span& span, const Http::HeaderMap* response_headers,
+                            const Http::HeaderMap* response_trailers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            const Config& tracing_config);
 
   static const std::string IngressOperation;
   static const std::string EgressOperation;
@@ -115,6 +137,7 @@ public:
     return request_headers_for_tags_;
   }
   bool verbose() const override { return false; }
+  uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
 
 private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_{};

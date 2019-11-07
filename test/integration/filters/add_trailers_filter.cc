@@ -12,7 +12,7 @@ namespace Envoy {
 // A test filter that inserts trailers at the end of encode/decode
 class AddTrailersStreamFilter : public Http::PassThroughFilter {
 public:
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) {
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
     if (end_stream) {
       decoder_callbacks_->addDecodedTrailers().insertGrpcMessage().value(std::string("decode"));
     }
@@ -20,7 +20,7 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterDataStatus encodeData(Buffer::Instance&, bool end_stream) {
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool end_stream) override {
     if (end_stream) {
       encoder_callbacks_->addEncodedTrailers().insertGrpcMessage().value(std::string("encode"));
     }
@@ -34,7 +34,8 @@ class AddTrailersStreamFilterConfig
 public:
   AddTrailersStreamFilterConfig() : EmptyHttpFilterConfig("add-trailers-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::AddTrailersStreamFilter>());
     };

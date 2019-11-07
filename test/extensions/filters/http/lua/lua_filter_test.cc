@@ -22,7 +22,6 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::StrEq;
 
@@ -66,7 +65,7 @@ public:
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
   }
 
-  ~LuaHttpFilterTest() { filter_->onDestroy(); }
+  ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
   void setup(const std::string& lua_code) {
     config_.reset(new FilterConfig(lua_code, tls_, cluster_manager_));
@@ -80,8 +79,9 @@ public:
   }
 
   void setupSecureConnection(const bool secure) {
+    ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
     EXPECT_CALL(decoder_callbacks_, connection()).WillOnce(Return(&connection_));
-    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? ssl_ : nullptr));
   }
 
   void setupMetadata(const std::string& yaml) {
@@ -97,7 +97,7 @@ public:
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   envoy::api::v2::core::Metadata metadata_;
-  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
+  std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 
@@ -250,6 +250,8 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestBody) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
@@ -742,7 +744,8 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
         {
           [":method"] = "POST",
           [":path"] = "/",
-          [":authority"] = "foo"
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
         },
         "hello world",
         5000)
@@ -768,6 +771,8 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
             EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
                                                {":method", "POST"},
                                                {":authority", "foo"},
+                                               {"set-cookie", "flavor=chocolate; Path=/"},
+                                               {"set-cookie", "variant=chewy; Path=/"},
                                                {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
@@ -957,7 +962,10 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
         nil,
         5000)
       request_handle:respond(
-        {[":status"] = "403"},
+        {
+          [":status"] = "403",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
         nil)
     end
   )EOF"};
@@ -986,7 +994,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  Http::TestHeaderMapImpl expected_headers{{":status", "403"}};
+  Http::TestHeaderMapImpl expected_headers{{":status", "403"},
+                                           {"set-cookie", "flavor=chocolate; Path=/"},
+                                           {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   callbacks->onSuccess(std::move(response_message));
 }
@@ -1257,7 +1267,14 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   config_->runtimeGC();
   const uint64_t mem_use_at_start = config_->runtimeBytesUsed();
 
-  for (uint64_t i = 0; i < 2000; i++) {
+  uint64_t num_loops = 2000;
+#if defined(__has_feature) && (__has_feature(thread_sanitizer))
+  // per https://github.com/envoyproxy/envoy/issues/7374 this test is causing
+  // problems on tsan
+  num_loops = 200;
+#endif
+
+  for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestHeaderMapImpl request_headers{{":path", "/"}};
     Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
@@ -1529,7 +1546,9 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "complex", {x="abcd", y=1234})
       request_handle:logTrace(request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"])
+      request_handle:logTrace(request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["complex"].x)
     end
   )EOF"};
 
@@ -1542,6 +1561,7 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("abcd")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
   EXPECT_EQ("bar", stream_info.dynamicMetadata()
@@ -1550,6 +1570,15 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                        .fields()
                        .at("foo")
                        .string_value());
+
+  const ProtobufWkt::Struct& meta_complex = stream_info.dynamicMetadata()
+                                                .filter_metadata()
+                                                .at("envoy.lb")
+                                                .fields()
+                                                .at("complex")
+                                                .struct_value();
+  EXPECT_EQ("abcd", meta_complex.fields().at("x").string_value());
+  EXPECT_EQ(1234.0, meta_complex.fields().at("y").number_value());
 }
 
 // Check the connection.
@@ -1659,28 +1688,28 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
 
       rawsig = signature:fromhex()
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature("unknown", pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature("unknown", pubkey, rawsig, string.len(rawsig), data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, "0000", 4, data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, "0000", 4, data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), "xxxx", 4) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), "xxxx", 4)
       if ok then
         request_handle:logTrace("signature is valid")
       else

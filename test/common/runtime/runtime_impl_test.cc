@@ -23,8 +23,6 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnNew;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Runtime {
@@ -104,12 +102,12 @@ protected:
 
 class DiskLoaderImplTest : public LoaderImplTest {
 public:
-  static void SetUpTestSuite() {
+  void SetUp() override {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }
 
-  static void TearDownTestSuite() {
+  void TearDown() override {
     TestEnvironment::removePath(TestEnvironment::temporaryPath("test/common/runtime/test_data"));
   }
 
@@ -140,6 +138,22 @@ public:
   ProtobufWkt::Struct base_;
 };
 
+TEST_F(DiskLoaderImplTest, DoubleUintInteraction) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
+  EXPECT_EQ(2.0, loader_->snapshot().getDouble("file3", 1.1));
+}
+
+TEST_F(DiskLoaderImplTest, DoubleUintInteractionNegatives) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_negative_double", 1));
+  EXPECT_EQ(-4.2, loader_->snapshot().getDouble("file_with_negative_double", 1.1));
+}
+
 TEST_F(DiskLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
@@ -154,8 +168,15 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
 
-  bool value;
-  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
+  // Double getting.
+  // Bogus string, expect default.
+  EXPECT_EQ(42.1, loader_->snapshot().getDouble("file_with_words", 42.1));
+  // Valid float string.
+  EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
+  // Valid float string followed by newlines.
+  EXPECT_EQ(3.141, loader_->snapshot().getDouble("file_with_double_newlines", 1.1));
+
+  const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
 
   // Validate that the layer name is set properly for static layers.
   EXPECT_EQ("base", snapshot->getLayers()[0]->name());
@@ -164,14 +185,18 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ("admin", snapshot->getLayers()[3]->name());
 
   // Boolean getting.
-  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
-  EXPECT_EQ(true, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
-  EXPECT_EQ(false, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
-  EXPECT_EQ(true, value);
-  // File1 is not a boolean.
-  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
+  // Lower-case boolean specification.
+  EXPECT_EQ(true, snapshot->getBoolean("file11", false));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", true));
+  // Mixed-case boolean specification.
+  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
+  // Lower-case boolean specification with leading whitespace.
+  EXPECT_EQ(true, snapshot->getBoolean("file13", true));
+  EXPECT_EQ(true, snapshot->getBoolean("file13", false));
+  // File1 is not a boolean. Should take default.
+  EXPECT_EQ(true, snapshot->getBoolean("file1", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file1", false));
 
   // Feature defaults.
   // test_feature_true is explicitly set true in runtime_features.cc
@@ -179,12 +204,22 @@ TEST_F(DiskLoaderImplTest, All) {
   // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
+  // Deprecation
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#else
+  EXPECT_EQ(true, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#endif
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
+                       "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal"));
+
   // Feature defaults via helper function.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 
   // Files with comments.
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file5", 1));
+  EXPECT_EQ(2.718, loader_->snapshot().getDouble("file_with_double_comment", 1.1));
   EXPECT_EQ("/home#about-us", loader_->snapshot().get("file6"));
   EXPECT_EQ("", loader_->snapshot().get("file7"));
 
@@ -240,8 +275,15 @@ TEST_F(DiskLoaderImplTest, All) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(17, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(23, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(DiskLoaderImplTest, UintLargeIntegerConversion) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_large_integer", 1));
 }
 
 TEST_F(DiskLoaderImplTest, GetLayers) {
@@ -333,7 +375,7 @@ TEST_F(DiskLoaderImplTest, PercentHandling) {
     // NOTE: high_value has to have the property that the lowest 32 bits % 100
     // is less than 100. If it's greater than 100 the test will pass whether or
     // not the uint32 conversion is handled properly.
-    uint64_t high_value = 1UL << 60;
+    uint64_t high_value = 1ULL << 60;
     std::string high_value_str = std::to_string(high_value);
     loader_->mergeValues({{"foo", high_value_str}});
     EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", default_value, 0));
@@ -348,24 +390,34 @@ void testNewOverrides(Loader& loader, Stats::Store& store) {
   Stats::Gauge& admin_overrides_active =
       store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
-  // New string
+  // New string.
   loader.mergeValues({{"foo", "bar"}});
   EXPECT_EQ("bar", loader.snapshot().get("foo"));
   EXPECT_EQ(1, admin_overrides_active.value());
 
-  // Remove new string
+  // Remove new string.
   loader.mergeValues({{"foo", ""}});
   EXPECT_EQ("", loader.snapshot().get("foo"));
   EXPECT_EQ(0, admin_overrides_active.value());
 
-  // New integer
+  // New integer.
   loader.mergeValues({{"baz", "42"}});
   EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
   EXPECT_EQ(1, admin_overrides_active.value());
 
-  // Remove new integer
+  // Remove new integer.
   loader.mergeValues({{"baz", ""}});
   EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
+  EXPECT_EQ(0, admin_overrides_active.value());
+
+  // New double.
+  loader.mergeValues({{"beep", "42.1"}});
+  EXPECT_EQ(42.1, loader.snapshot().getDouble("beep", 1.2));
+  EXPECT_EQ(1, admin_overrides_active.value());
+
+  // Remove new double.
+  loader.mergeValues({{"beep", ""}});
+  EXPECT_EQ(1.2, loader.snapshot().getDouble("beep", 1.2));
   EXPECT_EQ(0, admin_overrides_active.value());
 }
 
@@ -396,6 +448,16 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
   EXPECT_EQ(2, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(0, admin_overrides_active.value());
 
+  // Override double
+  loader_->mergeValues({{"file_with_double", "42.1"}});
+  EXPECT_EQ(42.1, loader_->snapshot().getDouble("file_with_double", 1.1));
+  EXPECT_EQ(1, admin_overrides_active.value());
+
+  // Remove overridden double
+  loader_->mergeValues({{"file_with_double", ""}});
+  EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
+  EXPECT_EQ(0, admin_overrides_active.value());
+
   // Override override string
   loader_->mergeValues({{"file1", "hello overridden override"}});
   EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1"));
@@ -408,7 +470,7 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
   EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport)
                    .value());
 
-  EXPECT_EQ(11, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(15, store_.counter("runtime.load_success").value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
@@ -491,6 +553,7 @@ TEST_F(StaticLoaderImplTest, All) {
   setup();
   EXPECT_EQ("", loader_->snapshot().get("foo"));
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("foo", 1));
+  EXPECT_EQ(1.1, loader_->snapshot().getDouble("foo", 1.1));
   EXPECT_CALL(generator_, random()).WillOnce(Return(49));
   EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", 50));
   testNewOverrides(*loader_, store_);
@@ -523,6 +586,8 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
       numerator: 100
       foo: bar
     empty: {}
+    file_with_words: "some words"
+    file_with_double: 23.2
   )EOF");
   setup();
 
@@ -536,20 +601,27 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
 
-  // Boolean getting.
-  bool value;
-  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
+  // Double getting.
+  EXPECT_EQ(1.1, loader_->snapshot().getDouble("file_with_words", 1.1));
+  EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
 
-  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
-  EXPECT_EQ(true, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
-  EXPECT_EQ(false, value);
-  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
-  EXPECT_EQ(false, value);
-  // File1 is not a boolean.
-  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
-  // Neither is blah.blah
-  EXPECT_EQ(false, snapshot->getBoolean("blah.blah", value));
+  // Boolean getting.
+  const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
+
+  EXPECT_EQ(true, snapshot->getBoolean("file11", true));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", false));
+
+  EXPECT_EQ(false, snapshot->getBoolean("file12", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file12", false));
+
+  EXPECT_EQ(false, snapshot->getBoolean("file13", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file13", false));
+
+  // Not a boolean. Expect the default.
+  EXPECT_EQ(true, snapshot->getBoolean("file1", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file1", false));
+  EXPECT_EQ(true, snapshot->getBoolean("blah.blah", true));
+  EXPECT_EQ(false, snapshot->getBoolean("blah.blah", false));
 
   // Fractional percent feature enablement
   envoy::type::FractionalPercent fractional_percent;
@@ -606,8 +678,65 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(15, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(17, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
+  // Force the thread to be considered a non-worker thread.
+  tls_.registered_ = false;
+  setup();
+
+  // Set up foo -> bar
+  loader_->mergeValues({{"foo", "bar"}});
+  EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+  const Snapshot* original_snapshot_pointer = loader_->threadsafeSnapshot().get();
+
+  // Now set up a test thread which verifies foo -> bar
+  //
+  // Then change foo and make sure the test thread picks up the change.
+  bool read_bar = false;
+  bool updated_eep = false;
+  Thread::MutexBasicLockable mutex;
+  Thread::CondVar foo_read;
+  Thread::CondVar foo_changed;
+  const Snapshot* original_thread_snapshot_pointer = nullptr;
+  auto thread = Thread::threadFactoryForTest().createThread([&]() {
+    {
+      Thread::LockGuard lock(mutex);
+      EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+      read_bar = true;
+      original_thread_snapshot_pointer = loader_->threadsafeSnapshot().get();
+      EXPECT_EQ(original_thread_snapshot_pointer, loader_->threadsafeSnapshot().get());
+      foo_read.notifyOne();
+    }
+
+    {
+      Thread::LockGuard lock(mutex);
+      if (!updated_eep) {
+        foo_changed.wait(mutex);
+      }
+      EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
+    }
+  });
+
+  {
+    Thread::LockGuard lock(mutex);
+    if (!read_bar) {
+      foo_read.wait(mutex);
+    }
+    loader_->mergeValues({{"foo", "eep"}});
+    updated_eep = true;
+  }
+
+  {
+    Thread::LockGuard lock(mutex);
+    foo_changed.notifyOne();
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
+  }
+
+  thread->join();
+  EXPECT_EQ(original_thread_snapshot_pointer, original_snapshot_pointer);
 }
 
 class DiskLayerTest : public testing::Test {
@@ -650,6 +779,16 @@ TEST(NoRuntime, FeatureEnabled) {
   // Feature defaults should still work.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+}
+
+TEST(NoRuntime, DefaultIntValues) {
+  // Make sure the registry is not set up.
+  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
+
+  // Feature defaults should still work.
+  EXPECT_EQ(0x1230000ABCDULL,
+            getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL));
+  EXPECT_EQ(0, getInteger("envoy.reloadable_features.test_int_feature_zero", 0));
 }
 
 // Test RTDS layer(s).
@@ -771,7 +910,9 @@ TEST_F(RtdsLoaderImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  rtds_callbacks_[0]->onConfigUpdateFailed({});
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  rtds_callbacks_[0]->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                           {});
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());

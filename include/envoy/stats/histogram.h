@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -66,27 +67,47 @@ public:
 
 /**
  * A histogram that records values one at a time.
- * Note: Histograms now incorporate what used to be timers because the only difference between the
- * two stat types was the units being represented. It is assumed that no downstream user of this
- * class (Sinks, in particular) will need to explicitly differentiate between histograms
- * representing durations and histograms representing other types of data.
+ * Note: Histograms now incorporate what used to be timers because the only
+ * difference between the two stat types was the units being represented.
  */
-class Histogram : public virtual Metric {
+class Histogram : public Metric {
 public:
+  /**
+   * Histogram values represent scalar quantity like time, length, mass,
+   * distance, or in general anything which has only magnitude and no other
+   * characteristics. These are often accompanied by a unit of measurement.
+   * This enum defines units for commonly measured quantities. Base units
+   * are preferred unless they are not granular enough to be useful as an
+   * integer.
+   */
+  enum class Unit {
+    Null,        // The histogram has been rejected, i.e. it's a null histogram and is not recording
+                 // anything.
+    Unspecified, // Measured quantity does not require a unit, e.g. "items".
+    Bytes,
+    Microseconds,
+    Milliseconds,
+  };
+
   ~Histogram() override = default;
 
   /**
-   * Records an unsigned value. If a timer, values are in units of milliseconds.
+   * @return the unit of measurement for values recorded by the histogram.
+   */
+  virtual Unit unit() const PURE;
+
+  /**
+   * Records an unsigned value in the unit specified during the construction.
    */
   virtual void recordValue(uint64_t value) PURE;
 };
 
-using HistogramSharedPtr = std::shared_ptr<Histogram>;
+using HistogramSharedPtr = RefcountPtr<Histogram>;
 
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
  */
-class ParentHistogram : public virtual Histogram {
+class ParentHistogram : public Histogram {
 public:
   ~ParentHistogram() override = default;
 
@@ -117,7 +138,7 @@ public:
   virtual const std::string bucketSummary() const PURE;
 };
 
-using ParentHistogramSharedPtr = std::shared_ptr<ParentHistogram>;
+using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
 
 } // namespace Stats
 } // namespace Envoy

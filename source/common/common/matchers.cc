@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 
+#include "common/common/regex.h"
 #include "common/config/metadata.h"
 
 #include "absl/strings/match.h"
@@ -16,7 +17,7 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::Valu
   case envoy::type::matcher::ValueMatcher::kDoubleMatch:
     return std::make_shared<const DoubleMatcher>(v.double_match());
   case envoy::type::matcher::ValueMatcher::kStringMatch:
-    return std::make_shared<const StringMatcher>(v.string_match());
+    return std::make_shared<const StringMatcherImpl>(v.string_match());
   case envoy::type::matcher::ValueMatcher::kBoolMatch:
     return std::make_shared<const BoolMatcher>(v.bool_match());
   case envoy::type::matcher::ValueMatcher::kPresentMatch:
@@ -56,7 +57,16 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
   };
 }
 
-bool StringMatcher::match(const ProtobufWkt::Value& value) const {
+StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::StringMatcher& matcher)
+    : matcher_(matcher) {
+  if (matcher.match_pattern_case() == envoy::type::matcher::StringMatcher::kRegex) {
+    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.regex());
+  } else if (matcher.match_pattern_case() == envoy::type::matcher::StringMatcher::kSafeRegex) {
+    regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
+  }
+}
+
+bool StringMatcherImpl::match(const ProtobufWkt::Value& value) const {
   if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
     return false;
   }
@@ -64,7 +74,7 @@ bool StringMatcher::match(const ProtobufWkt::Value& value) const {
   return match(value.string_value());
 }
 
-bool StringMatcher::match(const absl::string_view value) const {
+bool StringMatcherImpl::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::StringMatcher::kExact:
     return matcher_.exact() == value;
@@ -73,7 +83,8 @@ bool StringMatcher::match(const absl::string_view value) const {
   case envoy::type::matcher::StringMatcher::kSuffix:
     return absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::StringMatcher::kRegex:
-    return std::regex_match(value.begin(), value.end(), regex_);
+  case envoy::type::matcher::StringMatcher::kSafeRegex:
+    return regex_->match(value);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

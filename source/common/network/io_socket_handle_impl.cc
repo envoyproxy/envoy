@@ -1,7 +1,6 @@
 #include "common/network/io_socket_handle_impl.h"
 
-#include <errno.h>
-
+#include <cerrno>
 #include <iostream>
 
 #include "envoy/buffer/buffer.h"
@@ -27,9 +26,11 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
 
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
-  const int rc = ::close(fd_);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const auto& result = os_syscalls.close(fd_);
   fd_ = -1;
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  return Api::IoCallUint64Result(result.rc_,
+                                 Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
@@ -85,8 +86,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice& slice
 
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
-                                                    const Address::Instance& address) {
-  const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
+                                                    const Address::Ip* self_ip,
+                                                    const Address::Instance& peer_address) {
+  const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&peer_address);
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
 
   STACK_ARRAY(iov, iovec, num_slice);
@@ -107,14 +109,51 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   message.msg_namelen = address_base->sockAddrLen();
   message.msg_iov = iov.begin();
   message.msg_iovlen = num_slices_to_write;
-  message.msg_control = nullptr;
-  message.msg_controllen = 0;
   message.msg_flags = 0;
-
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+  if (self_ip == nullptr) {
+    message.msg_control = nullptr;
+    message.msg_controllen = 0;
+    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    return sysCallResultToIoCallResult(result);
+  } else {
+    const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
+    // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
+    const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
+    const size_t cmsg_space = (space_v4 < space_v6) ? space_v6 : space_v4;
+    // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
+    STACK_ARRAY(cbuf, char, cmsg_space);
+    memset(cbuf.begin(), 0, cmsg_space);
 
-  return sysCallResultToIoCallResult(result);
+    message.msg_control = cbuf.begin();
+    message.msg_controllen = cmsg_space * sizeof(char);
+    cmsghdr* const cmsg = CMSG_FIRSTHDR(&message);
+    RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
+                                                sizeof(cbuf), sizeof(cmsghdr)));
+    if (self_ip->version() == Address::IpVersion::v4) {
+      cmsg->cmsg_level = IPPROTO_IP;
+#ifndef IP_SENDSRCADDR
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
+      cmsg->cmsg_type = IP_PKTINFO;
+      auto pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+      pktinfo->ipi_ifindex = 0;
+      pktinfo->ipi_spec_dst.s_addr = self_ip->ipv4()->address();
+#else
+      cmsg->cmsg_type = IP_SENDSRCADDR;
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in_addr));
+      *(reinterpret_cast<struct in_addr*>(CMSG_DATA(cmsg))).s_addr = self_ip->ipv4()->address();
+#endif
+    } else if (self_ip->version() == Address::IpVersion::v6) {
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in6_pktinfo));
+      cmsg->cmsg_level = IPPROTO_IPV6;
+      cmsg->cmsg_type = IPV6_PKTINFO;
+      auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+      pktinfo->ipi6_ifindex = 0;
+      *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
+    }
+    const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
+    return sysCallResultToIoCallResult(result);
+  }
 }
 
 Api::IoCallUint64Result
@@ -124,6 +163,7 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
     return Api::IoCallUint64Result(result.rc_,
                                    Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
   }
+  RELEASE_ASSERT(result.errno_ != EINVAL, "Invalid argument passed in.");
   return Api::IoCallUint64Result(
       /*rc=*/0,
       (result.errno_ == EAGAIN
@@ -136,34 +176,34 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghdr& cmsg,
                                                              uint32_t self_port) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
-    const struct in6_pktinfo* info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
-    sockaddr_in6 ipv6_addr;
-    memset(&ipv6_addr, 0, sizeof(sockaddr_in6));
-    ipv6_addr.sin6_family = AF_INET6;
-    ipv6_addr.sin6_addr = info->ipi6_addr;
-    ipv6_addr.sin6_port = htons(self_port);
-    return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv6_addr),
-                                        sizeof(sockaddr_in6), /*v6only=*/false);
+    auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
+    sockaddr_storage ss;
+    auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+    memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+    ipv6_addr->sin6_family = AF_INET6;
+    ipv6_addr->sin6_addr = info->ipi6_addr;
+    ipv6_addr->sin6_port = htons(self_port);
+    return Address::addressFromSockAddr(ss, sizeof(sockaddr_in6), /*v6only=*/false);
   }
 #ifndef IP_RECVDSTADDR
   if (cmsg.cmsg_type == IP_PKTINFO) {
-    const struct in_pktinfo* info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(&cmsg));
+    auto info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(&cmsg));
 #else
   if (cmsg.cmsg_type == IP_RECVDSTADDR) {
-    const struct in_addr* addr = reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
+    auto addr = reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
 #endif
-    sockaddr_in ipv4_addr;
-    memset(&ipv4_addr, 0, sizeof(sockaddr_in));
-    ipv4_addr.sin_family = AF_INET;
-    ipv4_addr.sin_addr =
+    sockaddr_storage ss;
+    auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+    memset(ipv4_addr, 0, sizeof(sockaddr_in));
+    ipv4_addr->sin_family = AF_INET;
+    ipv4_addr->sin_addr =
 #ifndef IP_RECVDSTADDR
         info->ipi_addr;
 #else
         *addr;
 #endif
-    ipv4_addr.sin_port = htons(self_port);
-    return Address::addressFromSockAddr(reinterpret_cast<sockaddr_storage&>(ipv4_addr),
-                                        sizeof(sockaddr_in), /*v6only=*/false);
+    ipv4_addr->sin_port = htons(self_port);
+    return Address::addressFromSockAddr(ss, sizeof(sockaddr_in), /*v6only=*/false);
   }
   return nullptr;
 }
@@ -184,45 +224,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     RecvMsgOutput& output) {
 
-#ifndef __APPLE__
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
   // addresses.
-  constexpr int cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                             CMSG_SPACE(sizeof(struct in6_pktinfo));
-  char cbuf[cmsg_space];
-#else
-  // CMSG_SPACE() is supposed to be a constant expression, and most
-  // BSD-ish code uses it to determine the size of buffers used to
-  // send/receive descriptors in the control message for
-  // sendmsg/recvmsg. Such buffers are often automatic variables.
-
-  // In Darwin, CMSG_SPACE uses __DARWIN_ALIGN. And __DARWIN_ALIGN(p)
-  // expands to
-
-  // ((__darwin_size_t)((char *)(__darwin_size_t)(p) + __DARNWIN_ALIGNBYTES)
-  //  &~ __DARWIN_ALIGNBYTES)
-
-  // which Clang (to which many Apple employees contribute!) complains
-  // about when invoked with -pedantic -- and with our -Werror, causes
-  // Clang-based builds to fail. Clang says this is not a constant
-  // expression:
-
-  // error: variable length array folded to constant array as an
-  // extension [-Werror,-pedantic]
-
-  // Possibly true per standard definition, since that cast to (char *)
-  // is ugly, but actually Clang was able to convert to a compile-time
-  // constant... it just had to work harder.
-
-  // As a ugly workaround, we define the following constant for use in
-  // automatic array declarations, and in all cases have an assert to
-  // verify that the value is of sufficient size. (The assert should
-  // constantly propagate and be dead-code eliminated in normal compiles
-  // and should cause a quick death if ever violated.)
-  constexpr int cmsg_space = 128;
-  char cbuf[cmsg_space];
-#endif
+  const size_t cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
+                            CMSG_SPACE(sizeof(struct in6_pktinfo));
+  STACK_ARRAY(cbuf, char, cmsg_space);
+  memset(cbuf.begin(), 0, cmsg_space);
 
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_for_read = 0;
@@ -242,7 +250,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_iovlen = num_slices_for_read;
   hdr.msg_flags = 0;
 
-  struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(cbuf);
+  auto cmsg = reinterpret_cast<struct cmsghdr*>(cbuf.begin());
   cmsg->cmsg_len = cmsg_space;
   hdr.msg_control = cmsg;
   hdr.msg_controllen = cmsg_space;

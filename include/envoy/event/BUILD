@@ -20,6 +20,7 @@ envoy_cc_library(
         ":deferred_deletable",
         ":file_event_interface",
         ":signal_interface",
+        "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/filesystem:watcher_interface",

@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/stat_merger.h"
+#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/test_common/utility.h"
@@ -182,8 +182,8 @@ TEST_F(StatMergerTest, gaugeMergeImportMode) {
 
 class StatMergerThreadLocalTest : public testing::Test {
 protected:
-  FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_{symbol_table_};
+  SymbolTablePtr symbol_table_{SymbolTableCreator::makeSymbolTable()};
+  AllocatorImpl alloc_{*symbol_table_};
   ThreadLocalStoreImpl store_{alloc_};
 };
 
@@ -196,7 +196,7 @@ TEST_F(StatMergerThreadLocalTest, filterOutUninitializedGauges) {
 
   // We don't get "newgauge1" in the aggregated list, but we *do* get it if we try to
   // find it by name.
-  absl::optional<std::reference_wrapper<const Gauge>> find = store_.findGauge(g1.statName());
+  OptionalGauge find = store_.findGauge(g1.statName());
   ASSERT_TRUE(find);
   EXPECT_EQ(&g1, &(find->get()));
 }

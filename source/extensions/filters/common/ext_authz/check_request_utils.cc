@@ -37,24 +37,33 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
     Envoy::Network::Utility::addressToProtobufAddress(*connection.remoteAddress(), *addr);
   }
 
-  // Set the principal
-  // Preferably the SAN from the peer's cert or
-  // Subject from the peer's cert.
-  Ssl::ConnectionInfo* ssl = const_cast<Ssl::ConnectionInfo*>(connection.ssl());
+  // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
+  // cert.
+  auto ssl = connection.ssl();
   if (ssl != nullptr) {
     if (local) {
-      const auto uriSans = ssl->uriSanLocalCertificate();
-      if (uriSans.empty()) {
-        peer.set_principal(ssl->subjectLocalCertificate());
+      const auto uri_sans = ssl->uriSanLocalCertificate();
+      if (uri_sans.empty()) {
+        const auto dns_sans = ssl->dnsSansLocalCertificate();
+        if (dns_sans.empty()) {
+          peer.set_principal(ssl->subjectLocalCertificate());
+        } else {
+          peer.set_principal(dns_sans[0]);
+        }
       } else {
-        peer.set_principal(uriSans[0]);
+        peer.set_principal(uri_sans[0]);
       }
     } else {
-      const auto uriSans = ssl->uriSanPeerCertificate();
-      if (uriSans.empty()) {
-        peer.set_principal(ssl->subjectPeerCertificate());
+      const auto uri_sans = ssl->uriSanPeerCertificate();
+      if (uri_sans.empty()) {
+        const auto dns_sans = ssl->dnsSansPeerCertificate();
+        if (dns_sans.empty()) {
+          peer.set_principal(ssl->subjectPeerCertificate());
+        } else {
+          peer.set_principal(dns_sans[0]);
+        }
       } else {
-        peer.set_principal(uriSans[0]);
+        peer.set_principal(uri_sans[0]);
       }
     }
   }
@@ -143,6 +152,7 @@ void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
+    envoy::api::v2::core::Metadata&& metadata_context,
     envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes) {
 
   auto attrs = request.mutable_attributes();
@@ -158,6 +168,7 @@ void CheckRequestUtils::createHttpCheck(
 
   // Fill in the context extensions:
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
+  (*attrs->mutable_metadata_context()) = std::move(metadata_context);
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,

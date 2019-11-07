@@ -282,7 +282,7 @@ public:
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
     http_conn_pool_ = std::make_unique<Http::Http2::ProdConnPoolImpl>(
-        *dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr);
+        *dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
@@ -355,9 +355,8 @@ public:
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
-    request->grpc_request_ =
-        grpc_client_->send(*method_descriptor_, request_msg, *request, active_span,
-                           absl::optional<std::chrono::milliseconds>());
+    request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
+                                                active_span, Http::AsyncClient::RequestOptions());
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
@@ -391,7 +390,8 @@ public:
           }
         }));
 
-    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream);
+    stream->grpc_stream_ =
+        grpc_client_->start(*method_descriptor_, *stream, Http::AsyncClient::StreamOptions());
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
@@ -416,7 +416,7 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl(*symbol_table_);
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -468,10 +468,9 @@ public:
     fake_upstream_.reset();
     async_client_transport_socket_.reset();
     client_connection_.reset();
-    mock_cluster_info_->transport_socket_factory_.reset();
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     TestUtility::setTestSslGoogleGrpcConfig(config, use_client_cert_);
     return config;
@@ -493,13 +492,11 @@ public:
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
         tls_context, factory_context_);
 
-    mock_cluster_info_->transport_socket_factory_ =
+    mock_host_description_->socket_factory_ =
         std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
             std::move(cfg), context_manager_, *stats_store_);
-    ON_CALL(*mock_cluster_info_, transportSocketFactory())
-        .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
-        mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
+        mock_host_description_->socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
                                                     FakeHttpConnection::Type::HTTP2, ipVersion(),
                                                     test_time_.timeSystem());

@@ -11,7 +11,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -30,8 +29,8 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
     return route_config_provider_manager.createStaticRouteConfigProvider(config.route_config(),
                                                                          factory_context);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
-    return route_config_provider_manager.createRdsRouteConfigProvider(config.rds(), factory_context,
-                                                                      stat_prefix);
+    return route_config_provider_manager.createRdsRouteConfigProvider(
+        config.rds(), factory_context, stat_prefix, factory_context.initManager());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -41,8 +40,10 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::api::v2::RouteConfiguration& config,
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config},
-      last_updated_(factory_context.timeSource().systemTime()),
+    : config_(new ConfigImpl(config, factory_context.getServerFactoryContext(),
+                             factory_context.messageValidationVisitor(), true)),
+
+      route_config_proto_{config}, last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
   route_config_provider_manager_.static_route_config_providers_.insert(this);
 }
@@ -54,25 +55,26 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
+    const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
+      validator_(validator), init_manager_(init_manager),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier),
-      validation_visitor_(factory_context_.messageValidationVisitor()) {
+      manager_identifier_(manager_identifier) {
+
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(),
           Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
           *scope_, *this);
-
-  config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
-      factory_context.timeSource(), factory_context.messageValidationVisitor());
+  config_update_info_ =
+      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator_);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -92,12 +94,16 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
-      resources[0], validation_visitor_);
-  MessageUtil::validate(route_config);
+  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
+  MessageUtil::validate(route_config, validator_);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
+  }
+  for (auto* provider : route_config_providers_) {
+    // This seems inefficient, though it is necessary to validate config in each context,
+    // especially when it comes with per_filter_config,
+    provider->validateConfig(route_config);
   }
 
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
@@ -110,7 +116,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
-      vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());
+      vhds_subscription_->registerInitTargetWithInitManager(getRdsConfigInitManager());
     } else {
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 config_update_info_->configHash());
@@ -120,6 +126,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       }
       vhds_subscription_.release();
     }
+    update_callback_manager_.runCallbacks();
   }
 
   init_target_.ready();
@@ -143,7 +150,9 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   }
 }
 
-void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void RdsRouteConfigSubscription::onConfigUpdateFailed(
+    Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
@@ -167,12 +176,14 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)),
-      config_update_info_(subscription_->routeConfigUpdate()), factory_context_(factory_context),
+      config_update_info_(subscription_->routeConfigUpdate()),
+      factory_context_(factory_context.getServerFactoryContext()),
+      validator_(factory_context.messageValidationVisitor()),
       tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
-                                                  factory_context_, false);
+                                                  factory_context_, validator_, false);
   } else {
     initial_config = std::make_shared<NullConfigImpl>();
   }
@@ -191,10 +202,20 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 }
 
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
-  ConfigConstSharedPtr new_config(
-      new ConfigImpl(config_update_info_->routeConfiguration(), factory_context_, false));
-  tls_->runOnAllThreads(
-      [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+  ConfigConstSharedPtr new_config(new ConfigImpl(config_update_info_->routeConfiguration(),
+                                                 factory_context_, validator_, false));
+  tls_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
+    prev_config->config_ = new_config;
+    return previous;
+  });
+}
+
+void RdsRouteConfigProviderImpl::validateConfig(
+    const envoy::api::v2::RouteConfiguration& config) const {
+  // TODO(lizan): consider cache the config here until onConfigUpdate.
+  ConfigImpl validation_config(config, factory_context_, validator_, false);
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
@@ -207,10 +228,11 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
 
 Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
-
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    Init::Manager& init_manager) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
+  auto& server_factory_context = factory_context.getServerFactoryContext();
 
   RdsRouteConfigSubscriptionSharedPtr subscription;
 
@@ -219,11 +241,10 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
-    subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
-                                                      stat_prefix, *this));
-
-    factory_context.initManager().add(subscription->init_target_);
-
+    subscription.reset(new RdsRouteConfigSubscription(
+        rds, manager_identifier, server_factory_context, factory_context.messageValidationVisitor(),
+        init_manager, stat_prefix, *this));
+    init_manager.add(subscription->init_target_);
     route_config_subscriptions_.insert({manager_identifier, subscription});
   } else {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up

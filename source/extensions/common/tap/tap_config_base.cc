@@ -167,7 +167,9 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     }
 
     ENVOY_LOG_MISC(debug, "Opening tap file for [id={}] to {}", trace_id_, path);
-    output_file_.open(path);
+    // When reading and writing binary files, we need to be sure std::ios_base::binary
+    // is set, otherwise we will not get the expected results on Windows
+    output_file_.open(path, std::ios_base::binary);
   }
 
   ENVOY_LOG_MISC(trace, "Tap for [id={}]: {}", trace_id_, trace->DebugString());

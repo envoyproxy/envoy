@@ -5,6 +5,7 @@
 // porting layer for QUICHE.
 
 #include <memory>
+#include <string>
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
@@ -19,9 +20,7 @@
 #include "quiche/http2/platform/api/http2_logging.h"
 #include "quiche/http2/platform/api/http2_macros.h"
 #include "quiche/http2/platform/api/http2_optional.h"
-#include "quiche/http2/platform/api/http2_ptr_util.h"
 #include "quiche/http2/platform/api/http2_reconstruct_object.h"
-#include "quiche/http2/platform/api/http2_string.h"
 #include "quiche/http2/platform/api/http2_string_piece.h"
 #include "quiche/http2/test_tools/http2_random.h"
 
@@ -54,7 +53,7 @@ TEST(Http2PlatformTest, Http2Deque) {
 }
 
 TEST(Http2PlatformTest, Http2EstimateMemoryUsage) {
-  http2::Http2String s = "foo";
+  std::string s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, http2::Http2EstimateMemoryUsage(s));
 }
@@ -82,11 +81,6 @@ TEST(Http2PlatformTest, Http2Log) {
   HTTP2_DLOG_EVERY_N(ERROR, 2) << "DLOG_EVERY_N(ERROR, 2)";
 }
 
-TEST(Http2PlatformTest, Http2MakeUnique) {
-  auto p = http2::Http2MakeUnique<int>(4);
-  EXPECT_EQ(4, *p);
-}
-
 TEST(Http2PlatformTest, Http2Optional) {
   http2::Http2Optional<int> opt;
   EXPECT_FALSE(opt.has_value());
@@ -108,13 +102,8 @@ TEST(Http2PlatformTest, Http2ReconstructObject) {
   EXPECT_EQ("", s);
 }
 
-TEST(Http2PlatformTest, Http2String) {
-  http2::Http2String s = "foo";
-  EXPECT_EQ('o', s[1]);
-}
-
 TEST(Http2PlatformTest, Http2StringPiece) {
-  http2::Http2String s = "bar";
+  std::string s = "bar";
   http2::Http2StringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }

@@ -26,8 +26,9 @@ class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options);
-  ~ConnPoolImpl();
+               const Network::ConnectionSocket::OptionsSharedPtr& options,
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+  ~ConnPoolImpl() override;
 
   // Http::ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
@@ -44,7 +45,7 @@ protected:
                         public Event::DeferredDeletable,
                         public Http::ConnectionCallbacks {
     ActiveClient(ConnPoolImpl& parent);
-    ~ActiveClient();
+    ~ActiveClient() override;
 
     void onConnectTimeout() { parent_.onConnectTimeout(*this); }
 
@@ -96,6 +97,7 @@ protected:
   ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 };
 
 /**

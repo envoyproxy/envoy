@@ -20,7 +20,7 @@ public:
 
 private:
   ThreadFactory& thread_factory_;
-  ThreadIdPtr thread_advancing_time_ GUARDED_BY(mutex_);
+  ThreadId thread_advancing_time_ GUARDED_BY(mutex_);
   mutable MutexBasicLockable mutex_;
 };
 

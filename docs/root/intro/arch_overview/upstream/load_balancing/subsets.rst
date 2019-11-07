@@ -35,12 +35,20 @@ therefore, contain a definition that has the same keys as a given route in order
 balancing to occur.
 
 This feature can only be enabled using the V2 configuration API. Furthermore, host metadata is only
-supported when using the EDS discovery type for clusters. Host metadata for subset load balancing
-must be placed under the filter name ``"envoy.lb"``. Similarly, route metadata match criteria use
-the ``"envoy.lb"`` filter name. Host metadata may be hierarchical (e.g., the value for a top-level
-key may be a structured value or list), but the subset load balancer only compares top-level keys
-and values. Therefore when using structured values, a route's match criteria will only match if an
-identical structured value appears in the host's metadata.
+supported when hosts are defined using
+:ref:`ClusterLoadAssignments <envoy_api_msg_ClusterLoadAssignment>`. ClusterLoadAssignments are
+available via EDS or the Cluster :ref:`load_assignment <envoy_api_field_Cluster.load_assignment>`
+field. Host metadata for subset load balancing must be placed under the filter name ``"envoy.lb"``.
+Similarly, route metadata match criteria use ``"envoy.lb"`` filter name. Host metadata may be
+hierarchical (e.g., the value for a top-level key may be a structured value or list), but the
+subset load balancer only compares top-level keys and values. Therefore when using structured
+values, a route's match criteria will only match if an identical structured value appears in the
+host's metadata.
+
+Finally, note that subset load balancing is not available for the
+:ref:`ORIGINAL_DST_LB <envoy_api_enum_value_Cluster.LbPolicy.ORIGINAL_DST_LB>` or
+:ref:`CLUSTER_PROVIDED <envoy_api_enum_value_Cluster.LbPolicy.CLUSTER_PROVIDED>` load balancer
+policies.
 
 Examples
 ^^^^^^^^

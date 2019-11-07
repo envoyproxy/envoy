@@ -6,6 +6,7 @@
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/common/assert.h"
+#include "common/grpc/google_grpc_context.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -64,7 +65,18 @@ class AltsSharedState : public Singleton::Instance {
 public:
   AltsSharedState() { grpc_alts_shared_resource_dedicated_init(); }
 
-  ~AltsSharedState() { grpc_alts_shared_resource_dedicated_shutdown(); }
+  ~AltsSharedState() override { grpc_alts_shared_resource_dedicated_shutdown(); }
+
+private:
+  // There is blanket google-grpc initialization in MainCommonBase, but that
+  // doesn't cover unit tests. However, putting blanket coverage in ProcessWide
+  // causes background threaded memory allocation in all unit tests making it
+  // hard to measure memory. Thus we also initialize grpc using our idempotent
+  // wrapper-class in classes that need it. See
+  // https://github.com/envoyproxy/envoy/issues/8282 for details.
+#ifdef ENVOY_GOOGLE_GRPC
+  Grpc::GoogleGrpcContext google_grpc_context_;
+#endif
 };
 
 SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
@@ -79,7 +91,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
       [] { return std::make_shared<AltsSharedState>(); });
   auto config =
       MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
-          message);
+          message, factory_ctxt.messageValidationVisitor());
   HandshakeValidator validator = createHandshakeValidator(config);
 
   const std::string& handshaker_service = config.handshaker_service();

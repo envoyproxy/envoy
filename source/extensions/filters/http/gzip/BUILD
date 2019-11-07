@@ -23,10 +23,8 @@ envoy_cc_library(
         "//source/common/compressor:compressor_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_validator_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
+        "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
     ],
 )
 
@@ -39,5 +37,6 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
+        "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
     ],
 )

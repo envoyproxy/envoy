@@ -11,3 +11,4 @@ Upstream clusters
   load_balancing/load_balancing
   outlier
   circuit_breaking
+  upstream_filters

@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/api/api.h"
+
 #include "extensions/health_checkers/redis/redis.h"
 #include "extensions/health_checkers/redis/utility.h"
 
@@ -16,8 +18,6 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
 using testing::WithArg;
 
 namespace Envoy {
@@ -31,7 +31,7 @@ class RedisHealthCheckerTest
 public:
   RedisHealthCheckerTest()
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
-        event_logger_(new Upstream::MockHealthCheckEventLogger()) {}
+        event_logger_(new Upstream::MockHealthCheckEventLogger()), api_(Api::createApiForTest()) {}
 
   void setup() {
     const std::string yaml = R"EOF(
@@ -50,9 +50,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -73,9 +73,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   void setupExistsHealthcheck() {
@@ -96,9 +96,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   void setupDontReuseConnection() {
@@ -119,14 +119,16 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&) override {
+         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
+         Stats::Scope&, const std::string&) override {
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
   }
 
@@ -146,13 +148,13 @@ public:
   void expectExistsRequestCreate() {
     EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthChecker::existsHealthCheckRequest("")), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-    EXPECT_CALL(*timeout_timer_, enableTimer(_));
+    EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   }
 
   void expectPingRequestCreate() {
     EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthChecker::pingHealthCheckRequest()), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-    EXPECT_CALL(*timeout_timer_, enableTimer(_));
+    EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   }
 
   void exerciseStubs() {
@@ -167,6 +169,8 @@ public:
     EXPECT_TRUE(session->enableRedirection());
     EXPECT_EQ(session->maxBufferSizeBeforeFlush(), 0);
     EXPECT_EQ(session->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
+    EXPECT_EQ(session->maxUpstreamUnknownConnections(), 0);
+    EXPECT_FALSE(session->enableCommandStats());
     session->onDeferredDeleteBase(); // This must be called to pass assertions in the destructor.
   }
 
@@ -181,6 +185,7 @@ public:
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisHealthChecker> health_checker_;
+  Api::ApiPtr api_;
 };
 
 TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
@@ -203,7 +208,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
 
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   NetworkFilters::Common::Redis::RespValuePtr response(
       new NetworkFilters::Common::Redis::RespValue());
   response->type(NetworkFilters::Common::Redis::RespType::SimpleString);
@@ -211,38 +216,38 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Redis failure via disconnect
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   pool_callbacks_->onFailure();
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Timeout
   EXPECT_CALL(pool_request_, cancel());
   EXPECT_CALL(*client_, close());
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  timeout_timer_->callback_();
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  timeout_timer_->invokeCallback();
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());
@@ -271,7 +276,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
 
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   NetworkFilters::Common::Redis::RespValuePtr response(
       new NetworkFilters::Common::Redis::RespValue());
   response->type(NetworkFilters::Common::Redis::RespType::SimpleString);
@@ -279,28 +284,28 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Fail again
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());
@@ -331,18 +336,18 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   pool_callbacks_->onFailure();
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Success
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   NetworkFilters::Common::Redis::RespValuePtr response(
       new NetworkFilters::Common::Redis::RespValue());
   response->type(NetworkFilters::Common::Redis::RespType::SimpleString);
@@ -350,7 +355,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());
@@ -379,7 +384,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
 
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   NetworkFilters::Common::Redis::RespValuePtr response(
       new NetworkFilters::Common::Redis::RespValue());
   response->type(NetworkFilters::Common::Redis::RespType::Integer);
@@ -387,23 +392,23 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectExistsRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure, exists
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   response->type(NetworkFilters::Common::Redis::RespType::Integer);
   response->asInteger() = 1;
   pool_callbacks_->onResponse(std::move(response));
 
   expectExistsRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure, no value
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
@@ -431,18 +436,18 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
 
   // Success with moved redirection
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   NetworkFilters::Common::Redis::RespValue moved_response;
   moved_response.type(NetworkFilters::Common::Redis::RespType::Error);
   moved_response.asString() = "MOVED 1111 127.0.0.1:81"; // exact values not important
   pool_callbacks_->onRedirection(moved_response);
 
   expectExistsRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Success with ask redirection
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   NetworkFilters::Common::Redis::RespValue ask_response;
   ask_response.type(NetworkFilters::Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1111 127.0.0.1:81"; // exact values not important
@@ -470,7 +475,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
   // The connection will close on success.
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*client_, close());
   NetworkFilters::Common::Redis::RespValuePtr response(
       new NetworkFilters::Common::Redis::RespValue());
@@ -480,40 +485,40 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // The connection will close on failure.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*client_, close());
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Redis failure via disconnect, the connection was closed by the other end.
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   pool_callbacks_->onFailure();
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Timeout, the connection will be closed.
   EXPECT_CALL(pool_request_, cancel());
   EXPECT_CALL(*client_, close());
   EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  timeout_timer_->callback_();
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  timeout_timer_->invokeCallback();
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());

@@ -19,6 +19,9 @@ class Histogram;
 class Scope;
 class NullGaugeImpl;
 
+using OptionalCounter = absl::optional<std::reference_wrapper<const Counter>>;
+using OptionalGauge = absl::optional<std::reference_wrapper<const Gauge>>;
+using OptionalHistogram = absl::optional<std::reference_wrapper<const Histogram>>;
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
@@ -78,37 +81,37 @@ public:
 
   /**
    * @param name The name of the stat, obtained from the SymbolTable.
+   * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName name) PURE;
+  virtual Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.
    * @param name The name, expressed as a string.
+   * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogram(const std::string& name) PURE;
+  virtual Histogram& histogram(const std::string& name, Histogram::Unit unit) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a counter within the scope's namespace, if it exists.
    */
-  virtual absl::optional<std::reference_wrapper<const Counter>>
-  findCounter(StatName name) const PURE;
+  virtual OptionalCounter findCounter(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a gauge within the scope's namespace, if it exists.
    */
-  virtual absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const PURE;
+  virtual OptionalGauge findGauge(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a histogram within the scope's namespace, if it
    * exists.
    */
-  virtual absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const PURE;
+  virtual OptionalHistogram findHistogram(StatName name) const PURE;
 
   /**
    * @return a reference to the symbol table.

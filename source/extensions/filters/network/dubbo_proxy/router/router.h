@@ -32,6 +32,8 @@ public:
   virtual const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 };
 
+using RouteEntryPtr = std::shared_ptr<RouteEntry>;
+
 /**
  * Route holds the RouteEntry for a request.
  */
@@ -46,6 +48,7 @@ public:
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
+using RouteSharedPtr = std::shared_ptr<Route>;
 
 /**
  * The router configuration.

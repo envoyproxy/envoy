@@ -7,6 +7,7 @@
 
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
 
@@ -33,6 +34,7 @@ struct RawSlice {
  */
 class BufferFragment {
 public:
+  virtual ~BufferFragment() = default;
   /**
    * @return const void* a pointer to the referenced data.
    */
@@ -47,9 +49,6 @@ public:
    * Called by a buffer when the referenced data is no longer needed.
    */
   virtual void done() PURE;
-
-protected:
-  virtual ~BufferFragment() = default;
 };
 
 /**
@@ -183,13 +182,20 @@ public:
   virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
 
   /**
-   * Search for an occurrence of a buffer within the larger buffer.
+   * Search for an occurrence of data within the buffer.
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.
    * @param start supplies the starting index to search from.
    * @return the index where the match starts or -1 if there is no match.
    */
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
+
+  /**
+   * Search for an occurrence of data at the start of a buffer.
+   * @param data supplies the data to search for.
+   * @return true if this buffer starts with data, false otherwise.
+   */
+  virtual bool startsWith(absl::string_view data) const PURE;
 
   /**
    * Constructs a flattened string from a buffer.

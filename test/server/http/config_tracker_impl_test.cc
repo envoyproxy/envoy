@@ -4,8 +4,6 @@
 
 #include "gmock/gmock.h"
 
-using testing::_;
-
 namespace Envoy {
 namespace Server {
 
@@ -21,7 +19,7 @@ public:
 
   ProtobufTypes::MessagePtr test_msg() { return std::make_unique<ProtobufWkt::Any>(); }
 
-  virtual ~ConfigTrackerImplTest() = default;
+  ~ConfigTrackerImplTest() override = default;
 
   ConfigTrackerImpl tracker;
   const std::map<std::string, ConfigTracker::Cb>& cbs_map;

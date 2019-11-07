@@ -11,17 +11,36 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 
 function setup_gcc_toolchain() {
-  export CC=gcc
-  export CXX=g++
-  echo "$CC/$CXX toolchain configured"
+  if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
+    echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+    exit 1
+  fi
+  if [[ -z "${ENVOY_RBE}" ]]; then
+    export CC=gcc
+    export CXX=g++
+    export BAZEL_COMPILER=gcc
+    echo "$CC/$CXX toolchain configured"
+  else
+    export BAZEL_BUILD_OPTIONS="--config=remote-gcc ${BAZEL_BUILD_OPTIONS}"
+  fi
 }
 
 function setup_clang_toolchain() {
-  export PATH=/usr/lib/llvm-8/bin:$PATH
-  export CC=clang
-  export CXX=clang++
-  export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
-  echo "$CC/$CXX toolchain configured"
+  ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
+  if [[ -z "${ENVOY_RBE}" ]]; then
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
+    fi
+  else
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang ${BAZEL_BUILD_OPTIONS}"
+    fi
+  fi
+  echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
@@ -40,39 +59,25 @@ then
 fi
 export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
-# Make sure that /source doesn't contain /build on the underlying host
-# filesystem, including via hard links or symlinks. We can get into weird
-# loops with Bazel symlinking and gcovr's path traversal if this is true, so
-# best to keep /source and /build in distinct directories on the host
-# filesystem.
-SENTINEL="${BUILD_DIR}"/bazel.sentinel
-touch "${SENTINEL}"
-if [[ -n "$(find -L "${ENVOY_SRCDIR}" -name "$(basename "${SENTINEL}")")" ]]
-then
-  rm -f "${SENTINEL}"
-  echo "/source mount must not contain /build mount"
-  exit 1
-fi
-rm -f "${SENTINEL}"
-
 # Environment setup.
 export USER=bazel
 export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
+export PATH=/opt/llvm/bin:$PATH
+export CLANG_FORMAT=clang-format
 
-if [[ -f "/etc/redhat-release" ]]
-then
-  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
-else
-  export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-8/bin --linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+if [[ -f "/etc/redhat-release" ]]; then
+  export BAZEL_BUILD_EXTRA_OPTIONS+="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
 fi
+
+bazel/setup_clang.sh /opt/llvm
 
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
-export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
-  --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
-  --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
+export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
+  --local_cpu_resources=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
   --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
+  --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
@@ -85,8 +90,9 @@ if [ "$1" != "-nofetch" ]; then
   fi
 
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
-  cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 03b45933284b332fd1df42cfb3270751fe543842)
+  sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
+  cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 fi
 
 # Also setup some space for building Envoy standalone.
@@ -121,5 +127,7 @@ trap cleanup EXIT
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
+export BUILDOZER_BIN="/usr/local/bin/buildozer"

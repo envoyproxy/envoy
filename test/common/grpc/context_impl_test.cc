@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+#include "envoy/common/platform.h"
 
 #include "common/grpc/common.h"
 #include "common/grpc/context_impl.h"
@@ -18,7 +18,7 @@ namespace Grpc {
 
 TEST(GrpcContextTest, ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool(*symbol_table_);
   const Stats::StatName service = pool.add("service");
   const Stats::StatName method = pool.add("method");
@@ -33,6 +33,11 @@ TEST(GrpcContextTest, ChargeStats) {
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.success").value());
   EXPECT_EQ(1U, cluster.stats_store_.counter("grpc.service.method.failure").value());
   EXPECT_EQ(2U, cluster.stats_store_.counter("grpc.service.method.total").value());
+
+  context.chargeRequestMessageStat(cluster, request_names, 3);
+  context.chargeResponseMessageStat(cluster, request_names, 4);
+  EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.request_message_count").value());
+  EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.response_message_count").value());
 
   Http::TestHeaderMapImpl trailers;
   Http::HeaderEntry& status = trailers.insertGrpcStatus();
@@ -58,7 +63,7 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   Http::HeaderMapImpl headers;
   Http::HeaderEntry& path = headers.insertPath();
   path.value(std::string("/service_name/method_name"));
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table;
+  Stats::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
   absl::optional<Context::RequestNames> request_names = context.resolveServiceAndMethod(&path);
   EXPECT_TRUE(request_names);

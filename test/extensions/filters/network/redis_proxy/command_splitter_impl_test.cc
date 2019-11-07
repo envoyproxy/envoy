@@ -408,6 +408,7 @@ TEST_F(RedisSingleServerRequestTest, MovedRedirectionSuccess) {
   EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_)))
       .WillOnce(
           DoAll(SaveArg<0>(&host_address), SaveArg<1>(&request_copy), Return(&pool_request2)));
+  EXPECT_CALL(*conn_pool_, onRedirection());
   EXPECT_TRUE(pool_callbacks_->onRedirection(moved_response));
   EXPECT_EQ(host_address, "10.1.2.3:4000");
   EXPECT_EQ(request_copy.type(), Common::Redis::RespType::Array);
@@ -510,6 +511,7 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
             }
             return &pool_request3;
           }));
+  EXPECT_CALL(*conn_pool_, onRedirection());
   EXPECT_TRUE(pool_callbacks_->onRedirection(ask_response));
   respond();
 };
@@ -589,6 +591,18 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionFailure) {
   respond();
 };
 
+MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
+  const Common::Redis::RespValue& lhs = arg;
+  EXPECT_TRUE(lhs.type() == Common::Redis::RespType::CompositeArray);
+  EXPECT_EQ(lhs.asCompositeArray().size(), rhs.size());
+  std::vector<std::string> array;
+  for (auto const& entry : lhs.asCompositeArray()) {
+    array.emplace_back(entry.asString());
+  }
+  EXPECT_EQ(array, rhs);
+  return true;
+}
+
 class RedisMGETCommandHandlerTest : public RedisCommandSplitterImplTest {
 public:
   void setup(uint32_t num_gets, const std::list<uint64_t>& null_handle_indexes) {
@@ -600,8 +614,7 @@ public:
     Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
     makeBulkStringArray(*request, request_strings);
 
-    std::vector<Common::Redis::RespValue> tmp_expected_requests(num_gets);
-    expected_requests_.swap(tmp_expected_requests);
+    expected_requests_.reserve(num_gets);
     pool_callbacks_.resize(num_gets);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_gets);
     pool_requests_.swap(tmp_pool_requests);
@@ -609,20 +622,21 @@ public:
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
 
     for (uint32_t i = 0; i < num_gets; i++) {
-      makeBulkStringArray(expected_requests_[i], {"get", std::to_string(i)});
+      expected_requests_.push_back({"get", std::to_string(i)});
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
       }
-      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+      EXPECT_CALL(*conn_pool_,
+                  makeRequest(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   }
 
-  std::vector<Common::Redis::RespValue> expected_requests_;
+  std::vector<std::vector<std::string>> expected_requests_;
   std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
   std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
@@ -812,39 +826,20 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithMovedRedirection) {
   // Test with simulated upstream failures. This exercises code in
   // FragmentedRequest::onChildRedirection() common to MGET, MSET, and SplitKeysSumResult commands.
   for (unsigned int i = 0; i < 2; i++) {
-    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-        .WillOnce(Invoke(
-            [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-              EXPECT_EQ(host_address, "192.168.0.1:5000");
-              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 2);
-              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "get");
-              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-              EXPECT_NE(&pool_requests_[i], nullptr);
-              return nullptr;
-            }));
+    EXPECT_CALL(*conn_pool_,
+                makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                  Ref(*pool_callbacks_[i])))
+        .WillOnce(Return(nullptr));
     EXPECT_FALSE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
   // Test "successful" redirection.
   for (unsigned int i = 0; i < 2; i++) {
-    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-        .WillOnce(Invoke(
-            [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-              EXPECT_EQ(host_address, "192.168.0.1:5000");
-              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 2);
-              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "get");
-              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-              EXPECT_NE(&pool_requests_[i], nullptr);
-              return &pool_requests_[i];
-            }));
+    EXPECT_CALL(*conn_pool_,
+                makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                  Ref(*pool_callbacks_[i])))
+        .WillOnce(Return(&pool_requests_[i]));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
@@ -908,20 +903,10 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
               return (i == 0 ? nullptr : &dummy_poolrequest);
             }));
     if (i == 1) {
-      EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-          .WillOnce(Invoke(
-              [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                  Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-                EXPECT_EQ(host_address, "192.168.0.1:5000");
-                EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-                EXPECT_EQ(request.asArray().size(), 2);
-                EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-                EXPECT_EQ(request.asArray()[0].asString(), "get");
-                EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-                EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-                EXPECT_NE(&pool_requests_[i], nullptr);
-                return (i == 1 ? nullptr : &pool_requests_[i]);
-              }));
+      EXPECT_CALL(*conn_pool_,
+                  makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                    Ref(*pool_callbacks_[i])))
+          .WillOnce(Return(i == 1 ? nullptr : &pool_requests_[i]));
     }
     EXPECT_FALSE(pool_callbacks_[i]->onRedirection(ask_response));
   }
@@ -939,20 +924,11 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
               EXPECT_EQ(request.asArray()[0].asString(), "asking");
               return &dummy_poolrequest;
             }));
-    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-        .WillOnce(Invoke(
-            [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-              EXPECT_EQ(host_address, "192.168.0.1:5000");
-              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 2);
-              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "get");
-              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-              EXPECT_NE(&pool_requests_[i], nullptr);
-              return &pool_requests_[i];
-            }));
+    EXPECT_CALL(*conn_pool_,
+                makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                  Ref(*pool_callbacks_[i])))
+        .WillOnce(Return(&pool_requests_[i]));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
@@ -997,8 +973,7 @@ public:
     Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
     makeBulkStringArray(*request, request_strings);
 
-    std::vector<Common::Redis::RespValue> tmp_expected_requests(num_sets);
-    expected_requests_.swap(tmp_expected_requests);
+    expected_requests_.reserve(num_sets);
     pool_callbacks_.resize(num_sets);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_sets);
     pool_requests_.swap(tmp_pool_requests);
@@ -1006,20 +981,21 @@ public:
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
 
     for (uint32_t i = 0; i < num_sets; i++) {
-      makeBulkStringArray(expected_requests_[i], {"set", std::to_string(i), std::to_string(i)});
+      expected_requests_.push_back({"set", std::to_string(i), std::to_string(i)});
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
       }
-      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+      EXPECT_CALL(*conn_pool_,
+                  makeRequest(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   }
 
-  std::vector<Common::Redis::RespValue> expected_requests_;
+  std::vector<std::vector<std::string>> expected_requests_;
   std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
   std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
@@ -1129,22 +1105,11 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithMovedRedirection) {
   moved_response.type(Common::Redis::RespType::Error);
   moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
-    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-        .WillOnce(Invoke(
-            [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-              EXPECT_EQ(host_address, "192.168.0.1:5000");
-              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 3);
-              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "set");
-              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-              EXPECT_TRUE(request.asArray()[2].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[2].asString(), std::to_string(i));
-              EXPECT_NE(&pool_requests_[i], nullptr);
-              return &pool_requests_[i];
-            }));
+    EXPECT_CALL(*conn_pool_,
+                makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                  Ref(*pool_callbacks_[i])))
+        .WillOnce(Return(&pool_requests_[i]));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
@@ -1200,22 +1165,11 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithAskRedirection) {
               EXPECT_EQ(request.asArray()[0].asString(), "asking");
               return &dummy_poolrequest;
             }));
-    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-        .WillOnce(Invoke(
-            [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-              EXPECT_EQ(host_address, "192.168.0.1:5000");
-              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 3);
-              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "set");
-              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-              EXPECT_TRUE(request.asArray()[2].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[2].asString(), std::to_string(i));
-              EXPECT_NE(&pool_requests_[i], nullptr);
-              return &pool_requests_[i];
-            }));
+    EXPECT_CALL(*conn_pool_,
+                makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                  Ref(*pool_callbacks_[i])))
+        .WillOnce(Return(&pool_requests_[i]));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
@@ -1254,8 +1208,7 @@ public:
     Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
     makeBulkStringArray(*request, request_strings);
 
-    std::vector<Common::Redis::RespValue> tmp_expected_requests(num_commands);
-    expected_requests_.swap(tmp_expected_requests);
+    expected_requests_.reserve(num_commands);
     pool_callbacks_.resize(num_commands);
     std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_commands);
     pool_requests_.swap(tmp_pool_requests);
@@ -1263,20 +1216,21 @@ public:
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
 
     for (uint32_t i = 0; i < num_commands; i++) {
-      makeBulkStringArray(expected_requests_[i], {GetParam(), std::to_string(i)});
+      expected_requests_.push_back({GetParam(), std::to_string(i)});
       Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
       }
-      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+      EXPECT_CALL(*conn_pool_,
+                  makeRequest(std::to_string(i), CompositeArrayEq(expected_requests_[i]), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   }
 
-  std::vector<Common::Redis::RespValue> expected_requests_;
+  std::vector<std::vector<std::string>> expected_requests_;
   std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
   std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
@@ -1367,20 +1321,11 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithMovedRedirection) {
   moved_response.type(Common::Redis::RespType::Error);
   moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
-    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-        .WillOnce(Invoke(
-            [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-              EXPECT_EQ(host_address, "192.168.0.1:5000");
-              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 2);
-              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), GetParam());
-              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-              EXPECT_NE(&pool_requests_[i], nullptr);
-              return &pool_requests_[i];
-            }));
+    EXPECT_CALL(*conn_pool_,
+                makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                  Ref(*pool_callbacks_[i])))
+        .WillOnce(Return(&pool_requests_[i]));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
@@ -1437,20 +1382,11 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithAskRedirection) {
               EXPECT_EQ(request.asArray()[0].asString(), "asking");
               return &dummy_poolrequest;
             }));
-    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
-        .WillOnce(Invoke(
-            [&](const std::string& host_address, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-              EXPECT_EQ(host_address, "192.168.0.1:5000");
-              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 2);
-              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), GetParam());
-              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
-              EXPECT_NE(&pool_requests_[i], nullptr);
-              return &pool_requests_[i];
-            }));
+    EXPECT_CALL(*conn_pool_,
+                makeRequestToHost(Eq("192.168.0.1:5000"), CompositeArrayEq(expected_requests_[i]),
+                                  Ref(*pool_callbacks_[i])))
+        .WillOnce(Return(&pool_requests_[i]));
+    EXPECT_CALL(*conn_pool_, onRedirection());
     EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
@@ -1492,6 +1428,7 @@ public:
   }
 
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
   InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
                          store_, "redis.foo.", time_system_, true};
 };

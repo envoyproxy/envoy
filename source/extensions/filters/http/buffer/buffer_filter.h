@@ -61,10 +61,13 @@ public:
 
 private:
   void initConfig();
+  void maybeAddContentLength();
 
   BufferFilterConfigSharedPtr config_;
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Http::HeaderMap* request_headers_{};
+  uint64_t content_length_{};
   bool config_initialized_{};
 };
 

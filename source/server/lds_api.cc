@@ -11,6 +11,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -31,10 +33,16 @@ void LdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
-  Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  std::unique_ptr<Cleanup> maybe_eds_resume;
+  if (cm_.adsMux()) {
+    cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+    maybe_eds_resume = std::make_unique<Cleanup>(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
+  }
 
   bool any_applied = false;
+  listener_manager_.beginListenerUpdate();
+
   // We do all listener removals before adding the new listeners. This allows adding a new listener
   // with the same address as a listener that is to be removed. Do not change the order.
   for (const auto& removed_listener : removed_resources) {
@@ -44,14 +52,14 @@ void LdsApiImpl::onConfigUpdate(
     }
   }
 
-  std::vector<std::string> exception_msgs;
+  ListenerManager::FailureStates failure_state;
   std::unordered_set<std::string> listener_names;
+  std::string message;
   for (const auto& resource : added_resources) {
     envoy::api::v2::Listener listener;
     try {
-      listener = MessageUtil::anyConvert<envoy::api::v2::Listener>(resource.resource(),
-                                                                   validation_visitor_);
-      MessageUtil::validate(listener);
+      listener = MessageUtil::anyConvert<envoy::api::v2::Listener>(resource.resource());
+      MessageUtil::validate(listener, validation_visitor_);
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
@@ -63,17 +71,21 @@ void LdsApiImpl::onConfigUpdate(
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", listener.name(), e.what()));
+      failure_state.push_back(std::make_unique<envoy::admin::v2alpha::UpdateFailureState>());
+      auto& state = failure_state.back();
+      state->set_details(e.what());
+      state->mutable_failed_configuration()->PackFrom(resource);
+      absl::StrAppend(&message, listener.name(), ": ", e.what(), "\n");
     }
   }
+  listener_manager_.endListenerUpdate(std::move(failure_state));
 
   if (any_applied) {
     system_version_info_ = system_version_info;
   }
   init_target_.ready();
-  if (!exception_msgs.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+  if (!message.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}", message));
   }
 }
 
@@ -91,8 +103,7 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
     // Add this resource to our delta added/updated pile...
     envoy::api::v2::Resource* to_add = to_add_repeated.Add();
     const std::string listener_name =
-        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob, validation_visitor_)
-            .name();
+        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob).name();
     to_add->set_name(listener_name);
     to_add->set_version(version_info);
     to_add->mutable_resource()->MergeFrom(listener_blob);
@@ -108,7 +119,9 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
 }
 
-void LdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
+void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                      const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

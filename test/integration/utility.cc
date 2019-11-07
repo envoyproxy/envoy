@@ -24,6 +24,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
@@ -127,7 +129,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
   client_->connect();
 }
 
-RawConnectionDriver::~RawConnectionDriver() {}
+RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
 
@@ -140,9 +142,14 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   data_.append(data.toString());
   data.drain(data.length());
   read_end_stream_ = end_stream;
-  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) ||
+  if ((!data_to_wait_for_.empty() && absl::StartsWith(data_, data_to_wait_for_)) ||
       (exact_match_ == false && data_.find(data_to_wait_for_) != std::string::npos) || end_stream) {
     data_to_wait_for_.clear();
+    dispatcher_.exit();
+  }
+
+  if (wait_for_length_ && data_.size() >= length_to_wait_for_) {
+    wait_for_length_ = false;
     dispatcher_.exit();
   }
 

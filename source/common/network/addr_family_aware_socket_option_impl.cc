@@ -1,6 +1,7 @@
 #include "common/network/addr_family_aware_socket_option_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -25,10 +26,9 @@ absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
     // TODO(htuch): Figure out a way to obtain a consistent interface for IP
     // version from socket.
     if (socket.localAddress()) {
-      return absl::optional<Address::IpVersion>(getVersionFromAddress(socket.localAddress()));
+      return {getVersionFromAddress(socket.localAddress())};
     } else {
-      return absl::optional<Address::IpVersion>(
-          getVersionFromAddress(Address::addressFromFd(socket.ioHandle().fd())));
+      return {getVersionFromAddress(Address::addressFromFd(socket.ioHandle().fd()))};
     }
   } catch (const EnvoyException&) {
     // Ignore, we get here because we failed in getsockname().
@@ -48,15 +48,15 @@ getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
 
   // If the FD is v4, we can only try the IPv4 variant.
   if (*version == Network::Address::IpVersion::v4) {
-    return absl::optional<std::reference_wrapper<SocketOptionImpl>>(ipv4_option);
+    return {ipv4_option};
   }
   // If the FD is v6, we first try the IPv6 variant if the platform supports it and fallback to the
   // IPv4 variant otherwise.
   ASSERT(*version == Network::Address::IpVersion::v6);
   if (ipv6_option.isSupported()) {
-    return absl::optional<std::reference_wrapper<SocketOptionImpl>>(ipv6_option);
+    return {ipv6_option};
   }
-  return absl::optional<std::reference_wrapper<SocketOptionImpl>>(ipv4_option);
+  return {ipv4_option};
 }
 
 } // namespace

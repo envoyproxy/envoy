@@ -196,7 +196,7 @@ public:
   /**
    * @return the server-wide process context.
    */
-  virtual ProcessContext& processContext() PURE;
+  virtual OptProcessContextRef processContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
@@ -207,7 +207,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return the time source used for the server.
@@ -220,10 +220,15 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration
+   * @return ProtobufMessage::ValidationContext& validation context for configuration
    *         messages.
    */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
+   * @return Configuration::ServerFactoryContext& factory context for filters.
+   */
+  virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
 };
 
 } // namespace Server

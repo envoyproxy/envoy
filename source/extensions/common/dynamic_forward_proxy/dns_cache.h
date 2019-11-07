@@ -24,6 +24,17 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() PURE;
 
   /**
+   * Returns the host that was actually resolved via DNS. If port was originally specified it will
+   * be stripped from this return value.
+   */
+  virtual const std::string& resolvedHost() PURE;
+
+  /**
+   * Returns whether the original host is an IP address.
+   */
+  virtual bool isIpAddress() PURE;
+
+  /**
    * Indicates that the host has been used and should not be purged depending on any configured
    * TTL policy
    */
@@ -132,6 +143,11 @@ public:
    * @return a handle that on destruction will de-register the callbacks.
    */
   virtual AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) PURE;
+
+  /**
+   * @return all hosts currently stored in the cache.
+   */
+  virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

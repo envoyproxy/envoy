@@ -43,7 +43,8 @@ namespace Router {
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
   COUNTER(rq_total)                                                                                \
-  COUNTER(rq_reset_after_downstream_response_started)
+  COUNTER(rq_reset_after_downstream_response_started)                                              \
+  COUNTER(rq_retry_skipped_request_not_complete)
 // clang-format on
 
 /**
@@ -67,10 +68,55 @@ public:
     bool hedge_on_per_try_timeout_;
   };
 
+  class StrictHeaderChecker {
+  public:
+    struct HeaderCheckResult {
+      bool valid_ = true;
+      const Http::HeaderEntry* entry_;
+    };
+
+    /**
+     * Determine whether a given header's value passes the strict validation
+     * defined for that header.
+     * @param headers supplies the headers from which to get the target header.
+     * @param target_header is the header to be validated.
+     * @return HeaderCheckResult containing the entry for @param target_header
+     *         and valid_ set to FALSE if @param target_header is set to an
+     *         invalid value. If @param target_header doesn't appear in
+     *         @param headers, return a result with valid_ set to TRUE.
+     */
+    static const HeaderCheckResult checkHeader(Http::HeaderMap& headers,
+                                               const Http::LowerCaseString& target_header);
+
+    using ParseRetryFlagsFunc = std::function<std::pair<uint32_t, bool>(absl::string_view)>;
+
+  private:
+    static HeaderCheckResult hasValidRetryFields(Http::HeaderEntry* header_entry,
+                                                 const ParseRetryFlagsFunc& parse_fn) {
+      HeaderCheckResult r;
+      if (header_entry) {
+        const auto flags_and_validity = parse_fn(header_entry->value().getStringView());
+        r.valid_ = flags_and_validity.second;
+        r.entry_ = header_entry;
+      }
+      return r;
+    }
+
+    static HeaderCheckResult isInteger(Http::HeaderEntry* header_entry) {
+      HeaderCheckResult r;
+      if (header_entry) {
+        uint64_t out;
+        r.valid_ = absl::SimpleAtoi(header_entry->value().getStringView(), &out);
+        r.entry_ = header_entry;
+      }
+      return r;
+    }
+  };
+
   /**
-   * Set the :scheme header based on the properties of the upstream cluster.
+   * Set the :scheme header based on whether the underline transport is secure.
    */
-  static void setUpstreamScheme(Http::HeaderMap& headers, const Upstream::ClusterInfo& cluster);
+  static void setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport);
 
   /**
    * Determine whether a request should be shadowed.
@@ -94,7 +140,11 @@ public:
    */
   static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
                                   bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
-                                  bool per_try_timeout_hedging_enabled);
+                                  bool per_try_timeout_hedging_enabled,
+                                  bool respect_expected_rq_timeout);
+
+  static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+                                  TimeoutData& timeout);
 
   /**
    * Determine the final hedging settings after applying randomized behavior.
@@ -115,15 +165,25 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
+               bool respect_expected_rq_timeout,
+               const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        suppress_envoy_headers_(suppress_envoy_headers), http_context_(http_context),
+        suppress_envoy_headers_(suppress_envoy_headers),
+        respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
         stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
         empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source) {}
+        time_source_(time_source) {
+    if (!strict_check_headers.empty()) {
+      strict_check_headers_ = std::make_unique<HeaderVector>();
+      for (const auto& header : strict_check_headers) {
+        strict_check_headers_->emplace_back(Http::LowerCaseString(header));
+      }
+    }
+  }
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -132,11 +192,14 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
+                     config.respect_expected_rq_timeout(), config.strict_check_headers(),
                      context.api().timeSource(), context.httpContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
+  using HeaderVector = std::vector<Http::LowerCaseString>;
+  using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
@@ -150,6 +213,9 @@ public:
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
+  const bool respect_expected_rq_timeout_;
+  // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
+  HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatNamePool stat_name_pool_;
@@ -176,7 +242,7 @@ public:
         downstream_end_stream_(false), do_shadowing_(false), is_retry_(false),
         attempting_internal_redirect_with_complete_stream_(false) {}
 
-  ~Filter();
+  ~Filter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -185,6 +251,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
@@ -265,6 +332,10 @@ public:
     return callbacks_->getUpstreamSocketOptions();
   }
 
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return transport_socket_options_;
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
@@ -298,11 +369,12 @@ private:
                            public Http::ConnectionPool::Callbacks,
                            public LinkedObject<UpstreamRequest> {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
-    ~UpstreamRequest();
+    ~UpstreamRequest() override;
 
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);
     void encodeTrailers(const Http::HeaderMap& trailers);
+    void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
 
     void resetStream();
     void setupPerTryTimeout();
@@ -366,7 +438,8 @@ private:
                        absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
-                     Upstream::HostDescriptionConstSharedPtr host) override;
+                     Upstream::HostDescriptionConstSharedPtr host,
+                     const StreamInfo::StreamInfo& info) override;
 
     void setRequestEncoder(Http::StreamEncoder& request_encoder);
     void clearRequestEncoder();
@@ -400,6 +473,7 @@ private:
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
     Http::HeaderMapPtr upstream_trailers_;
+    Http::MetadataMapVector downstream_metadata_map_vector_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -465,6 +539,7 @@ private:
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
+  // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
   bool setupRetry();
   bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
@@ -472,8 +547,9 @@ private:
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
-  void handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
-                                   UpstreamRequest& upstream_request, bool end_stream);
+  void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                   UpstreamRequest& upstream_request, bool end_stream,
+                                   uint64_t grpc_to_http_status);
   TimeSource& timeSource() { return config_.timeSource(); }
   Http::Context& httpContext() { return config_.http_context_; }
 
@@ -496,7 +572,7 @@ private:
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
-  uint32_t buffer_limit_{0};
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::HeaderMap&)> modify_headers_;
 
@@ -511,6 +587,8 @@ private:
   bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
+
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 };
 
 class ProdFilter : public Filter {

@@ -28,16 +28,15 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
     case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kFromPlugin: {
       if (credential.from_plugin().name() == GrpcCredentialsNames::get().FileBasedMetadata) {
         FileBasedMetadataGrpcCredentialsFactory file_based_metadata_credentials_factory;
-        // TODO(htuch): This should probably follow the standard metadata validation pattern, but
-        // needs error handling, since this happens at runtime, not config time, and we need to
-        // catch any validation exceptions.
+        // We don't deal with validation failures here at runtime today, see
+        // https://github.com/envoyproxy/envoy/issues/8010.
         const Envoy::ProtobufTypes::MessagePtr file_based_metadata_config_message =
             Envoy::Config::Utility::translateToFactoryConfig(
                 credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
                 file_based_metadata_credentials_factory);
         const auto& file_based_metadata_config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig&>(
-            *file_based_metadata_config_message);
+            *file_based_metadata_config_message, ProtobufMessage::getNullValidationVisitor());
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<FileBasedMetadataAuthenticator>(file_based_metadata_config, api));
         if (call_creds == nullptr) {

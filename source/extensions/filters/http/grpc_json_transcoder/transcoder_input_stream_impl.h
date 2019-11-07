@@ -13,8 +13,8 @@ class TranscoderInputStreamImpl : public Buffer::ZeroCopyInputStreamImpl,
                                   public google::grpc::transcoding::TranscoderInputStream {
 public:
   // TranscoderInputStream
-  virtual int64_t BytesAvailable() const override;
-  virtual bool Finished() const override;
+  int64_t BytesAvailable() const override;
+  bool Finished() const override;
 };
 
 } // namespace GrpcJsonTranscoder

@@ -29,7 +29,7 @@ namespace Network {
 class MockActiveDnsQuery : public ActiveDnsQuery {
 public:
   MockActiveDnsQuery();
-  ~MockActiveDnsQuery();
+  ~MockActiveDnsQuery() override;
 
   // Network::ActiveDnsQuery
   MOCK_METHOD0(cancel, void());
@@ -38,7 +38,7 @@ public:
 class MockDnsResolver : public DnsResolver {
 public:
   MockDnsResolver();
-  ~MockDnsResolver();
+  ~MockDnsResolver() override;
 
   // Network::DnsResolver
   MOCK_METHOD3(resolve, ActiveDnsQuery*(const std::string& dns_name,
@@ -50,7 +50,7 @@ public:
 class MockAddressResolver : public Address::Resolver {
 public:
   MockAddressResolver();
-  ~MockAddressResolver();
+  ~MockAddressResolver() override;
 
   MOCK_METHOD1(resolve,
                Address::InstanceConstSharedPtr(const envoy::api::v2::core::SocketAddress&));
@@ -60,7 +60,7 @@ public:
 class MockReadFilterCallbacks : public ReadFilterCallbacks {
 public:
   MockReadFilterCallbacks();
-  ~MockReadFilterCallbacks();
+  ~MockReadFilterCallbacks() override;
 
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(continueReading, void());
@@ -75,7 +75,7 @@ public:
 class MockReadFilter : public ReadFilter {
 public:
   MockReadFilter();
-  ~MockReadFilter();
+  ~MockReadFilter() override;
 
   MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(onNewConnection, FilterStatus());
@@ -87,7 +87,7 @@ public:
 class MockWriteFilterCallbacks : public WriteFilterCallbacks {
 public:
   MockWriteFilterCallbacks();
-  ~MockWriteFilterCallbacks();
+  ~MockWriteFilterCallbacks() override;
 
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD2(injectWriteDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
@@ -98,7 +98,7 @@ public:
 class MockWriteFilter : public WriteFilter {
 public:
   MockWriteFilter();
-  ~MockWriteFilter();
+  ~MockWriteFilter() override;
 
   MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(initializeWriteFilterCallbacks, void(WriteFilterCallbacks& callbacks));
@@ -109,7 +109,7 @@ public:
 class MockFilter : public Filter {
 public:
   MockFilter();
-  ~MockFilter();
+  ~MockFilter() override;
 
   MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(onNewConnection, FilterStatus());
@@ -124,21 +124,17 @@ public:
 class MockListenerCallbacks : public ListenerCallbacks {
 public:
   MockListenerCallbacks();
-  ~MockListenerCallbacks();
+  ~MockListenerCallbacks() override;
 
-  void onAccept(ConnectionSocketPtr&& socket, bool redirected) override {
-    onAccept_(socket, redirected);
-  }
-  void onNewConnection(ConnectionPtr&& conn) override { onNewConnection_(conn); }
+  void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 
-  MOCK_METHOD2(onAccept_, void(ConnectionSocketPtr& socket, bool redirected));
-  MOCK_METHOD1(onNewConnection_, void(ConnectionPtr& conn));
+  MOCK_METHOD1(onAccept_, void(ConnectionSocketPtr& socket));
 };
 
 class MockUdpListenerCallbacks : public UdpListenerCallbacks {
 public:
   MockUdpListenerCallbacks();
-  ~MockUdpListenerCallbacks();
+  ~MockUdpListenerCallbacks() override;
 
   void onData(UdpRecvData& data) override { onData_(data); }
 
@@ -158,7 +154,7 @@ public:
 class MockDrainDecision : public DrainDecision {
 public:
   MockDrainDecision();
-  ~MockDrainDecision();
+  ~MockDrainDecision() override;
 
   MOCK_CONST_METHOD0(drainClose, bool());
 };
@@ -166,7 +162,7 @@ public:
 class MockListenerFilter : public ListenerFilter {
 public:
   MockListenerFilter();
-  ~MockListenerFilter();
+  ~MockListenerFilter() override;
 
   MOCK_METHOD1(onAccept, Network::FilterStatus(ListenerFilterCallbacks&));
 };
@@ -174,7 +170,7 @@ public:
 class MockListenerFilterManager : public ListenerFilterManager {
 public:
   MockListenerFilterManager();
-  ~MockListenerFilterManager();
+  ~MockListenerFilterManager() override;
 
   void addAcceptFilter(ListenerFilterPtr&& filter) override { addAcceptFilter_(filter); }
 
@@ -184,7 +180,7 @@ public:
 class MockFilterChain : public FilterChain {
 public:
   MockFilterChain();
-  ~MockFilterChain();
+  ~MockFilterChain() override;
 
   // Network::FilterChain
   MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory&());
@@ -194,7 +190,7 @@ public:
 class MockFilterChainManager : public FilterChainManager {
 public:
   MockFilterChainManager();
-  ~MockFilterChainManager();
+  ~MockFilterChainManager() override;
 
   // Network::FilterChainManager
   MOCK_CONST_METHOD1(findFilterChain, const FilterChain*(const ConnectionSocket& socket));
@@ -203,7 +199,7 @@ public:
 class MockFilterChainFactory : public FilterChainFactory {
 public:
   MockFilterChainFactory();
-  ~MockFilterChainFactory();
+  ~MockFilterChainFactory() override;
 
   MOCK_METHOD2(createNetworkFilterChain,
                bool(Connection& connection,
@@ -216,7 +212,7 @@ public:
 class MockListenSocket : public Socket {
 public:
   MockListenSocket();
-  ~MockListenSocket() override {}
+  ~MockListenSocket() override = default;
 
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
@@ -227,6 +223,7 @@ public:
   MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
+  MOCK_CONST_METHOD0(isOpen, bool());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
@@ -234,12 +231,13 @@ public:
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
+  bool socket_is_open_ = true;
 };
 
 class MockSocketOption : public Socket::Option {
 public:
   MockSocketOption();
-  ~MockSocketOption();
+  ~MockSocketOption() override;
 
   MOCK_CONST_METHOD2(setOption,
                      bool(Socket&, envoy::api::v2::core::SocketOption::SocketState state));
@@ -252,7 +250,7 @@ public:
 class MockConnectionSocket : public ConnectionSocket {
 public:
   MockConnectionSocket();
-  ~MockConnectionSocket() override {}
+  ~MockConnectionSocket() override;
 
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
@@ -276,16 +274,18 @@ public:
   MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
+  MOCK_CONST_METHOD0(isOpen, bool());
 
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
+  bool is_closed_;
 };
 
 class MockListenerFilterCallbacks : public ListenerFilterCallbacks {
 public:
   MockListenerFilterCallbacks();
-  ~MockListenerFilterCallbacks();
+  ~MockListenerFilterCallbacks() override;
 
   MOCK_METHOD0(socket, ConnectionSocket&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
@@ -297,7 +297,7 @@ public:
 class MockListenerConfig : public ListenerConfig {
 public:
   MockListenerConfig();
-  ~MockListenerConfig();
+  ~MockListenerConfig() override;
 
   MOCK_METHOD0(filterChainManager, FilterChainManager&());
   MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
@@ -307,9 +307,16 @@ public:
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(listenerFiltersTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(continueOnListenerFiltersTimeout, bool());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_METHOD0(udpListenerFactory, const Network::ActiveUdpListenerFactory*());
+  MOCK_METHOD0(connectionBalancer, ConnectionBalancer&());
+
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   testing::NiceMock<MockListenSocket> socket_;
@@ -320,7 +327,7 @@ public:
 class MockListener : public Listener {
 public:
   MockListener();
-  ~MockListener();
+  ~MockListener() override;
 
   MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD0(enable, void());
@@ -330,23 +337,24 @@ public:
 class MockConnectionHandler : public ConnectionHandler {
 public:
   MockConnectionHandler();
-  ~MockConnectionHandler();
+  ~MockConnectionHandler() override;
 
   MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_METHOD0(incNumConnections, void());
+  MOCK_METHOD0(decNumConnections, void());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
-  MOCK_METHOD1(findListenerByAddress,
-               Network::Listener*(const Network::Address::Instance& address));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
   MOCK_METHOD1(stopListeners, void(uint64_t listener_tag));
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(disableListeners, void());
   MOCK_METHOD0(enableListeners, void());
+  MOCK_METHOD0(statPrefix, const std::string&());
 };
 
 class MockIp : public Address::Ip {
 public:
   MockIp();
-  ~MockIp();
+  ~MockIp() override;
 
   MOCK_CONST_METHOD0(addressAsString, const std::string&());
   MOCK_CONST_METHOD0(isAnyAddress, bool());
@@ -361,7 +369,7 @@ class MockResolvedAddress : public Address::Instance {
 public:
   MockResolvedAddress(const std::string& logical, const std::string& physical)
       : logical_(logical), physical_(physical) {}
-  ~MockResolvedAddress();
+  ~MockResolvedAddress() override;
 
   bool operator==(const Address::Instance& other) const override {
     return asString() == other.asString();
@@ -376,43 +384,17 @@ public:
   MOCK_CONST_METHOD0(sockAddrLen, socklen_t());
 
   const std::string& asString() const override { return physical_; }
+  absl::string_view asStringView() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
 
   const std::string logical_;
   const std::string physical_;
 };
 
-class MockTransportSocket : public TransportSocket {
-public:
-  MockTransportSocket();
-  ~MockTransportSocket();
-
-  MOCK_METHOD1(setTransportSocketCallbacks, void(TransportSocketCallbacks& callbacks));
-  MOCK_CONST_METHOD0(protocol, std::string());
-  MOCK_CONST_METHOD0(failureReason, absl::string_view());
-  MOCK_METHOD0(canFlushClose, bool());
-  MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
-  MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
-  MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
-  MOCK_METHOD0(onConnected, void());
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
-
-  TransportSocketCallbacks* callbacks_{};
-};
-
-class MockTransportSocketFactory : public TransportSocketFactory {
-public:
-  MockTransportSocketFactory();
-  ~MockTransportSocketFactory();
-
-  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD1(createTransportSocket, TransportSocketPtr(TransportSocketOptionsSharedPtr));
-};
-
 class MockTransportSocketCallbacks : public TransportSocketCallbacks {
 public:
   MockTransportSocketCallbacks();
-  ~MockTransportSocketCallbacks();
+  ~MockTransportSocketCallbacks() override;
 
   MOCK_METHOD0(ioHandle, IoHandle&());
   MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
@@ -427,7 +409,7 @@ public:
 class MockUdpListener : public UdpListener {
 public:
   MockUdpListener();
-  ~MockUdpListener();
+  ~MockUdpListener() override;
 
   MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD0(enable, void());
@@ -440,7 +422,7 @@ public:
 class MockUdpReadFilterCallbacks : public UdpReadFilterCallbacks {
 public:
   MockUdpReadFilterCallbacks();
-  ~MockUdpReadFilterCallbacks();
+  ~MockUdpReadFilterCallbacks() override;
 
   MOCK_METHOD0(udpListener, UdpListener&());
 
@@ -450,7 +432,7 @@ public:
 class MockUdpListenerReadFilter : public UdpListenerReadFilter {
 public:
   MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks);
-  ~MockUdpListenerReadFilter();
+  ~MockUdpListenerReadFilter() override;
 
   MOCK_METHOD1(onData, void(UdpRecvData&));
 };
@@ -458,11 +440,22 @@ public:
 class MockUdpListenerFilterManager : public UdpListenerFilterManager {
 public:
   MockUdpListenerFilterManager();
-  ~MockUdpListenerFilterManager();
+  ~MockUdpListenerFilterManager() override;
 
   void addReadFilter(UdpListenerReadFilterPtr&& filter) override { addReadFilter_(filter); }
 
   MOCK_METHOD1(addReadFilter_, void(Network::UdpListenerReadFilterPtr&));
+};
+
+class MockConnectionBalancer : public ConnectionBalancer {
+public:
+  MockConnectionBalancer();
+  ~MockConnectionBalancer() override;
+
+  MOCK_METHOD1(registerHandler, void(BalancedConnectionHandler& handler));
+  MOCK_METHOD1(unregisterHandler, void(BalancedConnectionHandler& handler));
+  MOCK_METHOD1(pickTargetHandler,
+               BalancedConnectionHandler&(BalancedConnectionHandler& current_handler));
 };
 
 } // namespace Network

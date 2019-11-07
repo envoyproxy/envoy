@@ -17,7 +17,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
 
@@ -46,7 +45,7 @@ public:
   }
 
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
-  // all the load balancers have equivalent functonality for failover host sets.
+  // all the load balancers have equivalent functionality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   NiceMock<MockPrioritySet> priority_set_;

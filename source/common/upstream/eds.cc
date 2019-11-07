@@ -21,6 +21,12 @@ EdsClusterImpl::EdsClusterImpl(
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
+  if (eds_config.config_source_specifier_case() ==
+      envoy::api::v2::core::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+    initialize_phase_ = InitializePhase::Primary;
+  } else {
+    initialize_phase_ = InitializePhase::Secondary;
+  }
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config,
@@ -101,9 +107,9 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto cluster_load_assignment = MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(
-      resources[0], validation_visitor_);
-  MessageUtil::validate(cluster_load_assignment);
+  auto cluster_load_assignment =
+      MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
+  MessageUtil::validate(cluster_load_assignment, validation_visitor_);
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
@@ -251,8 +257,9 @@ bool EdsClusterImpl::updateHostsPerLocality(
   return false;
 }
 
-void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
-  UNREFERENCED_PARAMETER(e);
+void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                          const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }
@@ -267,7 +274,7 @@ EdsClusterFactory::createClusterImpl(
   }
 
   return std::make_pair(
-      std::make_shared<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
+      std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
                                        std::move(stats_scope), context.addedViaApi()),
       nullptr);
 }

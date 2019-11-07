@@ -12,7 +12,7 @@ namespace Aws {
 
 class EnvironmentRegionProviderTest : public testing::Test {
 public:
-  virtual ~EnvironmentRegionProviderTest() { TestEnvironment::unsetEnvVar("AWS_REGION"); }
+  ~EnvironmentRegionProviderTest() override { TestEnvironment::unsetEnvVar("AWS_REGION"); }
 
   EnvironmentRegionProvider provider_;
 };

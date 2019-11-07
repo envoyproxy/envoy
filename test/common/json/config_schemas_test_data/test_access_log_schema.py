@@ -5,7 +5,7 @@ ACCESS_LOG_BLOB = {
     "access_log": [{
         "filter": {
             "type":
-            "logical_and",
+                "logical_and",
             "filters": [{
                 "type": "not_healthcheck"
             }, {
@@ -14,32 +14,30 @@ ACCESS_LOG_BLOB = {
             }]
         },
         "path": "/var/log/envoy/access.log"
-    },
-                   {
-                       "filter": {
-                           "type":
-                           "logical_or",
-                           "filters": [{
-                               "runtime_key": "access_log.access_error.status",
-                               "type": "status_code",
-                               "value": 500,
-                               "op": ">="
-                           }, {
-                               "type": "status_code",
-                               "value": 429,
-                               "op": "="
-                           },
-                                       {
-                                           "runtime_key": "access_log.access_error.duration",
-                                           "type": "duration",
-                                           "value": 1000,
-                                           "op": ">="
-                                       }, {
-                                           "type": "traceable_request"
-                                       }]
-                       },
-                       "path": "/var/log/envoy/access_error.log"
-                   }]
+    }, {
+        "filter": {
+            "type":
+                "logical_or",
+            "filters": [{
+                "runtime_key": "access_log.access_error.status",
+                "type": "status_code",
+                "value": 500,
+                "op": ">="
+            }, {
+                "type": "status_code",
+                "value": 429,
+                "op": "="
+            }, {
+                "runtime_key": "access_log.access_error.duration",
+                "type": "duration",
+                "value": 1000,
+                "op": ">="
+            }, {
+                "type": "traceable_request"
+            }]
+        },
+        "path": "/var/log/envoy/access_error.log"
+    }]
 }
 
 

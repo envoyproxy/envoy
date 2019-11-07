@@ -7,8 +7,6 @@
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
-
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
 namespace Envoy {
@@ -27,19 +25,10 @@ Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb
-BufferFilterFactory::createFilterFactory(const Json::Object& json_config,
-                                         const std::string& stats_prefix,
-                                         Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::buffer::v2::Buffer proto_config;
-  Config::FilterJson::translateBufferFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
-}
-
 Router::RouteSpecificFilterConfigConstSharedPtr
 BufferFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config,
-    Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const BufferFilterSettings>(proto_config);
 }
 

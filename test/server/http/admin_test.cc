@@ -14,12 +14,14 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -34,6 +36,7 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::EndsWith;
 using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -44,13 +47,15 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(symbol_table_) {
+  AdminStatsTest()
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
@@ -63,10 +68,10 @@ public:
                                   true /*pretty_print*/);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::HeapStatDataAllocator alloc_;
+  Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
@@ -87,6 +92,17 @@ public:
   Http::TestHeaderMapImpl request_headers_;
 };
 
+// Check default implementations the admin class picks up.
+TEST_P(AdminFilterTest, MiscFunctions) {
+  EXPECT_EQ(false, admin_.preserveExternalRequestId());
+  Http::MockFilterChainFactoryCallbacks mock_filter_chain_factory_callbacks;
+  EXPECT_EQ(false,
+            admin_.createUpgradeFilterChain("", nullptr, mock_filter_chain_factory_callbacks));
+  EXPECT_TRUE(nullptr != admin_.scopedRouteConfigProvider());
+  EXPECT_EQ(Http::ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
+            admin_.serverHeaderTransformation());
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -95,8 +111,8 @@ TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -241,8 +257,8 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
@@ -339,8 +355,8 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -439,9 +455,12 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1_matches"); // Will match, be used, and print
-  Stats::Histogram& h2 = store_->histogram("h2_matches"); // Will match but not be used
-  Stats::Histogram& h3 = store_->histogram("h3_not");     // Will be used but not match
+  Stats::Histogram& h1 = store_->histogram(
+      "h1_matches", Stats::Histogram::Unit::Unspecified); // Will match, be used, and print
+  Stats::Histogram& h2 = store_->histogram(
+      "h2_matches", Stats::Histogram::Unit::Unspecified); // Will match but not be used
+  Stats::Histogram& h3 = store_->histogram(
+      "h3_not", Stats::Histogram::Unit::Unspecified); // Will be used but not match
 
   EXPECT_EQ("h1_matches", h1.name());
   EXPECT_EQ("h2_matches", h2.name());
@@ -557,6 +576,8 @@ TEST_P(AdminFilterTest, Body) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl data("hello");
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
   EXPECT_CALL(callbacks_, addDecodedData(_, false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(data, true));
@@ -584,7 +605,7 @@ public:
         admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
         admin_filter_(admin_) {
     admin_.startHttpListener("/dev/null", address_out_path_,
-                             Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
                              listener_scope_.createScope("listener.admin."));
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
@@ -712,6 +733,37 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
+TEST_P(AdminInstanceTest, StatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_LOG_CONTAINS(
+      "error", "Invalid regex: ",
+      EXPECT_EQ(Http::Code::BadRequest, getCallback("/stats?filter=*.test", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
+}
+
+TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl data;
+  EXPECT_LOG_CONTAINS(
+      "error", ": *.ptest",
+      EXPECT_EQ(Http::Code::BadRequest,
+                getCallback("/stats?format=prometheus&filter=*.ptest", header_map, data)));
+
+  // Note: depending on the library, the detailed error message might be one of:
+  //   "One of *?+{ was not preceded by a valid regular expression."
+  //   "regex_error"
+  // but we always precede by 'Invalid regex: "'.
+  EXPECT_THAT(data.toString(), StartsWith("Invalid regex: \""));
+  EXPECT_THAT(data.toString(), EndsWith("\"\n"));
+}
+
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
@@ -725,7 +777,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",
       admin_bad_address_out_path.startHttpListener(
-          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
+          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
           listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
@@ -900,8 +952,8 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(*loader, factory_context);
+  envoy::api::v2::auth::UpstreamTlsContext config;
+  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
       server_.sslContextManager().createSslClientContext(store, cfg));
@@ -931,11 +983,11 @@ TEST_P(AdminInstanceTest, Runtime) {
   Runtime::MockLoader loader;
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
-  Runtime::Snapshot::EntryMap entries2{{"string_key", {"override", {}, {}, {}}},
-                                       {"extra_key", {"bar", {}, {}, {}}}};
-  Runtime::Snapshot::EntryMap entries1{{"string_key", {"foo", {}, {}, {}}},
-                                       {"int_key", {"1", 1, {}, {}}},
-                                       {"other_key", {"bar", {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries2{{"string_key", {"override", {}, {}, {}, {}}},
+                                       {"extra_key", {"bar", {}, {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries1{{"string_key", {"foo", {}, {}, {}, {}}},
+                                       {"int_key", {"1", 1, {}, {}, {}}},
+                                       {"other_key", {"bar", {}, {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -1075,14 +1127,27 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));
 
   // Add stats in random order and validate that they come in order.
-  Stats::IsolatedStoreImpl store;
-  store.counter("test_counter").add(10);
-  store.counter("rest_counter").add(10);
-  store.counter("arest_counter").add(5);
-  store.gauge("test_gauge", Stats::Gauge::ImportMode::Accumulate).set(11);
-  store.gauge("atest_gauge", Stats::Gauge::ImportMode::Accumulate).set(10);
-  ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
-  ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
+  Stats::PrimitiveCounter test_counter;
+  test_counter.add(10);
+  Stats::PrimitiveCounter rest_counter;
+  rest_counter.add(10);
+  Stats::PrimitiveCounter arest_counter;
+  arest_counter.add(5);
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters = {
+      {"arest_counter", arest_counter},
+      {"rest_counter", rest_counter},
+      {"test_counter", test_counter},
+  };
+  Stats::PrimitiveGauge test_gauge;
+  test_gauge.set(11);
+  Stats::PrimitiveGauge atest_gauge;
+  atest_gauge.set(10);
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges = {
+      {"atest_gauge", atest_gauge},
+      {"test_gauge", test_gauge},
+  };
+  ON_CALL(*host, counters()).WillByDefault(Invoke([&counters]() { return counters; }));
+  ON_CALL(*host, gauges()).WillByDefault(Invoke([&gauges]() { return gauges; }));
 
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
       .WillByDefault(Return(true));
@@ -1235,6 +1300,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   }));
   NiceMock<Init::MockManager> initManager;
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+  ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
 
   {
     Http::HeaderMapImpl response_headers;
@@ -1250,6 +1316,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     // values such as timestamps + Envoy version are tricky to test for.
     TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+    EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
   }
@@ -1336,6 +1403,20 @@ TEST_P(AdminInstanceTest, GetRequestJson) {
               HasSubstr("application/json"));
 }
 
+TEST_P(AdminInstanceTest, RecentLookups) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+
+  // Recent lookup tracking is disabled by default.
+  EXPECT_EQ(Http::Code::OK, admin_.request("/stats/recentlookups", "GET", response_headers, body));
+  EXPECT_THAT(body, HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
+
+  // We can't test RecentLookups in admin unit tests as it doesn't work with a
+  // fake symbol table. However we cover this solidly in integration tests.
+}
+
 TEST_P(AdminInstanceTest, PostRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
@@ -1372,15 +1453,16 @@ private:
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
+  PrometheusStatsFormatterTest()
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {}
 
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    Stats::StatNameManagedStorage storage(name, *symbol_table_);
     counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
   }
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    Stats::StatNameManagedStorage storage(name, *symbol_table_);
     gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
                                        Stats::Gauge::ImportMode::Accumulate));
   }
@@ -1389,8 +1471,13 @@ protected:
     histograms_.push_back(histogram);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
-  Stats::HeapStatDataAllocator alloc_;
+  using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;
+  MockHistogramSharedPtr makeHistogram() {
+    return MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
+  }
+
+  Stats::SymbolTablePtr symbol_table_;
+  Stats::AllocatorImpl alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
   std::vector<Stats::ParentHistogramSharedPtr> histograms_;
@@ -1473,7 +1560,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram = makeHistogram();
   histogram->name_ = "histogram1";
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
@@ -1526,7 +1613,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram = makeHistogram();
   histogram->name_ = "histogram1";
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
@@ -1578,8 +1665,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1638,8 +1726,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1685,8 +1774,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = false;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1724,8 +1814,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 

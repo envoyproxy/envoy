@@ -8,7 +8,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
@@ -25,7 +24,9 @@ void checkMatcher(
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
     const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata()) {
-  EXPECT_EQ(expected, matcher.matches(connection, headers, metadata));
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_EQ(expected, matcher.matches(connection, headers, info));
 }
 
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
@@ -190,11 +191,11 @@ TEST(PortMatcher, PortMatcher) {
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnectionInfo ssl;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
 
   const std::vector<std::string> sans{"foo", "baz"};
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   // We should get the first URI SAN.
   envoy::config::rbac::v2::Principal_Authenticated auth;
@@ -205,14 +206,38 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   checkMatcher(AuthenticatedMatcher(auth), false, conn);
 }
 
+TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
+  Envoy::Network::MockConnection conn;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+
+  const std::vector<std::string> uri_sans;
+  const std::vector<std::string> dns_sans{"foo", "baz"};
+
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+
+  // We should get the first DNS SAN as URI SAN is not available.
+  envoy::config::rbac::v2::Principal_Authenticated auth;
+  auth.mutable_principal_name()->set_exact("foo");
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.mutable_principal_name()->set_exact("bar");
+  checkMatcher(AuthenticatedMatcher(auth), false, conn);
+}
+
 TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnectionInfo ssl;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
 
   const std::vector<std::string> sans;
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
-  EXPECT_CALL(ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
+  std::string peer_subject = "bar";
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(peer_subject));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   envoy::config::rbac::v2::Principal_Authenticated auth;
   auth.mutable_principal_name()->set_exact("bar");
@@ -224,10 +249,10 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnectionInfo ssl;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
   const std::vector<std::string> sans{"foo", "baz"};
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   envoy::config::rbac::v2::Principal_Authenticated auth;
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
@@ -270,16 +295,16 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
 
-  RBAC::PolicyMatcher matcher(policy);
+  RBAC::PolicyMatcher matcher(policy, nullptr);
 
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnectionInfo ssl;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
 
   const std::vector<std::string> sans{"bar", "baz"};
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return(sans));
-  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return(sans));
+  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(ssl));
   EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(matcher, true, conn);

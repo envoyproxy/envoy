@@ -24,9 +24,16 @@ envoy_sh_test(
     srcs = ["envoy_static_test.sh"],
     coverage = False,
     data = ["//source/exe:envoy-static"],
-    # NOTE: In some environments, ASAN causes dynamic linking no matter what, so don't run this
-    # test when doing ASAN.
-    tags = ["no_asan"],
+    # Sanitizers doesn't like statically linked lib(std)c++ and libgcc, skip this test in that context.
+    tags = ["no_san"],
+)
+
+envoy_sh_test(
+    name = "pie_test",
+    srcs = ["pie_test.sh"],
+    coverage = False,
+    data = ["//source/exe:envoy-static"],
+    tags = ["nofips"],
 )
 
 envoy_sh_test(
@@ -49,16 +56,6 @@ envoy_cc_test(
         "//source/exe:envoy_main_common_lib",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "signals_test",
-    srcs = ["signals_test.cc"],
-    tags = ["backtrace"],
-    deps = [
-        "//source/exe:sigaction_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 

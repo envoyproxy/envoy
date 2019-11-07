@@ -10,9 +10,11 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/matchers.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
@@ -101,14 +103,9 @@ public:
   virtual ~CorsPolicy() = default;
 
   /**
-   * @return std::list<std::string>& access-control-allow-origin values.
+   * @return std::vector<StringMatcherPtr>& access-control-allow-origin matchers.
    */
-  virtual const std::list<std::string>& allowOrigins() const PURE;
-
-  /*
-   * @return std::list<std::regex>& regexes that match allowed origins.
-   */
-  virtual const std::list<std::regex>& allowOriginRegexes() const PURE;
+  virtual const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const PURE;
 
   /**
    * @return std::string access-control-allow-methods value.
@@ -163,6 +160,8 @@ public:
   static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
   static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
+  static const uint32_t RETRY_ON_RESET                   = 0x800;
+  static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -206,6 +205,18 @@ public:
    * policy is enabled.
    */
   virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
+
+  /**
+   * @return std::vector<Http::HeaderMatcherSharedPtr>& list of response header matchers that
+   * will be checked when the 'retriable-headers' retry policy is enabled.
+   */
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const PURE;
+
+  /**
+   * @return std::vector<Http::HeaderMatcherSharedPt>& list of request header
+   * matchers that will be checked before enabling retries.
+   */
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const PURE;
 
   /**
    * @return absl::optional<std::chrono::milliseconds> base retry interval
@@ -425,38 +436,16 @@ public:
    * @return bool whether to include the request count header in upstream requests.
    */
   virtual bool includeAttemptCount() const PURE;
-};
-
-/**
- * Route hash policy. I.e., if using a hashing load balancer, how the route should be hashed onto
- * an upstream host.
- */
-class HashPolicy {
-public:
-  virtual ~HashPolicy() = default;
 
   /**
-   * A callback used for requesting that a cookie be set with the given lifetime.
-   * @param key the name of the cookie to be set
-   * @param path the path of the cookie, or the empty string if no path should be set.
-   * @param ttl the lifetime of the cookie
-   * @return std::string the opaque value of the cookie that will be set
+   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
+   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
+   *         as other limits may apply.
+   *         If a per route limit exists, it takes precedence over this configuration.
+   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
+   *         rather than no limit applies.
    */
-  using AddCookieCallback = std::function<std::string(
-      const std::string& key, const std::string& path, std::chrono::seconds ttl)>;
-
-  /**
-   * @param downstream_address is the address of the connected client host, or nullptr if the
-   * request is initiated from within this host
-   * @param headers stores the HTTP headers for the stream
-   * @param add_cookie is called to add a set-cookie header on the reply sent to the downstream
-   * host
-   * @return absl::optional<uint64_t> an optional hash value to route on. A hash value might not be
-   * returned if for example the specified HTTP header does not exist.
-   */
-  virtual absl::optional<uint64_t>
-  generateHash(const Network::Address::Instance* downstream_address, const Http::HeaderMap& headers,
-               AddCookieCallback add_cookie) const PURE;
+  virtual uint32_t retryShadowBufferLimit() const PURE;
 };
 
 /**
@@ -529,6 +518,15 @@ public:
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
 
+class TlsContextMatchCriteria {
+public:
+  virtual ~TlsContextMatchCriteria() = default;
+
+  virtual const absl::optional<bool>& presented() const PURE;
+};
+
+using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
+
 /**
  * Type of path matching that a route entry uses.
  */
@@ -600,7 +598,7 @@ public:
   /**
    * @return const HashPolicy* the optional hash policy for the route.
    */
-  virtual const HashPolicy* hashPolicy() const PURE;
+  virtual const Http::HashPolicy* hashPolicy() const PURE;
 
   /**
    * @return const HedgePolicy& the hedge policy for the route. All routes have a hedge policy even
@@ -623,6 +621,15 @@ public:
    *         if it is empty and does not allow retries.
    */
   virtual const RetryPolicy& retryPolicy() const PURE;
+
+  /**
+   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
+   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
+   *         as other limits may apply.
+   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
+   *         rather than no limit applies.
+   */
+  virtual uint32_t retryShadowBufferLimit() const PURE;
 
   /**
    * @return const ShadowPolicy& the shadow policy for the route. All routes have a shadow policy
@@ -702,6 +709,12 @@ public:
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
+   * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
+   * tls context match criteria, nullptr is returned.
+   */
+  virtual const TlsContextMatchCriteria* tlsContextMatchCriteria() const PURE;
+
+  /**
    * @return const PathMatchCriterion& the match criterion for this route.
    */
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
@@ -720,6 +733,16 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   };
+
+  /**
+   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
+   * host's. Or nullptr if none of them exist.
+   */
+  template <class Derived>
+  const Derived* mostSpecificPerFilterConfigTyped(const std::string& name) const {
+    const Derived* config = perFilterConfigTyped<Derived>(name);
+    return config ? config : virtualHost().perFilterConfigTyped<Derived>(name);
+  }
 
   /**
    * True if the virtual host this RouteEntry belongs to is configured to include the attempt
@@ -856,6 +879,7 @@ public:
    * @return the route or nullptr if there is no matching route for the request.
    */
   virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
 
   /**
@@ -873,6 +897,13 @@ public:
    * @return whether router configuration uses VHDS.
    */
   virtual bool usesVhds() const PURE;
+
+  /**
+   * @return bool whether most specific header mutations should take precedence. The default
+   * evaluation order is route level, then virtual host level and finally global connection
+   * manager level.
+   */
+  virtual bool mostSpecificHeaderMutationsWins() const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

@@ -11,10 +11,7 @@
 #include "gtest/gtest.h"
 
 using Envoy::Server::Configuration::MockTransportSocketFactoryContext;
-using testing::_;
-using testing::Invoke;
 using testing::ReturnRef;
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -23,8 +20,8 @@ namespace Alts {
 namespace {
 
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
-  MockTransportSocketFactoryContext factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<MockTransportSocketFactoryContext> factory_context;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
   EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   UpstreamAltsTransportSocketConfigFactory factory;
 
@@ -43,8 +40,8 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
 }
 
 TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
-  MockTransportSocketFactoryContext factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<MockTransportSocketFactoryContext> factory_context;
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
   EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   DownstreamAltsTransportSocketConfigFactory factory;
 

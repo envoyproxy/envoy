@@ -10,6 +10,7 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 
+#include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 
@@ -22,7 +23,7 @@ namespace Outlier {
 class MockDetectorHostMonitor : public DetectorHostMonitor {
 public:
   MockDetectorHostMonitor();
-  ~MockDetectorHostMonitor();
+  ~MockDetectorHostMonitor() override;
 
   MOCK_METHOD0(numEjections, uint32_t());
   MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
@@ -38,7 +39,7 @@ public:
 class MockEventLogger : public EventLogger {
 public:
   MockEventLogger();
-  ~MockEventLogger();
+  ~MockEventLogger() override;
 
   MOCK_METHOD4(logEject,
                void(const HostDescriptionConstSharedPtr& host, Detector& detector,
@@ -49,7 +50,7 @@ public:
 class MockDetector : public Detector {
 public:
   MockDetector();
-  ~MockDetector();
+  ~MockDetector() override;
 
   void runCallbacks(HostSharedPtr host) {
     for (const ChangeStateCb& cb : callbacks_) {
@@ -70,7 +71,7 @@ public:
 class MockHealthCheckHostMonitor : public HealthCheckHostMonitor {
 public:
   MockHealthCheckHostMonitor();
-  ~MockHealthCheckHostMonitor();
+  ~MockHealthCheckHostMonitor() override;
 
   MOCK_METHOD0(setUnhealthy, void());
 };
@@ -78,7 +79,7 @@ public:
 class MockHostDescription : public HostDescription {
 public:
   MockHostDescription();
-  ~MockHostDescription();
+  ~MockHostDescription() override;
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
@@ -90,6 +91,7 @@ public:
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
   MOCK_CONST_METHOD0(priority, uint32_t());
@@ -105,10 +107,10 @@ public:
   Network::Address::InstanceConstSharedPtr address_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
+  Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
-  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  HostStats stats_;
+  mutable Stats::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
@@ -120,7 +122,7 @@ public:
   };
 
   MockHost();
-  ~MockHost();
+  ~MockHost() override;
 
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher,
                                         const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -155,12 +157,14 @@ public:
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
   MOCK_METHOD1(metadata, void(const envoy::api::v2::core::Metadata&));
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
-  MOCK_CONST_METHOD0(counters, std::vector<Stats::CounterSharedPtr>());
+  MOCK_CONST_METHOD0(counters,
+                     std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>());
   MOCK_CONST_METHOD2(
       createConnection_,
       MockCreateConnectionData(Event::Dispatcher& dispatcher,
                                const Network::ConnectionSocket::OptionsSharedPtr& options));
-  MOCK_CONST_METHOD0(gauges, std::vector<Stats::GaugeSharedPtr>());
+  MOCK_CONST_METHOD0(gauges,
+                     std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));
@@ -169,6 +173,7 @@ public:
   MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
   MOCK_CONST_METHOD0(health, Host::Health());
   MOCK_CONST_METHOD0(hostname, const std::string&());
+  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_METHOD1(setHealthChecker_, void(HealthCheckHostMonitorPtr& health_checker));
   MOCK_METHOD1(setOutlierDetector_, void(Outlier::DetectorHostMonitorPtr& outlier_detector));
@@ -183,10 +188,10 @@ public:
   MOCK_CONST_METHOD0(warmed, bool());
 
   testing::NiceMock<MockClusterInfo> cluster_;
+  Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
-  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  HostStats stats_;
+  mutable Stats::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 

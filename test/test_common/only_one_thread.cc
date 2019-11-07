@@ -13,10 +13,10 @@ OnlyOneThread::OnlyOneThread() : thread_factory_(threadFactoryForTest()) {}
 
 void OnlyOneThread::checkOneThread() {
   LockGuard lock(mutex_);
-  if (thread_advancing_time_ == nullptr) {
+  if (thread_advancing_time_.isEmpty()) {
     thread_advancing_time_ = thread_factory_.currentThreadId();
   } else {
-    RELEASE_ASSERT(thread_advancing_time_->isCurrentThreadId(),
+    RELEASE_ASSERT(thread_advancing_time_ == thread_factory_.currentThreadId(),
                    "time should only be advanced on one thread in the context of a test");
   }
 }

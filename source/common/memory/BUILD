@@ -34,5 +34,6 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
     ],
 )

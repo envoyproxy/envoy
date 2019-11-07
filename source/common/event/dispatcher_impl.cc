@@ -25,6 +25,10 @@
 
 #include "event2/event.h"
 
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "common/signal/signal_action.h"
+#endif
+
 namespace Envoy {
 namespace Event {
 
@@ -35,11 +39,22 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
                                Event::TimeSystem& time_system)
     : api_(api), buffer_factory_(std::move(factory)),
       scheduler_(time_system.createScheduler(base_scheduler_)),
-      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
-      post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {}
+      deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
+      post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
+      current_to_delete_(&to_delete_1_) {
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::registerFatalErrorHandler(*this);
+#endif
+  updateApproximateMonotonicTime();
+  base_scheduler_.registerOnPrepareCallback(
+      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
+}
 
-DispatcherImpl::~DispatcherImpl() {}
+DispatcherImpl::~DispatcherImpl() {
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::removeFatalErrorHandler(*this);
+#endif
+}
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
@@ -48,7 +63,7 @@ void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& pre
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
     base_scheduler_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_->debugString());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_.debugString());
   });
 }
 
@@ -119,23 +134,24 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr
-DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                               bool bind_to_port, bool hand_off_restored_destination_connections) {
+Network::ListenerPtr DispatcherImpl::createListener(Network::Socket& socket,
+                                                    Network::ListenerCallbacks& cb,
+                                                    bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::ListenerImpl(*this, socket, cb, bind_to_port,
-                                                        hand_off_restored_destination_connections)};
+  return std::make_unique<Network::ListenerImpl>(*this, socket, cb, bind_to_port);
 }
 
-Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
-                                                       Network::UdpListenerCallbacks& cb) {
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+                                                          Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, timeSource())};
+  return std::make_unique<Network::UdpListenerImpl>(*this, socket, cb, timeSource());
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
+TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
+
+TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   ASSERT(isThreadSafe());
-  return scheduler_->createTimer(cb);
+  return scheduler_->createTimer(cb, *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -176,6 +192,14 @@ void DispatcherImpl::run(RunType type) {
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
   base_scheduler_.run(type);
+}
+
+MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
+  return approximate_monotonic_time_;
+}
+
+void DispatcherImpl::updateApproximateMonotonicTime() {
+  approximate_monotonic_time_ = timeSource().monotonicTime();
 }
 
 void DispatcherImpl::runPostCallbacks() {

@@ -1,0 +1,32 @@
+commit ecf04ccf4d8be9378166ec9e0ccf44081e211d11
+Author: Marcel Hlopko <hlopko@google.com>
+Date:   Thu Jun 20 18:57:33 2019 +0200
+
+    Require ProtoInfo in attributes, not "proto"
+
+diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
+index 581165a190..87e8b9d329 100644
+--- a/bazel/generate_cc.bzl
++++ b/bazel/generate_cc.bzl
+@@ -146,7 +146,7 @@ _generate_cc = rule(
+         "srcs": attr.label_list(
+             mandatory = True,
+             allow_empty = False,
+-            providers = ["proto"],
++            providers = [ProtoInfo],
+         ),
+         "plugin": attr.label(
+             executable = True,
+diff --git a/bazel/python_rules.bzl b/bazel/python_rules.bzl
+index 3df30f8262..d4ff77094c 100644
+--- a/bazel/python_rules.bzl
++++ b/bazel/python_rules.bzl
+@@ -99,7 +99,7 @@ __generate_py = rule(
+         "deps": attr.label_list(
+             mandatory = True,
+             allow_empty = False,
+-            providers = ["proto"],
++            providers = [ProtoInfo],
+         ),
+         "plugin": attr.label(
+             executable = True,

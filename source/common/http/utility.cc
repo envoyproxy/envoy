@@ -250,17 +250,39 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
   ret.initial_connection_window_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  ret.max_outbound_frames_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_outbound_frames, Http::Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
+  ret.max_outbound_control_frames_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_outbound_control_frames,
+                                      Http::Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
+  ret.max_consecutive_inbound_frames_with_empty_payload_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_consecutive_inbound_frames_with_empty_payload,
+      Http::Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD);
+  ret.max_inbound_priority_frames_per_stream_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_inbound_priority_frames_per_stream,
+      Http::Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM);
+  ret.max_inbound_window_update_frames_per_data_frame_sent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_inbound_window_update_frames_per_data_frame_sent,
+      Http::Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
   ret.allow_connect_ = config.allow_connect();
   ret.allow_metadata_ = config.allow_metadata();
+  ret.stream_error_on_invalid_http_messaging_ = config.stream_error_on_invalid_http_messaging();
   return ret;
 }
 
 Http1Settings
 Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& config) {
   Http1Settings ret;
-  ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, false);
+  ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
   ret.accept_http_10_ = config.accept_http_10();
   ret.default_host_for_http_10_ = config.default_host_for_http_10();
+
+  if (config.header_key_format().has_proper_case_words()) {
+    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
+  } else {
+    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
+  }
+
   return ret;
 }
 
@@ -373,6 +395,8 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
     return Headers::get().ProtocolStrings.Http11String;
   case Protocol::Http2:
     return Headers::get().ProtocolStrings.Http2String;
+  case Protocol::Http3:
+    return Headers::get().ProtocolStrings.Http3String;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

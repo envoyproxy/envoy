@@ -24,7 +24,7 @@ namespace RedisProxy {
 class NoOpSplitCallbacks : public CommandSplitter::SplitCallbacks {
 public:
   NoOpSplitCallbacks() = default;
-  ~NoOpSplitCallbacks() = default;
+  ~NoOpSplitCallbacks() override = default;
 
   bool connectionAllowed() override { return true; }
   void onAuth(const std::string&) override {}

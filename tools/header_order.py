@@ -108,11 +108,10 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Header reordering.')
   parser.add_argument('--path', type=str, help='specify the path to the header file')
   parser.add_argument('--rewrite', action='store_true', help='rewrite header file in-place')
-  parser.add_argument(
-      '--include_dir_order',
-      type=str,
-      default=','.join(common.includeDirOrder()),
-      help='specify the header block include directory order')
+  parser.add_argument('--include_dir_order',
+                      type=str,
+                      default=','.join(common.includeDirOrder()),
+                      help='specify the header block include directory order')
   args = parser.parse_args()
   target_path = args.path
   include_dir_order = args.include_dir_order.split(',')

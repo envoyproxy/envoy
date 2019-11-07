@@ -18,6 +18,7 @@
 #include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
+#include "common/stats/recent_lookups.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
@@ -132,7 +133,7 @@ public:
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  StoragePtr join(const std::vector<StatName>& stat_names) const override;
+  StoragePtr join(const StatNameVec& stat_names) const override;
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
@@ -159,6 +160,13 @@ public:
     return bytes;
   }
 
+  StatNameSetPtr makeSet(absl::string_view name) override;
+  void forgetSet(StatNameSet& stat_name_set) override;
+  uint64_t getRecentLookups(const RecentLookupsFn&) const override;
+  void clearRecentLookups() override;
+  void setRecentLookupCapacity(uint64_t capacity) override;
+  uint64_t recentLookupCapacity() const override;
+
 private:
   friend class StatName;
   friend class StatNameTest;
@@ -172,6 +180,9 @@ private:
 
   // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
+
+  // This must be held while updating stat_name_sets_.
+  mutable Thread::MutexBasicLockable stat_name_set_mutex_;
 
   /**
    * Decodes a vector of symbols back into its period-delimited stat name. If
@@ -229,7 +240,7 @@ private:
   // Bitmap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
-  using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
+  using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol>;
   using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);
@@ -238,6 +249,9 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
+  RecentLookups recent_lookups_ GUARDED_BY(lock_);
+
+  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
 };
 
 /**
@@ -310,12 +324,25 @@ public:
   explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
-  StatName() : size_and_data_(nullptr) {}
+  StatName() = default;
 
-  // Constructs a StatName object with new storage, which must be of size
-  // src.size(). This is used in the a flow where we first construct a StatName
-  // for lookup in a cache, and then on a miss need to store the data directly.
-  StatName(const StatName& src, SymbolTable::Storage memory);
+  /**
+   * Defines default hash function so StatName can be used as a key in an absl
+   * hash-table without specifying a functor. See
+   * https://abseil.io/docs/cpp/guides/hash for details.
+   */
+  template <typename H> friend H AbslHashValue(H h, StatName stat_name) {
+    if (stat_name.empty()) {
+      return H::combine(std::move(h), absl::string_view());
+    }
+
+    // Casts the raw data as a string_view. Note that this string_view will not
+    // be in human-readable form, but it will be compatible with a string-view
+    // hasher.
+    const char* cdata = reinterpret_cast<const char*>(stat_name.data());
+    absl::string_view data_as_string_view = absl::string_view(cdata, stat_name.dataSize());
+    return H::combine(std::move(h), data_as_string_view);
+  }
 
   /**
    * Note that this hash function will return a different hash than that of
@@ -323,10 +350,7 @@ public:
    *
    * @return uint64_t a hash of the underlying representation.
    */
-  uint64_t hash() const {
-    const char* cdata = reinterpret_cast<const char*>(data());
-    return HashUtil::xxHash64(absl::string_view(cdata, dataSize()));
-  }
+  uint64_t hash() const { return absl::Hash<StatName>()(*this); }
 
   bool operator==(const StatName& rhs) const {
     const uint64_t sz = dataSize();
@@ -339,6 +363,9 @@ public:
    *                  overhead for the size itself.
    */
   uint64_t dataSize() const {
+    if (size_and_data_ == nullptr) {
+      return 0;
+    }
     return size_and_data_[0] | (static_cast<uint64_t>(size_and_data_[1]) << 8);
   }
 
@@ -365,7 +392,7 @@ public:
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
-  const uint8_t* size_and_data_;
+  const uint8_t* size_and_data_{nullptr};
 };
 
 StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
@@ -394,14 +421,7 @@ public:
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
 
-  // Obtains new backing storage for an already existing StatName.
-  StatNameManagedStorage(StatName src, SymbolTable& table)
-      : StatNameStorage(src, table), symbol_table_(table) {}
-
   ~StatNameManagedStorage() { free(symbol_table_); }
-
-  SymbolTable& symbolTable() { return symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
 private:
   SymbolTable& symbol_table_;
@@ -464,7 +484,7 @@ private:
 
 // Represents an ordered container of StatNames. The encoding for each StatName
 // is byte-packed together, so this carries less overhead than allocating the
-// storage separately. The tradeoff is there is no random access; you can only
+// storage separately. The trade-off is there is no random access; you can only
 // iterate through the StatNames.
 //
 // The maximum size of the list is 255 elements, so the length can fit in a
@@ -523,22 +543,11 @@ private:
   SymbolTable::StoragePtr storage_;
 };
 
-// Helper class for constructing hash-tables with StatName keys.
-struct StatNameHash {
-  size_t operator()(const StatName& a) const { return a.hash(); }
-};
-
-// Helper class for constructing hash-tables with StatName keys.
-struct StatNameCompare {
-  bool operator()(const StatName& a, const StatName& b) const { return a == b; }
-};
-
 // Value-templatized hash-map with StatName key.
-template <class T>
-using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash, StatNameCompare>;
+template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T>;
 
 // Hash-set of StatNames
-using StatNameHashSet = absl::flat_hash_set<StatName, StatNameHash, StatNameCompare>;
+using StatNameHashSet = absl::flat_hash_set<StatName>;
 
 // Helper class for sorting StatNames.
 struct StatNameLessThan {
@@ -558,7 +567,7 @@ struct HeterogeneousStatNameHash {
   // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
   // official reference, and https://abseil.io/tips/144 for a description of
   // using it in the context of absl.
-  using is_transparent = void;
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
 
   size_t operator()(StatName a) const { return a.hash(); }
   size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
@@ -566,7 +575,7 @@ struct HeterogeneousStatNameHash {
 
 struct HeterogeneousStatNameEqual {
   // See description for HeterogeneousStatNameHash::is_transparent.
-  using is_transparent = void;
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
 
   size_t operator()(StatName a, StatName b) const { return a == b; }
   size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
@@ -587,7 +596,7 @@ class StatNameStorageSet {
 public:
   using HashSet =
       absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
-  using iterator = HashSet::iterator;
+  using Iterator = HashSet::iterator;
 
   ~StatNameStorageSet();
 
@@ -609,12 +618,12 @@ public:
    * @param stat_name The stat_name to find.
    * @return the iterator pointing to the stat_name, or end() if not found.
    */
-  iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+  Iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
 
   /**
    * @return the end-marker.
    */
-  iterator end() { return hash_set_.end(); }
+  Iterator end() { return hash_set_.end(); }
 
   /**
    * @param set the storage set to swap with.
@@ -628,6 +637,103 @@ public:
 
 private:
   HashSet hash_set_;
+};
+
+// Captures StatNames for lookup by string, keeping two maps: a map of
+// 'built-ins' that is expected to be populated during initialization, and a map
+// of dynamically discovered names. The latter map is protected by a mutex, and
+// can be mutated at runtime.
+//
+// Ideally, builtins should be added during process initialization, in the
+// outermost relevant context. And as the builtins map is not mutex protected,
+// builtins must *not* be added in the request-path.
+class StatNameSet {
+public:
+  // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
+
+  ~StatNameSet();
+
+  /**
+   * Adds a string to the builtin map, which is not mutex protected. This map is
+   * always consulted first as a hit there means no lock is required.
+   *
+   * Builtins can only be added immediately after construction, as the builtins
+   * map is not mutex-protected.
+   */
+  void rememberBuiltin(absl::string_view str);
+
+  /**
+   * Remembers every string in a container as builtins.
+   */
+  template <class StringContainer> void rememberBuiltins(const StringContainer& container) {
+    for (const auto& str : container) {
+      rememberBuiltin(str);
+    }
+  }
+  void rememberBuiltins(const std::vector<const char*>& container) {
+    rememberBuiltins<std::vector<const char*>>(container);
+  }
+
+  /**
+   * Finds a StatName by name. If 'token' has been remembered as a built-in,
+   * then no lock is required. Otherwise we must consult dynamic_stat_names_
+   * under a lock that's private to the StatNameSet. If that's empty, we need to
+   * create the StatName in the pool, which requires taking a global lock, and
+   * then remember the new StatName in the dynamic_stat_names_. This allows
+   * subsequent lookups of the same string to take only the set's lock, and not
+   * the whole symbol-table lock.
+   *
+   * @return a StatName corresponding to the passed-in token, owned by the set.
+   *
+   * TODO(jmarantz): Potential perf issue here with contention, both on this
+   * set's mutex and also the SymbolTable mutex which must be taken during
+   * StatNamePool::add().
+   */
+  StatName getDynamic(absl::string_view token);
+
+  /**
+   * Finds a builtin StatName by name. If the builtin has not been registered,
+   * then the fallback is returned.
+   *
+   * @return the StatName or fallback.
+   */
+  StatName getBuiltin(absl::string_view token, StatName fallback);
+
+  /**
+   * Adds a StatName using the pool, but without remembering it in any maps.
+   */
+  StatName add(absl::string_view str) {
+    absl::MutexLock lock(&mutex_);
+    return pool_.add(str);
+  }
+
+  /**
+   * Clears recent lookups.
+   */
+  void clearRecentLookups();
+
+  /**
+   * Sets the number of names recorded in the recent-lookups set.
+   *
+   * @param capacity the capacity to configure.
+   */
+  void setRecentLookupCapacity(uint64_t capacity);
+
+private:
+  friend class FakeSymbolTableImpl;
+  friend class SymbolTableImpl;
+
+  StatNameSet(SymbolTable& symbol_table, absl::string_view name);
+  uint64_t getRecentLookups(const RecentLookups::IterFn& iter) const;
+
+  const std::string name_;
+  Stats::SymbolTable& symbol_table_;
+  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
+  mutable absl::Mutex mutex_;
+  using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
+  StringStatNameMap builtin_stat_names_;
+  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
+  RecentLookups recent_lookups_ GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

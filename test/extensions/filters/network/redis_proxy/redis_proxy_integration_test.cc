@@ -7,7 +7,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Matcher;
 using testing::Return;
 
 namespace RedisCmdSplitter = Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitter;
@@ -54,9 +53,12 @@ static_resources:
     filter_chains:
       filters:
         name: envoy.redis_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
-          cluster: cluster_0
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
           settings:
             op_timeout: 5s
 )EOF";
@@ -141,7 +143,8 @@ static_resources:
     filter_chains:
       filters:
         name: envoy.redis_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
@@ -149,7 +152,8 @@ static_resources:
 
 const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
-            catch_all_cluster: cluster_0
+            catch_all_route:
+              cluster: cluster_0
             routes:
             - prefix: "foo:"
               cluster: cluster_1
@@ -196,8 +200,10 @@ static_resources:
   clusters:
     - name: cluster_0
       type: STATIC
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: cluster_0_password }}
+      typed_extension_protocol_options:
+        envoy.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: cluster_0_password }
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -211,8 +217,10 @@ static_resources:
     - name: cluster_1
       type: STATIC
       lb_policy: RANDOM
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: cluster_1_password }}
+      typed_extension_protocol_options:
+        envoy.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: cluster_1_password }
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -224,8 +232,10 @@ static_resources:
                     port_value: 1
     - name: cluster_2
       type: STATIC
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: cluster_2_password }}
+      typed_extension_protocol_options:
+        envoy.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: cluster_2_password }
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
@@ -245,12 +255,14 @@ static_resources:
     filter_chains:
       filters:
         name: envoy.redis_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
           prefix_routes:
-            catch_all_cluster: cluster_0
+            catch_all_route:
+              cluster: cluster_0
             routes:
             - prefix: "foo:"
               cluster: cluster_1
@@ -264,9 +276,9 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
   std::stringstream result;
 
   result << "*" << command_strings.size() << "\r\n";
-  for (uint64_t i = 0; i < command_strings.size(); i++) {
-    result << "$" << command_strings[i].size() << "\r\n";
-    result << command_strings[i] << "\r\n";
+  for (auto& command_string : command_strings) {
+    result << "$" << command_string.size() << "\r\n";
+    result << command_string << "\r\n";
   }
 
   return result.str();
@@ -976,7 +988,8 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
 
   // command is not mirrored to cluster 1
   FakeRawConnectionPtr cluster_1_connection;
-  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection));
+  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection,
+                                                        std::chrono::milliseconds(500)));
 
   redis_client->waitForData(get_response);
   EXPECT_EQ(get_response, redis_client->data());

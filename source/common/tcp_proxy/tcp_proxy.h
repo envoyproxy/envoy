@@ -24,6 +24,7 @@
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
+#include "common/network/hash_policy.h"
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -113,6 +114,7 @@ public:
   const Router::MetadataMatchCriteria* metadataMatchCriteria() {
     return cluster_metadata_match_criteria_.get();
   }
+  const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
   struct Route {
@@ -149,6 +151,7 @@ private:
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Runtime::RandomGenerator& random_generator_;
+  std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -178,7 +181,7 @@ class Filter : public Network::ReadFilter,
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
          TimeSource& time_source);
-  ~Filter();
+  ~Filter() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -196,8 +199,23 @@ public:
     return config_->metadataMatchCriteria();
   }
 
+  // Upstream::LoadBalancerContext
+  absl::optional<uint64_t> computeHashKey() override {
+    auto hash_policy = config_->hashPolicy();
+    if (hash_policy) {
+      return hash_policy->generateHash(downstreamConnection()->remoteAddress().get(),
+                                       downstreamConnection()->localAddress().get());
+    }
+
+    return {};
+  }
+
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
+  }
+
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return transport_socket_options_;
   }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
@@ -231,6 +249,8 @@ public:
     bool on_high_watermark_called_{false};
   };
 
+  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
+
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(Filter& parent) : parent_(parent) {}
@@ -245,10 +265,10 @@ protected:
   };
 
   enum class UpstreamFailureReason {
-    CONNECT_FAILED,
-    NO_HEALTHY_UPSTREAM,
-    RESOURCE_LIMIT_EXCEEDED,
-    NO_ROUTE,
+    ConnectFailed,
+    NoHealthyUpstream,
+    ResourceLimitExceeded,
+    NoRoute,
   };
 
   // Callbacks for different error and success states during connection establishment
@@ -259,8 +279,6 @@ protected:
   virtual void onInitFailure(UpstreamFailureReason) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
-
-  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
@@ -282,6 +300,7 @@ protected:
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
   StreamInfo::StreamInfoImpl stream_info_;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };
@@ -315,7 +334,7 @@ using DrainerPtr = std::unique_ptr<Drainer>;
 
 class UpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
-  ~UpstreamDrainManager();
+  ~UpstreamDrainManager() override;
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,

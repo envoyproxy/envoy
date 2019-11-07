@@ -115,47 +115,22 @@ void CorsFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& c
 }
 
 bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
-  return isOriginAllowedString(origin) || isOriginAllowedRegex(origin);
-}
-
-bool CorsFilter::isOriginAllowedString(const Http::HeaderString& origin) {
-  if (allowOrigins() == nullptr) {
+  const auto allow_origins = allowOrigins();
+  if (allow_origins == nullptr) {
     return false;
   }
-  for (const auto& o : *allowOrigins()) {
-    if (o == "*" || origin == o.c_str()) {
+  for (const auto& allow_origin : *allow_origins) {
+    if (allow_origin->match("*") || allow_origin->match(origin.getStringView())) {
       return true;
     }
   }
   return false;
 }
 
-bool CorsFilter::isOriginAllowedRegex(const Http::HeaderString& origin) {
-  if (allowOriginRegexes() == nullptr) {
-    return false;
-  }
-  for (const auto& regex : *allowOriginRegexes()) {
-    const absl::string_view origin_view = origin.getStringView();
-    if (std::regex_match(origin_view.begin(), origin_view.end(), regex)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-const std::list<std::string>* CorsFilter::allowOrigins() {
+const std::vector<Matchers::StringMatcherPtr>* CorsFilter::allowOrigins() {
   for (const auto policy : policies_) {
     if (policy && !policy->allowOrigins().empty()) {
       return &policy->allowOrigins();
-    }
-  }
-  return nullptr;
-}
-
-const std::list<std::regex>* CorsFilter::allowOriginRegexes() {
-  for (const auto policy : policies_) {
-    if (policy && !policy->allowOriginRegexes().empty()) {
-      return &policy->allowOriginRegexes();
     }
   }
   return nullptr;

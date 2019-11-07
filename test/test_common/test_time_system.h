@@ -15,7 +15,7 @@ class TestTimeSystem;
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
 public:
-  virtual ~TestTimeSystem() = default;
+  ~TestTimeSystem() override = default;
 
   /**
    * Advances time forward by the specified duration, running any timers

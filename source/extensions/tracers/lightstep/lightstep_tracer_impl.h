@@ -74,7 +74,7 @@ private:
   public:
     explicit LightStepTransporter(LightStepDriver& driver);
 
-    ~LightStepTransporter();
+    ~LightStepTransporter() override;
 
     // lightstep::AsyncTransporter
     void Send(const Protobuf::Message& request, Protobuf::Message& response,

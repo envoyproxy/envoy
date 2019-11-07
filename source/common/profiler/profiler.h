@@ -60,9 +60,6 @@ public:
    * @return bool whether the file is dumped
    */
   static bool stopProfiler();
-
-private:
-  static void forceLink();
 };
 
 } // namespace Profiler

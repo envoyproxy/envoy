@@ -185,6 +185,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/network:listener_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/common/network:listener_impl_test_base_lib",
@@ -207,6 +208,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -287,5 +289,14 @@ envoy_cc_test(
     srcs = ["io_socket_handle_impl_test.cc"],
     deps = [
         "//source/common/network:address_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "transport_socket_options_impl_test",
+    srcs = ["transport_socket_options_impl_test.cc"],
+    deps = [
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/stream_info:filter_state_lib",
     ],
 )

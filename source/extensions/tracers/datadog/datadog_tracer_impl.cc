@@ -80,8 +80,8 @@ void TraceReporter::enableTimer() {
 
 void TraceReporter::flushTraces() {
   auto pendingTraces = encoder_->pendingTraces();
-  ENVOY_LOG(debug, "flushing traces: {} traces", pendingTraces);
   if (pendingTraces) {
+    ENVOY_LOG(debug, "flushing traces: {} traces", pendingTraces);
     driver_.tracerStats().traces_sent_.add(pendingTraces);
 
     Http::MessagePtr message(new Http::RequestMessageImpl());
@@ -95,7 +95,7 @@ void TraceReporter::flushTraces() {
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
     body->add(encoder_->payload());
     message->body() = std::move(body);
-    ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload {}", pendingTraces,
+    ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
     driver_.clusterManager()

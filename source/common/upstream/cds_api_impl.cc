@@ -12,6 +12,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -35,8 +37,7 @@ void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   std::vector<envoy::api::v2::Cluster> clusters;
   for (const auto& cluster_blob : resources) {
-    clusters.push_back(
-        MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob, validation_visitor_));
+    clusters.push_back(MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob));
     clusters_to_remove.erase(clusters.back().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
@@ -57,8 +58,15 @@ void CdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
-  Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+  std::unique_ptr<Cleanup> maybe_eds_resume;
+  if (cm_.adsMux()) {
+    cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
+    maybe_eds_resume = std::make_unique<Cleanup>(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+  }
+
+  ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
+            removed_resources.size());
 
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
@@ -66,16 +74,17 @@ void CdsApiImpl::onConfigUpdate(
   for (const auto& resource : added_resources) {
     envoy::api::v2::Cluster cluster;
     try {
-      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource(),
-                                                                 validation_visitor_);
-      MessageUtil::validate(cluster);
+      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
+      MessageUtil::validate(cluster, validation_visitor_);
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
       }
       if (cm_.addOrUpdateCluster(cluster, resource.version())) {
         any_applied = true;
-        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
+        ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster.name());
+      } else {
+        ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
       }
     } catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
@@ -84,7 +93,7 @@ void CdsApiImpl::onConfigUpdate(
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
-      ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
+      ENVOY_LOG(info, "cds: remove cluster '{}'", resource_name);
     }
   }
 
@@ -94,11 +103,13 @@ void CdsApiImpl::onConfigUpdate(
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
     throw EnvoyException(
-        fmt::format("Error adding/updating cluster(s) {}", StringUtil::join(exception_msgs, ", ")));
+        fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
 }
 
-void CdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
+void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                      const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   runInitializeCallbackIfAny();

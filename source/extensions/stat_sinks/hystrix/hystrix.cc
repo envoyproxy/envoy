@@ -39,9 +39,8 @@ void ClusterStatsCache::printToStream(std::stringstream& out_str) {
 void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow rolling_window,
                                            std::stringstream& out_str) {
   out_str << name << " | ";
-  for (auto specific_stat_vec_itr = rolling_window.begin();
-       specific_stat_vec_itr != rolling_window.end(); ++specific_stat_vec_itr) {
-    out_str << *specific_stat_vec_itr << " | ";
+  for (uint64_t& specific_stat_vec_itr : rolling_window) {
+    out_str << specific_stat_vec_itr << " | ";
   }
   out_str << std::endl;
 }

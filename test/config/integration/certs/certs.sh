@@ -52,6 +52,8 @@ generate_ca upstreamca
 # Generate cert for the upstream node.
 generate_rsa_key upstream upstreamca
 generate_x509_cert upstream upstreamca
+generate_rsa_key upstreamlocalhost upstreamca
+generate_x509_cert upstreamlocalhost upstreamca
 
 rm *.csr
 rm *.srl

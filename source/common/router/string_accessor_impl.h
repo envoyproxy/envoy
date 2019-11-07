@@ -12,6 +12,13 @@ public:
   // StringAccessor
   absl::string_view asString() const override { return value_; }
 
+  // FilterState::Object
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    message->set_value(value_);
+    return message;
+  }
+
 private:
   std::string value_;
 };

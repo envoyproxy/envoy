@@ -8,6 +8,7 @@
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/stats/symbol_table_creator.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
@@ -16,7 +17,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Property;
 
 namespace Envoy {
@@ -45,7 +45,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
@@ -245,28 +245,33 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
                                            pool_.add("from_az"),
                                            pool_.add("to_az")};
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              histogram("prefix.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope, deliverHistogramToSinks(
                                  Property(&Stats::Metric::name, "prefix.upstream_rq_time"), 5));
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.canary.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              histogram("prefix.canary.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(
       cluster_scope,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "prefix.canary.upstream_rq_time"), 5));
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.internal.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope,
+              histogram("prefix.internal.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "prefix.internal.upstream_rq_time"), 5));
   EXPECT_CALL(global_store,
-              histogram("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"));
+              histogram("vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time",
+                        Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(global_store,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name,
                            "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time"),
                   5));
 
-  EXPECT_CALL(cluster_scope, histogram("prefix.zone.from_az.to_az.upstream_rq_time"));
+  EXPECT_CALL(cluster_scope, histogram("prefix.zone.from_az.to_az.upstream_rq_time",
+                                       Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"), 5));
@@ -276,13 +281,14 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
 
 class CodeStatsTest : public testing::Test {
 protected:
-  CodeStatsTest() : code_stats_(symbol_table_) {}
+  CodeStatsTest()
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), code_stats_(*symbol_table_) {}
 
   absl::string_view stripTrailingDot(absl::string_view prefix) {
     return CodeStatsImpl::stripTrailingDot(prefix);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTablePtr symbol_table_;
   CodeStatsImpl code_stats_;
 };
 

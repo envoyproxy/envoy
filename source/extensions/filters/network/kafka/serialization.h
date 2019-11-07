@@ -60,7 +60,7 @@ public:
  */
 template <typename T> class IntDeserializer : public Deserializer<T> {
 public:
-  IntDeserializer() : written_{0}, ready_(false){};
+  IntDeserializer() : written_{0} {};
 
   uint32_t feed(absl::string_view& data) override {
     const uint32_t available = std::min<uint32_t>(sizeof(buf_) - written_, data.size());
@@ -153,7 +153,7 @@ public:
  */
 class BooleanDeserializer : public Deserializer<bool> {
 public:
-  BooleanDeserializer(){};
+  BooleanDeserializer() = default;
 
   uint32_t feed(absl::string_view& data) override { return buffer_.feed(data); }
 

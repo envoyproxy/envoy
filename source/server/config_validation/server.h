@@ -34,7 +34,8 @@ namespace Server {
  * validateConfig() takes over from main() for a config-validation run of Envoy. It returns true if
  * the config is valid, false if invalid.
  */
-bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+bool validateConfig(const Options& options,
+                    const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                     Filesystem::Instance& file_system);
 
@@ -50,14 +51,14 @@ bool validateConfig(const Options& options, Network::Address::InstanceConstShare
  * If we finish initialization, and reach the point where an ordinary Envoy run would begin serving
  * requests, the validation is considered successful.
  */
-class ValidationInstance : Logger::Loggable<Logger::Id::main>,
-                           public Instance,
-                           public ListenerComponentFactory,
-                           public ServerLifecycleNotifier,
-                           public WorkerFactory {
+class ValidationInstance final : Logger::Loggable<Logger::Id::main>,
+                                 public Instance,
+                                 public ListenerComponentFactory,
+                                 public ServerLifecycleNotifier,
+                                 public WorkerFactory {
 public:
   ValidationInstance(const Options& options, Event::TimeSystem& time_system,
-                     Network::Address::InstanceConstSharedPtr local_address,
+                     const Network::Address::InstanceConstSharedPtr& local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                      Filesystem::Instance& file_system);
@@ -94,25 +95,24 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  OptProcessContextRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
-
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
-                                         : ProtobufMessage::getNullValidationVisitor();
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return validation_context_;
   }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
-                                        listenerManager(), messageValidationVisitor());
+                                        listenerManager(),
+                                        messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -143,7 +143,7 @@ public:
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&) override {
+  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -158,7 +158,8 @@ public:
   }
 
 private:
-  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options,
+                  const Network::Address::InstanceConstSharedPtr& local_address,
                   ComponentFactory& component_factory);
 
   // init_manager_ must come before any member that participates in initialization, and destructed
@@ -173,6 +174,7 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   const Options& options_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
@@ -181,7 +183,7 @@ private:
   Singleton::ManagerPtr singleton_manager_;
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
-  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
@@ -192,6 +194,7 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
+  ServerFactoryContextImpl server_context_;
 };
 
 } // namespace Server

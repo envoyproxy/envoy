@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/options.h"
 
 #include "common/common/logger.h"
@@ -40,6 +41,9 @@ public:
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
+  void setConfigProto(const envoy::config::bootstrap::v2::Bootstrap& config_proto) {
+    config_proto_ = config_proto;
+  }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
@@ -71,13 +75,26 @@ public:
     signal_handling_enabled_ = signal_handling_enabled;
   }
   void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
+  void setAllowUnkownFields(bool allow_unknown_static_fields) {
+    allow_unknown_static_fields_ = allow_unknown_static_fields;
+  }
+  void setRejectUnknownFieldsDynamic(bool reject_unknown_dynamic_fields) {
+    reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields;
+  }
+  void setFakeSymbolTableEnabled(bool fake_symbol_table_enabled) {
+    fake_symbol_table_enabled_ = fake_symbol_table_enabled;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
+  const envoy::config::bootstrap::v2::Bootstrap& configProto() const override {
+    return config_proto_;
+  }
   const std::string& configYaml() const override { return config_yaml_; }
-  bool allowUnknownFields() const override { return allow_unknown_fields_; }
+  bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
+  bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -89,6 +106,7 @@ public:
     return component_log_levels_;
   }
   const std::string& logFormat() const override { return log_format_; }
+  bool logFormatEscaped() const override { return log_format_escaped_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
@@ -103,7 +121,8 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   bool libeventBufferEnabled() const override { return libevent_buffer_enabled_; }
-  virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
+  bool fakeSymbolTableEnabled() const override { return fake_symbol_table_enabled_; }
+  Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
   uint32_t count() const;
@@ -114,14 +133,17 @@ private:
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
+  envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
-  bool allow_unknown_fields_{false};
+  bool allow_unknown_static_fields_{false};
+  bool reject_unknown_dynamic_fields_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
   std::string log_format_;
+  bool log_format_escaped_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
@@ -136,6 +158,7 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   bool libevent_buffer_enabled_;
+  bool fake_symbol_table_enabled_;
   uint32_t count_;
 };
 

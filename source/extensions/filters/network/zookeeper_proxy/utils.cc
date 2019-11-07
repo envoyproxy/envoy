@@ -10,7 +10,7 @@ namespace ZooKeeperProxy {
 int32_t BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset) {
   ensureMaxLen(sizeof(int32_t));
 
-  int32_t val = buffer.peekBEInt<int32_t>(offset);
+  const int32_t val = buffer.peekBEInt<int32_t>(offset);
   offset += sizeof(int32_t);
   return val;
 }
@@ -18,7 +18,7 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& buffer, uint64_t& offset) {
 int64_t BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset) {
   ensureMaxLen(sizeof(int64_t));
 
-  int64_t val = buffer.peekBEInt<int64_t>(offset);
+  const int64_t val = buffer.peekBEInt<int64_t>(offset);
   offset += sizeof(int64_t);
   return val;
 }
@@ -34,7 +34,7 @@ bool BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset) {
 
 std::string BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset) {
   std::string val;
-  uint32_t len = peekInt32(buffer, offset);
+  const uint32_t len = peekInt32(buffer, offset);
 
   if (len == 0) {
     return val;

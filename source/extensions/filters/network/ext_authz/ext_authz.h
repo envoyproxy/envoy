@@ -73,7 +73,7 @@ class Filter : public Network::ReadFilter,
 public:
   Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
-  ~Filter() {}
+  ~Filter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

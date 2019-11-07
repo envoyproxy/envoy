@@ -75,7 +75,7 @@ class ProxyFilter : public Network::ReadFilter,
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
               CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
-  ~ProxyFilter();
+  ~ProxyFilter() override;
 
   // Network::ReadFilter
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
@@ -95,7 +95,7 @@ public:
 private:
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
     PendingRequest(ProxyFilter& parent);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }

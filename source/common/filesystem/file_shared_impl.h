@@ -42,14 +42,14 @@ public:
   ~FileSharedImpl() override = default;
 
   // Filesystem::File
-  Api::IoCallBoolResult open() override;
+  Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
   bool isOpen() const override;
   std::string path() const override;
 
 protected:
-  virtual void openFile() PURE;
+  virtual void openFile(FlagSet in) PURE;
   virtual ssize_t writeFile(absl::string_view buffer) PURE;
   virtual bool closeFile() PURE;
 

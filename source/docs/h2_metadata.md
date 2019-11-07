@@ -22,10 +22,9 @@ stream flag. Because metadata frames must be associated with an existing frame, 
 ensure metadata frames to be received before the end of stream is received by the
 peer.
 
-Metadata associated with a response can be sent before response headers, after response headers,
-between response data or after response data. If metadata frames have to be sent last,
+Metadata associated with a stream can be sent before headers, after headers,
+between data or after data. If metadata frames have to be sent last,
 users must put the end of stream in an empty data frame and send the empty data frame after metadata frames.
-TODO(soya3129): add more conditions for metadata in requests.
 
 Envoy only allows up to 1M metadata to be sent per stream. If the accumulated
 metadata size exceeds the limit, the stream will be reset.
@@ -36,16 +35,12 @@ Envoy provides the functionality to proxy, process and add metadata.
 
 ## Proxying metadata
 
-(To be implemented)
-
 If not specified, all the metadata received by Envoy is proxied to the next hop
 unmodified. Note that, we do not guarantee the same frame order will be preserved from
 hop by hop. That is, metadata from upstream at the beginning of a stream can be
 received by the downstream at the end of the stream.
 
 ## Consuming metadata
-
-(To be implemented)
 
 If Envoy needs to take actions when a metadata frame is received, users should
 create a new filter.
@@ -74,32 +69,32 @@ If the metadata is left in the map, it will be passed to the next hop.
 
 ## Inserting metadata
 
-(To be implemented)
-
 Envoy filters can be used to add new metadata to a stream.
 
 If users need to add new metadata for a request from downstream to upstream, a
 StreamDecoderFilter should be created. The StreamDecoderFilterCallbacks object that Envoy passes to the
 StreamDecoderFilter has an interface MetadataMapVector&
 StreamDecoderFilterCallbacks::addDecodedMetadata(). By calling the interface,
-users get a reference to the metadata map associated with the request stream. Users can
-insert new metadata to the metadata map, and Envoy will proxy the new metadata
-map to the upstream.
+users get a reference to a vector of metadata map associated with the request stream. Users can
+insert new metadata map to the metadata map vector, and Envoy will proxy the new metadata
+map to the upstream. StreamDecoderFilterCallbacks::addDecodedMetadata() can be called in
+StreamDecoderFilter::decodeHeaders(), StreamDecoderFilter::decodeData() and
+StreamDecoderFilter::decodeTrailers(). Do not call
+StreamDecoderFilterCallbacks::addDecodedMetadata() in
+StreamDecoderFilter::decodeMetadata(MetadataMap metadata\_map). New metadata can
+be added directly to metadata\_map.
 
 If users need to add new metadata for a response to downstream, a
-StreamFilter should be created. Users pass the metadata to be added to
-StreamDecoderFilterCallbacks::encodeMetadata(MetadataMapPtr&&
+StreamEncoderFilter should be created. Users pass the metadata to be added to
+StreamEncoderFilterCallbacks::addEncodedMetadata(MetadataMapPtr&&
 metadata\_map\_ptr). This function can be called in
-StreamFilter::encode100ContinueHeaders(HeaderMap& headers), StreamFilter::encodeHeaders(HeaderMap& headers, bool end\_stream),
-StreamFilter::encodeData(Buffer::Instance& data, bool end\_stream), StreamFilter::encodeTrailers(HeaderMap& trailers).
-Consequently, the new metadata will be passed through all the encoding filters. Note that, the added
-metadata should not share the same key as the metadata to be consumed. Otherwise, the added metadata
-will be consumed.
+StreamEncoderFilter::encode100ContinueHeaders(HeaderMap& headers), StreamEncoderFilter::encodeHeaders(HeaderMap& headers, bool end\_stream),
+StreamEncoderFilter::encodeData(Buffer::Instance& data, bool end\_stream), StreamEncoderFilter::encodeTrailers(HeaderMap& trailers).
+Consequently, the new metadata will be passed through all the encoding filters that follow the filter
+where the new metadata are added.
 
 If users receive metadata from upstream, new metadata can be added directly to
-the input argument metadata\_map in StreamFilter::encodeMetadata(MetadataMap& metadata\_map). Note that,
-users should never call StreamDecoderFilterCallbacks::encodeMetadata(MetadataMapPtr&&
-metadata\_map\_ptr) to add new metadata in StreamFilter::encodeMetadata(MetadataMap& metadata\_map).
+the input argument metadata\_map in StreamFilter::encodeMetadata(MetadataMap& metadata\_map).
 
 ### Metadata implementation
 
@@ -171,3 +166,37 @@ ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter\* 
 to go through all the encoding filters.
 Or new metadata can be added to metadata\_map in
 StreamFilter::encodeMetadata(MetadataMap& metadata\_map) directly.
+
+## Request metadata handling
+
+We first explain how request metadata get consumed or proxied.
+In function EnvoyConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilter\* filter,
+MetadataMap& metadata\_map), Envoy passes request metadata received from downstream to filters by
+calling the following filter interface:
+
+FilterMetadatasStatus StreamDecoderFilter::decodeMetadata(MetadataMap& metadata\_map).
+
+Filters, by implementing the interface, can consume or modify request metadata. If no filter
+touches the metadata, it is proxied to upstream unchanged.
+
+The last filter in the filter chain is router filter. The router filter calls
+Filter::request\_encoder\_-\>encodeMetadata(const MetadataMapVector& metadata\_map\_vector) to pass
+the metadata to codec, and codec encodes and forwards the metadata to the upstream. If the connection
+to the upstream has not been established when metadata is received, the metadata is temporarily stored in
+Filter::downstream\_metadata\_map\_vector\_. When the connection is ready
+(Filter::UpstreamRequest::onPoolReady()), the metadata is then passed to codec, and forwarded to
+the upstream.
+
+Envoy can also add new request metadata through filters's decoding interfaces (See section
+[Inserting metadata](#inserting-metadata) for detailed interfaces). Filters can add new
+metadata to ActiveStream::request\_metadata\_map\_vector\_ by calling
+StreamDecoderFilterCallbacks::addDecodedMetadata(). After calling each filter's decoding function,
+Envoy checks if new metadata is added to ActiveStream::request\_metadata\_map\_vector\_. If so,
+then Envoy calls ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamEncoderFilter\* filter,
+MetadataMapPtr&& metadata\_map) to go through all the filters.
+
+Note that, because metadata frames do not carry end\_stream, if new metadata is added to a headers
+only request, Envoy moves end\_stream from headers to an empty data frame which is sent after the new
+metadata. In addition, Envoy drains metadata in router filter before any other types of
+frames except headers to make sure end\_stream is handled correctly.
+

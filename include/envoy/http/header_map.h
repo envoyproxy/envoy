@@ -300,6 +300,7 @@ private:
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
+  HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
@@ -456,9 +457,41 @@ public:
   virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
+   * HeaderMap contains an internal byte size count, updated as entries are added, removed, or
+   * modified through the HeaderMap interface. However, HeaderEntries can be accessed and modified
+   * by reference so that the HeaderMap can no longer accurately update the internal byte size
+   * count.
+   *
+   * Calling byteSize before a HeaderEntry is accessed will return the internal byte size count. The
+   * value is cleared when a HeaderEntry is accessed, and the value is updated and set again when
+   * refreshByteSize is called.
+   *
+   * To guarantee an accurate byte size count, call refreshByteSize.
+   *
+   * @return uint64_t the approximate size of the header map in bytes if valid.
+   */
+  virtual absl::optional<uint64_t> byteSize() const PURE;
+
+  /**
+   * This returns the sum of the byte sizes of the keys and values in the HeaderMap. This also
+   * updates and sets the byte size count.
+   *
+   * To guarantee an accurate byte size count, use this. If it is known HeaderEntries have not been
+   * manipulated since a call to refreshByteSize, it is safe to use byteSize.
+   *
    * @return uint64_t the approximate size of the header map in bytes.
    */
-  virtual uint64_t byteSize() const PURE;
+  virtual uint64_t refreshByteSize() PURE;
+
+  /**
+   * This returns the sum of the byte sizes of the keys and values in the HeaderMap.
+   *
+   * This iterates over the HeaderMap to calculate size and should only be called directly when the
+   * user wants an explicit recalculation of the byte size.
+   *
+   * @return uint64_t the approximate size of the header map in bytes.
+   */
+  virtual uint64_t byteSizeInternal() const PURE;
 
   /**
    * Get a header by key.
@@ -528,18 +561,22 @@ public:
   virtual bool empty() const PURE;
 
   /**
+   * Dump the header map to the ostream specified
+   *
+   * @param os the stream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation where possible.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
    * @param os supplies the ostream to print to.
    * @param headers the headers to print.
    */
   friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          *static_cast<std::ostream*>(context) << "'" << header.key().getStringView() << "', '"
-                                               << header.value().getStringView() << "'\n";
-          return HeaderMap::Iterate::Continue;
-        },
-        &os);
+    headers.dumpState(os);
     return os;
   }
 };
@@ -550,6 +587,21 @@ using HeaderMapPtr = std::unique_ptr<HeaderMap>;
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
  */
 using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;
+
+/**
+ * An interface to be implemented by header matchers.
+ */
+class HeaderMatcher {
+public:
+  virtual ~HeaderMatcher() = default;
+
+  /*
+   * Check whether header matcher matches any headers in a given HeaderMap.
+   */
+  virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
+};
+
+using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
 
 } // namespace Http
 } // namespace Envoy

@@ -15,18 +15,22 @@ def envoy_copts(repository, test = False):
         "-std=c++14",
     ]
 
+    # Windows options for cleanest service compilation;
+    #   General MSVC C++ options
+    #   Streamline windows.h behavior for Win8+ API (for ntohll, see;
+    #     https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx )
+    #   Minimize Win32 API, dropping GUI-oriented features
     msvc_options = [
         "-WX",
         "-Zc:__cplusplus",
         "-std:c++14",
         "-DWIN32",
-        "-DWIN32_LEAN_AND_MEAN",
-        # need win8 for ntohll
-        # https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
         "-D_WIN32_WINNT=0x0602",
         "-DNTDDI_VERSION=0x06020000",
-        "-DCARES_STATICLIB",
-        "-DNGHTTP2_STATICLIB",
+        "-DWIN32_LEAN_AND_MEAN",
+        "-DNOUSER",
+        "-DNOMCX",
+        "-DNOIME",
     ]
 
     return select({
@@ -41,6 +45,10 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
            }) + select({
+               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand"],
+               repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({
@@ -49,6 +57,12 @@ def envoy_copts(repository, test = False):
            }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+           }) + select({
+               repository + "//bazel:disable_object_dump_on_signal_trace": [],
+               "//conditions:default": ["-DENVOY_OBJECT_TRACE_ON_DUMP"],
+           }) + select({
+               repository + "//bazel:disable_deprecated_features": ["-DENVOY_DISABLE_DEPRECATED_FEATURES"],
+               "//conditions:default": [],
            }) + select({
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
@@ -67,7 +81,7 @@ def envoy_external_dep_path(dep):
 
 def envoy_linkstatic():
     return select({
-        "@envoy//bazel:asan_build": 0,
+        "@envoy//bazel:dynamic_link_tests": 0,
         "//conditions:default": 1,
     })
 
@@ -79,13 +93,12 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "//conditions:default": default or [],
     })
 
-def envoy_static_link_libstdcpp_linkopts():
-    return envoy_select_force_libcpp(
-        # TODO(PiotrSikora): statically link libc++ once that's possible.
-        # See: https://reviews.llvm.org/D53238
-        ["-stdlib=libc++"],
-        ["-static-libstdc++", "-static-libgcc"],
-    )
+def envoy_stdlib_deps():
+    return select({
+        "@envoy//bazel:asan_build": ["@envoy//bazel:dynamic_stdlib"],
+        "@envoy//bazel:tsan_build": ["@envoy//bazel:dynamic_stdlib"],
+        "//conditions:default": ["@envoy//bazel:static_stdlib"],
+    })
 
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):

@@ -15,6 +15,9 @@ envoy_cc_library(
     deps = [
         ":message_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -62,11 +65,21 @@ envoy_cc_library(
         ":codec_interface",
         ":header_map_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:status",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "hash_policy_interface",
+    hdrs = ["hash_policy.h"],
+    deps = [
+        ":header_map_interface",
+        "//include/envoy/network:address_interface",
     ],
 )
 

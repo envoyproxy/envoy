@@ -254,6 +254,7 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("binary-bin"), "help"},
   };
   stream->sendServerInitialMetadata(initial_metadata);
   stream->sendReply();
@@ -406,7 +407,7 @@ public:
     }
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);

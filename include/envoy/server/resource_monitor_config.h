@@ -3,6 +3,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/server/resource_monitor.h"
 
 #include "common/protobuf/protobuf.h"
@@ -25,6 +26,12 @@ public:
    * @return reference to the Api object
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 /**

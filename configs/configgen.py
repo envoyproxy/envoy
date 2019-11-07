@@ -42,14 +42,10 @@ service_to_service_envoy_clusters = {
 # DynamoDB statistics filter, as well as generating a special access log which includes the
 # X-AMZN-RequestId response header.
 external_virtual_hosts = [{
-    'name':
-    'dynamodb_iad',
-    'address':
-    "127.0.0.1",
-    'protocol':
-    "TCP",
-    'port_value':
-    "9204",
+    'name': 'dynamodb_iad',
+    'address': "127.0.0.1",
+    'protocol': "TCP",
+    'port_value': "9204",
     'hosts': [{
         'name': 'dynamodb_iad',
         'domain': '*',
@@ -59,10 +55,8 @@ external_virtual_hosts = [{
         'verify_subject_alt_name': ['dynamodb.us-east-1.amazonaws.com'],
         'ssl': True
     }],
-    'is_amzn_service':
-    True,
-    'cluster_type':
-    'logical_dns'
+    'is_amzn_service': True,
+    'cluster_type': 'logical_dns'
 }]
 
 # This is the set of mongo clusters that local Envoys can talk to. Each database defines a set of
@@ -72,12 +66,9 @@ external_virtual_hosts = [{
 # as it demonstrates how to setup TCP proxy and the network rate limit filter.
 mongos_servers = {
     'somedb': {
-        'address':
-        "127.0.0.1",
-        'protocol':
-        "TCP",
-        'port_value':
-        27019,
+        'address': "127.0.0.1",
+        'protocol': "TCP",
+        'port_value': 27019,
         'hosts': [
             {
                 'port_value': 27817,
@@ -100,17 +91,15 @@ mongos_servers = {
                 'protocol': 'TCP'
             },
         ],
-        'ratelimit':
-        True
+        'ratelimit': True
     }
 }
 
 
 def generate_config(template_path, template, output_file, **context):
   """ Generate a final config file based on a template and some context. """
-  env = jinja2.Environment(
-      loader=jinja2.FileSystemLoader(template_path, followlinks=True),
-      undefined=jinja2.StrictUndefined)
+  env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path, followlinks=True),
+                           undefined=jinja2.StrictUndefined)
   raw_output = env.get_template(template).render(**context)
   with open(output_file, 'w') as fh:
     fh.write(raw_output)
@@ -118,11 +107,10 @@ def generate_config(template_path, template, output_file, **context):
 
 # Generate a demo config for the main front proxy. This sets up both HTTP and HTTPS listeners,
 # as well as a listener for the double proxy to connect to via SSL client authentication.
-generate_config(
-    SCRIPT_DIR,
-    'envoy_front_proxy_v2.template.yaml',
-    '{}/envoy_front_proxy.v2.yaml'.format(OUT_DIR),
-    clusters=front_envoy_clusters)
+generate_config(SCRIPT_DIR,
+                'envoy_front_proxy_v2.template.yaml',
+                '{}/envoy_front_proxy.v2.yaml'.format(OUT_DIR),
+                clusters=front_envoy_clusters)
 
 # Generate a demo config for the double proxy. This sets up both an HTTP and HTTPS listeners,
 # and backhauls the traffic to the main front proxy.
@@ -137,13 +125,12 @@ generate_config(SCRIPT_DIR, 'envoy_double_proxy_v2.template.yaml',
 # optional external service ports: built from external_virtual_hosts above. Each external host
 #                                  that Envoy proxies to listens on its own port.
 # optional mongo ports: built from mongos_servers above.
-generate_config(
-    SCRIPT_DIR,
-    'envoy_service_to_service_v2.template.yaml',
-    '{}/envoy_service_to_service.yaml'.format(OUT_DIR),
-    internal_virtual_hosts=service_to_service_envoy_clusters,
-    external_virtual_hosts=external_virtual_hosts,
-    mongos_servers=mongos_servers)
+generate_config(SCRIPT_DIR,
+                'envoy_service_to_service_v2.template.yaml',
+                '{}/envoy_service_to_service.yaml'.format(OUT_DIR),
+                internal_virtual_hosts=service_to_service_envoy_clusters,
+                external_virtual_hosts=external_virtual_hosts,
+                mongos_servers=mongos_servers)
 
 for google_ext in ['v2.yaml']:
   shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.%s' % google_ext), OUT_DIR)

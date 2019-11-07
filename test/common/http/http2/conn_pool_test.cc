@@ -27,7 +27,6 @@ using testing::NiceMock;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Http {
@@ -65,9 +64,9 @@ public:
 
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
-        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
+        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr) {}
 
-  ~Http2ConnPoolImplTest() {
+  ~Http2ConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
@@ -85,7 +84,7 @@ public:
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
-        std::move(connection), test_client.codec_,
+        CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
         [this](CodecClient*) -> void { onClientDestroy(); },
         Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
     if (buffer_limits) {
@@ -96,7 +95,7 @@ public:
         .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
           return test_clients_.back().codec_client_;
         }));
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
+    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
   }
 
   // Connects a pending connection for client with the given index, asserting
@@ -622,7 +621,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   EXPECT_CALL(r1.callbacks_.pool_failure_, ready());
-  test_clients_[0].connect_timer_->callback_();
+  test_clients_[0].connect_timer_->invokeCallback();
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();

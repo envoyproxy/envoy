@@ -49,7 +49,7 @@ private:
 class LogRecordingSink : public Logger::SinkDelegate {
 public:
   explicit LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink);
-  virtual ~LogRecordingSink();
+  ~LogRecordingSink() override;
 
   // Logger::SinkDelegate
   void log(absl::string_view msg) override;
@@ -68,8 +68,17 @@ using ExpectedLogMessages = std::vector<StringPair>;
 // Below macros specify Envoy:: before class names so that the macro can be used outside of
 // namespace Envoy.
 
+// Alias for EXPECT_LOG_CONTAINS_ALL_OF_HELPER, with escaped=true
+#define EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(expected_messages, stmt)                                \
+  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, true)
+
+// Alias for EXPECT_LOG_CONTAINS_ALL_OF_HELPER, with escaped=false
+#define EXPECT_LOG_CONTAINS_ALL_OF(expected_messages, stmt)                                        \
+  EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, false)
+
 // Validates that when stmt is executed, log messages containing substr and loglevel will be
-// emitted. Failure message e.g.,
+// emitted. Escaped=true sets the behavior to function like the --log-format-escaped CLI flag.
+// Failure message e.g.,
 //
 // Logs:
 //  [2018-04-12 05:51:00.245][7290192][debug][upstream] grpc_mux_impl.cc:160] Received gRPC
@@ -78,11 +87,13 @@ using ExpectedLogMessages = std::vector<StringPair>;
 //  Does NOT contain:
 //    'warning', 'Too many sendDiscoveryRequest calls for baz’
 //    'warning', 'Too man sendDiscoveryRequest calls for foo'
-#define EXPECT_LOG_CONTAINS_ALL_OF(expected_messages, stmt)                                        \
+#define EXPECT_LOG_CONTAINS_ALL_OF_HELPER(expected_messages, stmt, escaped)                        \
   do {                                                                                             \
     ASSERT_FALSE(expected_messages.empty()) << "Expected messages cannot be empty.";               \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    Envoy::Logger::DelegatingLogSinkPtr sink_ptr = Envoy::Logger::Registry::getSink();             \
+    sink_ptr->set_should_escape(escaped);                                                          \
+    Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
     stmt;                                                                                          \
     if (log_recorder.messages().empty()) {                                                         \
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \

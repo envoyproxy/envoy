@@ -64,7 +64,7 @@ public:
       Server::Configuration::ResourceMonitorFactoryContext& context) override {
     auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher());
     monitor_ = monitor.get();
-    return std::move(monitor);
+    return monitor;
   }
 
   FakeResourceMonitor* monitor_; // not owned

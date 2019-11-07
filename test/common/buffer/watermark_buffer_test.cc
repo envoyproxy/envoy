@@ -27,8 +27,8 @@ public:
   uint32_t times_high_watermark_called_{0};
 };
 
-INSTANTIATE_TEST_CASE_P(WatermarkBufferTest, WatermarkBufferTest,
-                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(WatermarkBufferTest, WatermarkBufferTest,
+                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(WatermarkBufferTest, TestWatermark) { ASSERT_EQ(10, buffer_.highWatermark()); }
 
@@ -251,6 +251,14 @@ TEST_P(WatermarkBufferTest, Search) {
   EXPECT_EQ(1, buffer_.search(&TEN_BYTES[1], 2, 0));
 
   EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5));
+}
+
+TEST_P(WatermarkBufferTest, StartsWith) {
+  buffer_.add(TEN_BYTES, 10);
+
+  EXPECT_TRUE(buffer_.startsWith({TEN_BYTES, 2}));
+  EXPECT_TRUE(buffer_.startsWith({TEN_BYTES, 10}));
+  EXPECT_FALSE(buffer_.startsWith({&TEN_BYTES[1], 2}));
 }
 
 TEST_P(WatermarkBufferTest, MoveBackWithWatermarks) {

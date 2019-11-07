@@ -41,8 +41,16 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
   open();
 }
 
+Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
+  static constexpr Filesystem::FlagSet default_flags{1 << Filesystem::File::Operation::Write |
+                                                     1 << Filesystem::File::Operation::Create |
+                                                     1 << Filesystem::File::Operation::Append};
+
+  return default_flags;
+}
+
 void AccessLogFileImpl::open() {
-  const Api::IoCallBoolResult result = file_->open();
+  const Api::IoCallBoolResult result = file_->open(defaultFlags());
   if (!result.rc_) {
     throw EnvoyException(
         fmt::format("unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails()));
@@ -92,8 +100,12 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
     for (const Buffer::RawSlice& slice : slices) {
       absl::string_view data(static_cast<char*>(slice.mem_), slice.len_);
       const Api::IoCallSizeResult result = file_->write(data);
-      ASSERT(result.rc_ == static_cast<ssize_t>(slice.len_));
-      stats_.write_completed_.inc();
+      if (result.ok() && result.rc_ == static_cast<ssize_t>(slice.len_)) {
+        stats_.write_completed_.inc();
+      } else {
+        // Probably disk full.
+        stats_.write_failed_.inc();
+      }
     }
   }
 
@@ -111,7 +123,7 @@ void AccessLogFileImpl::flushThreadFunc() {
 
       // flush_event_ can be woken up either by large enough flush_buffer or by timer.
       // In case it was timer, flush_buffer_ can be empty.
-      while (flush_buffer_.length() == 0 && !flush_thread_exit_) {
+      while (flush_buffer_.length() == 0 && !flush_thread_exit_ && !reopen_file_) {
         // CondVar::wait() does not throw, so it's safe to pass the mutex rather than the guard.
         flush_event_.wait(write_lock_);
       }
@@ -121,7 +133,6 @@ void AccessLogFileImpl::flushThreadFunc() {
       }
 
       flush_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
-      ASSERT(flush_buffer_.length() > 0);
       about_to_write_buffer_.move(flush_buffer_);
       ASSERT(flush_buffer_.length() == 0);
     }

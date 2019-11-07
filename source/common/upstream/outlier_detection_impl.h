@@ -92,7 +92,7 @@ public:
    * @return a valid absl::optional<double> with the success rate. If there were not enough
    * requests, an invalid absl::optional<double> is returned.
    */
-  absl::optional<double> getSuccessRate(uint64_t success_rate_request_volume);
+  absl::optional<std::pair<double, uint64_t>> getSuccessRateAndVolume();
 
 private:
   std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
@@ -156,8 +156,8 @@ public:
   }
 
   const SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) const {
-    return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_SR_monitor_
-                                                            : local_origin_SR_monitor_;
+    return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_sr_monitor_
+                                                            : local_origin_sr_monitor_;
   }
 
   SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) {
@@ -197,8 +197,8 @@ private:
   //   and for external origin failures when external/local events are split
   // - local origin: for local events when external/local events are split and
   //   not used when external/local events are not split.
-  SuccessRateMonitor external_origin_SR_monitor_;
-  SuccessRateMonitor local_origin_SR_monitor_;
+  SuccessRateMonitor external_origin_sr_monitor_;
+  SuccessRateMonitor local_origin_sr_monitor_;
 
   void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
@@ -214,13 +214,17 @@ private:
   COUNTER(ejections_detected_consecutive_5xx)                                                      \
   COUNTER(ejections_detected_consecutive_gateway_failure)                                          \
   COUNTER(ejections_detected_success_rate)                                                         \
+  COUNTER(ejections_detected_failure_percentage)                                                   \
   COUNTER(ejections_enforced_consecutive_5xx)                                                      \
   COUNTER(ejections_enforced_consecutive_gateway_failure)                                          \
   COUNTER(ejections_enforced_success_rate)                                                         \
+  COUNTER(ejections_enforced_failure_percentage)                                                   \
   COUNTER(ejections_detected_consecutive_local_origin_failure)                                     \
   COUNTER(ejections_enforced_consecutive_local_origin_failure)                                     \
   COUNTER(ejections_detected_local_origin_success_rate)                                            \
   COUNTER(ejections_enforced_local_origin_success_rate)                                            \
+  COUNTER(ejections_detected_local_origin_failure_percentage)                                      \
+  COUNTER(ejections_enforced_local_origin_failure_percentage)                                      \
   COUNTER(ejections_enforced_total)                                                                \
   COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_success_rate)                                                                  \
@@ -249,11 +253,18 @@ public:
   uint64_t successRateMinimumHosts() const { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
+  uint64_t failurePercentageThreshold() const { return failure_percentage_threshold_; }
+  uint64_t failurePercentageMinimumHosts() const { return failure_percentage_minimum_hosts_; }
+  uint64_t failurePercentageRequestVolume() const { return failure_percentage_request_volume_; }
   uint64_t enforcingConsecutive5xx() const { return enforcing_consecutive_5xx_; }
   uint64_t enforcingConsecutiveGatewayFailure() const {
     return enforcing_consecutive_gateway_failure_;
   }
   uint64_t enforcingSuccessRate() const { return enforcing_success_rate_; }
+  uint64_t enforcingFailurePercentage() const { return enforcing_failure_percentage_; }
+  uint64_t enforcingFailurePercentageLocalOrigin() const {
+    return enforcing_failure_percentage_local_origin_;
+  }
   bool splitExternalLocalOriginErrors() const { return split_external_local_origin_errors_; }
   uint64_t consecutiveLocalOriginFailure() const { return consecutive_local_origin_failure_; }
   uint64_t enforcingConsecutiveLocalOriginFailure() const {
@@ -270,13 +281,38 @@ private:
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
   const uint64_t success_rate_stdev_factor_;
+  const uint64_t failure_percentage_threshold_;
+  const uint64_t failure_percentage_minimum_hosts_;
+  const uint64_t failure_percentage_request_volume_;
   const uint64_t enforcing_consecutive_5xx_;
   const uint64_t enforcing_consecutive_gateway_failure_;
   const uint64_t enforcing_success_rate_;
+  const uint64_t enforcing_failure_percentage_;
+  const uint64_t enforcing_failure_percentage_local_origin_;
   const bool split_external_local_origin_errors_;
   const uint64_t consecutive_local_origin_failure_;
   const uint64_t enforcing_consecutive_local_origin_failure_;
   const uint64_t enforcing_local_origin_success_rate_;
+
+  static const uint64_t DEFAULT_INTERVAL_MS = 10000;
+  static const uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
+  static const uint64_t DEFAULT_CONSECUTIVE_5XX = 5;
+  static const uint64_t DEFAULT_CONSECUTIVE_GATEWAY_FAILURE = 5;
+  static const uint64_t DEFAULT_MAX_EJECTION_PERCENT = 10;
+  static const uint64_t DEFAULT_SUCCESS_RATE_MINIMUM_HOSTS = 5;
+  static const uint64_t DEFAULT_SUCCESS_RATE_REQUEST_VOLUME = 100;
+  static const uint64_t DEFAULT_SUCCESS_RATE_STDEV_FACTOR = 1900;
+  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_THRESHOLD = 85;
+  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_MINIMUM_HOSTS = 5;
+  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_REQUEST_VOLUME = 50;
+  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_5XX = 100;
+  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_GATEWAY_FAILURE = 0;
+  static const uint64_t DEFAULT_ENFORCING_SUCCESS_RATE = 100;
+  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE = 0;
+  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE_LOCAL_ORIGIN = 0;
+  static const uint64_t DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 5;
+  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
+  static const uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
 };
 
 /**
@@ -290,7 +326,7 @@ public:
   create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger);
-  ~DetectorImpl();
+  ~DetectorImpl() override;
 
   void onConsecutive5xx(HostSharedPtr host);
   void onConsecutiveGatewayFailure(HostSharedPtr host);
@@ -360,17 +396,17 @@ private:
   EventLoggerSharedPtr event_logger_;
 
   // EjectionPair for external and local origin events.
-  // When external/local origin events are not split, external_origin_SR_num_ are used for
-  // both types of events: external and local. local_origin_SR_num_ is not used.
-  // When external/local origin events are split, external_origin_SR_num_ are used only
-  // for external events and local_origin_SR_num_ is used for local origin events.
-  EjectionPair external_origin_SR_num_;
-  EjectionPair local_origin_SR_num_;
+  // When external/local origin events are not split, external_origin_sr_num_ are used for
+  // both types of events: external and local. local_origin_sr_num_ is not used.
+  // When external/local origin events are split, external_origin_sr_num_ are used only
+  // for external events and local_origin_sr_num_ is used for local origin events.
+  EjectionPair external_origin_sr_num_;
+  EjectionPair local_origin_sr_num_;
 
   const EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) const {
     return (DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin == monitor_type)
-               ? external_origin_SR_num_
-               : local_origin_SR_num_;
+               ? external_origin_sr_num_
+               : local_origin_sr_num_;
   }
   EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
     return const_cast<EjectionPair&>(

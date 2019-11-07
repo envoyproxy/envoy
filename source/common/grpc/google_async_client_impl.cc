@@ -2,6 +2,7 @@
 
 #include "envoy/stats/scope.h"
 
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
@@ -95,13 +96,14 @@ GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
   }
 }
 
-AsyncRequest*
-GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name, absl::string_view method_name,
-                               Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
-                               Tracing::Span& parent_span,
-                               const absl::optional<std::chrono::milliseconds>& timeout) {
+AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name,
+                                             absl::string_view method_name,
+                                             Buffer::InstancePtr&& request,
+                                             RawAsyncRequestCallbacks& callbacks,
+                                             Tracing::Span& parent_span,
+                                             const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new GoogleAsyncRequestImpl(
-      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, timeout);
+      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
   std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
 
   grpc_stream->initialize(true);
@@ -115,10 +117,10 @@ GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name, absl::string
 
 RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_name,
                                                 absl::string_view method_name,
-                                                RawAsyncStreamCallbacks& callbacks) {
-  const absl::optional<std::chrono::milliseconds> no_timeout;
+                                                RawAsyncStreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions& options) {
   auto grpc_stream = std::make_unique<GoogleAsyncStreamImpl>(*this, service_full_name, method_name,
-                                                             callbacks, no_timeout);
+                                                             callbacks, options);
 
   grpc_stream->initialize(false);
   if (grpc_stream->call_failed()) {
@@ -129,13 +131,14 @@ RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_n
   return active_streams_.front().get();
 }
 
-GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(
-    GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
-    absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-    const absl::optional<std::chrono::milliseconds>& timeout)
+GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
+                                             absl::string_view service_full_name,
+                                             absl::string_view method_name,
+                                             RawAsyncStreamCallbacks& callbacks,
+                                             const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
-      timeout_(timeout) {}
+      options_(options) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -149,9 +152,10 @@ GoogleAsyncStreamImpl::PendingMessage::PendingMessage(Buffer::InstancePtr reques
 void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   parent_.stats_.streams_total_->inc();
   gpr_timespec abs_deadline =
-      timeout_ ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
-                              gpr_time_from_millis(timeout_.value().count(), GPR_TIMESPAN))
-               : gpr_inf_future(GPR_CLOCK_REALTIME);
+      options_.timeout
+          ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
+                         gpr_time_from_millis(options_.timeout.value().count(), GPR_TIMESPAN))
+          : gpr_inf_future(GPR_CLOCK_REALTIME);
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
@@ -349,8 +353,13 @@ void GoogleAsyncStreamImpl::metadataTranslate(
   // More painful copying, this time due to the mismatch in header
   // representation data structures in Envoy and Google gRPC.
   for (const auto& it : grpc_metadata) {
-    header_map.addCopy(Http::LowerCaseString(std::string(it.first.data(), it.first.size())),
-                       std::string(it.second.data(), it.second.size()));
+    auto key = Http::LowerCaseString(std::string(it.first.data(), it.first.size()));
+    if (absl::EndsWith(key.get(), "-bin")) {
+      auto value = Base64::encode(it.second.data(), it.second.size());
+      header_map.addCopy(key, value);
+      continue;
+    }
+    header_map.addCopy(key, std::string(it.second.data(), it.second.size()));
   }
 }
 
@@ -387,8 +396,8 @@ void GoogleAsyncStreamImpl::cleanup() {
 GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
     GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
     absl::string_view method_name, Buffer::InstancePtr request, RawAsyncRequestCallbacks& callbacks,
-    Tracing::Span& parent_span, const absl::optional<std::chrono::milliseconds>& timeout)
-    : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, timeout),
+    Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options)
+    : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.stat_prefix_ + " egress",

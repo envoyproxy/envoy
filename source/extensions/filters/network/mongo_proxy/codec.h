@@ -22,16 +22,16 @@ namespace MongoProxy {
 class Message {
 public:
   enum class OpCode {
-    OP_REPLY = 1,
-    OP_MSG = 1000,
-    OP_UPDATE = 2001,
-    OP_INSERT = 2002,
-    OP_QUERY = 2004,
-    OP_GET_MORE = 2005,
-    OP_DELETE = 2006,
-    OP_KILL_CURSORS = 2007,
-    OP_COMMAND = 2010,
-    OP_COMMANDREPLY = 2011
+    Reply = 1,
+    Msg = 1000,
+    Update = 2001,
+    Insert = 2002,
+    Query = 2004,
+    GetMore = 2005,
+    Delete = 2006,
+    KillCursors = 2007,
+    Command = 2010,
+    CommandReply = 2011
   };
 
   virtual ~Message() = default;
@@ -89,7 +89,7 @@ public:
   virtual bool operator==(const KillCursorsMessage& rhs) const PURE;
 
   virtual int32_t numberOfCursorIds() const PURE;
-  virtual void numberOfCursorIds(int32_t number_of_cursors_ids_) PURE;
+  virtual void numberOfCursorIds(int32_t number_of_cursors_ids) PURE;
   virtual const std::vector<int64_t>& cursorIds() const PURE;
   virtual void cursorIds(std::vector<int64_t>&& cursors_ids) PURE;
 };
@@ -163,11 +163,11 @@ public:
   virtual std::string database() const PURE;
   virtual void database(std::string database) PURE;
   virtual std::string commandName() const PURE;
-  virtual void commandName(std::string commandName) PURE;
+  virtual void commandName(std::string command_name) PURE;
   virtual const Bson::Document* metadata() const PURE;
   virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
   virtual const Bson::Document* commandArgs() const PURE;
-  virtual void commandArgs(Bson::DocumentSharedPtr&& commandArgs) PURE;
+  virtual void commandArgs(Bson::DocumentSharedPtr&& command_args) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& inputDocs() const PURE;
   virtual std::list<Bson::DocumentSharedPtr>& inputDocs() PURE;
 };
@@ -180,7 +180,7 @@ public:
   virtual const Bson::Document* metadata() const PURE;
   virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
   virtual const Bson::Document* commandReply() const PURE;
-  virtual void commandReply(Bson::DocumentSharedPtr&& commandReply) PURE;
+  virtual void commandReply(Bson::DocumentSharedPtr&& command_reply) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& outputDocs() const PURE;
   virtual std::list<Bson::DocumentSharedPtr>& outputDocs() PURE;
 };

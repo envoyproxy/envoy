@@ -1,13 +1,12 @@
-#!/usr/bin/env python
-
-from __future__ import print_function
+#!/usr/bin/env python3
 
 import argparse
 import common
-import fileinput
+import functools
 import multiprocessing
 import os
 import os.path
+import pathlib
 import re
 import subprocess
 import stat
@@ -16,7 +15,8 @@ import traceback
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
-                     "./tools/testdata/check_format/", "./tools/pyformat/")
+                     "./bazel/toolchains/configs/", "./tools/testdata/check_format/",
+                     "./tools/pyformat/")
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
 DOCS_SUFFIX = (".md", ".rst")
@@ -30,6 +30,7 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
 REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
+                       "./source/extensions/filters/http/common/aws/utility.cc",
                        "./source/common/event/real_time_system.cc",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
                        "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
@@ -41,24 +42,48 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/integration/integration.h")
 
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
-                                 "./test/common/grpc/codec_test.cc")
+SERIALIZE_AS_STRING_WHITELIST = (
+    "./source/common/config/version_converter.cc",
+    "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
+    "./test/common/protobuf/utility_test.cc",
+    "./test/common/grpc/codec_test.cc",
+    "./test/common/grpc/codec_fuzz_test.cc",
+)
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
+# Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
+# ones were grandfathered as part of PR #8484 for backwards compatibility.
+HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_length_ms",
+                                      "initialization_time_ms", "loop_duration_us", "poll_delay_us",
+                                      "request_time_ms", "upstream_cx_connect_ms",
+                                      "upstream_cx_length_ms")
+
+# Files in these paths can use std::regex
+STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
+                       "./source/common/common/regex.cc",
+                       "./source/common/stats/tag_extractor_impl.h",
+                       "./source/common/stats/tag_extractor_impl.cc",
+                       "./source/common/access_log/access_log_formatter.cc",
+                       "./source/extensions/filters/http/squash/squash_filter.h",
+                       "./source/extensions/filters/http/squash/squash_filter.cc",
+                       "./source/server/http/admin.h", "./source/server/http/admin.cc")
+
+# Only one C++ file should instantiate grpc_init
+GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
+
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
-ENVOY_BUILD_FIXER_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
+BUILDOZER_PATH = os.getenv("BUILDOZER_BIN", "$GOPATH/bin/buildozer")
+ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
+                                      "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
-PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
-PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
-PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
+X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -83,78 +108,71 @@ LIBCXX_REPLACEMENTS = {
 UNOWNED_EXTENSIONS = {
   "extensions/filters/http/ratelimit",
   "extensions/filters/http/buffer",
-  "extensions/filters/http/grpc_http1_bridge",
-  "extensions/filters/http/grpc_http1_reverse_bridge",
   "extensions/filters/http/rbac",
-  "extensions/filters/http/gzip",
   "extensions/filters/http/ip_tagging",
   "extensions/filters/http/tap",
-  "extensions/filters/http/fault",
-  "extensions/filters/http/grpc_json_transcoder",
   "extensions/filters/http/health_check",
-  "extensions/filters/http/router",
   "extensions/filters/http/cors",
   "extensions/filters/http/ext_authz",
   "extensions/filters/http/dynamo",
   "extensions/filters/http/lua",
-  "extensions/filters/http/grpc_web",
   "extensions/filters/http/common",
-  "extensions/filters/http/common/aws",
-  "extensions/filters/http/squash",
   "extensions/filters/common",
   "extensions/filters/common/ratelimit",
   "extensions/filters/common/rbac",
-  "extensions/filters/common/fault",
-  "extensions/filters/common/ext_authz",
   "extensions/filters/common/lua",
-  "extensions/filters/common/original_src",
   "extensions/filters/listener/original_dst",
   "extensions/filters/listener/proxy_protocol",
-  "extensions/filters/listener/tls_inspector",
-  "extensions/grpc_credentials/example",
-  "extensions/grpc_credentials/file_based_metadata",
-  "extensions/stat_sinks/dog_statsd",
-  "extensions/stat_sinks/hystrix",
-  "extensions/stat_sinks/metrics_service",
   "extensions/stat_sinks/statsd",
   "extensions/stat_sinks/common",
   "extensions/stat_sinks/common/statsd",
   "extensions/health_checkers/redis",
-  "extensions/access_loggers/http_grpc",
+  "extensions/access_loggers/grpc",
   "extensions/access_loggers/file",
   "extensions/common/tap",
   "extensions/transport_sockets/raw_buffer",
   "extensions/transport_sockets/tap",
-  "extensions/transport_sockets/tls",
   "extensions/tracers/zipkin",
   "extensions/tracers/dynamic_ot",
   "extensions/tracers/opencensus",
   "extensions/tracers/lightstep",
   "extensions/tracers/common",
   "extensions/tracers/common/ot",
-  "extensions/resource_monitors/injected_resource",
-  "extensions/resource_monitors/fixed_heap",
-  "extensions/resource_monitors/common",
-  "extensions/retry/priority",
-  "extensions/retry/priority/previous_priorities",
-  "extensions/retry/host",
   "extensions/retry/host/previous_hosts",
   "extensions/filters/network/ratelimit",
   "extensions/filters/network/client_ssl_auth",
-  "extensions/filters/network/http_connection_manager",
   "extensions/filters/network/rbac",
   "extensions/filters/network/tcp_proxy",
   "extensions/filters/network/echo",
   "extensions/filters/network/ext_authz",
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
-  "extensions/filters/network/kafka/protocol_code_generator",
-  "extensions/filters/network/kafka/serialization_code_generator",
+  "extensions/filters/network/kafka/protocol",
+  "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
   "extensions/filters/network/common",
   "extensions/filters/network/common/redis",
 }
 # yapf: enable
+
+
+# Map a line transformation function across each line of a file.
+# .bak temporaries.
+def replaceLines(path, line_xform):
+  # We used to use fileinput in the older Python 2.7 script, but this doesn't do
+  # inplace mode and UTF-8 in Python 3, so doing it the manual way.
+  output_lines = [line_xform(line) for line in readLines(path)]
+  pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+
+
+# Obtain all the lines in a given file.
+def readLines(path):
+  return readFile(path).split('\n')
+
+
+# Read a UTF-8 encoded file as a str.
+def readFile(path):
+  return pathlib.Path(path).read_text(encoding='utf-8')
 
 
 # lookPath searches for the given executable in all directories in PATH
@@ -180,7 +198,7 @@ def executableByOthers(executable):
   return bool(st.st_mode & stat.S_IXOTH)
 
 
-# Check whether all needed external tools (clang-format, buildifier) are
+# Check whether all needed external tools (clang-format, buildifier, buildozer) are
 # available.
 def checkTools():
   error_messages = []
@@ -196,27 +214,32 @@ def checkTools():
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
-        "    export CLANG_FORMAT=clang-format-8.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-8\n"
-        "    export CLANG_FORMAT=/usr/local/opt/llvm@8/bin/clang-format".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=clang-format-9.0.0\n"
+        "    export CLANG_FORMAT=/opt/bin/clang-format-9\n"
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@9/bin/clang-format".format(CLANG_FORMAT_PATH))
 
-  buildifier_abs_path = lookPath(BUILDIFIER_PATH)
-  if buildifier_abs_path:
-    if not executableByOthers(buildifier_abs_path):
-      error_messages.append("command {} exists, but cannot be executed by other "
-                            "users".format(BUILDIFIER_PATH))
-  elif pathExists(BUILDIFIER_PATH):
-    if not executableByOthers(BUILDIFIER_PATH):
-      error_messages.append("command {} exists, but cannot be executed by other "
-                            "users".format(BUILDIFIER_PATH))
-  else:
-    error_messages.append(
-        "Command {} not found. If you have buildifier installed, but the binary "
-        "name is different or it's not available in $GOPATH/bin, please use "
-        "BUILDIFIER_BIN environment variable to specify the path. Example:\n"
-        "    export BUILDIFIER_BIN=/opt/bin/buildifier\n"
-        "If you don't have buildifier installed, you can install it by:\n"
-        "    go get -u github.com/bazelbuild/buildtools/buildifier".format(BUILDIFIER_PATH))
+  def checkBazelTool(name, path, var):
+    bazel_tool_abs_path = lookPath(path)
+    if bazel_tool_abs_path:
+      if not executableByOthers(bazel_tool_abs_path):
+        error_messages.append("command {} exists, but cannot be executed by other "
+                              "users".format(path))
+    elif pathExists(path):
+      if not executableByOthers(path):
+        error_messages.append("command {} exists, but cannot be executed by other "
+                              "users".format(path))
+    else:
+
+      error_messages.append(
+          "Command {} not found. If you have buildifier installed, but the binary "
+          "name is different or it's not available in $GOPATH/bin, please use "
+          "{} environment variable to specify the path. Example:\n"
+          "    export {}=/opt/bin/buildifier\n"
+          "If you don't have buildifier installed, you can install it by:\n"
+          "    go get -u github.com/bazelbuild/buildtools/{}".format(path, var, var, name))
+
+  checkBazelTool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
+  checkBazelTool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
 
   return error_messages
 
@@ -227,68 +250,23 @@ def checkNamespace(file_path):
       return []
 
   nolint = "NOLINT(namespace-%s)" % namespace_check.lower()
-  with open(file_path) as f:
-    text = f.read()
-    if not re.search("^\s*namespace\s+%s\s*{" % namespace_check, text, re.MULTILINE) and \
-       not nolint in text:
-      return [
-          "Unable to find %s namespace or %s for file: %s" % (namespace_check, nolint, file_path)
-      ]
+  text = readFile(file_path)
+  if not re.search("^\s*namespace\s+%s\s*{" % namespace_check, text, re.MULTILINE) and \
+     not nolint in text:
+    return ["Unable to find %s namespace or %s for file: %s" % (namespace_check, nolint, file_path)]
   return []
-
-
-# If the substring is not found in the file, then insert to_add
-def insertProtoOptionIfNotFound(substring, file_path, to_add):
-  text = None
-  with open(file_path) as f:
-    text = f.read()
-
-  if not substring in text:
-
-    def repl(m):
-      return m.group(0).rstrip() + "\n\n" + to_add + "\n"
-
-    with open(file_path, "w") as f:
-      f.write(re.sub(PROTO_PACKAGE_REGEX, repl, text))
 
 
 def packageNameForProto(file_path):
   package_name = None
   error_message = []
-  with open(file_path) as f:
-    result = PROTO_PACKAGE_REGEX.search(f.read())
-    if result is not None and len(result.groups()) == 1:
-      package_name = result.group(1)
-    if package_name is None:
-      error_message = ["Unable to find package name for proto file: %s" % file_path]
+  result = PROTO_PACKAGE_REGEX.search(readFile(file_path))
+  if result is not None and len(result.groups()) == 1:
+    package_name = result.group(1)
+  if package_name is None:
+    error_message = ["Unable to find package name for proto file: %s" % file_path]
 
   return [package_name, error_message]
-
-
-def fixJavaPackageProtoOption(file_path):
-  package_name = packageNameForProto(file_path)[0]
-  to_add = PROTO_OPTION_JAVA_PACKAGE + "io.envoyproxy.{}\";".format(package_name)
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path, to_add)
-  return []
-
-
-# Add "option java_outer_classname = FooBarProto;" for foo_bar.proto
-def fixJavaOuterClassnameProtoOption(file_path):
-  file_name = os.path.basename(file_path)[:-len(".proto")]
-  if "-" in file_name or "." in file_name or not file_name.islower():
-    return ["Unable to decide java_outer_classname for proto file: %s" % file_path]
-
-  to_add = PROTO_OPTION_JAVA_OUTER_CLASSNAME \
-       + "".join(x.title() for x in file_name.split("_")) \
-       + "Proto\";"
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path, to_add)
-  return []
-
-
-def fixJavaMultipleFilesProtoOption(file_path):
-  to_add = PROTO_OPTION_JAVA_MULTIPLE_FILES + "true;"
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path, to_add)
-  return []
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -314,21 +292,31 @@ def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
+def whitelistedForHistogramSiSuffix(name):
+  return name in HISTOGRAM_WITH_SI_SUFFIX_WHITELIST
+
+
+def whitelistedForStdRegex(file_path):
+  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
+
+
+def whitelistedForGrpcInit(file_path):
+  return file_path in GRPC_INIT_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
-  with open(file_path) as f:
-    text = f.read()
-    if pattern in text:
-      error_messages = [file_path + ": " + error_message]
-      for i, line in enumerate(text.splitlines()):
-        if pattern in line:
-          error_messages.append("  %s:%s" % (file_path, i + 1))
-      return error_messages
-    return []
+  text = readFile(file_path)
+  if pattern in text:
+    error_messages = [file_path + ": " + error_message]
+    for i, line in enumerate(text.splitlines()):
+      if pattern in line:
+        error_messages.append("  %s:%s" % (file_path, i + 1))
+    return error_messages
+  return []
 
 
 def errorIfNoSubstringFound(pattern, file_path, error_message):
-  with open(file_path) as f:
-    return [] if pattern in f.read() else [file_path + ": " + error_message]
+  return [] if pattern in readFile(file_path) else [file_path + ": " + error_message]
 
 
 def isApiFile(file_path):
@@ -354,6 +342,13 @@ def isWorkspaceFile(file_path):
   return os.path.basename(file_path) == "WORKSPACE"
 
 
+def isBuildFixerExcludedFile(file_path):
+  for excluded_path in build_fixer_check_excluded_paths:
+    if file_path.startswith(excluded_path):
+      return True
+  return False
+
+
 def hasInvalidAngleBracketDirectory(line):
   if not line.startswith(INCLUDE_ANGLE):
     return False
@@ -372,8 +367,7 @@ VERSION_HISTORY_NEW_RELEASE_REGEX = re.compile("^====[=]+$")
 def checkCurrentReleaseNotes(file_path, error_messages):
   in_current_release = False
 
-  file_handle = fileinput.input(file_path)
-  for line_number, line in enumerate(file_handle):
+  for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
@@ -388,7 +382,6 @@ def checkCurrentReleaseNotes(file_path, error_messages):
     if line.startswith("*") and not VERSION_HISTORY_NEW_LINE_REGEX.match(line):
       reportError("Version history line malformed. "
                   "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" % line)
-  file_handle.close()
 
 
 def checkFileContents(file_path, checker):
@@ -400,7 +393,7 @@ def checkFileContents(file_path, checker):
     # notes have a different format.
     checkCurrentReleaseNotes(file_path, error_messages)
 
-  for line_number, line in enumerate(fileinput.input(file_path)):
+  for line_number, line in enumerate(readLines(file_path)):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
@@ -447,10 +440,26 @@ def hasCondVarWaitFor(line):
   return True
 
 
+# Determines whether the filename is either in the specified subdirectory, or
+# at the top level. We consider files in the top level for the benefit of
+# the check_format testcases in tools/testdata/check_format.
+def isInSubdir(filename, *subdirs):
+  # Skip this check for check_format's unit-tests.
+  if filename.count("/") <= 1:
+    return True
+  for subdir in subdirs:
+    if filename.startswith('./' + subdir + '/'):
+      return True
+  return False
+
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
     reportError("over-enthusiastic spaces")
+  if isInSubdir(file_path, 'source', 'include') and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
+    reportError(
+        "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue.")
   if hasInvalidAngleBracketDirectory(line):
     reportError("envoy includes should not have angle brackets")
   for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
@@ -459,8 +468,11 @@ def checkSourceLine(line, file_path, reportError):
                   "should be %s" % (invalid_construct, valid_construct))
   for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     if invalid_construct in line:
-      reportError("term %s should be replaced with standard library term %s" % (invalid_construct,
-                                                                                valid_construct))
+      reportError("term %s should be replaced with standard library term %s" %
+                  (invalid_construct, valid_construct))
+  # Do not include the virtual_includes headers.
+  if re.search("#include.*/_virtual_includes/", line):
+    reportError("Don't include the virtual includes headers.")
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
@@ -534,6 +546,32 @@ def checkSourceLine(line, file_path, reportError):
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
+  if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
+     ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
+    reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
+
+  hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
+  if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
+    reportError(
+        "Don't suffix histogram names with the unit symbol, "
+        "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
+        "other sinks can add the suffix automatically on flush should they prefer to do so.")
+
+  if not whitelistedForStdRegex(file_path) and "std::regex" in line:
+    reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
+
+  if not whitelistedForGrpcInit(file_path):
+    grpc_init_or_shutdown = line.find("grpc_init()")
+    grpc_shutdown = line.find("grpc_shutdown()")
+    if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
+                                       grpc_shutdown < grpc_init_or_shutdown):
+      grpc_init_or_shutdown = grpc_shutdown
+    if grpc_init_or_shutdown != -1:
+      comment = line.find("// ")
+      if comment == -1 or comment > grpc_init_or_shutdown:
+        reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
+                    "Grpc::GoogleGrpcContext. See #8282")
+
 
 def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/")):
@@ -546,7 +584,7 @@ def checkBuildLine(line, file_path, reportError):
     reportError("Superfluous '@envoy//' prefix")
 
 
-def fixBuildLine(line, file_path):
+def fixBuildLine(file_path, line):
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
       not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
@@ -554,12 +592,13 @@ def fixBuildLine(line, file_path):
 
 
 def fixBuildPath(file_path):
-  for line in fileinput.input(file_path, inplace=True):
-    sys.stdout.write(fixBuildLine(line, file_path))
+  replaceLines(file_path, functools.partial(fixBuildLine, file_path))
 
   error_messages = []
+
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
+      file_path) and not isWorkspaceFile(file_path):
     if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
@@ -570,9 +609,20 @@ def fixBuildPath(file_path):
 
 def checkBuildPath(file_path):
   error_messages = []
-  if not isApiFile(file_path) and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path):
+
+  if not isBuildFixerExcludedFile(file_path) and not isApiFile(file_path) and not isSkylarkFile(
+      file_path) and not isWorkspaceFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
+
+  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+    found = False
+    for line in readLines(file_path):
+      if "api_proto_package(" in line:
+        found = True
+        break
+    if not found:
+      error_messages += ["API build file does not provide api_proto_package()"]
 
   command = "%s -mode=diff %s" % (BUILDIFIER_PATH, file_path)
   error_messages += executeCommand(command, "buildifier check failed", file_path)
@@ -581,10 +631,10 @@ def checkBuildPath(file_path):
 
 
 def fixSourcePath(file_path):
-  for line in fileinput.input(file_path, inplace=True):
-    sys.stdout.write(fixSourceLine(line))
+  replaceLines(file_path, fixSourceLine)
 
   error_messages = []
+
   if not file_path.endswith(DOCS_SUFFIX):
     if not file_path.endswith(PROTO_SUFFIX):
       error_messages += fixHeaderOrder(file_path)
@@ -593,10 +643,6 @@ def fixSourcePath(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-    else:
-      error_messages += fixJavaMultipleFilesProtoOption(file_path)
-      error_messages += fixJavaOuterClassnameProtoOption(file_path)
-      error_messages += fixJavaPackageProtoOption(file_path)
   return error_messages
 
 
@@ -616,13 +662,6 @@ def checkSourcePath(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-    else:
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path,
-                                                "Java proto option 'java_package' not set")
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path,
-                                                "Java proto option 'java_outer_classname' not set")
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path,
-                                                "Java proto option 'java_multiple_files' not set")
   return error_messages
 
 
@@ -637,14 +676,14 @@ def executeCommand(command,
   try:
     output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
     if output:
-      return output.split("\n")
+      return output.decode('utf-8').split("\n")
     return []
   except subprocess.CalledProcessError as e:
     if (e.returncode != 0 and e.returncode != 1):
       return ["ERROR: something went wrong while executing: %s" % e.cmd]
     # In case we can't find any line numbers, record an error message first.
     error_messages = ["%s for file: %s" % (error_message, file_path)]
-    for line in e.output.splitlines():
+    for line in e.output.decode('utf-8').splitlines():
       for num in regex.findall(line):
         error_messages.append("  %s:%s" % (file_path, num))
     return error_messages
@@ -759,47 +798,48 @@ def checkErrorMessages(error_messages):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Check or fix file format.")
-  parser.add_argument(
-      "operation_type",
-      type=str,
-      choices=["check", "fix"],
-      help="specify if the run should 'check' or 'fix' format.")
+  parser.add_argument("operation_type",
+                      type=str,
+                      choices=["check", "fix"],
+                      help="specify if the run should 'check' or 'fix' format.")
   parser.add_argument(
       "target_path",
       type=str,
       nargs="?",
       default=".",
       help="specify the root directory for the script to recurse over. Default '.'.")
-  parser.add_argument(
-      "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
-  parser.add_argument(
-      "-j",
-      "--num-workers",
-      type=int,
-      default=multiprocessing.cpu_count(),
-      help="number of worker processes to use; defaults to one per core.")
+  parser.add_argument("--add-excluded-prefixes",
+                      type=str,
+                      nargs="+",
+                      help="exclude additional prefixes.")
+  parser.add_argument("-j",
+                      "--num-workers",
+                      type=int,
+                      default=multiprocessing.cpu_count(),
+                      help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
-  parser.add_argument(
-      "--skip_envoy_build_rule_check",
-      action="store_true",
-      help="skip checking for '@envoy//' prefix in build rules.")
-  parser.add_argument(
-      "--namespace_check",
-      type=str,
-      nargs="?",
-      default="Envoy",
-      help="specify namespace check string. Default 'Envoy'.")
-  parser.add_argument(
-      "--namespace_check_excluded_paths",
-      type=str,
-      nargs="+",
-      default=[],
-      help="exclude paths from the namespace_check.")
-  parser.add_argument(
-      "--include_dir_order",
-      type=str,
-      default=",".join(common.includeDirOrder()),
-      help="specify the header block include directory order.")
+  parser.add_argument("--skip_envoy_build_rule_check",
+                      action="store_true",
+                      help="skip checking for '@envoy//' prefix in build rules.")
+  parser.add_argument("--namespace_check",
+                      type=str,
+                      nargs="?",
+                      default="Envoy",
+                      help="specify namespace check string. Default 'Envoy'.")
+  parser.add_argument("--namespace_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from the namespace_check.")
+  parser.add_argument("--build_fixer_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument("--include_dir_order",
+                      type=str,
+                      default=",".join(common.includeDirOrder()),
+                      help="specify the header block include directory order.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
@@ -807,43 +847,51 @@ if __name__ == "__main__":
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
+      "./bazel/external/", "./bazel/toolchains/", "./bazel/BUILD"
+  ]
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
-
-  # Returns the list of directories with owners listed in CODEOWNERS
-  def ownedDirectories():
-    owned = []
-    try:
-      with open('./CODEOWNERS') as f:
-        for line in f:
-          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
-          # name and store it in the list of directories with documented owners.
-          m = re.search(r'..*(extensions[^@]* )@.*@.*', line)
-          if m is not None:
-            owned.append(m.group(1).strip())
-      return owned
-    except IOError:
-      return []  # for the check format tests.
-
-  # Calculate the list of owned directories once per run.
-  owned_directories = ownedDirectories()
 
   # Check whether all needed external tools are available.
   ct_error_messages = checkTools()
   if checkErrorMessages(ct_error_messages):
     sys.exit(1)
 
+  # Returns the list of directories with owners listed in CODEOWNERS. May append errors to
+  # error_messages.
+  def ownedDirectories(error_messages):
+    owned = []
+    try:
+      with open('./CODEOWNERS') as f:
+        for line in f:
+          # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
+          # name and store it in the list of directories with documented owners.
+          m = re.search(r'.*(extensions[^@]*\s+)(@.*)', line)
+          if m is not None and not line.startswith('#'):
+            owned.append(m.group(1).strip())
+            owners = re.findall('@\S+', m.group(2).strip())
+            if len(owners) < 2:
+              error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
+                                    "    {}".format(line))
+      return owned
+    except IOError:
+      return []  # for the check format tests.
+
+  # Calculate the list of owned directories once per run.
+  error_messages = []
+  owned_directories = ownedDirectories(error_messages)
+
   if os.path.isfile(target_path):
-    error_messages = checkFormat("./" + target_path)
+    error_messages += checkFormat("./" + target_path)
   else:
     pool = multiprocessing.Pool(processes=args.num_workers)
     results = []
-    error_messages = []
     # For each file in target_path, start a new task in the pool and collect the
     # results (results is passed by reference, and is used as an output).
-    os.path.walk(target_path, checkFormatVisitor,
-                 (pool, results, owned_directories, error_messages))
+    for root, _, files in os.walk(target_path):
+      checkFormatVisitor((pool, results, owned_directories, error_messages), root, files)
 
     # Close the pool to new tasks, wait for all of the running tasks to finish,
     # then collect the error messages.

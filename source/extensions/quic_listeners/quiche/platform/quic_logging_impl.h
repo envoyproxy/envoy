@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 
+#include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/stl_helpers.h"
 
@@ -143,7 +144,7 @@ private:
   std::ostringstream stream_;
 };
 
-class NullLogStream {
+class NullLogStream : public std::ostream {
 public:
   NullLogStream& stream() { return *this; }
 };

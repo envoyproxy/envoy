@@ -1,7 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <limits>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 
@@ -10,15 +12,25 @@
 namespace Envoy {
 namespace Thread {
 
+/**
+ * An id for a thread.
+ */
 class ThreadId {
 public:
-  virtual ~ThreadId() = default;
+  ThreadId() : id_(std::numeric_limits<int64_t>::min()) {}
+  explicit ThreadId(int64_t id) : id_(id) {}
 
-  virtual std::string debugString() const PURE;
-  virtual bool isCurrentThreadId() const PURE;
+  std::string debugString() const { return std::to_string(id_); }
+  bool isEmpty() const { return *this == ThreadId(); }
+  friend bool operator==(ThreadId lhs, ThreadId rhs) { return lhs.id_ == rhs.id_; }
+  friend bool operator!=(ThreadId lhs, ThreadId rhs) { return lhs.id_ != rhs.id_; }
+  template <typename H> friend H AbslHashValue(H h, ThreadId id) {
+    return H::combine(std::move(h), id.id_);
+  }
+
+private:
+  int64_t id_;
 };
-
-using ThreadIdPtr = std::unique_ptr<ThreadId>;
 
 class Thread {
 public:
@@ -48,20 +60,20 @@ public:
   /**
    * Return the current system thread ID
    */
-  virtual ThreadIdPtr currentThreadId() PURE;
+  virtual ThreadId currentThreadId() PURE;
 };
 
 /**
  * Like the C++11 "basic lockable concept" but a pure virtual interface vs. a template, and
  * with thread annotations.
  */
-class LOCKABLE BasicLockable {
+class ABSL_LOCKABLE BasicLockable {
 public:
   virtual ~BasicLockable() = default;
 
-  virtual void lock() EXCLUSIVE_LOCK_FUNCTION() PURE;
-  virtual bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) PURE;
-  virtual void unlock() UNLOCK_FUNCTION() PURE;
+  virtual void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() PURE;
+  virtual bool tryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) PURE;
+  virtual void unlock() ABSL_UNLOCK_FUNCTION() PURE;
 };
 
 } // namespace Thread

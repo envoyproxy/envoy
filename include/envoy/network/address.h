@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <array>
@@ -9,10 +8,12 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
 
 #include "absl/numeric/int128.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -44,7 +45,7 @@ public:
   virtual absl::uint128 address() const PURE;
 };
 
-enum class IpVersion { v4, v6 };
+enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)
 
 /**
  * Interface for a generic IP address.
@@ -116,6 +117,11 @@ public:
    * For pipe addresses: "/foo"
    */
   virtual const std::string& asString() const PURE;
+
+  /**
+   * @return Similar to asString but returns a string view.
+   */
+  virtual absl::string_view asStringView() const PURE;
 
   /**
    * @return a human readable string for the address that represents the

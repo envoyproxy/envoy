@@ -1,0 +1,47 @@
+{
+    "tests": [
+      {
+        "test_name": "Test_1",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/",
+          "method": "GET",
+          "ssl": true,
+          "internal": true
+        },
+        "validate": {
+          "cluster_name": "www3"
+        }
+      },
+      {
+        "test_name": "Test_2",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "runtime": "runtime.key",
+          "random_value": 70
+        },
+        "validate": {
+          "cluster_name": "www3"
+        }
+      },
+      {
+        "test_name": "Test_3",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "runtime": "runtime.key",
+          "random_value": 20
+        },
+        "validate": {
+          "cluster_name": "www2"
+        }
+      }
+    ]
+  }

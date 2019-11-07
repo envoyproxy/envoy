@@ -1,6 +1,6 @@
 ![Envoy Logo](https://github.com/envoyproxy/artwork/blob/master/PNG/Envoy_Logo_Final_PANTONE.png)
 
-[C++ L7 proxy and communication bus](https://www.envoyproxy.io/)
+[Cloud-native high-performance edge/middle/service proxy](https://www.envoyproxy.io/)
 
 Envoy is hosted by the [Cloud Native Computing Foundation](https://cncf.io) (CNCF). If you are a
 company that wants to help shape the evolution of technologies that are container-packaged,
@@ -9,8 +9,10 @@ involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/envoyproxy.envoy.mac?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=2&branchName=master)
+[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=master)
 [![CircleCI](https://circleci.com/gh/envoyproxy/envoy/tree/master.svg?style=shield)](https://circleci.com/gh/envoyproxy/envoy/tree/master)
+[![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
+[![fuzzit](https://app.fuzzit.dev/badge?org_id=envoyproxy)](https://app.fuzzit.dev/orgs/envoyproxy/dashboard)
 [![Jenkins](https://img.shields.io/jenkins/s/https/powerci.osuosl.org/job/build-envoy-master/badge/icon/.svg?label=ppc64le%20build)](http://powerci.osuosl.org/job/build-envoy-master/)
 
 ## Documentation
@@ -70,7 +72,8 @@ have prior experience. To get started:
 
 The Envoy team meets every other Tuesday at 9am PT. The public Google calendar is here: https://goo.gl/PkDijT
 
-Meeting minutes are here: https://goo.gl/5Cergb
+* Meeting minutes are [here](https://goo.gl/5Cergb)
+* Recorded videos are posted [here](https://www.youtube.com/channel/UCvqbFHwN-nwalWPjPUKpvTA/videos?view=0&sort=dd&shelf_id=1)
 
 ## Security
 
@@ -85,4 +88,4 @@ If you've found a vulnerability or a potential vulnerability in Envoy please let
 email to acknowledge your report, and we'll send an additional email when we've identified the issue
 positively or negatively.
 
-For further details please see our complete [security release process](SECURITY_RELEASE_PROCESS.md).
+For further details please see our complete [security release process](SECURITY.md).

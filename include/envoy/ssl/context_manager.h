@@ -2,8 +2,10 @@
 
 #include <functional>
 
+#include "envoy/common/time.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
@@ -38,6 +40,23 @@ public:
    * Iterate through all currently allocated contexts.
    */
   virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
+
+  /**
+   * Access the private key operations manager, which is part of SSL
+   * context manager.
+   */
+  virtual PrivateKeyMethodManager& privateKeyMethodManager() PURE;
+};
+
+using ContextManagerPtr = std::unique_ptr<ContextManager>;
+
+class ContextManagerFactory {
+public:
+  virtual ~ContextManagerFactory() = default;
+  virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
+
+  // There could be only one factory thus the name is static.
+  static std::string name() { return "ssl_context_manager"; }
 };
 
 } // namespace Ssl

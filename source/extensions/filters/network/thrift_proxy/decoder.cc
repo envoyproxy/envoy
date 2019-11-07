@@ -17,42 +17,42 @@ namespace ThriftProxy {
 // MessageBegin -> StructBegin
 DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Instance& buffer) {
   if (!proto_.readMessageBegin(buffer, *metadata_)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   stack_.clear();
   stack_.emplace_back(Frame(ProtocolState::MessageEnd));
 
-  return DecoderStatus(ProtocolState::StructBegin, handler_.messageBegin(metadata_));
+  return {ProtocolState::StructBegin, handler_.messageBegin(metadata_)};
 }
 
 // MessageEnd -> Done
 DecoderStateMachine::DecoderStatus DecoderStateMachine::messageEnd(Buffer::Instance& buffer) {
   if (!proto_.readMessageEnd(buffer)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
-  return DecoderStatus(ProtocolState::Done, handler_.messageEnd());
+  return {ProtocolState::Done, handler_.messageEnd()};
 }
 
 // StructBegin -> FieldBegin
 DecoderStateMachine::DecoderStatus DecoderStateMachine::structBegin(Buffer::Instance& buffer) {
   std::string name;
   if (!proto_.readStructBegin(buffer, name)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
-  return DecoderStatus(ProtocolState::FieldBegin, handler_.structBegin(absl::string_view(name)));
+  return {ProtocolState::FieldBegin, handler_.structBegin(absl::string_view(name))};
 }
 
 // StructEnd -> stack's return state
 DecoderStateMachine::DecoderStatus DecoderStateMachine::structEnd(Buffer::Instance& buffer) {
   if (!proto_.readStructEnd(buffer)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   ProtocolState next_state = popReturnState();
-  return DecoderStatus(next_state, handler_.structEnd());
+  return {next_state, handler_.structEnd()};
 }
 
 // FieldBegin -> FieldValue, or
@@ -62,17 +62,17 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::fieldBegin(Buffer::Insta
   FieldType field_type;
   int16_t field_id;
   if (!proto_.readFieldBegin(buffer, name, field_type, field_id)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   if (field_type == FieldType::Stop) {
-    return DecoderStatus(ProtocolState::StructEnd, FilterStatus::Continue);
+    return {ProtocolState::StructEnd, FilterStatus::Continue};
   }
 
   stack_.emplace_back(Frame(ProtocolState::FieldEnd, field_type));
 
-  return DecoderStatus(ProtocolState::FieldValue,
-                       handler_.fieldBegin(absl::string_view(name), field_type, field_id));
+  return {ProtocolState::FieldValue,
+          handler_.fieldBegin(absl::string_view(name), field_type, field_id)};
 }
 
 // FieldValue -> FieldEnd (via stack return state)
@@ -86,12 +86,12 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::fieldValue(Buffer::Insta
 // FieldEnd -> FieldBegin
 DecoderStateMachine::DecoderStatus DecoderStateMachine::fieldEnd(Buffer::Instance& buffer) {
   if (!proto_.readFieldEnd(buffer)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   popReturnState();
 
-  return DecoderStatus(ProtocolState::FieldBegin, handler_.fieldEnd());
+  return {ProtocolState::FieldBegin, handler_.fieldEnd()};
 }
 
 // ListBegin -> ListValue
@@ -99,12 +99,12 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::listBegin(Buffer::Instan
   FieldType elem_type;
   uint32_t size;
   if (!proto_.readListBegin(buffer, elem_type, size)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   stack_.emplace_back(Frame(ProtocolState::ListEnd, elem_type, size));
 
-  return DecoderStatus(ProtocolState::ListValue, handler_.listBegin(elem_type, size));
+  return {ProtocolState::ListValue, handler_.listBegin(elem_type, size)};
 }
 
 // ListValue -> ListValue, ListBegin, MapBegin, SetBegin, StructBegin (depending on value type), or
@@ -113,7 +113,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::listValue(Buffer::Instan
   ASSERT(!stack_.empty());
   Frame& frame = stack_.back();
   if (frame.remaining_ == 0) {
-    return DecoderStatus(popReturnState(), FilterStatus::Continue);
+    return {popReturnState(), FilterStatus::Continue};
   }
   frame.remaining_--;
 
@@ -123,11 +123,11 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::listValue(Buffer::Instan
 // ListEnd -> stack's return state
 DecoderStateMachine::DecoderStatus DecoderStateMachine::listEnd(Buffer::Instance& buffer) {
   if (!proto_.readListEnd(buffer)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   ProtocolState next_state = popReturnState();
-  return DecoderStatus(next_state, handler_.listEnd());
+  return {next_state, handler_.listEnd()};
 }
 
 // MapBegin -> MapKey
@@ -135,12 +135,12 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::mapBegin(Buffer::Instanc
   FieldType key_type, value_type;
   uint32_t size;
   if (!proto_.readMapBegin(buffer, key_type, value_type, size)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   stack_.emplace_back(Frame(ProtocolState::MapEnd, key_type, value_type, size));
 
-  return DecoderStatus(ProtocolState::MapKey, handler_.mapBegin(key_type, value_type, size));
+  return {ProtocolState::MapKey, handler_.mapBegin(key_type, value_type, size)};
 }
 
 // MapKey -> MapValue, ListBegin, MapBegin, SetBegin, StructBegin (depending on key type), or
@@ -149,7 +149,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::mapKey(Buffer::Instance&
   ASSERT(!stack_.empty());
   Frame& frame = stack_.back();
   if (frame.remaining_ == 0) {
-    return DecoderStatus(popReturnState(), FilterStatus::Continue);
+    return {popReturnState(), FilterStatus::Continue};
   }
 
   return handleValue(buffer, frame.elem_type_, ProtocolState::MapValue);
@@ -169,11 +169,11 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::mapValue(Buffer::Instanc
 // MapEnd -> stack's return state
 DecoderStateMachine::DecoderStatus DecoderStateMachine::mapEnd(Buffer::Instance& buffer) {
   if (!proto_.readMapEnd(buffer)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   ProtocolState next_state = popReturnState();
-  return DecoderStatus(next_state, handler_.mapEnd());
+  return {next_state, handler_.mapEnd()};
 }
 
 // SetBegin -> SetValue
@@ -181,12 +181,12 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::setBegin(Buffer::Instanc
   FieldType elem_type;
   uint32_t size;
   if (!proto_.readSetBegin(buffer, elem_type, size)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   stack_.emplace_back(Frame(ProtocolState::SetEnd, elem_type, size));
 
-  return DecoderStatus(ProtocolState::SetValue, handler_.setBegin(elem_type, size));
+  return {ProtocolState::SetValue, handler_.setBegin(elem_type, size)};
 }
 
 // SetValue -> SetValue, ListBegin, MapBegin, SetBegin, StructBegin (depending on value type), or
@@ -195,7 +195,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::setValue(Buffer::Instanc
   ASSERT(!stack_.empty());
   Frame& frame = stack_.back();
   if (frame.remaining_ == 0) {
-    return DecoderStatus(popReturnState(), FilterStatus::Continue);
+    return {popReturnState(), FilterStatus::Continue};
   }
   frame.remaining_--;
 
@@ -205,11 +205,11 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::setValue(Buffer::Instanc
 // SetEnd -> stack's return state
 DecoderStateMachine::DecoderStatus DecoderStateMachine::setEnd(Buffer::Instance& buffer) {
   if (!proto_.readSetEnd(buffer)) {
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   ProtocolState next_state = popReturnState();
-  return DecoderStatus(next_state, handler_.setEnd());
+  return {next_state, handler_.setEnd()};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleValue(Buffer::Instance& buffer,
@@ -219,69 +219,69 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleValue(Buffer::Inst
   case FieldType::Bool: {
     bool value{};
     if (proto_.readBool(buffer, value)) {
-      return DecoderStatus(return_state, handler_.boolValue(value));
+      return {return_state, handler_.boolValue(value)};
     }
     break;
   }
   case FieldType::Byte: {
     uint8_t value{};
     if (proto_.readByte(buffer, value)) {
-      return DecoderStatus(return_state, handler_.byteValue(value));
+      return {return_state, handler_.byteValue(value)};
     }
     break;
   }
   case FieldType::I16: {
     int16_t value{};
     if (proto_.readInt16(buffer, value)) {
-      return DecoderStatus(return_state, handler_.int16Value(value));
+      return {return_state, handler_.int16Value(value)};
     }
     break;
   }
   case FieldType::I32: {
     int32_t value{};
     if (proto_.readInt32(buffer, value)) {
-      return DecoderStatus(return_state, handler_.int32Value(value));
+      return {return_state, handler_.int32Value(value)};
     }
     break;
   }
   case FieldType::I64: {
     int64_t value{};
     if (proto_.readInt64(buffer, value)) {
-      return DecoderStatus(return_state, handler_.int64Value(value));
+      return {return_state, handler_.int64Value(value)};
     }
     break;
   }
   case FieldType::Double: {
     double value{};
     if (proto_.readDouble(buffer, value)) {
-      return DecoderStatus(return_state, handler_.doubleValue(value));
+      return {return_state, handler_.doubleValue(value)};
     }
     break;
   }
   case FieldType::String: {
     std::string value;
     if (proto_.readString(buffer, value)) {
-      return DecoderStatus(return_state, handler_.stringValue(value));
+      return {return_state, handler_.stringValue(value)};
     }
     break;
   }
   case FieldType::Struct:
     stack_.emplace_back(Frame(return_state));
-    return DecoderStatus(ProtocolState::StructBegin, FilterStatus::Continue);
+    return {ProtocolState::StructBegin, FilterStatus::Continue};
   case FieldType::Map:
     stack_.emplace_back(Frame(return_state));
-    return DecoderStatus(ProtocolState::MapBegin, FilterStatus::Continue);
+    return {ProtocolState::MapBegin, FilterStatus::Continue};
   case FieldType::List:
     stack_.emplace_back(Frame(return_state));
-    return DecoderStatus(ProtocolState::ListBegin, FilterStatus::Continue);
+    return {ProtocolState::ListBegin, FilterStatus::Continue};
   case FieldType::Set:
     stack_.emplace_back(Frame(return_state));
-    return DecoderStatus(ProtocolState::SetBegin, FilterStatus::Continue);
+    return {ProtocolState::SetBegin, FilterStatus::Continue};
   default:
     throw EnvoyException(fmt::format("unknown field type {}", static_cast<int8_t>(elem_type)));
   }
 
-  return DecoderStatus(ProtocolState::WaitForData);
+  return {ProtocolState::WaitForData};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Instance& buffer) {

@@ -31,6 +31,7 @@ envoy_cc_library(
         "//source/common/crypto:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/singleton:const_singleton",
+        "//source/extensions/common/crypto:utility_lib",
     ],
 )
 
@@ -41,9 +42,25 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "credentials_provider_impl_lib",
+    srcs = ["credentials_provider_impl.cc"],
+    hdrs = ["credentials_provider_impl.h"],
+    external_deps = ["abseil_time"],
+    deps = [
+        ":credentials_provider_interface",
+        "//include/envoy/api:api_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["curl"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",

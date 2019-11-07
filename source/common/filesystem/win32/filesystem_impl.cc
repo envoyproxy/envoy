@@ -1,18 +1,6 @@
 #include <fcntl.h>
 #include <io.h>
 #include <sys/stat.h>
-#include <windows.h>
-
-// <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
-// interfere with our code. DELETE shows up in the base.pb.h header generated from
-// api/envoy/api/core/base.proto. Since it's a generated header, we can't #undef DELETE at
-// the top of that header to avoid the collision. Similarly, GetMessage shows up in generated
-// protobuf code so we can't #undef the symbol there.
-#undef DELETE
-#undef GetMessage
-
-#include "common/common/assert.h"
-#include "common/filesystem/filesystem_impl.h"
 
 #include <fstream>
 #include <iostream>
@@ -21,7 +9,9 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -33,15 +23,36 @@ FileImplWin32::~FileImplWin32() {
   }
 }
 
-void FileImplWin32::openFile() {
-  const int flags = _O_RDWR | _O_APPEND | _O_CREAT;
-  const int mode = _S_IREAD | _S_IWRITE;
-
-  fd_ = ::_open(path_.c_str(), flags, mode);
+void FileImplWin32::openFile(FlagSet in) {
+  const auto flags_and_mode = translateFlag(in);
+  fd_ = ::open(path_.c_str(), flags_and_mode.flags_, flags_and_mode.pmode_);
 }
 
 ssize_t FileImplWin32::writeFile(absl::string_view buffer) {
   return ::_write(fd_, buffer.data(), buffer.size());
+}
+
+FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
+  int out = 0;
+  int pmode = 0;
+  if (in.test(File::Operation::Create)) {
+    out |= _O_CREAT;
+    pmode |= _S_IREAD | _S_IWRITE;
+  }
+
+  if (in.test(File::Operation::Append)) {
+    out |= _O_APPEND;
+  }
+
+  if (in.test(File::Operation::Read) && in.test(File::Operation::Write)) {
+    out |= _O_RDWR;
+  } else if (in.test(File::Operation::Read)) {
+    out |= _O_RDONLY;
+  } else if (in.test(File::Operation::Write)) {
+    out |= _O_WRONLY;
+  }
+
+  return {out, pmode};
 }
 
 bool FileImplWin32::closeFile() { return ::_close(fd_) != -1; }

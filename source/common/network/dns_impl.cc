@@ -1,20 +1,19 @@
 #include "common/network/dns_impl.h"
 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -48,7 +47,7 @@ DnsResolverImpl::DnsResolverImpl(
                                            resolver->ip()->addressAsString(),
                                            resolver->ip()->port()));
     }
-    const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
+    const std::string resolvers_csv = absl::StrJoin(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
     RELEASE_ASSERT(result == ARES_SUCCESS, "");
   }
@@ -79,7 +78,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     completed_ = true;
   }
 
-  std::list<Address::InstanceConstSharedPtr> address_list;
+  std::list<DnsResponse> address_list;
   if (status == ARES_SUCCESS) {
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       if (addrinfo->nodes->ai_family == AF_INET) {
@@ -89,7 +88,10 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
           address.sin_family = AF_INET;
           address.sin_port = 0;
           address.sin_addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr)->sin_addr;
-          address_list.emplace_back(new Address::Ipv4Instance(&address));
+
+          address_list.emplace_back(
+              DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
+                          std::chrono::seconds(ai->ai_ttl)));
         }
       } else if (addrinfo->nodes->ai_family == AF_INET6) {
         for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
@@ -98,7 +100,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
           address.sin6_family = AF_INET6;
           address.sin6_port = 0;
           address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
-          address_list.emplace_back(new Address::Ipv6Instance(address));
+          address_list.emplace_back(
+              DnsResponse(std::make_shared<const Address::Ipv6Instance>(address),
+                          std::chrono::seconds(ai->ai_ttl)));
         }
       }
     }

@@ -46,6 +46,12 @@ struct MetadataMapHelper {
   static void setValue(lua_State* state, const ProtobufWkt::Value& value);
   static void createTable(lua_State* state,
                           const Protobuf::Map<std::string, ProtobufWkt::Value>& fields);
+  static ProtobufWkt::Value loadValue(lua_State* state);
+
+private:
+  static ProtobufWkt::Struct loadStruct(lua_State* state);
+  static ProtobufWkt::ListValue loadList(lua_State* state, int length);
+  static int tableLength(lua_State* state);
 };
 
 /**
@@ -106,7 +112,7 @@ private:
  */
 class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
 public:
-  SslConnectionWrapper(const Ssl::ConnectionInfo*) {}
+  SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr) {}
   static ExportedFunctions exportedFunctions() { return {}; }
 
   // TODO(dio): Add more Lua APIs around Ssl::Connection.

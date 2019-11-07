@@ -10,25 +10,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-/**
- * Callback invoked when response is successfully decoded.
- */
-class ResponseCallback {
-public:
-  virtual ~ResponseCallback() = default;
-
-  /**
-   * Callback method invoked when response is successfully decoded.
-   * @param response response that has been decoded.
-   */
-  virtual void onMessage(AbstractResponseSharedPtr response) PURE;
-
-  /**
-   * Callback method invoked when response could not be decoded.
-   * Invoked after all response's bytes have been consumed.
-   */
-  virtual void onFailedParse(ResponseMetadataSharedPtr failure_data) PURE;
-};
+using ResponseCallback = MessageCallback<AbstractResponseSharedPtr, ResponseMetadataSharedPtr>;
 
 using ResponseCallbackSharedPtr = std::shared_ptr<ResponseCallback>;
 
@@ -75,10 +57,12 @@ using ResponseInitialParserFactorySharedPtr = std::shared_ptr<ResponseInitialPar
  * As Kafka protocol does not carry response type data, it is necessary to register expected message
  * type beforehand with `expectResponse`.
  */
-class ResponseDecoder : public MessageDecoder, public Logger::Loggable<Logger::Id::kafka> {
+class ResponseDecoder
+    : public AbstractMessageDecoder<ResponseParserSharedPtr, ResponseCallbackSharedPtr>,
+      public Logger::Loggable<Logger::Id::kafka> {
 public:
   /**
-   * Creates a decoder that will notify provided callbacks.
+   * Creates a decoder that will notify provided callbacks when a message is successfully parsed.
    * @param callbacks callbacks to be invoked (in order).
    */
   ResponseDecoder(const std::vector<ResponseCallbackSharedPtr> callbacks)
@@ -87,13 +71,16 @@ public:
 
   /**
    * Visible for testing.
-   * Allows injecting parser resolver.
+   * Allows injecting initial parser factory and parser resolver.
+   * @param factory parser factory to be used when new message is to be processed.
+   * @param parserResolver supported parser resolver.
+   * @param callbacks callbacks to be invoked (in order).
    */
   ResponseDecoder(const ResponseInitialParserFactorySharedPtr factory,
                   const ResponseParserResolver& response_parser_resolver,
                   const std::vector<ResponseCallbackSharedPtr> callbacks)
-      : factory_{factory}, response_parser_resolver_{response_parser_resolver}, callbacks_{
-                                                                                    callbacks} {};
+      : AbstractMessageDecoder{callbacks}, factory_{factory}, response_parser_resolver_{
+                                                                  response_parser_resolver} {};
 
   /**
    * Registers an expected message.
@@ -104,23 +91,12 @@ public:
    */
   void expectResponse(const int16_t api_key, const int16_t api_version);
 
-  /**
-   * Consumes all data present in a buffer.
-   * If a response can be successfully parsed, then callbacks get notified with parsed response.
-   * Updates decoder state.
-   * Can throw if data is received, but the decoder is not expecting any response.
-   * Impl note: similar to redis codec, which also keeps state.
-   */
-  void onData(Buffer::Instance& data) override;
+protected:
+  ResponseParserSharedPtr createStartParser() override;
 
 private:
-  void doParse(const Buffer::RawSlice& slice);
-
   ResponseInitialParserFactorySharedPtr factory_;
   const ResponseParserResolver& response_parser_resolver_;
-  const std::vector<ResponseCallbackSharedPtr> callbacks_;
-
-  ResponseParserSharedPtr current_parser_;
 };
 
 /**

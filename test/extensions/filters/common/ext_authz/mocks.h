@@ -16,7 +16,7 @@ namespace ExtAuthz {
 class MockClient : public Client {
 public:
   MockClient();
-  ~MockClient();
+  ~MockClient() override;
 
   // ExtAuthz::Client
   MOCK_METHOD0(cancel, void());
@@ -28,7 +28,7 @@ public:
 class MockRequestCallbacks : public RequestCallbacks {
 public:
   MockRequestCallbacks();
-  ~MockRequestCallbacks();
+  ~MockRequestCallbacks() override;
 
   void onComplete(ResponsePtr&& response) override { onComplete_(response); }
 
