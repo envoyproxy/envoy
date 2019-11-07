@@ -264,6 +264,8 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
       socket_->setDetectedTransportProtocol(
           Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
     }
+    // TODO(lambdai): add test cases
+    // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
     // Erase accept filter states because accept filters may not get the opportunity to clean up.
     // Particularly the assigned events need to reset before assigning new events in the follow up.
     accept_filters_.clear();
