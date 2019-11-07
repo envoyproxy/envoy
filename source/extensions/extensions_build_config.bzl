@@ -133,7 +133,6 @@ EXTENSIONS = {
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
 
     # Retry host predicates
     "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
@@ -237,5 +236,4 @@ WINDOWS_EXTENSIONS = {
     #
 
     #"envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
 }
