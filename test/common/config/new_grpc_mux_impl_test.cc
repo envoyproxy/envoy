@@ -35,7 +35,7 @@ namespace Config {
 namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of
-// NewGrpcMuxImpl is provided in [grpc_]subscription_impl_test.cc.
+// GrpcMuxImpl is provided in [grpc_]subscription_impl_test.cc.
 class NewGrpcMuxImplTestBase : public testing::Test {
 public:
   NewGrpcMuxImplTestBase()
@@ -44,18 +44,18 @@ public:
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)) {}
 
   void setup() {
-    grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(
+    grpc_mux_ = std::make_unique<GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, local_info_);
+        random_, stats_, rate_limit_settings_, local_info_, false);
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
+  std::unique_ptr<GrpcMuxDelta> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
@@ -67,12 +67,6 @@ class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
 public:
   Event::SimulatedTimeSystem time_system_;
 };
-
-// TODO(fredlas) #8478 will delete this.
-TEST_F(NewGrpcMuxImplTest, JustForCoverageTodoDelete) {
-  setup();
-  EXPECT_TRUE(grpc_mux_->isDelta());
-}
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.
 TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
