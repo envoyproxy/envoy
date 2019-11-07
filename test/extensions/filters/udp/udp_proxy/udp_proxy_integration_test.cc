@@ -60,7 +60,7 @@ public:
   static std::string configToUse() {
     return ConfigHelper::BASE_UDP_LISTENER_CONFIG + R"EOF(
     listener_filters:
-      name: envoy.filters.udp.udp_proxy
+      name: envoy.filters.udp_listener.udp_proxy
       typed_config:
         '@type': type.googleapis.com/envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig
         cluster: cluster_0

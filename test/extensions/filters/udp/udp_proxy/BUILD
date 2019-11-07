@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "udp_proxy_integration_test",
     srcs = ["udp_proxy_integration_test.cc"],
-    extension_name = "envoy.filters.udp.udp_proxy",
+    extension_name = "envoy.filters.udp_listener.udp_proxy",
     deps = [
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/integration:integration_lib",

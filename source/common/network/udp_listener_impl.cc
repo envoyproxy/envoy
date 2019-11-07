@@ -70,7 +70,8 @@ void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   const Api::IoCallUint64Result result = Utility::readAllDatagramsFromSocket(
       socket_.ioHandle(), *socket_.localAddress(), *this, time_source_, packets_dropped_);
-  // We should always get a failed result, even if no further data.
+  // readAllDatagramsFromSocket should/will always read until we get an error, though that error may
+  // simply be IoErrorCode::Again.
   ASSERT(!result.ok());
   if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result.err_->getErrorCode()),
