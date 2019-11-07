@@ -13,10 +13,10 @@ import re
 import subprocess
 import sys
 import tempfile
-import shutil
+import paths
 
 # Where does Buildozer live?
-BUILDOZER_PATH = os.getenv("BUILDOZER_BIN") or (os.path.expandvars("$GOPATH/bin/buildozer") if os.getenv("GOPATH") else shutil.which("buildozer"))
+BUILDOZER_PATH = paths.getBuildozer()
 
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
