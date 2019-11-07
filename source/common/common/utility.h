@@ -222,10 +222,10 @@ public:
   static absl::string_view trim(absl::string_view source);
 
   /**
-   * Removes any specific trailing characters from the end of a string.
+   * Removes any specific trailing characters from the end of a string_view.
    *
-   * @param source the string.
-   * @param ch the character to strip from the end of the string.
+   * @param source the string_view.
+   * @param ch the character to strip from the end of the string_view.
    * @return a view of the string with the end characters removed.
    */
   static absl::string_view removeTrailingCharacters(absl::string_view source, char ch);
