@@ -691,7 +691,8 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   Stats::Gauge& downstream_pre_cx_active =
       stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
   EXPECT_EQ(1UL, downstream_pre_cx_active.value());
-
+  EXPECT_CALL(*test_filter, die_()).Times(1);
+  // Barrier: test_filter must be destructed before findFilterChain
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(*timeout, disableTimer());
   timeout->invokeCallback();
