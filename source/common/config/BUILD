@@ -43,12 +43,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "delta_subscription_lib",
-    srcs = ["delta_subscription_impl.cc"],
-    hdrs = ["delta_subscription_impl.h"],
+    name = "grpc_subscription_lib",
+    srcs = ["grpc_subscription_impl.cc"],
+    hdrs = ["grpc_subscription_impl.h"],
     deps = [
+        ":grpc_mux_lib",
         ":grpc_stream_lib",
-        ":new_grpc_mux_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -66,15 +66,35 @@ envoy_cc_library(
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
     deps = [
-        ":pausable_ack_queue_lib",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:backoff_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:token_bucket_impl_lib",
+        ":subscription_state_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "sotw_subscription_state_lib",
+    srcs = ["sotw_subscription_state.cc"],
+    hdrs = ["sotw_subscription_state.h"],
+    deps = [
+        ":subscription_state_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "subscription_state_lib",
+    srcs = ["subscription_state.cc"],
+    hdrs = ["subscription_state.h"],
+    deps = [
+        ":update_ack_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
@@ -115,56 +135,13 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "grpc_mux_lib",
-    srcs = ["grpc_mux_impl.cc"],
-    hdrs = ["grpc_mux_impl.h"],
-    deps = [
-        ":grpc_stream_lib",
-        ":utility_lib",
-        "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
-    name = "grpc_mux_subscription_lib",
-    srcs = ["grpc_mux_subscription_impl.cc"],
-    hdrs = ["grpc_mux_subscription_impl.h"],
-    deps = [
-        "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/grpc:common_lib",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "grpc_subscription_lib",
-    hdrs = ["grpc_subscription_impl.h"],
-    deps = [
-        ":grpc_mux_lib",
-        ":grpc_mux_subscription_lib",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/grpc:async_client_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "new_grpc_mux_lib",
     srcs = ["new_grpc_mux_impl.cc"],
     hdrs = ["new_grpc_mux_impl.h"],
     deps = [
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
+        ":sotw_subscription_state_lib",
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -212,8 +189,8 @@ envoy_cc_library(
     srcs = ["pausable_ack_queue.cc"],
     hdrs = ["pausable_ack_queue.h"],
     deps = [
+        ":update_ack_lib",
         "//source/common/common:assert_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -257,9 +234,7 @@ envoy_cc_library(
     srcs = ["subscription_factory_impl.cc"],
     hdrs = ["subscription_factory_impl.h"],
     deps = [
-        ":delta_subscription_lib",
         ":filesystem_subscription_lib",
-        ":grpc_mux_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
         ":type_to_endpoint_lib",
@@ -282,6 +257,12 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "update_ack_lib",
+    hdrs = ["update_ack.h"],
+    deps = ["@envoy_api//envoy/api/v2:pkg_cc_proto"],
 )
 
 envoy_cc_library(
