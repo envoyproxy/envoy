@@ -374,17 +374,36 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
 class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
 public:
-  void setup(const std::string& tcp_proxy_config, const std::string& endpoint_role,
-             const std::string& endpoint_version, const std::string& endpoint_stage);
+  void initialize();
 
   void expectEndpointToMatchRoute();
   void expectEndpointNotToMatchRoute();
+
+  envoy::api::v2::core::Metadata lbMetadata(std::map<std::string, std::string> values);
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_;
+  envoy::api::v2::core::Metadata endpoint_metadata_;
 };
 
-void TcpProxyMetadataMatchIntegrationTest::setup(const std::string& tcp_proxy_config,
-                                                 const std::string& endpoint_role,
-                                                 const std::string& endpoint_version,
-                                                 const std::string& endpoint_stage) {
+envoy::api::v2::core::Metadata
+TcpProxyMetadataMatchIntegrationTest::lbMetadata(std::map<std::string, std::string> values) {
+
+  ProtobufWkt::Struct map;
+  auto* mutable_fields = map.mutable_fields();
+  ProtobufWkt::Value value;
+
+  std::map<std::string, std::string>::iterator it;
+  for (it = values.begin(); it != values.end(); it++) {
+    value.set_string_value(it->second);
+    mutable_fields->insert({it->first, value});
+  }
+
+  envoy::api::v2::core::Metadata metadata;
+  (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] = map;
+  return metadata;
+}
+
+void TcpProxyMetadataMatchIntegrationTest::initialize() {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
@@ -394,42 +413,27 @@ void TcpProxyMetadataMatchIntegrationTest::setup(const std::string& tcp_proxy_co
         ->mutable_filter_chains(0)
         ->mutable_filters(0)
         ->mutable_typed_config()
-        ->PackFrom(TestUtility::parseYaml<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
-            tcp_proxy_config));
+        ->PackFrom(tcp_proxy_);
 
     ASSERT(static_resources->clusters_size() == 1);
-    static_resources->clear_clusters();
-    static_resources->add_clusters()->CopyFrom(
-        TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
-            R"EOF(
-            name: cluster_0
-            type: STATIC
-            lb_policy: ROUND_ROBIN
-            lb_subset_config:              # 'lb_subset_config' is the same across all tests
-              fallback_policy: NO_FALLBACK
-              subset_selectors:
-              - keys:
-                - role
-                - version
-                - stage
-            load_assignment:
-              cluster_name: cluster_0
-              endpoints:
-              - lb_endpoints:
-                - endpoint:
-                    address:
-                      socket_address:
-                        address: {}
-                        port_value: 0
-                  metadata:
-                    filter_metadata:
-                      envoy.lb:
-                        role: {}           # assigned 'role' value varies across tests
-                        version: {}        # assigned 'version' value varies across tests
-                        stage: {}          # assigned 'stage' value varies across tests
-          )EOF",
-            Network::Test::getLoopbackAddressString(version_), endpoint_role, endpoint_version,
-            endpoint_stage)));
+    auto* cluster_0 = static_resources->mutable_clusters(0);
+    cluster_0->Clear();
+    cluster_0->set_name("cluster_0");
+    cluster_0->set_type(envoy::api::v2::Cluster::STATIC);
+    cluster_0->set_lb_policy(envoy::api::v2::Cluster::ROUND_ROBIN);
+    auto* lb_subset_config = cluster_0->mutable_lb_subset_config();
+    lb_subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
+    auto* subset_selector = lb_subset_config->add_subset_selectors();
+    subset_selector->add_keys("role");
+    subset_selector->add_keys("version");
+    subset_selector->add_keys("stage");
+    auto* load_assignment = cluster_0->mutable_load_assignment();
+    load_assignment->set_cluster_name("cluster_0");
+    auto* locality_lb_endpoints = load_assignment->add_endpoints();
+    auto* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(version_));
+    lb_endpoint->mutable_metadata()->MergeFrom(endpoint_metadata_);
   });
 
   TcpProxyIntegrationTest::initialize();
@@ -457,6 +461,9 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
 // Verifies connection failure.
 void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  tcp_client->waitForDisconnect();
+  tcp_client->close();
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);
@@ -470,19 +477,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyMetadataMatchIntegrationTest,
 // level.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldMatchSingleClusterWithTopLevelMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      cluster: cluster_0
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            role: master
-            version: v1
-            stage: prod
-    )EOF",                   // TcpProxy config
-      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointToMatchRoute();
 }
@@ -491,22 +493,15 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // level.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        DEPRECATED_FEATURE_TEST(EndpointShouldMatchRouteWithTopLevelMetadataMatch)) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      cluster: fallback
-      deprecated_v1:
-        routes:
-        - cluster: cluster_0
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            role: master
-            version: v1
-            stage: prod
-    )EOF",                   // TcpProxy config
-      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("fallback");
+  tcp_proxy_.mutable_deprecated_v1()->add_routes()->set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointToMatchRoute();
 }
@@ -514,22 +509,16 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
 // cluster.
 TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterWithMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      weighted_clusters:
-        clusters:
-        - name: cluster_0
-          metadata_match:
-            filter_metadata:
-              envoy.lb:
-                role: master
-                version: v1
-                stage: prod
-          weight: 1
-    )EOF",                   // TcpProxy config
-      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointToMatchRoute();
 }
@@ -538,26 +527,17 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterW
 // weighted cluster and at the top level.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldMatchWeightedClusterWithMetadataMatchAndTopLevelMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            version: v1
-            stage: dev
-      weighted_clusters:
-        clusters:
-        - name: cluster_0
-          metadata_match:
-            filter_metadata:
-              envoy.lb:
-                role: master
-                stage: prod  # should override `stage` value at top-level
-          weight: 1
-    )EOF",                   // TcpProxy config
-      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(lbMetadata({{"version", "v1"}, {"stage", "dev"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
+      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointToMatchRoute();
 }
@@ -566,22 +546,16 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // level only.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldMatchWeightedClusterWithTopLevelMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            role: master
-            version: v1
-            stage: prod
-      weighted_clusters:
-        clusters:
-        - name: cluster_0
-          weight: 1
-    )EOF",                   // TcpProxy config
-      "master", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointToMatchRoute();
 }
@@ -590,19 +564,14 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // level.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldNotMatchSingleClusterWithTopLevelMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      cluster: cluster_0
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            role: master
-            version: v1
-            stage: prod
-    )EOF",                    // TcpProxy config
-      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointNotToMatchRoute();
 }
@@ -611,22 +580,15 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // level.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        DEPRECATED_FEATURE_TEST(EndpointShouldNotMatchRouteWithTopLevelMetadataMatch)) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      cluster: fallback
-      deprecated_v1:
-        routes:
-        - cluster: cluster_0
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            role: master
-            version: v1
-            stage: prod
-    )EOF",                    // TcpProxy config
-      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("fallback");
+  tcp_proxy_.mutable_deprecated_v1()->add_routes()->set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointNotToMatchRoute();
 }
@@ -635,22 +597,16 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // cluster.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldNotMatchWeightedClusterWithMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      weighted_clusters:
-        clusters:
-        - name: cluster_0
-          metadata_match:
-            filter_metadata:
-              envoy.lb:
-                role: master
-                version: v1
-                stage: prod
-          weight: 1
-    )EOF",                    // TcpProxy config
-      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointNotToMatchRoute();
 }
@@ -659,26 +615,17 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // weighted cluster and at the top level.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldNotMatchWeightedClusterWithMetadataMatchAndTopLevelMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            version: v1
-            stage: dev
-      weighted_clusters:
-        clusters:
-        - name: cluster_0
-          metadata_match:
-            filter_metadata:
-              envoy.lb:
-                role: master
-                stage: prod  # should override `stage` value at top-level
-          weight: 1
-    )EOF",                  // TcpProxy config
-      "master", "v1", "dev" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(lbMetadata({{"version", "v1"}, {"stage", "dev"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
+      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "dev"}});
+
+  initialize();
 
   expectEndpointNotToMatchRoute();
 }
@@ -687,22 +634,16 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
 // level only.
 TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldNotMatchWeightedClusterWithTopLevelMetadataMatch) {
-  setup(
-      R"EOF(
-      stat_prefix: tcp_stats
-      metadata_match:
-        filter_metadata:
-          envoy.lb:
-            role: master
-            version: v1
-            stage: prod
-      weighted_clusters:
-        clusters:
-        - name: cluster_0
-          weight: 1
-    )EOF",                    // TcpProxy config
-      "replica", "v1", "prod" // <role, version, stage> assigned to the endpoint
-  );
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
 
   expectEndpointNotToMatchRoute();
 }
