@@ -22,6 +22,6 @@ message ClusterConfig {
     uint32 priority = 2;
   }
 
-  // [#not-implemented-hide:] Load balancing clusters in aggregate cluster with explicit priority.
+  // Load balancing clusters in aggregate cluster with explicit priority.
   repeated LbCluster clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 }
