@@ -17,6 +17,7 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, int fd, FileReadyCb cb,
   RELEASE_ASSERT(trigger_ == FileTriggerType::Level,
                  "libevent does not support edge triggers on Windows");
 #endif
+  assignEventBase(&dispatcher.base());
   assignEvents(events);
   event_add(&raw_event_, nullptr);
 }
@@ -39,7 +40,18 @@ void FileEventImpl::activate(uint32_t events) {
   event_active(&raw_event_, libevent_events, 0);
 }
 
+void FileEventImpl::assignEventBase(event_base* base) {
+  //  ASSERT(-1 !=event_base_set(base, &raw_event_));
+  raw_event_.ev_base = base;
+}
+
 void FileEventImpl::assignEvents(uint32_t events) {
+  {
+    event_base* base_out;
+    event_get_assignment(&raw_event_, &base_out, nullptr, nullptr, nullptr, nullptr);
+    ASSERT(base_ == base_out);
+  }
+
   event_assign(
       &raw_event_, base_, fd_,
       EV_PERSIST | (trigger_ == FileTriggerType::Level ? 0 : EV_ET) |
