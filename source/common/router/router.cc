@@ -76,16 +76,16 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   }
 
   // Preserve the original request URL for the second pass.
-  downstream_headers.setCopyEnvoyOriginalUrl(
+  downstream_headers.setEnvoyOriginalUrl(
       absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
                                   : Http::Headers::get().SchemeValues.Https,
                    "://", downstream_headers.Host()->value().getStringView(),
                    downstream_headers.Path()->value().getStringView()));
 
   // Replace the original host, scheme and path.
-  downstream_headers.setCopyScheme(std::string(absolute_url.scheme()));
-  downstream_headers.setCopyHost(std::string(absolute_url.host_and_port()));
-  downstream_headers.setCopyPath(std::string(absolute_url.path_and_query_params()));
+  downstream_headers.setScheme(absolute_url.scheme());
+  downstream_headers.setHost(absolute_url.host_and_port());
+  downstream_headers.setPath(absolute_url.path_and_query_params());
 
   return true;
 }
@@ -201,7 +201,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
 
   if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
-    request_headers.setIntegerEnvoyExpectedRequestTimeoutMs(expected_timeout);
+    request_headers.setEnvoyExpectedRequestTimeoutMs(expected_timeout);
   }
 
   // If we've configured max_grpc_timeout, override the grpc-timeout header with
@@ -526,7 +526,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   include_attempt_count_ = route_entry_->includeAttemptCount();
   if (include_attempt_count_) {
-    headers.setIntegerEnvoyAttemptCount(attempt_count_);
+    headers.setEnvoyAttemptCount(attempt_count_);
   }
 
   // Inject the active span's tracing context into the request headers.
@@ -1132,7 +1132,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
     if (!config_.suppress_envoy_headers_) {
-      headers->setIntegerEnvoyUpstreamServiceTime(ms.count());
+      headers->setEnvoyUpstreamServiceTime(ms.count());
     }
   }
 
@@ -1322,7 +1322,7 @@ void Filter::doRetry() {
   }
 
   if (include_attempt_count_) {
-    downstream_headers_->setIntegerEnvoyAttemptCount(attempt_count_);
+    downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);

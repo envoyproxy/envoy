@@ -173,8 +173,8 @@ void ReporterImpl::flushSpans() {
     const std::string request_body = span_buffer_->serialize();
     Http::MessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-    message->headers().setCopyPath(collector_.endpoint_);
-    message->headers().setCopyHost(driver_.cluster()->name());
+    message->headers().setPath(collector_.endpoint_);
+    message->headers().setHost(driver_.cluster()->name());
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf

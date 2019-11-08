@@ -122,7 +122,7 @@ static void HeaderMapImplSetInlineInteger(benchmark::State& state) {
   HeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
   for (auto _ : state) {
-    headers.setIntegerConnection(value);
+    headers.setConnection(value);
   }
   benchmark::DoNotOptimize(headers.size());
 }

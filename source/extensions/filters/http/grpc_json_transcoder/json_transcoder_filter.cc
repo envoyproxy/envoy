@@ -299,8 +299,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
 
   headers.removeContentLength();
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
-  headers.setCopyEnvoyOriginalPath(headers.Path()->value().getStringView());
-  headers.setCopyPath("/" + method_->service()->full_name() + "/" + method_->name());
+  headers.setEnvoyOriginalPath(headers.Path()->value().getStringView());
+  headers.setPath("/" + method_->service()->full_name() + "/" + method_->name());
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
 
@@ -491,7 +491,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   } else {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
     if (!is_trailers_only_response) {
-      response_headers_->setIntegerGrpcStatus(enumToInt(grpc_status.value()));
+      response_headers_->setGrpcStatus(enumToInt(grpc_status.value()));
     }
   }
 
@@ -499,7 +499,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     // Copy the grpc-message header if it exists.
     const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
     if (grpc_message_header) {
-      response_headers_->setCopyGrpcMessage(grpc_message_header->value().getStringView());
+      response_headers_->setGrpcMessage(grpc_message_header->value().getStringView());
     }
   }
 
@@ -508,7 +508,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     response_headers_->remove(trailerHeader());
   }
 
-  response_headers_->setIntegerContentLength(
+  response_headers_->setContentLength(
       encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   return Http::FilterTrailersStatus::Continue;
 }
@@ -550,8 +550,8 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
 
       data.add(body);
 
-      response_headers.setCopyContentType(http_body.content_type());
-      response_headers.setIntegerContentLength(body.size());
+      response_headers.setContentType(http_body.content_type());
+      response_headers.setContentLength(body.size());
       return;
     }
   }
@@ -611,7 +611,7 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 
   response_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
-  response_headers_->setIntegerContentLength(json_status.length());
+  response_headers_->setContentLength(json_status.length());
 
   Buffer::OwnedImpl status_data(json_status);
   encoder_callbacks_->addEncodedData(status_data, false);

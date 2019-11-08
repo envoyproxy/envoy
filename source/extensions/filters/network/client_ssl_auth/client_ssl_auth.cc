@@ -85,7 +85,7 @@ static const std::string Path = "/v1/certs/list/approved";
 
 void ClientSslAuthConfig::createRequest(Http::Message& request) {
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  request.headers().setCopyPath(Path);
+  request.headers().setPath(Path);
 }
 
 Network::FilterStatus ClientSslAuthFilter::onData(Buffer::Instance&, bool) {

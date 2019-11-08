@@ -69,7 +69,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // "content-length: 0" request header here.
     const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
     if (no_body) {
-      request_headers.setIntegerContentLength(uint64_t(0));
+      request_headers.setContentLength(uint64_t(0));
     }
   } else {
     request_headers.removeConnection();
@@ -199,7 +199,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   }
 
   if (config.userAgent()) {
-    request_headers.setCopyEnvoyDownstreamServiceCluster(config.userAgent().value());
+    request_headers.setEnvoyDownstreamServiceCluster(config.userAgent().value());
     const HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {
       // Following setReference() is safe because user agent is constant for the life of the
@@ -221,7 +221,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // If we are an external request, AND we are "using remote address" (see above), we set
   // x-envoy-external-address since this is our first ingress point into the trusted network.
   if (edge_request && final_remote_address->type() == Network::Address::Type::Ip) {
-    request_headers.setCopyEnvoyExternalAddress(final_remote_address->ip()->addressAsString());
+    request_headers.setEnvoyExternalAddress(final_remote_address->ip()->addressAsString());
   }
 
   // Generate x-request-id for all edge requests, or if there is none.
@@ -230,7 +230,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     if ((!config.preserveExternalRequestId() && edge_request) || !request_headers.RequestId()) {
       const std::string uuid = random.uuid();
       ASSERT(!uuid.empty());
-      request_headers.setCopyRequestId(uuid);
+      request_headers.setRequestId(uuid);
     }
   }
 
@@ -367,7 +367,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
     HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
                                   client_cert_details_str);
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
-    request_headers.setCopyForwardedClientCert(client_cert_details_str);
+    request_headers.setForwardedClientCert(client_cert_details_str);
   } else {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -385,7 +385,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
     const bool no_body =
         (!response_headers.TransferEncoding() && !response_headers.ContentLength());
     if (no_body) {
-      response_headers.setIntegerContentLength(uint64_t(0));
+      response_headers.setContentLength(uint64_t(0));
     }
   } else {
     response_headers.removeConnection();
@@ -394,7 +394,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
 
   if (request_headers != nullptr && request_headers->EnvoyForceTrace() &&
       request_headers->RequestId()) {
-    response_headers.setCopyRequestId(request_headers->RequestId()->value().getStringView());
+    response_headers.setRequestId(request_headers->RequestId()->value().getStringView());
   }
 
   response_headers.removeKeepAlive();

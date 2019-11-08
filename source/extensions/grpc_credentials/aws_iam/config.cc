@@ -120,8 +120,8 @@ AwsIamHeaderAuthenticator::buildMessageToSign(absl::string_view service_url,
 
   Http::RequestMessageImpl message;
   message.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  message.headers().setCopyHost(host);
-  message.headers().setCopyPath(path);
+  message.headers().setHost(host);
+  message.headers().setPath(path);
 
   return message;
 }

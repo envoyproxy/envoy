@@ -201,7 +201,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                                  service_full_name.size());
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
-  message->headers().setCopyHost(upstream_cluster);
+  message->headers().setHost(upstream_cluster);
   // According to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md TE should appear
   // before Timeout and ContentType.
   message->headers().setReferenceTE(Http::Headers::get().TEValues.Trailers);

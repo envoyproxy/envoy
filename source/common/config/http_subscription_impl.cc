@@ -61,11 +61,11 @@ void HttpSubscriptionImpl::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "Sending REST request for {}", path_);
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  request.headers().setCopyPath(path_);
+  request.headers().setPath(path_);
   request.body() =
       std::make_unique<Buffer::OwnedImpl>(MessageUtil::getJsonStringFromMessage(request_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  request.headers().setIntegerContentLength(request.body()->length());
+  request.headers().setContentLength(request.body()->length());
 }
 
 void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {

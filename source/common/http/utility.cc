@@ -320,7 +320,7 @@ void Utility::sendLocalReply(
     if (!body_text.empty() && !is_head_request) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
-      response_headers->setCopyGrpcMessage(PercentEncoding::encode(body_text));
+      response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
     encode_headers(std::move(response_headers), true); // Trailers only response
     return;
@@ -329,7 +329,7 @@ void Utility::sendLocalReply(
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {
-    response_headers->setIntegerContentLength(body_text.size());
+    response_headers->setContentLength(body_text.size());
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);
   }
 
@@ -435,8 +435,8 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
   extractHostPathFromUri(http_uri.uri(), host, path);
 
   MessagePtr message(new RequestMessageImpl());
-  message->headers().setCopyPath(path);
-  message->headers().setCopyHost(host);
+  message->headers().setPath(path);
+  message->headers().setHost(host);
 
   return message;
 }
@@ -479,7 +479,7 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
 
   const HeaderString& upgrade = headers.Upgrade()->value();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Connect);
-  headers.setCopyProtocol(upgrade.getStringView());
+  headers.setProtocol(upgrade.getStringView());
   headers.removeUpgrade();
   headers.removeConnection();
   // nghttp2 rejects upgrade requests/responses with content length, so strip
@@ -492,7 +492,7 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
 
 void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
-    headers.setIntegerStatus(200);
+    headers.setStatus(200);
   }
   headers.removeUpgrade();
   headers.removeConnection();
@@ -507,16 +507,16 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
 
   const HeaderString& protocol = headers.Protocol()->value();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  headers.setCopyUpgrade(protocol.getStringView());
+  headers.setUpgrade(protocol.getStringView());
   headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
 }
 
 void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
-    headers.setCopyUpgrade(upgrade);
+    headers.setUpgrade(upgrade);
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
-    headers.setIntegerStatus(101);
+    headers.setStatus(101);
   }
 }
 

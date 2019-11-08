@@ -33,16 +33,20 @@ public:                                                                         
     cached_byte_size_.reset();                                                                     \
     return maybeCreateInline(&inline_headers_.name##_, Headers::get().name);                       \
   }                                                                                                \
-  void setReference##name(const std::string& value) override {                                     \
-    addSize(value.size());                                                                         \
-    maybeCreateInline(&inline_headers_.name##_, Headers::get().name).value().setReference(value);  \
+  void setReference##name(absl::string_view value) override {                                      \
+    HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
+    updateSize(entry.value().size(), value.size());                                                \
+    entry.value().setReference(value);                                                             \
   }                                                                                                \
-  void setCopy##name(absl::string_view value) override {                                           \
-    addSize(value.size());                                                                         \
-    maybeCreateInline(&inline_headers_.name##_, Headers::get().name).value().setCopy(value);       \
+  void set##name(absl::string_view value) override {                                               \
+    HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
+    updateSize(entry.value().size(), value.size());                                                \
+    entry.value().setCopy(value);                                                                  \
   }                                                                                                \
-  void setInteger##name(uint64_t value) override {                                                 \
-    maybeCreateInline(&inline_headers_.name##_, Headers::get().name).value().setInteger(value);    \
+  void set##name(uint64_t value) override {                                                        \
+    HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
+    subtractSize(inline_headers_.name##_->value().size());                                         \
+    entry.value().setInteger(value);                                                               \
     addSize(inline_headers_.name##_->value().size());                                              \
   }                                                                                                \
   void remove##name() override { removeInline(&inline_headers_.name##_); }
@@ -218,6 +222,7 @@ protected:
   HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);
+  void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
   void subtractSize(uint64_t size);
 

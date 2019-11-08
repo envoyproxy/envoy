@@ -294,7 +294,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.setReferenceAccessControlAllowOrigin(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.setIntegerNoChunks(0);
+  response_headers.setNoChunks(0);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();

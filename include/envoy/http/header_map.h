@@ -169,7 +169,7 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  void setReference(const std::string& ref_value);
+  void setReference(absl::string_view ref_value);
 
   /**
    * @return the size of the string, not including the null terminator.
@@ -352,9 +352,9 @@ private:
   virtual const HeaderEntry* name() const PURE;                                                    \
   virtual HeaderEntry* name() PURE;                                                                \
   virtual HeaderEntry& insert##name() PURE;                                                        \
-  virtual void setReference##name(const std::string& value) PURE;                                  \
-  virtual void setCopy##name(absl::string_view value) PURE;                                        \
-  virtual void setInteger##name(uint64_t value) PURE;                                              \
+  virtual void setReference##name(absl::string_view value) PURE;                                   \
+  virtual void set##name(absl::string_view value) PURE;                                            \
+  virtual void set##name(uint64_t value) PURE;                                                     \
   virtual void remove##name() PURE;
 
 /**

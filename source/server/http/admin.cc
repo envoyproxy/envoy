@@ -143,7 +143,7 @@ const std::regex PromRegex("[^a-zA-Z0-9_]");
 const uint64_t RecentLookupsCapacity = 100;
 
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
-  header_map.setCopyStatus(std::to_string(enumToInt(code)));
+  header_map.setStatus(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map.ContentType() == nullptr) {
     // Default to text-plain if unset.
@@ -1467,7 +1467,7 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
                               Http::HeaderMap& response_headers, std::string& body) {
   AdminFilter filter(*this);
   Http::HeaderMapImpl request_headers;
-  request_headers.setCopyMethod(method);
+  request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);
   Buffer::OwnedImpl response;
 

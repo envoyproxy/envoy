@@ -768,7 +768,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if ((protocol == Protocol::Http10) &&
         !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
       // Add a default host if configured to do so.
-      request_headers_->setCopyHost(
+      request_headers_->setHost(
           connection_manager_.config_.http1Settings().default_host_for_http_10_);
     } else {
       // Require host header. For HTTP/1.1 Host has already been translated to :authority.
@@ -916,7 +916,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // For egress (outbound) requests, pass the decorator's operation name (if defined)
     // as a request header to enable the receiving service to use it in its server span.
     if (decorated_operation_) {
-      request_headers_->setCopyEnvoyDecoratorOperation(*decorated_operation_);
+      request_headers_->setEnvoyDecoratorOperation(*decorated_operation_);
     }
   } else {
     const HeaderEntry* req_operation_override = request_headers_->EnvoyDecoratorOperation();
@@ -1517,7 +1517,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // decorator operation (override), then pass the decorator's operation name (if defined)
       // as a response header to enable the client service to use it in its client span.
       if (decorated_operation_) {
-        headers.setCopyEnvoyDecoratorOperation(*decorated_operation_);
+        headers.setEnvoyDecoratorOperation(*decorated_operation_);
       }
     } else if (connection_manager_.config_.tracingConfig()->operation_name_ ==
                Tracing::OperationName::Egress) {
