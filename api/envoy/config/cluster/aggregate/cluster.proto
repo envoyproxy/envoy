@@ -17,6 +17,7 @@ message ClusterConfig {
   message LbCluster {
     // Cluster name.
     string cluster = 1;
+
     // Cluster priority.
     int32 priority = 2;
   }
