@@ -53,6 +53,9 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
 /**
  * Called when the async HTTP stream is canceled.
+ * Note this callback will ALWAYS be fired if a stream is canceled, even if the request and/or
+ * response is already complete. It will fire no more than once, and no other callbacks for the
+ * stream will be issued afterwards.
  */
 @property (nonatomic, strong) void (^onCancel)();
 

@@ -137,27 +137,27 @@ static void ios_on_complete(void *context) {
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled)) {
-      return;
-    }
-
+    // TODO: If the callback queue is not serial, clean up is not currently thread-safe.
     assert(stream);
     [stream cleanUp];
   });
 }
 
 static void ios_on_cancel(void *context) {
+  // This call is atomically gated at the call-site and will only happen once. It may still fire
+  // after a complete response or error callback, but no other callbacks for the stream will ever
+  // fire AFTER the cancellation callback.
+
+  // The cancellation callback does not clean up the stream, since that will race with work Envoy's
+  // main thread may already be doing. Instead we rely on the reset that's dispatched to Envoy to
+  // effect cleanup, with appropriate timing.
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
-    // This call is atomically gated at the call-site and will only happen once.
     if (callbacks.onCancel) {
       callbacks.onCancel();
     }
-
-    assert(stream);
-    [stream cleanUp];
   });
 }
 
@@ -166,11 +166,7 @@ static void ios_on_error(envoy_error error, void *context) {
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled)) {
-      return;
-    }
-
-    if (callbacks.onError) {
+    if (!atomic_load(c->canceled) && callbacks.onError) {
       NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
                                                         length:error.message.length
                                                       encoding:NSUTF8StringEncoding];
@@ -178,6 +174,7 @@ static void ios_on_error(envoy_error error, void *context) {
       callbacks.onError(error.error_code, errorMessage);
     }
 
+    // TODO: If the callback queue is not serial, clean up is not currently thread-safe.
     assert(stream);
     [stream cleanUp];
   });
