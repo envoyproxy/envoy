@@ -5,6 +5,7 @@ Version history
 ================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * api: remove all support for v1
+* buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
 * redis: performance improvement for larger split commands by avoiding string copies.
