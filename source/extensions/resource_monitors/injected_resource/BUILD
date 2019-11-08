@@ -26,7 +26,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "robust_to_untrusted_downstream",
+    security_posture = "data_plane_agnostic",
     deps = [
         ":injected_resource_monitor",
         "//include/envoy/registry",

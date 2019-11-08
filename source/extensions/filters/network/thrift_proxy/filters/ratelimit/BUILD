@@ -31,7 +31,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "unknown",
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":ratelimit_lib",
         "//include/envoy/registry",

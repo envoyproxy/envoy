@@ -46,8 +46,6 @@ mkdir -p "${GENERATED_RST_DIR}"
 source_venv "$BUILD_DIR"
 pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
-# Generate extension trust profile
-
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
 rm -rf bazel-bin/external/envoy_api

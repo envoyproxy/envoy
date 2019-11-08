@@ -26,6 +26,5 @@ if __name__ == '__main__':
   for sp, extensions in security_postures.items():
     output_path = pathlib.Path(security_rst_root, 'secpos_%s.rst' % sp)
     content = '\n'.join(
-        FormatItem(extension, extension_db[extension])
-        for extension in sorted(extensions))
+        FormatItem(extension, extension_db[extension]) for extension in sorted(extensions))
     output_path.write_text(content)

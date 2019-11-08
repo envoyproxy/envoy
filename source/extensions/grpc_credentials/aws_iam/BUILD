@@ -15,7 +15,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     external_deps = ["grpc"],
-    security_posture = "unknown",
+    security_posture = "data_plane_agnostic",
     deps = [
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",

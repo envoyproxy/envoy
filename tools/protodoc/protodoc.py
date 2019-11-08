@@ -48,19 +48,20 @@ $security_posture
 # macro) to human readable text for extension docs.
 SECURITY_POSTURES = {
     'robust_to_untrusted_downstream':
-        'This extension is hardened against untrusted downstream traffic. It '
+        'This extension is intended to be robust against untrusted downstream traffic. It '
         'assumes that the upstream is trusted.',
     'robust_to_untrusted_downstream_and_upstream':
-        'This extension is hardened against both untrusted downstream and '
-        'upstream traffic. This extension is not hardened and should only be '
-        'used in deployments where both the downstream and upstream are '
-        'trusted.',
+        'This extension is intended to be robust against both untrusted downstream and '
+        'upstream traffic.',
     'requires_trusted_downstream_and_upstream':
         'This extension is not hardened and should only be used in deployments'
         ' where both the downstream and upstream are trusted.',
-    'unknown': 'This extension has an unknown security posture and should only be '
-               'used in deployments where both the downstream and upstream are '
-               'trusted.',
+    'unknown':
+        'This extension has an unknown security posture and should only be '
+        'used in deployments where both the downstream and upstream are '
+        'trusted.',
+    'data_plane_agnostic':
+        'This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.',
 }
 
 

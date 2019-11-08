@@ -43,10 +43,12 @@ EXTENSION_SECURITY_POSTURES = [
     # This extension is not hardened and should only be used in deployments
     # where both the downstream and upstream are trusted.
     "requires_trusted_downstream_and_upstream",
-    # This is functionally equivaelnt to
+    # This is functionally equivalent to
     # requires_trusted_downstream_and_upstream, but acts as a placeholder to
     # allow us to identify extensions that need classifying.
     "unknown",
+    # Not relevant to data plane threats, e.g. stats sinks.
+    "data_plane_agnostic",
 ]
 
 def envoy_cc_extension(

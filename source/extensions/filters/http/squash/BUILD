@@ -36,7 +36,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "robust_to_untrusted_downstream",
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
