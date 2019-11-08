@@ -1,6 +1,10 @@
 Version history
 ---------------
 
+1.12.1 (November 8, 2019)
+=========================
+* listener: fixed CVE-2019-18836 by clearing accept filters before connection creation.
+
 1.12.0 (October 31, 2019)
 =========================
 * access log: added a new flag for :ref:`downstream protocol error <envoy_api_field_data.accesslog.v2.ResponseFlags.downstream_protocol_error>`.
