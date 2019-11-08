@@ -82,7 +82,7 @@ grpc-bridge_grpc-server_1         /bin/sh -c /bin/server           Up      0.0.0
 * The client has the methods `set key value` and `get key` to use the in-memory key-value store.
 
 ```console
-$ docker exec grpc-bridge_grpc-client_1 /client/grpc-kv-client.py set foo bar
+$ docker-compose exec grpc-client /client/grpc-kv-client.py set foo bar
 setf foo to bar
 ```
 
@@ -98,7 +98,7 @@ grpc-client-proxy_1  | [2019-11-07T16:33:58.855Z] "POST /kv.KV/Set HTTP/1.1" 200
 * Getting the value is no different
 
 ```console
-$ docker exec grpc-bridge_grpc-client_1 /client/grpc-kv-client.py get foo
+$ docker-compose exec grpc-client /client/grpc-kv-client.py get foo
 bar
 ```
 
