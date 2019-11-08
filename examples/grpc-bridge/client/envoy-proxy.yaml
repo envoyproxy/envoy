@@ -24,7 +24,6 @@ static_resources:
             virtual_hosts:
             - name: backend
               domains:
-              # The gRPC domain is associated with the endpoint from the server?
               - grpc
               routes:
               - match:

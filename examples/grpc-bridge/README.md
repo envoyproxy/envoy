@@ -5,9 +5,9 @@ to the [envoy docs](https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/
 
 This is an example of a key-value store where a client CLI, written in Python, updates a remote store, written in Go, using the stubs generated for both languages. 
  
-Running clients that uses gRPC Stubs and sends messages through a proxy
+Running clients that uses gRPC stubs and sends messages through a proxy
 that upgrades the HTTP requests from http/1.1 to http/2. This is a more detailed
-implementation of the envoy documentation at https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/grpc_bridge
+implementation of the Envoy documentation at https://www.envoyproxy.io/docs/envoy/latest/start/sandboxes/grpc_bridge
 
 * Client: talks in python and sends HTTP/1.1 requests (gRPC stubs)
   * Client-Proxy: Envoy setup that acts as an egress and converts the HTTP/1.1 call to HTTP/2.
@@ -56,11 +56,11 @@ $ ls -la server/kv/kv.pb.go
 $ docker-compose up --build
 ```
 
-* Inspect the client and server envoy.yaml config on each respective dir and compare the port numbers
+* Inspect the files `client/envoy-proxy.yaml` and `server/envoy-proxy.yaml`, as they define configs for their respective container, comparing port numbers and other specific settings.
 
 Notice that you will be interacting with the client container, which hosts
 the client python CLI. The port numbers for the proxies and the containers are displayed
-by the `docker-compose ps`, so it's easier to compare with the envoy.yaml config for each
+by the `docker-compose ps`, so it's easier to compare with the `\*/envoy-proxy.yaml` config files for each
 of the containers how they match.
 
 Note that the client container to use is `grpc-bridge_grpc-client_1` and binds to no port
@@ -86,6 +86,8 @@ $ docker-compose exec grpc-client /client/grpc-kv-client.py set foo bar
 setf foo to bar
 ```
 
+> NOTE: You could also run docker instead of docker-compose `docker exec -ti grpc-bridge_grpc-client_1 /client/grpc-kv-client.py set foo bar`
+
 * The server will display the gRPC call received by the server, and then the access logs from the proxy for the SET method.
   * Note that the proxy is propagating the headers of the request
 
@@ -101,6 +103,8 @@ grpc-client-proxy_1  | [2019-11-07T16:33:58.855Z] "POST /kv.KV/Set HTTP/1.1" 200
 $ docker-compose exec grpc-client /client/grpc-kv-client.py get foo
 bar
 ```
+
+> NOTE: You could also run docker instead of docker-compose `docker exec -ti grpc-bridge_grpc-client_1 /client/grpc-kv-client.py get foo`
 
 * The logs in the server will show the same for the GET method.
   * Note that again the request ID is proxied through

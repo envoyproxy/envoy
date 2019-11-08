@@ -11,9 +11,6 @@ RUN pip install -r /client/requirements.txt
 COPY client.py /client/grpc-kv-client.py
 COPY kv /client/kv
 
-# https://stackoverflow.com/questions/1260792/import-a-file-from-a-subdirectory/1260813#1260813
-#RUN touch /client/kv/__init__.py
-
 RUN chmod a+x /client/grpc-kv-client.py
 
 # http://bigdatums.net/2017/11/07/how-to-keep-docker-containers-running/
