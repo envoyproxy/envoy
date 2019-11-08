@@ -16,7 +16,7 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       tls_(tls.allocateSlot()) {
   for (const auto& inner_cluster : config.clusters()) {
-    clusters_.emplace_back(inner_cluster);
+    clusters_.emplace_back(inner_cluster.name());
   }
 }
 
@@ -24,7 +24,7 @@ PriorityContext
 Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
   Upstream::PrioritySetImpl priority_set;
   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster;
-  int next_priority_after_linearizing = 0;
+  uint32_t next_priority_after_linearizing = 0;
 
   // Linearize the priority set. e.g. for clusters [C_0, C_1, C_2] referred in aggregate cluster
   //    C_0 [P_0, P_1, P_2]
@@ -38,11 +38,13 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
       continue;
     }
     auto tlc = cluster_manager_.get(cluster);
+    // It is possible that the cluster doesn't exist, e.g., the cluster cloud be deleted or the
+    // cluster hasn't beed added by xDS.
     if (tlc == nullptr) {
       continue;
     }
 
-    int priority_in_current_cluster = 0;
+    uint32_t priority_in_current_cluster = 0;
     for (const auto& host_set : tlc->prioritySet().hostSetsPerPriority()) {
       if (!host_set->hosts().empty()) {
         priority_set.updateHosts(
@@ -60,6 +62,8 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
 void Cluster::startPreInit() {
   for (const auto& cluster : clusters_) {
     auto tlc = cluster_manager_.get(cluster);
+    // It is possible when initializing the cluster, the included cluster doesn't exist. e.g., the
+    // cluster could be added dynamically by xDS.
     if (tlc == nullptr) {
       continue;
     }

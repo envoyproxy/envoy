@@ -61,8 +61,8 @@ public:
       typed_config:
         "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
         clusters:
-        - primary
-        - secondary
+        - name: primary
+        - name: secondary
   )EOF";
 };
 
@@ -247,8 +247,8 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
       typed_config:
         "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
         clusters:
-        - primary
-        - secondary
+        - name: primary
+        - name: secondary
   )EOF";
 
   cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(

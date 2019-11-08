@@ -132,8 +132,8 @@ public:
       typed_config:
         "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
         clusters:
-        - primary
-        - secondary
+        - name: primary
+        - name: secondary
 )EOF";
 }; // namespace Aggregate
 
