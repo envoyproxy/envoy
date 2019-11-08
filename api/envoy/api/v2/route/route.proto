@@ -159,7 +159,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Route {
   reserved 6;
 
@@ -168,6 +168,10 @@ message Route {
 
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
+
+  // [#not-implemented-hide:]
+  // If true, a filter will overwrite some or all of the RouteAction proto.
+  bool filter_overwrites_route_action = 17;
 
   oneof action {
     option (validate.required) = true;
