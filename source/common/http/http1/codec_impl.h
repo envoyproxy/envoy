@@ -192,10 +192,12 @@ public:
 
   CodecStats& stats() { return stats_; }
 
+  const bool disable_trailers_;
+
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter);
+                 HeaderKeyFormatterPtr&& header_key_formatter, bool disable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 

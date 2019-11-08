@@ -43,6 +43,12 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
+// Disable the encoding of Http1 trailers downstream
+void setDisableEncodeTrailersHttp1(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  hcm.mutable_http_protocol_options()->set_disable_trailers(true);
+};
+
 // Tests for DownstreamProtocolIntegrationTest will be run with all protocols
 // (H1/H2 downstream) but only H1 upstreams.
 //
@@ -78,6 +84,58 @@ protected:
 using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
 TEST_P(ProtocolIntegrationTest, TrailerSupport) { testTrailers(10, 20); }
+
+TEST_P(ProtocolIntegrationTest, TrailerHttp1Disabled) {
+  config_helper_.addConfigModifier(&setDisableEncodeTrailersHttp1);
+
+  // Disable the encoding of trailers upstream
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_http_protocol_options()->set_disable_trailers(true);
+    }
+  });
+
+  Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
+  Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(1, false);
+  upstream_request_->encodeTrailers(response_trailers);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1, upstream_request_->bodyLength());
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    EXPECT_EQ(upstream_request_->trailers(), nullptr);
+  } else {
+    EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
+  }
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(1, response->body().size());
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    EXPECT_EQ(nullptr, response->trailers());
+  } else {
+    EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+  }
+}
 
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
