@@ -233,6 +233,7 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
 public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> server_pre_start_function_,
          std::function<void()> on_server_init_function, bool deterministic,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
