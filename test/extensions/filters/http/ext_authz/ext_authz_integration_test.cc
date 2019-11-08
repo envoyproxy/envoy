@@ -7,6 +7,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
@@ -86,6 +87,7 @@ public:
     attributes->clear_metadata_context();
     http_request->clear_id();
     http_request->clear_headers();
+    http_request->clear_scheme();
 
     EXPECT_EQ(check_request.DebugString(), expected_check_request.DebugString());
 
@@ -142,31 +144,30 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol,
-                                  uint64_t request_size) {
-    initializeWithDownstreamProtocol(downstream_protocol);
-    initiateClientConnection(request_size);
-    waitForExtAuthzRequest(fmt::format(R"EOF(
+  const std::string expectedCheckRequest(Http::CodecClient::Type downstream_protocol) {
+    const std::string expected_downstream_protocol =
+        downstream_protocol == Http::CodecClient::Type::HTTP1 ? "HTTP/1.1" : "HTTP/2";
+    constexpr absl::string_view expected_format = R"EOF(
 attributes:
   request:
     http:
       method: POST
       path: /test
       host: host
-      size: "{}"
-      body: "{}"
-      {}
-)EOF",
-                                       request_body_.length(), expectedRequestBody(),
-                                       downstream_protocol == Http::CodecClient::Type::HTTP1 ?
-                                                                                             R"EOF(
-      protocol: HTTP/1.1
-)EOF"
-                                                                                             :
-                                                                                             R"EOF(
-      scheme: http
-      protocol: HTTP/2
-)EOF"));
+      size: "%d"
+      body: "%s"
+      protocol: %s
+)EOF";
+
+    return absl::StrFormat(expected_format, request_body_.length(), expectedRequestBody(),
+                           expected_downstream_protocol);
+  }
+
+  void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol,
+                                  uint64_t request_size) {
+    initializeWithDownstreamProtocol(downstream_protocol);
+    initiateClientConnection(request_size);
+    waitForExtAuthzRequest(expectedCheckRequest(downstream_protocol));
     sendExtAuthzResponse();
     waitForSuccessfulUpstreamResponse();
     cleanup();
