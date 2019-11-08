@@ -263,6 +263,16 @@ absl::string_view StringUtil::rtrim(absl::string_view source) {
 
 absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
 
+absl::string_view StringUtil::removeTrailingCharacters(absl::string_view source, char ch) {
+  const absl::string_view::size_type pos = source.find_last_not_of(ch);
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - pos - 1);
+  } else {
+    source.remove_suffix(source.size());
+  }
+  return source;
+}
+
 bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
                            absl::string_view key_token, bool trim_whitespace) {
   const auto tokens = splitToken(source, delimiters, trim_whitespace);
