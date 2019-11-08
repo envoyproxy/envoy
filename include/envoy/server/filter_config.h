@@ -9,7 +9,6 @@
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/manager.h"
-#include "envoy/json/json_object.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -249,6 +248,13 @@ public:
   virtual Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.listener"; }
 };
 
 /**
@@ -270,6 +276,13 @@ public:
   virtual Network::UdpListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.udp_listener"; }
 };
 
 /**
@@ -312,13 +325,6 @@ public:
   ~NamedNetworkFilterConfigFactory() override = default;
 
   /**
-   * TODO(dereka): fully remove this method once envoy-filter-example is updated.
-   */
-  virtual Network::FilterFactoryCb createFilterFactory(const Json::Object&, FactoryContext&) {
-    throw EnvoyException("v1 API is unsupported");
-  }
-
-  /**
    * Create a particular network filter factory implementation. If the implementation is unable to
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
@@ -341,6 +347,13 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.network"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -374,6 +387,13 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.upstream_network"; }
 };
 
 /**
@@ -383,14 +403,6 @@ public:
 class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   ~NamedHttpFilterConfigFactory() override = default;
-
-  /**
-   * TODO(dereka): fully remove this method once envoy-filter-example is updated.
-   */
-  virtual Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
-                                                    FactoryContext&) {
-    throw EnvoyException("v1 API is unsupported");
-  }
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to
@@ -439,6 +451,13 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

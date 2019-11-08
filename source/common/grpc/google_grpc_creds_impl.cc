@@ -126,8 +126,7 @@ public:
 /**
  * Static registration for the default Google gRPC credentials factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DefaultGoogleGrpcCredentialsFactory, GoogleGrpcCredentialsFactory>
-    default_google_grpc_credentials_registered_;
+REGISTER_FACTORY(DefaultGoogleGrpcCredentialsFactory, GoogleGrpcCredentialsFactory);
 
 std::shared_ptr<grpc::ChannelCredentials>
 getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service,

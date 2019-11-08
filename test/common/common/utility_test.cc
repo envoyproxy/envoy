@@ -223,6 +223,13 @@ TEST(StringUtil, StringViewRtrim) {
   EXPECT_EQ("", StringUtil::rtrim(""));
 }
 
+TEST(StringUtil, RemoveTrailingCharacters) {
+  EXPECT_EQ("", StringUtil::removeTrailingCharacters("......", '.'));
+  EXPECT_EQ("\t\f\v\n\rhello ", StringUtil::removeTrailingCharacters("\t\f\v\n\rhello ", '.'));
+  EXPECT_EQ("\t\f\v\n\r a b", StringUtil::removeTrailingCharacters("\t\f\v\n\r a b.......", '.'));
+  EXPECT_EQ("", StringUtil::removeTrailingCharacters("", '.'));
+}
+
 TEST(StringUtil, StringViewTrim) {
   EXPECT_EQ("", StringUtil::trim("   "));
   EXPECT_EQ("hello", StringUtil::trim("\t\f\v\n\r  hello   "));
