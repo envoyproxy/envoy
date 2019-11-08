@@ -462,16 +462,13 @@ void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
   setDeterministic();
   config_helper_.renameListener("redis_proxy");
-
-  server_pre_start_function_ = [this](Envoy::IntegrationTestServer& test_server) {
-    mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));
-    // Abort now if we cannot downcast the server's random number generator pointer.
-    ASSERT_TRUE(mock_rng_ != nullptr);
-    // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
-    ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
-  };
-
   BaseIntegrationTest::initialize();
+
+  mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&test_server_->server().random());
+  // Abort now if we cannot downcast the server's random number generator pointer.
+  ASSERT_TRUE(mock_rng_ != nullptr);
+  // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
+  ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
 }
 
 void RedisProxyIntegrationTest::roundtripToUpstreamStep(
