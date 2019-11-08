@@ -177,6 +177,54 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   cds_callbacks_->onConfigUpdate(clusters, "");
 }
 
+TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
+  {
+    InSequence s;
+    setup();
+  }
+  EXPECT_CALL(initialized_, ready());
+
+  {
+    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+    {
+      envoy::api::v2::Cluster cluster;
+      cluster.set_name("cluster_1");
+      expectAdd("cluster_1", "v1");
+      auto* resource = resources.Add();
+      resource->mutable_resource()->PackFrom(cluster);
+      resource->set_name("cluster_1");
+      resource->set_version("v1");
+    }
+    {
+      envoy::api::v2::Cluster cluster;
+      cluster.set_name("cluster_2");
+      expectAdd("cluster_2", "v1");
+      auto* resource = resources.Add();
+      resource->mutable_resource()->PackFrom(cluster);
+      resource->set_name("cluster_2");
+      resource->set_version("v1");
+    }
+    cds_callbacks_->onConfigUpdate(resources, {}, "v1");
+  }
+
+  {
+    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+    {
+      envoy::api::v2::Cluster cluster;
+      cluster.set_name("cluster_3");
+      expectAdd("cluster_3", "v2");
+      auto* resource = resources.Add();
+      resource->mutable_resource()->PackFrom(cluster);
+      resource->set_name("cluster_3");
+      resource->set_version("v2");
+    }
+    Protobuf::RepeatedPtrField<std::string> removed;
+    *removed.Add() = "cluster_1";
+    EXPECT_CALL(cm_, removeCluster(StrEq("cluster_1"))).WillOnce(Return(true));
+    cds_callbacks_->onConfigUpdate(resources, removed, "v2");
+  }
+}
+
 TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
   {
     InSequence s;
