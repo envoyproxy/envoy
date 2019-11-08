@@ -39,7 +39,7 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
     }
     auto tlc = cluster_manager_.get(cluster);
     // It is possible that the cluster doesn't exist, e.g., the cluster cloud be deleted or the
-    // cluster hasn't beed added by xDS.
+    // cluster hasn't been added by xDS.
     if (tlc == nullptr) {
       continue;
     }
