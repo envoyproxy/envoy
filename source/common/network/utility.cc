@@ -563,10 +563,10 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   return result;
 }
 
-Api::IoCallUint64Result
-Utility::readAllDatagramsFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                    UdpPacketProcessor& udp_packet_processor,
-                                    TimeSource& time_source, uint32_t& packets_dropped) {
+Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
+                                               const Address::Instance& local_address,
+                                               UdpPacketProcessor& udp_packet_processor,
+                                               TimeSource& time_source, uint32_t& packets_dropped) {
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
@@ -575,7 +575,7 @@ Utility::readAllDatagramsFromSocket(IoHandle& handle, const Address::Instance& l
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
-      return result;
+      return std::move(result.err_);
     }
 
     if (result.rc_ == 0) {

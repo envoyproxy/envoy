@@ -68,21 +68,21 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
-  const Api::IoCallUint64Result result = Utility::readAllDatagramsFromSocket(
+  const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_.ioHandle(), *socket_.localAddress(), *this, time_source_, packets_dropped_);
-  // readAllDatagramsFromSocket should/will always read until we get an error, though that error may
-  // simply be IoErrorCode::Again.
-  ASSERT(!result.ok());
-  if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-    ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result.err_->getErrorCode()),
-                  result.err_->getErrorDetails());
-    cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError, result.err_->getErrorCode());
+  // TODO(mattklein123): Handle no error when we limit the number of packets read.
+  if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+    ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result->getErrorCode()),
+                  result->getErrorDetails());
+    cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError, result->getErrorCode());
   }
 }
 
 void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_address,
                                     Address::InstanceConstSharedPtr peer_address,
                                     Buffer::InstancePtr buffer, MonotonicTime receive_time) {
+  // UDP listeners are always configured with the socket option that allows pulling the local
+  // address. This should never be null.
   ASSERT(local_address != nullptr);
   UdpRecvData recvData{
       {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};

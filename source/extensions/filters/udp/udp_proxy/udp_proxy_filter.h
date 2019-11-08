@@ -44,6 +44,14 @@ public:
   void onData(Network::UdpRecvData& data) override;
 
 private:
+  /**
+   * An active session is similar to a TCP connection. It binds a 4-tuple (downstream IP/port, local
+   * IP/port) to a selected upstream host for the purpose of packet forwarding. Unlike a TCP
+   * connection, there is obviously no concept of session destruction beyond internally tracked data
+   * such as an idle timeout, maximum packets, etc. Once a session is created, downstream packets
+   * will be hashed to the same session and will be forwarded to the same upstream, using the same
+   * local ephemeral IP/port.
+   */
   class ActiveSession : public Network::UdpPacketProcessor {
   public:
     ActiveSession(UdpProxyFilter& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
@@ -68,6 +76,9 @@ private:
     UdpProxyFilter& parent_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     const Upstream::HostConstSharedPtr host_;
+    // The IO handle is used for writing packets to the selected upstream host as well as receiving
+    // packets from the upstream host. Note that a a local ephemeral port is bound on the first
+    // write to the upstream host.
     const Network::IoHandlePtr io_handle_;
     const Event::FileEventPtr socket_event_;
   };

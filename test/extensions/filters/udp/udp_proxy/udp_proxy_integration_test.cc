@@ -67,11 +67,19 @@ public:
       )EOF";
   }
 
-  /**
-   * Initializer for an individual test.
-   */
-  void SetUp() override {
+  void setup(uint32_t upstream_count) {
     udp_fake_upstream_ = true;
+    if (upstream_count > 1) {
+      setDeterministic();
+      setUpstreamCount(upstream_count);
+      config_helper_.addConfigModifier([upstream_count](
+                                           envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+        for (uint32_t i = 1; i < upstream_count; i++) {
+          auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
+          new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+        }
+      });
+    }
     BaseIntegrationTest::initialize();
   }
 
@@ -106,14 +114,19 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Basic loopback test.
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
+  setup(1);
   const uint32_t port = lookupPort("listener_0");
-  auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address);
 }
 
+// Verifies calling sendmsg with a non-local address. Note that this test is only fully complete for
+// IPv4. See the comment below for more details.
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
+  setup(1);
   const uint32_t port = lookupPort("listener_0");
   Network::Address::InstanceConstSharedPtr listener_address;
   if (version_ == Network::Address::IpVersion::v4) {
@@ -137,9 +150,11 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   requestResponseWithListenerAddress(*listener_address);
 }
 
+// Make sure multiple clients are routed correctly to a single upstream host.
 TEST_P(UdpProxyIntegrationTest, MultipleClients) {
+  setup(1);
   const uint32_t port = lookupPort("listener_0");
-  auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   UdpSyncClient client1(timeSystem(), version_);
@@ -176,6 +191,32 @@ TEST_P(UdpProxyIntegrationTest, MultipleClients) {
   fake_upstreams_[0]->sendUdpDatagram("client1_world", *client1_request_datagram.addresses_.peer_);
   client1.recv(response_datagram);
   EXPECT_EQ("client1_world", response_datagram.buffer_->toString());
+}
+
+// Make sure sessions correctly forward to the same upstream host when there are multiple upstream
+// hosts.
+TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
+  setup(2);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  UdpSyncClient client(timeSystem(), version_);
+  client.write("hello1", *listener_address);
+  client.write("hello2", *listener_address);
+  Network::UdpRecvData request_datagram;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ("hello1", request_datagram.buffer_->toString());
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
+  EXPECT_EQ("hello2", request_datagram.buffer_->toString());
+
+  fake_upstreams_[0]->sendUdpDatagram("world1", *request_datagram.addresses_.peer_);
+  fake_upstreams_[0]->sendUdpDatagram("world2", *request_datagram.addresses_.peer_);
+  Network::UdpRecvData response_datagram;
+  client.recv(response_datagram);
+  EXPECT_EQ("world1", response_datagram.buffer_->toString());
+  client.recv(response_datagram);
+  EXPECT_EQ("world2", response_datagram.buffer_->toString());
 }
 
 } // namespace

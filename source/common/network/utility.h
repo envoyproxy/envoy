@@ -321,18 +321,25 @@ public:
                                                 uint32_t* packets_dropped);
 
   /**
-   * Read all available packets from a given UDP socket and pass the packet to a given
+   * Read available packets from a given UDP socket and pass the packet to a given
    * UdpPacketProcessor.
    * @param handle is the UDP socket to read from.
    * @param local_address is the socket's local address used to populate port.
    * @param udp_packet_processor is the callback to receive the packets.
    * @param time_source is the time source used to generate the time stamp of the received packets.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel.
+   *
+   * TODO(mattklein123): Allow the number of packets read to be limited for fairness. Currently
+   *                     this function will always return an error, even if EAGAIN. In the future
+   *                     we can return no error if we limited the number of packets read and have
+   *                     to fake another read event.
+   * TODO(mattklein123): Can we potentially share this with the TCP stack somehow? Similar code
+   *                     exists there.
    */
-  static Api::IoCallUint64Result
-  readAllDatagramsFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                             UdpPacketProcessor& udp_packet_processor, TimeSource& time_source,
-                             uint32_t& packets_dropped);
+  static Api::IoErrorPtr readPacketsFromSocket(IoHandle& handle,
+                                               const Address::Instance& local_address,
+                                               UdpPacketProcessor& udp_packet_processor,
+                                               TimeSource& time_source, uint32_t& packets_dropped);
 
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
