@@ -14,6 +14,7 @@
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -249,27 +250,9 @@ void InstanceImpl::initialize(const Options& options,
             restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
-  ENVOY_LOG(info, "  access_loggers: {}",
-            Registry::FactoryRegistry<Configuration::AccessLogInstanceFactory>::allFactoryNames());
-  ENVOY_LOG(
-      info, "  filters.http: {}",
-      Registry::FactoryRegistry<Configuration::NamedHttpFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  filters.listener: {}",
-            Registry::FactoryRegistry<
-                Configuration::NamedListenerFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(
-      info, "  filters.network: {}",
-      Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  stat_sinks: {}",
-            Registry::FactoryRegistry<Configuration::StatsSinkFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  tracers: {}",
-            Registry::FactoryRegistry<Configuration::TracerFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  transport_sockets.downstream: {}",
-            Registry::FactoryRegistry<
-                Configuration::DownstreamTransportSocketConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  transport_sockets.upstream: {}",
-            Registry::FactoryRegistry<
-                Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
+  }
 
   // Enable the selected buffer implementation (old libevent evbuffer version or new native
   // version) early in the initialization, before any buffers can be created.
