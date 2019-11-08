@@ -427,7 +427,6 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
 
     // By default we will remove any nominated headers
     bool keep_header = false;
-    StringUtil::CaseUnorderedSet tokens_to_remove{};
 
     // Determine whether the nominated header contains invalid values
     HeaderEntry* nominated_header = NULL;
@@ -463,33 +462,23 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
       }
 
       if (is_te_header) {
-        keep_header = true;
         for (const auto& header_value : absl::StrSplit(nominated_header_value_sv, ',')) {
 
           const absl::string_view header_sv = StringUtil::trim(header_value);
 
-          // Remove everything from TE header except "trailers"
-          if (!StringUtil::CaseInsensitiveCompare()(header_sv,
-                                                    Http::Headers::get().TEValues.Trailers)) {
-            ENVOY_LOG_MISC(trace, "Sanitizing nominated header [{}] value [{}]", token_sv,
-                           header_sv);
-            tokens_to_remove.emplace(header_sv);
+          // If trailers exist in the TE value tokens, keep the header, removing any other values
+          // that may exist
+          if (StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                   Http::Headers::get().TEValues.Trailers)) {
+            keep_header = true;
+            break;
           }
         }
-      }
 
-      // We found tokens in an expected header that needed removal. If after removing them the
-      // set is empty, we will remove that header. Conversely, we will move on to examining the
-      // next nominated header
-      if (keep_header && !tokens_to_remove.empty()) {
-        const std::string new_value =
-            StringUtil::removeTokens(nominated_header_value_sv, ",", tokens_to_remove, ",");
-        if (new_value.empty()) {
-          keep_header = false;
-        } else {
+        if (keep_header) {
           nominated_header->value().clear();
-          nominated_header->value().setCopy(new_value.data(), new_value.size());
-          continue;
+          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
+                                            Http::Headers::get().TEValues.Trailers.size());
         }
       }
     }

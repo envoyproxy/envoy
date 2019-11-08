@@ -1386,7 +1386,7 @@ TEST_P(HeaderIntegrationTest, TestRejectNominatedXForwardedProto) {
           {":path", "/"},
           {":method", "GET"},
           {"x-request-foo", "downstram"},
-          {"te", "TrAiLeRs"},
+          {"te", "trailers"},
       },
       Http::TestHeaderMapImpl{
           {":status", "400"},
@@ -1407,14 +1407,14 @@ TEST_P(HeaderIntegrationTest, TestRejectTrailersSubString) {
           {":scheme", "http"},
           {":authority", "no-headers.com"},
           {"x-request-foo", "downstram"},
-          {"te", "semiswithtripletrailersareathing"},
+          {"te", "SemisWithTripleTrailersAreAthing"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "no-headers.com"},
           {":path", "/"},
           {":method", "GET"},
           {"x-request-foo", "downstram"},
-          {"te", "semiswithtripletrailersareathing"},
+          {"te", "SemisWithTripleTrailersAreAthing"},
       },
       Http::TestHeaderMapImpl{
           {":status", "400"},
