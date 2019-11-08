@@ -733,12 +733,7 @@ TEST_F(QuicPlatformTest, TestQuicOptional) {
   EXPECT_EQ(1, *maybe_a);
 }
 
-class QuicMemSliceTest : public testing::Test {
-public:
-  ~QuicMemSliceTest() override = default;
-};
-
-TEST_F(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
+TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
@@ -776,7 +771,7 @@ TEST_F(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(fragment_releaser_called);
 }
 
-TEST_F(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
+TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
   Envoy::Buffer::OwnedImpl buffer;
   std::string str(1024, 'a');
   buffer.add(str);
@@ -787,7 +782,7 @@ TEST_F(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
   EXPECT_EQ(str, span.GetData(0));
 }
 
-TEST_F(QuicMemSliceTest, QuicMemSliceStorage) {
+TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
   std::string str(512, 'a');
   struct iovec iov = {const_cast<char*>(str.data()), str.length()};
   SimpleBufferAllocator allocator;

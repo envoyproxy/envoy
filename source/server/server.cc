@@ -19,7 +19,6 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
