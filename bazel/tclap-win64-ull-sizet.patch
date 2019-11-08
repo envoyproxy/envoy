@@ -1,0 +1,16 @@
+diff --git a/include/tclap/StandardTraits.h b/include/tclap/StandardTraits.h
+index 46d7f6f..117057b 100644
+--- a/include/tclap/StandardTraits.h
++++ b/include/tclap/StandardTraits.h
+@@ -123,8 +123,9 @@ struct ArgTraits<unsigned char> {
+     typedef ValueLike ValueCategory;
+ };
+ 
+-// Microsoft implements size_t awkwardly. 
+-#if defined(_MSC_VER) && defined(_M_X64)
++// Microsoft implements size_t awkwardly.
++// Studio 2005 introduces unsigned long long, which conflicts with the size_t template
++#if defined(_MSC_VER) && (_MSC_VER < 1400) && defined(_M_X64)
+ /**
+  * size_ts have value-like semantics.
+  */

@@ -97,17 +97,17 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
-  case Result::EXT_ORIGIN_REQUEST_SUCCESS:
-  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL:
+  case Result::ExtOriginRequestSuccess:
+  case Result::LocalOriginConnectSuccessFinal:
     http_code = Http::Code::OK;
     break;
-  case Result::LOCAL_ORIGIN_TIMEOUT:
+  case Result::LocalOriginTimeout:
     http_code = Http::Code::GatewayTimeout;
     break;
-  case Result::LOCAL_ORIGIN_CONNECT_FAILED:
+  case Result::LocalOriginConnectFailed:
     http_code = Http::Code::ServiceUnavailable;
     break;
-  case Result::EXT_ORIGIN_REQUEST_FAILED:
+  case Result::ExtOriginRequestFailed:
     http_code = Http::Code::InternalServerError;
     break;
     // LOCAL_ORIGIN_CONNECT_SUCCESS  is used is 2-layer protocols, like HTTP.
@@ -115,7 +115,7 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
     // If error happens in higher layer protocol, it will be mapped to
     // HTTP code indicating error. In order not to intervene with result of
     // higher layer protocol, this code is not mapped to HTTP code.
-  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
+  case Result::LocalOriginConnectSuccess:
     return absl::nullopt;
   }
 
@@ -147,23 +147,23 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
-  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS:
-  case Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL:
+  case Result::LocalOriginConnectSuccess:
+  case Result::LocalOriginConnectSuccessFinal:
     return localOriginNoFailure();
   // Connectivity related errors.
-  case Result::LOCAL_ORIGIN_TIMEOUT:
-  case Result::LOCAL_ORIGIN_CONNECT_FAILED:
+  case Result::LocalOriginTimeout:
+  case Result::LocalOriginConnectFailed:
     return localOriginFailure();
   // EXT_ORIGIN_REQUEST_FAILED is used when connection to server was successful, but transaction on
   // server level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
-  case Result::EXT_ORIGIN_REQUEST_FAILED:
+  case Result::ExtOriginRequestFailed:
     // map it to http code and call http handler.
     return putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
   // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with non-http server was
   // completed successfully. This means that connection and server level transactions were
   // successful. Map it to http code 200 OK and indicate that there was no errors on connection
   // level.
-  case Result::EXT_ORIGIN_REQUEST_SUCCESS:
+  case Result::ExtOriginRequestSuccess:
     putHttpResponseCode(enumToInt(Http::Code::OK));
     localOriginNoFailure();
     break;

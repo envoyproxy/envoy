@@ -18,11 +18,10 @@ namespace Quic {
 class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase, public EnvoyQuicStream {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
-                        quic::StreamType type)
-      : quic::QuicSpdyServerStreamBase(id, session, type) {}
+                        quic::StreamType type);
+
   EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
-                        quic::StreamType type)
-      : quic::QuicSpdyServerStreamBase(pending, session, type) {}
+                        quic::StreamType type);
 
   // Http::StreamEncoder
   void encode100ContinueHeaders(const Http::HeaderMap& headers) override;
@@ -33,19 +32,28 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-  void readDisable(bool disable) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
+  void OnClose() override;
+  void OnCanWrite() override;
   // quic::QuicServerSessionBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
 protected:
+  // EnvoyQuicStream
+  void switchStreamBlockState(bool should_block) override;
+  uint32_t streamId() override;
+  Network::Connection* connection() override;
+
   // quic::QuicSpdyStream
   void OnInitialHeadersComplete(bool fin, size_t frame_len,
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
+
+private:
+  QuicFilterManagerConnectionImpl* filterManagerConnection();
 };
 
 } // namespace Quic

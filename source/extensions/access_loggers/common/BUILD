@@ -19,5 +19,6 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/http:header_map_lib",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )

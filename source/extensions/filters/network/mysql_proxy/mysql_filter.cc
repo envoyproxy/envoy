@@ -72,7 +72,7 @@ DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
 void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
 
 void MySQLFilter::onNewMessage(MySQLSession::State state) {
-  if (state == MySQLSession::State::MYSQL_CHALLENGE_REQ) {
+  if (state == MySQLSession::State::ChallengeReq) {
     config_->stats_.login_attempts_.inc();
   }
 }

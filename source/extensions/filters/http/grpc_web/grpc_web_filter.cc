@@ -1,6 +1,8 @@
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
+#ifndef WIN32
 #include <arpa/inet.h>
+#endif
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"

@@ -10,7 +10,9 @@
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
 // TODO(soya3129): Remove after issue https://github.com/nghttp2/nghttp2/issues/1246 is fixed.
+extern "C" {
 extern int nghttp2_enable_strict_preface;
+}
 
 namespace Envoy {
 namespace Http {
@@ -202,7 +204,7 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSize
   MetadataCallback cb = [](std::unique_ptr<MetadataMap>) -> void {};
   initialize(cb);
 
-  int result = 0;
+  ssize_t result = 0;
 
   for (int i = 0; i < 100; i++) {
     // Cleans up the output buffer.

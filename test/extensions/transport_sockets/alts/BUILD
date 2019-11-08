@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
     ],
 )
 

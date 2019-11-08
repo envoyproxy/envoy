@@ -12,6 +12,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -101,7 +103,7 @@ void CdsApiImpl::onConfigUpdate(
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
     throw EnvoyException(
-        fmt::format("Error adding/updating cluster(s) {}", StringUtil::join(exception_msgs, ", ")));
+        fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
 }
 

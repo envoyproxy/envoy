@@ -123,6 +123,11 @@ public:
   virtual const std::string& logFormat() const PURE;
 
   /**
+   * @return const bool indicating whether to escape c-style escape sequences in logs.
+   */
+  virtual bool logFormatEscaped() const PURE;
+
+  /**
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;

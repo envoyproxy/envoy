@@ -180,7 +180,7 @@ public:
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
 
 private:
-  enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
+  enum class SslRequirements { None, ExternalOnly, All };
 
   struct VirtualClusterEntry : public VirtualCluster {
     VirtualClusterEntry(const envoy::api::v2::route::VirtualCluster& virtual_cluster,
