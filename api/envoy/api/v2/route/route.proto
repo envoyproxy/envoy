@@ -152,6 +152,14 @@ message VirtualHost {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
+// A filter-defined action type.
+message FilterAction {
+  oneof action {
+    google.protobuf.Any filter_action = 1;
+    google.protobuf.Struct typed_filter_action = 2;
+  }
+}
+
 // A route is both a specification of how to match a request as well as an indication of what to do
 // next (e.g., redirect, forward, rewrite, etc.).
 //
@@ -169,10 +177,6 @@ message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
-  // [#not-implemented-hide:]
-  // If true, a filter will overwrite some or all of the RouteAction proto.
-  bool filter_overwrites_route_action = 17;
-
   oneof action {
     option (validate.required) = true;
 
@@ -184,6 +188,10 @@ message Route {
 
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
+
+    // [#not-implemented-hide:]
+    // If true, a filter will define the RouteAction.
+    FilterAction filter_action = 17;
   }
 
   // The Metadata field can be used to provide additional information
