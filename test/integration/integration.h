@@ -332,10 +332,11 @@ public:
 protected:
   // Create the envoy server in another thread and start it.
   // Will not return until that server is listening.
-  virtual IntegrationTestServerPtr createIntegrationTestServer(
-      const std::string& bootstrap_path,
-      std::function<void(IntegrationTestServer&)> server_pre_start_function_,
-      std::function<void()> on_server_init_function, Event::TestTimeSystem& time_system);
+  virtual IntegrationTestServerPtr
+  createIntegrationTestServer(const std::string& bootstrap_path,
+                              std::function<void(IntegrationTestServer&)> on_server_ready_function,
+                              std::function<void()> on_server_init_function,
+                              Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
 
@@ -351,7 +352,7 @@ protected:
   absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
 
   // Steps that should be done before the envoy server starting.
-  std::function<void(IntegrationTestServer&)> server_pre_start_function_;
+  std::function<void(IntegrationTestServer&)> on_server_ready_function_;
 
   // Steps that should be done in parallel with the envoy server starting. E.g., xDS
   // pre-init, control plane synchronization needed for server start.

@@ -136,7 +136,7 @@ public:
       }
     });
 
-    server_pre_start_function_ = [this](Envoy::IntegrationTestServer& test_server) {
+    on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
       mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));
       // Abort now if we cannot downcast the server's random number generator pointer.
       ASSERT_TRUE(mock_rng_ != nullptr);
