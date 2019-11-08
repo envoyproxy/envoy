@@ -11,32 +11,36 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 
 function setup_gcc_toolchain() {
+  if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
+    echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+    exit 1
+  fi
   if [[ -z "${ENVOY_RBE}" ]]; then
     export CC=gcc
     export CXX=g++
     export BAZEL_COMPILER=gcc
     echo "$CC/$CXX toolchain configured"
   else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-gcc ${BAZEL_BUILD_OPTIONS}"
+    export BAZEL_BUILD_OPTIONS="--config=remote-gcc ${BAZEL_BUILD_OPTIONS}"
   fi
 }
 
 function setup_clang_toolchain() {
+  ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
+    fi
   else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang ${BAZEL_BUILD_OPTIONS}"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang ${BAZEL_BUILD_OPTIONS}"
+    fi
   fi
-  echo "clang toolchain configured"
-}
-
-function setup_clang_libcxx_toolchain() {
-  if [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
-  else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
-  fi
-  echo "clang toolchain with libc++ configured"
+  echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
