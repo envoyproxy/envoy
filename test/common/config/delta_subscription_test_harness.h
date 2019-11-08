@@ -2,7 +2,7 @@
 
 #include <queue>
 
-#include "common/config/grpc_subscription_impl.h"
+#include "common/config/delta_subscription_impl.h"
 #include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -34,11 +34,11 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    grpc_mux_ = std::make_shared<GrpcMuxDelta>(
+    xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        random_, stats_store_, rate_limit_settings_, local_info_, false);
-    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        grpc_mux_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+        random_, stats_store_, rate_limit_settings_, local_info_);
+    subscription_ = std::make_unique<DeltaSubscriptionImpl>(
+        xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
         init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
@@ -148,8 +148,8 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
     }
-    auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(response));
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -189,8 +189,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  std::shared_ptr<GrpcMux> grpc_mux_;
-  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
+  std::shared_ptr<NewGrpcMuxImpl> xds_context_;
+  std::unique_ptr<DeltaSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
