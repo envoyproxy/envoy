@@ -10,7 +10,7 @@ Version history
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 * tls: remove TLS 1.0 and 1.1 from client defaults
-* http: add support for encoding http1 trailers. To disable use :ref:`config <envoy_api_field.core.Http1ProtocolOptions.disable_trailers>`.
+* http: add support for encoding http1 trailers. To disable use :ref:`disable_trailers <envoy_api_field.core.Http1ProtocolOptions.disable_trailers>`.
 
 1.12.0 (October 31, 2019)
 =========================
