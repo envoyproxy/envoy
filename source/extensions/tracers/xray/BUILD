@@ -40,6 +40,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "unknown",
+    status = "wip",
     deps = [
         ":xray_lib",
         "//source/common/config:datasource_lib",

@@ -51,16 +51,29 @@ EXTENSION_SECURITY_POSTURES = [
     "data_plane_agnostic",
 ]
 
+EXTENSION_STATUS_VALUES = [
+    # This extension is stable and is expected to be production usable.
+    "stable",
+    # This extension is functional but has not had substantial production burn
+    # time, use only with this caveat.
+    "alpha",
+    # This extension is work-in-progress. Functionality is incomplete and it is
+    # not intended for production use.
+    "wip",
+]
+
 def envoy_cc_extension(
         name,
         security_posture,
         # Only set this for internal, undocumented extensions.
         undocumented = False,
+        status = "stable",
         tags = [],
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
-    tags = tags + ["secpos:" + security_posture]
+    if status not in EXTENSION_STATUS_VALUES:
+        fail("Unknown extension status: " + status)
     envoy_cc_library(name, tags = tags, **kwargs)
 
 # Envoy C++ library targets should be specified with this function.

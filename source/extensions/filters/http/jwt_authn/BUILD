@@ -69,6 +69,7 @@ envoy_cc_extension(
     srcs = ["filter_factory.cc"],
     hdrs = ["filter_factory.h"],
     security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     deps = [
         ":filter_lib",
         "//include/envoy/registry",

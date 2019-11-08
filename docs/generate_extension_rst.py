@@ -9,7 +9,7 @@ import sys
 
 
 def FormatItem(extension, metadata):
-  if metadata['undocumented']:
+  if metadata['undocumented'] or metadata['status'] == 'wip':
     return '* %s' % extension
   return '* :ref:`%s <extension_%s>`' % (extension, extension)
 

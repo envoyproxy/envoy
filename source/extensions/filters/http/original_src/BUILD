@@ -38,6 +38,7 @@ envoy_cc_extension(
     srcs = ["original_src_config_factory.cc"],
     hdrs = ["original_src_config_factory.h"],
     security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     deps = [
         ":config_lib",
         ":original_src_lib",

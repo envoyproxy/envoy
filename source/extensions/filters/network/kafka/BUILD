@@ -30,6 +30,7 @@ envoy_cc_extension(
         "request_codec.h",
     ],
     security_posture = "requires_trusted_downstream_and_upstream",
+    status = "wip",
     deps = [
         ":abstract_codec_lib",
         ":kafka_request_parser_lib",

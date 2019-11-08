@@ -15,6 +15,7 @@ envoy_cc_extension(
     srcs = ["grpc_stats_filter.cc"],
     hdrs = ["grpc_stats_filter.h"],
     security_posture = "unknown",
+    status = "alpha",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",

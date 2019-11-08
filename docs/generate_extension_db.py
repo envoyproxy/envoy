@@ -29,16 +29,22 @@ class ExtensionDbError(Exception):
   pass
 
 
+def IsMissing(value):
+  return value == '(missing)'
+
+
 def GetExtensionMetadata(target):
-  r = subprocess.run([BUILDOZER_PATH, '-stdout', 'print security_posture undocumented', target],
-                     stdout=subprocess.PIPE,
-                     stderr=subprocess.PIPE)
-  security_posture, undocumented = r.stdout.decode('utf-8').strip().split(' ')
-  if security_posture == '(missing)':
+  r = subprocess.run(
+      [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented', target],
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE)
+  security_posture, status, undocumented = r.stdout.decode('utf-8').strip().split(' ')
+  if IsMissing(security_posture):
     raise ExtensionDbError('Missing security posture for %s' % target)
   return {
       'security_posture': security_posture,
-      'undocumented': bool(undocumented) if undocumented != '(missing)' else False
+      'undocumented': False if IsMissing(undocumented) else bool(undocumented),
+      'status': 'stable' if IsMissing(status) else status,
   }
 
 

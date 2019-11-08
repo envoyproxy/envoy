@@ -53,6 +53,7 @@ envoy_cc_extension(
     srcs = ["mysql_config.cc"],
     hdrs = ["mysql_config.h"],
     security_posture = "requires_trusted_downstream_and_upstream",
+    status = "alpha",
     deps = [
         ":proxy_lib",
         "//source/extensions/filters/network:well_known_names",

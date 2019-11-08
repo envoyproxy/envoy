@@ -40,13 +40,15 @@ DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d
 EXTENSION_TEMPLATE = string.Template("""$anchor
 This extension may be referenced by the qualified name *$extension*
 
+$status
+
 $security_posture
 
 """)
 
-# A map from the security postures (as defined in the envoy_cc_extension build
-# macro) to human readable text for extension docs.
-SECURITY_POSTURES = {
+# A map from the extension security postures (as defined in the
+# envoy_cc_extension build macro) to human readable text for extension docs.
+EXTENSION_SECURITY_POSTURES = {
     'robust_to_untrusted_downstream':
         'This extension is intended to be robust against untrusted downstream traffic. It '
         'assumes that the upstream is trusted.',
@@ -62,6 +64,15 @@ SECURITY_POSTURES = {
         'trusted.',
     'data_plane_agnostic':
         'This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.',
+}
+
+# A map from the extension status value to a human readable text for extension
+# docs.
+EXTENSION_STATUS_VALUES = {
+    'alpha':
+        'This extension is functional but has not had substantial production burn time, use only with this caveat.',
+    'wip':
+        'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
 
@@ -163,10 +174,12 @@ def FormatExtension(extension):
   extension_metadata = json.loads(pathlib.Path(
       os.getenv('EXTENSION_DB_PATH')).read_text())[extension]
   anchor = FormatAnchor('extension_' + extension)
-  return EXTENSION_TEMPLATE.substitute(
-      anchor=anchor,
-      extension=extension,
-      security_posture=SECURITY_POSTURES[extension_metadata['security_posture']])
+  status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
+  security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+  return EXTENSION_TEMPLATE.substitute(anchor=anchor,
+                                       extension=extension,
+                                       status=status,
+                                       security_posture=security_posture)
 
 
 def FormatHeaderFromFile(style, source_code_info, proto_name):
