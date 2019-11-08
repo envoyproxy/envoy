@@ -181,7 +181,7 @@ tracing:
     metadata:
       kind: { request: {} }
       metadata_key:
-        filter: com.bar.foo
+        key: com.bar.foo
         path: [ { key: xx }, { key: yy } ]
       default_value: mvalue
   max_path_tag_length: 128

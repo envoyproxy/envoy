@@ -217,19 +217,19 @@ cases:
     tag: b
     metadata:
       kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ {key: not-found } ] }
+      metadata_key: { key: m.rot, path: [ {key: not-found } ] }
       default_value: _c
   value: _c
 - custom_tag:
     tag: c
     metadata:
       kind: { cluster: {} }
-      metadata_key: { filter: m.cluster, path: [ {key: not-found } ] }
+      metadata_key: { key: m.cluster, path: [ {key: not-found } ] }
 - custom_tag:
     tag: d
     metadata:
       kind: { host: {} }
-      metadata_key: { filter: m.host, path: [ {key: not-found } ] }
+      metadata_key: { key: m.host, path: [ {key: not-found } ] }
 )EOF");
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
@@ -388,64 +388,64 @@ cases:
     tag: dd-1,
     metadata:
       kind: { request: {} }
-      metadata_key: { filter: m.req, path: [ { key: ree }, { key: foo } ] }
+      metadata_key: { key: m.req, path: [ { key: ree }, { key: foo } ] }
   value: bar
 - custom_tag:
     tag: dd-2,
     metadata:
       kind: { request: {} }
-      metadata_key: { filter: m.req, path: [ { key: not-found } ] }
+      metadata_key: { key: m.req, path: [ { key: not-found } ] }
       default_value: d2
   value: d2
 - custom_tag:
     tag: dd-3,
     metadata:
       kind: { request: {} }
-      metadata_key: { filter: m.req, path: [ { key: not-found } ] }
+      metadata_key: { key: m.req, path: [ { key: not-found } ] }
 - custom_tag:
     tag: dd-4,
     metadata:
       kind: { request: {} }
-      metadata_key: { filter: m.req, path: [ { key: ree }, { key: nuu } ] }
+      metadata_key: { key: m.req, path: [ { key: ree }, { key: nuu } ] }
       default_value: _d
   value: "1"
 - custom_tag:
     tag: dd-5,
     metadata:
       kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ { key: ree }, { key: boo } ] }
+      metadata_key: { key: m.rot, path: [ { key: ree }, { key: boo } ] }
   value: "true"
 - custom_tag:
     tag: dd-6,
     metadata:
       kind: { route: {} }
-      metadata_key: { filter: m.rot, path: [ { key: ree }, { key: poo } ] }
+      metadata_key: { key: m.rot, path: [ { key: ree }, { key: poo } ] }
   value: "false"
 - custom_tag:
     tag: dd-7,
     metadata:
       kind: { cluster: {} }
-      metadata_key: { filter: m.cluster, path: [ { key: ree }, { key: emp } ] }
+      metadata_key: { key: m.cluster, path: [ { key: ree }, { key: emp } ] }
       default_value: _d
   value: ''
 - custom_tag:
     tag: dd-8,
     metadata:
       kind: { cluster: {} }
-      metadata_key: { filter: m.cluster, path: [ { key: ree }, { key: lii } ] }
+      metadata_key: { key: m.cluster, path: [ { key: ree }, { key: lii } ] }
       default_value: _d
   value: "[\"something\"]"
 - custom_tag:
     tag: dd-9,
     metadata:
       kind: { host: {} }
-      metadata_key: { filter: m.host, path: [ { key: ree }, { key: stt } ] }
+      metadata_key: { key: m.host, path: [ { key: ree }, { key: stt } ] }
   value: "{\"some\":\"thing\"}"
 - custom_tag:
     tag: dd-10,
     metadata:
       kind: { host: {} }
-      metadata_key: { filter: m.host, path: [ { key: not-found } ] }
+      metadata_key: { key: m.host, path: [ { key: not-found } ] }
 )EOF");
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,

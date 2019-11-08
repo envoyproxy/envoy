@@ -10,7 +10,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Metadata]
 
-// MetadataKey provides a general interface using `filter` and `path` to retrieve value from
+// MetadataKey provides a general interface using `key` and `path` to retrieve value from
 // :ref:`Metadata <envoy_api_msg_core.Metadata>`.
 //
 // For example, for the following Metadata:
@@ -18,22 +18,19 @@ import "validate/validate.proto";
 // .. code-block:: yaml
 //
 //    filter_metadata:
-//      envoy.filters.http.rbac:
-//        path:
-//          to:
-//            foo: bar
-//            people:
-//              name: bob
+//      envoy.xxx:
+//        prop:
+//          foo: bar
+//          xyz:
+//            hello: envoy
 //
-// The following MetadataKey is matched as the path ``[path, to, foo]``
-// will retrieve a string value "bar" from the Metadata.
+// The following MetadataKey will retrieve a string value "bar" from the Metadata.
 //
 // .. code-block:: yaml
 //
-//    filter: envoy.filters.http.rbac
+//    key: envoy.xxx
 //    path:
-//    - key: path
-//    - key: to
+//    - key: prop
 //    - key: foo
 //
 message MetadataKey {
@@ -48,11 +45,12 @@ message MetadataKey {
     }
   }
 
-  // The filter name to retrieve the Struct from the Metadata.
-  string filter = 1 [(validate.rules).string = {min_bytes: 1}];
+  // The key name of Metadata to retrieve the Struct from the metadata.
+  // Typically, it represents a builtin subsystem or custom extension.
+  string key = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The path to retrieve the Value from the Struct. It can be a prefix or a full path,
-  // e.g. ``[path, to, people]`` for a struct or ``[path, to, foo]`` for a string in the example,
+  // e.g. ``[prop, xyz]`` for a struct or ``[prop, foo]`` for a string in the example,
   // which depends on the particular scenario.
   //
   // Note: Due to that only the key type segment is supported, the path can not specify a list

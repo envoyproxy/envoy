@@ -5436,7 +5436,7 @@ virtual_hosts:
             metadata:
               kind: { route: {} }
               metadata_key:
-                filter: com.bar.foo
+                key: com.bar.foo
                 path: [ { key: xx }, { key: yy } ]
               default_value: mvalue
         route: { cluster: ww2 }

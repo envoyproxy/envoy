@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Config {
 
 MetadataKey::MetadataKey(const envoy::type::metadata::v2::MetadataKey& metadata_key)
-    : filter_(metadata_key.filter()) {
+    : key_(metadata_key.key()) {
   for (const auto& seg : metadata_key.path()) {
     path_.push_back(seg.key());
   }
@@ -14,7 +14,7 @@ MetadataKey::MetadataKey(const envoy::type::metadata::v2::MetadataKey& metadata_
 
 const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
                                                   const MetadataKey& metadata_key) {
-  return metadataValue(metadata, metadata_key.filter_, metadata_key.path_);
+  return metadataValue(metadata, metadata_key.key_, metadata_key.path_);
 }
 
 const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
