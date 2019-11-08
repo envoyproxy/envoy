@@ -39,7 +39,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "requires_trusted_downstream_and_upstream",
+    security_posture = "unknown",
     deps = [
         ":xray_lib",
         "//source/common/config:datasource_lib",

@@ -29,7 +29,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "data_plane_agnostic",
+    security_posture = "unknown",
     deps = [
         ":dynamic_opentracing_driver_lib",
         "//source/extensions/tracers:well_known_names",

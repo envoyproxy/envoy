@@ -34,7 +34,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "data_plane_agnostic",
+    security_posture = "unknown",
     deps = [
         ":lightstep_tracer_lib",
         "//source/extensions/tracers:well_known_names",

@@ -15,7 +15,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "data_plane_agnostic",
+    security_posture = "unknown",
     deps = [
         ":opencensus_tracer_impl",
         "//source/extensions/tracers:well_known_names",
