@@ -367,7 +367,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   // Envoys asks the endpoint if it's healthy
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping"),
-                                                     nullptr, 1000 /*millisecond*/));
+                                                     nullptr, std::chrono::milliseconds(1000)));
   host_upstream_->set_allow_unexpected_disconnects(true);
 
   // No response from the endpoint
