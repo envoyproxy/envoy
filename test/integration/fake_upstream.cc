@@ -569,6 +569,7 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
   ENVOY_LOG(debug, "waiting for data");
   auto end_time = time_system_.monotonicTime() + timeout;
   while (!data_validator(data_)) {
+    ENVOY_LOG(critical, "data so far: {} ", data_);
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
