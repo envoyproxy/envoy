@@ -53,9 +53,9 @@ A sample aggregate cluster configuration could be:
       "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
       clusters:
       # cluster primary, secondary and tertiary should be defined outside.
-      - primary
-      - secondary
-      - tertiary
+      - name: primary
+      - name: secondary
+      - name: tertiary
 
 Note: :ref:`PriorityLoad retry plugins <envoy_api_field_route.RetryPolicy.retry_priority>` won't work for aggregate cluster because the aggregate load balancer
 will override the *PriorityLoad* during load balancing.
