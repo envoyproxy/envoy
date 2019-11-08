@@ -98,7 +98,7 @@ MockDrainDecision::MockDrainDecision() = default;
 MockDrainDecision::~MockDrainDecision() = default;
 
 MockListenerFilter::MockListenerFilter() = default;
-MockListenerFilter::~MockListenerFilter() = default;
+MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
 MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
