@@ -90,6 +90,14 @@ message TcpProxy {
       // determined by its weight. The sum of weights across all entries in the
       // clusters array determines the total weight.
       uint32 weight = 2 [(validate.rules).uint32 = {gte: 1}];
+
+      // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints
+      // in the upstream cluster with metadata matching what is set in this field will be considered
+      // for load balancing. Note that this will be merged with what's provided in
+      // :ref:`TcpProxy.metadata_match
+      // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.metadata_match>`, with values
+      // here taking precedence. The filter name should be specified as *envoy.lb*.
+      api.v2.core.Metadata metadata_match = 3;
     }
 
     // Specifies one or more upstream clusters associated with the route.
