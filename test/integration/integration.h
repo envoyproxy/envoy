@@ -220,14 +220,13 @@ public:
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
   // compareDiscoveryRequest() and sendDiscoveryResponse(), but the SotW/delta-specific versions are
   // available if you're writing a SotW/delta-specific test.
-  AssertionResult
-  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
-                          const std::vector<std::string>& expected_resource_names,
-                          const std::vector<std::string>& expected_resource_names_added,
-                          const std::vector<std::string>& expected_resource_names_removed,
-                          bool expect_node = false,
-                          const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-                          const std::string& expected_error_substring = "");
+  AssertionResult compareDiscoveryRequest(
+      const std::string& expected_type_url, const std::string& expected_version,
+      const std::vector<std::string>& expected_resource_names,
+      const std::vector<std::string>& expected_resource_names_added,
+      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+      const std::string& expected_error_substring = "");
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
