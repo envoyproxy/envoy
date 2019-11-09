@@ -36,22 +36,16 @@ public:
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()), timer_(new Event::MockTimer()) {
-    node_.set_id("node_name");
-    node_.set_cluster("cluster_name");
-    node_.mutable_locality()->set_zone("zone_name");
-    EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
+    node_.set_id("fo0");
+    EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
-
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        std::make_shared<GrpcMuxSotw>(std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
-                                      dispatcher_, *method_descriptor_, random_, stats_store_,
-                                      rate_limit_settings_, local_info_,
-                                      /*skip_subsequent_node=*/true),
-        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_, init_fetch_timeout,
-        /*is_aggregated=*/false);
+        local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
+        *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+        stats_store_, rate_limit_settings_, init_fetch_timeout, true);
   }
 
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }
@@ -82,9 +76,7 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(
-        async_stream_,
-        sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
@@ -96,7 +88,8 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    auto response = std::make_unique<envoy::api::v2::DiscoveryResponse>();
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+        new envoy::api::v2::DiscoveryResponse());
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
@@ -121,19 +114,35 @@ public:
       expectSendMessage(last_cluster_names_, version_, false, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
-    auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxSotw*>(shared_mux.get())->onDiscoveryResponse(std::move(response));
+    subscription_->grpcMux()->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
   void updateResourceInterest(const std::set<std::string>& cluster_names) override {
+    // The "watch" mechanism means that updates that lose interest in a resource
+    // will first generate a request for [still watched resources, i.e. without newly unwatched
+    // ones] before generating the request for all of cluster_names.
+    // TODO(fredlas) this unnecessary second request will stop happening once the watch mechanism is
+    // no longer internally used by GrpcSubscriptionImpl.
+    std::set<std::string> both;
+    for (const auto& n : cluster_names) {
+      if (last_cluster_names_.find(n) != last_cluster_names_.end()) {
+        both.insert(n);
+      }
+    }
+    expectSendMessage(both, version_);
     expectSendMessage(cluster_names, version_);
     subscription_->updateResourceInterest(cluster_names);
     last_cluster_names_ = cluster_names;
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr))
+        .WillOnce([this](ConfigUpdateFailureReason reason, const EnvoyException*) {
+          if (reason == ConfigUpdateFailureReason::FetchTimedout) {
+            stats_.init_fetch_timeout_.inc();
+          }
+        });
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {

@@ -6,6 +6,8 @@
 namespace Envoy {
 namespace {
 
+// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
+//               work restores it here.
 std::string tdsBootstrapConfig(absl::string_view api_type) {
   return fmt::format(R"EOF(
 static_resources:
@@ -36,7 +38,7 @@ layered_runtime:
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
-          set_node_on_first_message_only: true
+          set_node_on_first_message_only: false
   - name: some_admin_layer
     admin_layer: {{}}
 admin:

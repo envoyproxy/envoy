@@ -17,14 +17,13 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   while (provider.remaining_bytes() != 0) {
     std::string next_data = provider.ConsumeRandomLengthString(provider.remaining_bytes());
-
-    // ending with a "." is not considered legal, so just skip.
-    if (!next_data.empty() && next_data[next_data.size() - 1] == '.') {
-      continue;
-    }
-
     StatName stat_name = pool.add(next_data);
-    FUZZ_ASSERT(next_data == symbol_table.toString(stat_name));
+
+    // We can add stat-names with trailing dots, but note that they will be
+    // trimmed by the Symbol Table implementation, so we must trim the input
+    // string before comparing.
+    absl::string_view trimmed_fuzz_data = StringUtil::removeTrailingCharacters(next_data, '.');
+    FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(stat_name));
   }
 }
 

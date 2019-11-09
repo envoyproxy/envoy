@@ -258,9 +258,10 @@ message WeightedCluster {
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field will be considered for
-    // load balancing. Note that this will be merged with what's provided in :ref:
-    // `RouteAction.MetadataMatch <envoy_api_field_api.v3alpha.route.RouteAction.metadata_match>`,
-    // with values here taking precedence. The filter name should be specified as *envoy.lb*.
+    // load balancing. Note that this will be merged with what's provided in
+    // :ref:`RouteAction.metadata_match
+    // <envoy_api_field_api.v3alpha.route.RouteAction.metadata_match>`, with values here taking
+    // precedence. The filter name should be specified as *envoy.lb*.
     core.Metadata metadata_match = 3;
 
     // Specifies a list of headers to be added to requests when this cluster is selected
@@ -580,7 +581,7 @@ message RouteAction {
   // Allows enabling and disabling upgrades on a per-route basis.
   // This overrides any enabled/disabled upgrade filter chain specified in the
   // HttpConnectionManager
-  // :ref:upgrade_configs`
+  // :ref:`upgrade_configs
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.upgrade_configs>`
   // but does not affect any custom filter chain specified there.
   message UpgradeConfig {

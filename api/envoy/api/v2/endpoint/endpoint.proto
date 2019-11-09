@@ -57,6 +57,7 @@ message LbEndpoint {
   oneof host_identifier {
     Endpoint endpoint = 1;
 
+    // [#not-implemented-hide:]
     string endpoint_name = 5;
   }
 
