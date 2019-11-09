@@ -140,5 +140,5 @@ Route configuration names can still be used for virtual host matching, but with
 scoped RDS configured it would point to a scoped route configuration.
 
 However, it is imporant to note that using
-:ref:`scoped RDS <envoy_api_msg_ScopedRouteConfiguration>`
+on-demand :ref:`scoped RDS <envoy_api_msg_ScopedRouteConfiguration>`
 and VHDS together will require two on-demand subscriptions per routing scope.
