@@ -10,6 +10,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gtest/gtest.h"
 
 // We are adding things into the std namespace.
@@ -291,9 +292,9 @@ TEST(Ipv4CidrRangeTest, BigRange) {
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("9.255.255.255")));
   std::string addr;
   for (int i = 0; i < 256; ++i) {
-    addr = fmt::format("10.{}.0.1", i);
+    addr = absl::Substitute("10.$0.0.1", i);
     EXPECT_TRUE(rng.isInRange(Ipv4Instance(addr))) << addr;
-    addr = fmt::format("10.{}.255.255", i);
+    addr = absl::Substitute("10.$0.255.255", i);
     EXPECT_TRUE(rng.isInRange(Ipv4Instance(addr))) << addr;
   }
   EXPECT_FALSE(rng.isInRange(Ipv4Instance("11.0.0.0")));
@@ -370,9 +371,9 @@ TEST(Ipv6CidrRange, BigRange) {
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:0db8:85a2:ffff:ffff:ffff:ffff:ffff")));
   std::string addr;
   for (char c : std::string("0123456789abcdef")) {
-    addr = fmt::format("{}:000{}::", prefix, std::string(1, c));
+    addr = absl::Substitute("$0:000$1::", prefix, std::string(1, c));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance(addr))) << addr << " not in " << rng.asString();
-    addr = fmt::format("{}:fff{}:ffff:ffff:ffff", prefix, std::string(1, c));
+    addr = absl::Substitute("$0:fff$1:ffff:ffff:ffff", prefix, std::string(1, c));
     EXPECT_TRUE(rng.isInRange(Ipv6Instance(addr))) << addr << " not in " << rng.asString();
   }
   EXPECT_FALSE(rng.isInRange(Ipv6Instance("2001:0db8:85a4::")));

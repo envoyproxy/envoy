@@ -22,6 +22,7 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -227,9 +228,8 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
         }));
 
     expectSendMessage(
-        "foo", {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
-        fmt::format("bar does not match the message-wide type URL foo in DiscoveryResponse {}",
-                    invalid_response->DebugString()));
+        absl::Substitute("bar does not match the message-wide type URL foo in DiscoveryResponse $0",
+                         invalid_response->DebugString()));
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(invalid_response));
   }
   expectSendMessage("foo", {}, "");

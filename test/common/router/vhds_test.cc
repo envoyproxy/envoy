@@ -21,6 +21,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -45,14 +46,15 @@ vhds:
 
   envoy::api::v2::route::VirtualHost buildVirtualHost(const std::string& name,
                                                       const std::string& domain) {
-    return TestUtility::parseYaml<envoy::api::v2::route::VirtualHost>(fmt::format(R"EOF(
-      name: {}
-      domains: [{}]
+    return TestUtility::parseYaml<envoy::api::v2::route::VirtualHost>(absl::Substitute(R"EOF(
+      name: $0
+      domains: [$1]
       routes:
       - match: {{ prefix: "/" }}
         route: {{ cluster: "my_service" }}
     )EOF",
-                                                                                  name, domain));
+                                                                                       name,
+                                                                                       domain));
   }
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Resource>

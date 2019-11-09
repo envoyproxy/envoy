@@ -13,6 +13,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -115,10 +116,10 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
   for (ResponseFlag flag : responseFlags) {
     // Test cumulative setting of response flags.
     EXPECT_FALSE(stream_info.hasResponseFlag(flag))
-        << fmt::format("Flag: {} was already set", flag);
+        << absl::Substitute("Flag: $0 was already set", flag);
     stream_info.setResponseFlag(flag);
     EXPECT_TRUE(stream_info.hasResponseFlag(flag))
-        << fmt::format("Flag: {} was expected to be set", flag);
+        << absl::Substitute("Flag: $0 was expected to be set", flag);
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
   EXPECT_EQ(0xFFF, stream_info.responseFlags());

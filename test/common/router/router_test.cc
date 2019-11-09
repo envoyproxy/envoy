@@ -31,6 +31,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -118,14 +119,14 @@ public:
 
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error) {
     if (success != cm_.conn_pool_.host_->stats_.rq_success_.value()) {
-      return AssertionFailure() << fmt::format("rq_success {} does not match expected {}",
-                                               cm_.conn_pool_.host_->stats_.rq_success_.value(),
-                                               success);
+      return AssertionFailure() << absl::Substitute(
+                 "rq_success $0 does not match expected $1",
+                 cm_.conn_pool_.host_->stats_.rq_success_.value(), success);
     }
     if (error != cm_.conn_pool_.host_->stats_.rq_error_.value()) {
-      return AssertionFailure() << fmt::format("rq_error {} does not match expected {}",
-                                               cm_.conn_pool_.host_->stats_.rq_error_.value(),
-                                               error);
+      return AssertionFailure() << absl::Substitute("rq_error $0 does not match expected $1",
+                                                    cm_.conn_pool_.host_->stats_.rq_error_.value(),
+                                                    error);
     }
     return AssertionSuccess();
   }
@@ -4814,7 +4815,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
     EXPECT_TRUE(
         FilterUtility::StrictHeaderChecker::checkHeader(headers, Http::LowerCaseString(target))
             .valid_)
-        << fmt::format("'{}' should have passed strict validation", target);
+        << absl::Substitute("'$0' should have passed strict validation", target);
   }
 
   Http::TestHeaderMapImpl failing_headers{
@@ -4829,7 +4830,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
     EXPECT_FALSE(FilterUtility::StrictHeaderChecker::checkHeader(failing_headers,
                                                                  Http::LowerCaseString(target))
                      .valid_)
-        << fmt::format("'{}' should have failed strict validation", target);
+        << absl::Substitute("'$0' should have failed strict validation", target);
   }
 }
 

@@ -27,6 +27,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -328,7 +329,7 @@ public:
   }
 
   void setupServiceValidationWithCustomHostValueHC(const std::string& host) {
-    std::string yaml = fmt::format(R"EOF(
+    std::string yaml = absl::Substitute(R"EOF(
     timeout: 1s
     interval: 1s
     interval_jitter: 1s
@@ -337,9 +338,9 @@ public:
     http_health_check:
       service_name: locations
       path: /healthcheck
-      host: {0}
+      host: $0
     )EOF",
-                                   host);
+                                        host);
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_,
@@ -361,8 +362,8 @@ public:
                        const HostWithHealthCheckMap& hosts, const std::string& protocol = "tcp://",
                        const uint32_t priority = 0) {
     for (const auto& host : hosts) {
-      cluster->prioritySet().getMockHostSet(priority)->hosts_.emplace_back(
-          makeTestHost(cluster->info_, fmt::format("{}{}", protocol, host.first), host.second));
+      cluster->prioritySet().getMockHostSet(priority)->hosts_.emplace_back(makeTestHost(
+          cluster->info_, absl::Substitute("$0$1", protocol, host.first), host.second));
     }
   }
 

@@ -12,6 +12,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -46,7 +47,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   HostVector hosts;
   for (uint64_t i = 0; i < num_hosts; i++) {
     const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
-    hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
+    hosts.push_back(makeTestHost(info_, absl::Substitute("tcp://10.0.$0.$1:6379", i / 256, i % 256),
                                  should_weight ? weight : 1));
     if (should_weight) {
       hosts.back()->stats().rq_active_.set(active_requests);
@@ -79,15 +80,16 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 
   std::unordered_map<uint64_t, double> weight_to_percent;
   for (const auto& host : host_hits) {
-    std::cout << fmt::format("url:{}, weight:{}, hits:{}, percent_of_total:{}\n",
-                             host.first->address()->asString(), host.first->weight(), host.second,
-                             (static_cast<double>(host.second) / total_requests) * 100);
+    std::cout << absl::Substitute("url:$0, weight:$1, hits:$2, percent_of_total:$3\n",
+                                  host.first->address()->asString(), host.first->weight(),
+                                  host.second,
+                                  (static_cast<double>(host.second) / total_requests) * 100);
     weight_to_percent[host.first->weight()] +=
         (static_cast<double>(host.second) / total_requests) * 100;
   }
 
   for (const auto& weight : weight_to_percent) {
-    std::cout << fmt::format("weight:{}, percent:{}\n", weight.first, weight.second);
+    std::cout << absl::Substitute("weight:$0, percent:$1\n", weight.first, weight.second);
   }
 }
 
@@ -174,8 +176,8 @@ public:
     double mean = total_number_of_requests * 1.0 / hits.size();
     for (const auto& host_hit_num_pair : hits) {
       double percent_diff = std::abs((mean - host_hit_num_pair.second) / mean) * 100;
-      std::cout << fmt::format("url:{}, hits:{}, {} % from mean", host_hit_num_pair.first,
-                               host_hit_num_pair.second, percent_diff)
+      std::cout << absl::Substitute("url:$0, hits:$1, $2 % from mean", host_hit_num_pair.first,
+                                    host_hit_num_pair.second, percent_diff)
                 << std::endl;
     }
   }
@@ -194,7 +196,7 @@ public:
     for (size_t i = 0; i < hosts.size(); ++i) {
       const std::string zone = std::to_string(i);
       for (uint32_t j = 0; j < hosts[i]; ++j) {
-        const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
+        const std::string url = absl::Substitute("tcp://host.$0.$1:80", i, j);
         ret->push_back(newTestHost(info_, url, 1, zone));
       }
     }
@@ -213,7 +215,7 @@ public:
       HostVector zone_hosts;
 
       for (uint32_t j = 0; j < hosts[i]; ++j) {
-        const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
+        const std::string url = absl::Substitute("tcp://host.$0.$1:80", i, j);
         zone_hosts.push_back(newTestHost(info_, url, 1, zone));
       }
 

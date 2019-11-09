@@ -9,6 +9,7 @@
 
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -79,10 +80,10 @@ public:
     };
 
     EXPECT_EQ(expected_tag_extracted_name, tag_extracted_name);
-    ASSERT_EQ(expected_tags.size(), tags.size())
-        << fmt::format("Stat name '{}' did not produce the expected number of tags", stat_name);
+    ASSERT_EQ(expected_tags.size(), tags.size()) << absl::Substitute(
+        "Stat name '$0' did not produce the expected number of tags", stat_name);
     EXPECT_TRUE(std::is_permutation(expected_tags.begin(), expected_tags.end(), tags.begin(), cmp))
-        << fmt::format("Stat name '{}' did not produce the expected tags", stat_name);
+        << absl::Substitute("Stat name '$0' did not produce the expected tags", stat_name);
 
     // Reverse iteration through regexes to ensure ordering invariance
     std::vector<Tag> rev_tags;
@@ -90,14 +91,14 @@ public:
 
     EXPECT_EQ(expected_tag_extracted_name, rev_tag_extracted_name);
     ASSERT_EQ(expected_tags.size(), rev_tags.size())
-        << fmt::format("Stat name '{}' did not produce the expected number of tags when regexes "
-                       "were run in reverse order",
-                       stat_name);
+        << absl::Substitute("Stat name '$0' did not produce the expected number of tags when "
+                            "regexes were run in reverse order",
+                            stat_name);
     EXPECT_TRUE(
         std::is_permutation(expected_tags.begin(), expected_tags.end(), rev_tags.begin(), cmp))
-        << fmt::format("Stat name '{}' did not produce the expected tags when regexes were run in "
-                       "reverse order",
-                       stat_name);
+        << absl::Substitute("Stat name '$0' did not produce the expected tags when regexes were "
+                            "run in reverse order",
+                            stat_name);
   }
 
   /**

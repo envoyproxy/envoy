@@ -14,6 +14,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -37,7 +38,7 @@ void makeFdBlocking(int fd) {
 
 void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6only) {
   auto addr_port = Network::Utility::parseInternetAddressAndPort(
-      fmt::format("{}:0", Network::Test::getAnyAddressUrlString(ip_version)), v6only);
+      absl::Substitute("$0:0", Network::Test::getAnyAddressUrlString(ip_version)), v6only);
   ASSERT_NE(addr_port, nullptr);
 
   if (addr_port->ip()->port() == 0) {

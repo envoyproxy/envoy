@@ -26,6 +26,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -2022,7 +2023,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   // path from other errors. Test this also.
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl(
-          fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
+          absl::Substitute("tcp://$0:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   connection->connect();
   connection->noDelay(true);

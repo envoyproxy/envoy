@@ -531,7 +531,7 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
 
   const auto time = std::chrono::milliseconds(1234567891234);
   timeSystem().setSystemTime(time);
-  const EnvoyException ex(fmt::format("config failure"));
+  const EnvoyException ex(absl::Substitute("config failure"));
   // Verify the failure updates the lastUpdated() timestamp.
   srds_subscription_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                            &ex);

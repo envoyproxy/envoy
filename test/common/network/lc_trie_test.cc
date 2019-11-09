@@ -7,6 +7,7 @@
 
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -20,7 +21,7 @@ public:
     std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> output;
     for (size_t i = 0; i < cidr_range_strings.size(); i++) {
       std::pair<std::string, std::vector<Address::CidrRange>> ip_tags;
-      ip_tags.first = fmt::format("tag_{0}", i);
+      ip_tags.first = absl::Substitute("tag_$0", i);
       for (const auto& j : cidr_range_strings[i]) {
         ip_tags.second.push_back(Address::CidrRange::create(j));
       }
@@ -355,7 +356,8 @@ TEST_F(LcTrieTest, MaximumEntriesExceptionOverride) {
   for (size_t i = 0; i < 16; i++) {
     for (size_t j = 0; j < 16; j++) {
       for (size_t k = 0; k < 32; k++) {
-        prefixes.emplace_back(Address::CidrRange::create(fmt::format("10.{}.{}.{}/8", i, j, k)));
+        prefixes.emplace_back(
+            Address::CidrRange::create(absl::Substitute("10.$0.$1.$2/8", i, j, k)));
       }
     }
   }

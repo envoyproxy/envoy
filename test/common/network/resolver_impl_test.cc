@@ -16,6 +16,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -88,8 +89,8 @@ public:
     const std::string& logical = socket_address.address();
     const std::string physical = getPhysicalName(logical);
     const std::string port = getPort(socket_address);
-    return InstanceConstSharedPtr{new MockResolvedAddress(fmt::format("{}:{}", logical, port),
-                                                          fmt::format("{}:{}", physical, port))};
+    return InstanceConstSharedPtr{new MockResolvedAddress(
+        absl::Substitute("$0:$1", logical, port), absl::Substitute("$0:$1", physical, port))};
   }
 
   void addMapping(const std::string& logical, const std::string& physical) {
@@ -114,11 +115,11 @@ private:
     case envoy::api::v2::core::SocketAddress::kPortValue:
     // default to port 0 if no port value is specified
     case envoy::api::v2::core::SocketAddress::PORT_SPECIFIER_NOT_SET:
-      return fmt::format("{}", socket_address.port_value());
+      return absl::Substitute("$0", socket_address.port_value());
 
     default:
       throw EnvoyException(
-          fmt::format("Unknown port specifier type {}", socket_address.port_specifier_case()));
+          absl::Substitute("Unknown port specifier type $0", socket_address.port_specifier_case()));
     }
   }
 

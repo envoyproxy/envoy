@@ -28,6 +28,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "ares.h"
 #include "ares_dns.h"
 #include "gtest/gtest.h"
@@ -355,7 +356,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
 class CustomInstance : public Address::Instance {
 public:
   CustomInstance(const std::string& address, uint32_t port) : instance_(address, port) {
-    antagonistic_name_ = fmt::format("{}:borked_port_{}", address, port);
+    antagonistic_name_ = absl::Substitute("$0:borked_port_$1", address, port);
   }
   ~CustomInstance() override = default;
 
