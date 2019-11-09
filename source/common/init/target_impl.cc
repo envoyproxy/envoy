@@ -55,7 +55,7 @@ bool TargetImpl::ready() {
 SharedTargetImpl::SharedTargetImpl(absl::string_view name, InitializeFn fn)
     : name_(fmt::format("shared target {}", name)),
       fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
-        if (is_initialization_done_) {
+        if (initialized_) {
           watcher_handle->ready();
         } else {
           watcher_handles_.push_back(std::move(watcher_handle));
@@ -74,13 +74,14 @@ TargetHandlePtr SharedTargetImpl::createHandle(absl::string_view handle_name) co
 }
 
 bool SharedTargetImpl::ready() {
-  is_initialization_done_ = true;
+  initialized_ = true;
+  bool all_notified = true;
   for (auto& watcher_handle : watcher_handles_) {
-    watcher_handle->ready();
+    all_notified = watcher_handle->ready() && all_notified;
   }
   // save heap and avoid repeatedly invoke
   watcher_handles_.clear();
-  return true;
+  return all_notified;
 }
 
 } // namespace Init

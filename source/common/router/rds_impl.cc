@@ -254,7 +254,8 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     // in the RdsRouteConfigSubscription destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
     auto existing_provider = it->second.lock();
-    RELEASE_ASSERT(existing_provider != nullptr, "");
+    RELEASE_ASSERT(existing_provider != nullptr,
+                   absl::StrCat("cannot find subscribed rds resource ", rds.route_config_name()));
     init_manager.add(existing_provider->subscription_->init_target_);
     return existing_provider;
   }

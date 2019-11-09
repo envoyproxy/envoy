@@ -88,7 +88,7 @@ private:
 };
 
 /**
- * A specialized Target which can be added by multiple Manager.
+ * A specialized Target which can be added by multiple Managers.
  * The initialization will be triggered only once.
  */
 class SharedTargetImpl : public Target, Logger::Loggable<Logger::Id::init> {
@@ -110,7 +110,7 @@ public:
    * Signal to the init manager(s) that this target has finished initializing. This is safe to call
    * any time. Calling it before initialization begins or after initialization has already ended
    * will have no effect.
-   * @return true if the init manager received this call, false otherwise.
+   * @return true if all init managers received this call, false otherwise.
    */
   bool ready();
 
@@ -118,14 +118,14 @@ private:
   // Human-readable name for logging
   const std::string name_;
 
-  // Handle to the ManagerImpl's internal watcher, to call when this target is initialized
+  // Handle to all the ManagerImpl's internal watcher, to call when this target is initialized.
   std::vector<WatcherHandlePtr> watcher_handles_;
 
   // The callback function, called via TargetHandleImpl by the manager
   const std::shared_ptr<InternalInitalizeFn> fn_;
 
   // The state so as to signal the manager when a ready target is added.
-  bool is_initialization_done_{false};
+  bool initialized_{false};
 
   // To guarantee the initialization function is called once.
   std::once_flag once_flag_;
