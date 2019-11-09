@@ -58,13 +58,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_fuzz_test(
-    name = "new_buffer_fuzz_test",
-    srcs = ["new_buffer_fuzz_test.cc"],
-    corpus = "buffer_corpus",
-    deps = [":buffer_fuzz_lib"],
-)
-
 envoy_cc_test(
     name = "owned_impl_test",
     srcs = ["owned_impl_test.cc"],

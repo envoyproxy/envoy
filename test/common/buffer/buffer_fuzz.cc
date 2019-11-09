@@ -477,9 +477,7 @@ void executeActions(const test::common::buffer::BufferFuzzTestCase& input, Buffe
   }
 }
 
-void BufferFuzz::bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input, bool old_impl) {
-  ENVOY_LOG_MISC(trace, "Using {} buffer implementation", old_impl ? "old" : "new");
-  Buffer::OwnedImpl::useOldImpl(old_impl);
+void BufferFuzz::bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input) {
   Context ctxt;
   // Fuzzed buffers.
   BufferList buffers;

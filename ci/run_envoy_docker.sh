@@ -26,7 +26,7 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm ${DOCKER_TTY_OPTION} -e HTTP_PROXY=${http_proxy} -e HTTPS_PROXY=${https_proxy} \
   -u "${USER}":"${USER_GROUP}" -v "${ENVOY_DOCKER_BUILD_DIR}":/build -v /var/run/docker.sock:/var/run/docker.sock ${GIT_VOLUME_OPTION} \
-  -e BAZEL_BUILD_EXTRA_OPTIONS -e BAZEL_EXTRA_TEST_OPTIONS -e BAZEL_REMOTE_CACHE -e ENVOY_STDLIB \
+  -e BAZEL_BUILD_EXTRA_OPTIONS -e BAZEL_EXTRA_TEST_OPTIONS -e BAZEL_REMOTE_CACHE -e ENVOY_STDLIB -e BUILD_REASON \
   -e BAZEL_REMOTE_INSTANCE -e GCP_SERVICE_ACCOUNT_KEY -e NUM_CPUS -e ENVOY_RBE -e FUZZIT_API_KEY -e ENVOY_BUILD_IMAGE \
   -v "$PWD":/source --cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN "${ENVOY_BUILD_IMAGE}" \
   /bin/bash -lc "groupadd --gid $(id -g) -f envoygroup && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home \

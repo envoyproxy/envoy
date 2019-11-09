@@ -59,6 +59,34 @@ class Drainer;
 class UpstreamDrainManager;
 
 /**
+ * Route is an individual resolved route for a connection.
+ */
+class Route {
+public:
+  virtual ~Route() = default;
+
+  /**
+   * Check whether this route matches a given connection.
+   * @param connection supplies the connection to test against.
+   * @return bool true if this route matches a given connection.
+   */
+  virtual bool matches(Network::Connection& connection) const PURE;
+
+  /**
+   * @return const std::string& the upstream cluster that owns the route.
+   */
+  virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * selecting an upstream host
+   */
+  virtual const Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
+};
+
+using RouteConstSharedPtr = std::shared_ptr<const Route>;
+
+/**
  * Filter configuration.
  *
  * This configuration holds a TLS slot, and therefore it must be destructed
@@ -97,11 +125,11 @@ public:
    * parameters of a downstream connection.
    * @param connection supplies the parameters of the downstream connection for
    * which the proxy needs to open the corresponding upstream.
-   * @return the cluster name to be used for the upstream connection.
-   * If no route applies, returns the empty string.
+   * @return the route to be used for the upstream connection.
+   * If no route applies, returns nullptr.
    */
-  const std::string& getRouteFromEntries(Network::Connection& connection);
-  const std::string& getRegularRouteFromEntries(Network::Connection& connection);
+  RouteConstSharedPtr getRouteFromEntries(Network::Connection& connection);
+  RouteConstSharedPtr getRegularRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
@@ -111,16 +139,25 @@ public:
   }
   UpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() {
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() const {
     return cluster_metadata_match_criteria_.get();
   }
   const Network::HashPolicy* hashPolicy() { return hash_policy_.get(); }
 
 private:
-  struct Route {
-    Route(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-              config);
+  struct RouteImpl : public Route {
+    RouteImpl(const Config& parent,
+              const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
+                  config);
 
+    // Route
+    bool matches(Network::Connection& connection) const override;
+    const std::string& clusterName() const override { return cluster_name_; }
+    const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+      return parent_.metadataMatchCriteria();
+    }
+
+    const Config& parent_;
     Network::Address::IpList source_ips_;
     Network::PortRangeList source_port_ranges_;
     Network::Address::IpList destination_ips_;
@@ -128,22 +165,34 @@ private:
     std::string cluster_name_;
   };
 
-  class WeightedClusterEntry {
+  class WeightedClusterEntry : public Route {
   public:
-    WeightedClusterEntry(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::
+    WeightedClusterEntry(const Config& parent,
+                         const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::
                              WeightedCluster::ClusterWeight& config);
 
-    const std::string& clusterName() const { return cluster_name_; }
     uint64_t clusterWeight() const { return cluster_weight_; }
 
+    // Route
+    bool matches(Network::Connection&) const override { return false; }
+    const std::string& clusterName() const override { return cluster_name_; }
+    const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+      if (metadata_match_criteria_) {
+        return metadata_match_criteria_.get();
+      }
+      return parent_.metadataMatchCriteria();
+    }
+
   private:
+    const Config& parent_;
     const std::string cluster_name_;
     const uint64_t cluster_weight_;
+    Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   };
-  using WeightedClusterEntrySharedPtr = std::unique_ptr<WeightedClusterEntry>;
+  using WeightedClusterEntryConstSharedPtr = std::shared_ptr<const WeightedClusterEntry>;
 
-  std::vector<Route> routes_;
-  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  std::vector<RouteConstSharedPtr> routes_;
+  std::vector<WeightedClusterEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
@@ -196,7 +245,10 @@ public:
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    return config_->metadataMatchCriteria();
+    if (route_) {
+      return route_->metadataMatchCriteria();
+    }
+    return nullptr;
   }
 
   // Upstream::LoadBalancerContext
@@ -272,7 +324,7 @@ protected:
   };
 
   // Callbacks for different error and success states during connection establishment
-  virtual const std::string& getUpstreamCluster() {
+  virtual RouteConstSharedPtr pickRoute() {
     return config_->getRouteFromEntries(read_callbacks_->connection());
   }
 
@@ -300,6 +352,7 @@ protected:
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
   StreamInfo::StreamInfoImpl stream_info_;
+  RouteConstSharedPtr route_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
