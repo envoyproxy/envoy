@@ -51,6 +51,7 @@ void DrainManagerImpl::drainSequenceTick() {
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> completion) {
   drain_sequence_completion_ = completion;
+  ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
   draining_ = true;
   drain_tick_timer_ = server_.dispatcher().createTimer([this]() -> void { drainSequenceTick(); });
