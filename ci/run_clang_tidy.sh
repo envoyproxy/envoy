@@ -52,12 +52,12 @@ LLVM_PREFIX=$(llvm-config --prefix)
 if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   echo "Running full clang-tidy..."
   "${LLVM_PREFIX}/share/clang/run-clang-tidy.py"
-elif [[ -z "${CIRCLE_PR_NUMBER}" && "$CIRCLE_BRANCH" == "master" ]]; then
-  echo "On master branch, running clang-tidy-diff against previous commit..."
+elif [[ "${BUILD_REASON}" != "PullRequest" ]]; then
+  echo "Running clang-tidy-diff against previous commit..."
   git diff HEAD^ | filter_excludes | "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" -p 1
 else
   echo "Running clang-tidy-diff against master branch..."
   git fetch https://github.com/envoyproxy/envoy.git master
-  git diff $(git merge-base HEAD FETCH_HEAD)..HEAD | filter_excludes | \
+  git diff "${SYSTEM_PULLREQUEST_TARGETBRANCH:-refs/heads/master}..HEAD" | filter_excludes | \
      "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" -p 1
 fi
