@@ -100,11 +100,12 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
-   * todo update comments
    * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
    * dispatcher.
    * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
    * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
+   * @param use_tcp_for_dns_lookups if set to true, tcp will be used to perform dns lookups.
+   * Otherwise, udp is used.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
