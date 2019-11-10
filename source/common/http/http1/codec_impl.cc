@@ -445,7 +445,13 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
-  /*const auto rc = */llhttp_execute(&parser_, slice, len);
+
+  llhttp_errno_t err;
+  if (slice == nullptr || len == 0) {
+    err = llhttp_finish(&parser_);
+  } else {
+    err = llhttp_execute(&parser_, slice, len);
+  }
 
   // If llhttp ran into an error, llhttp_get_error_pos will return a char* to where it
   // left off, allowing us to calculate how many bytes were read. Otherwise, we assume
