@@ -405,22 +405,22 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
 //
 // Ensures that requests with invalid HTTP header values are not rejected
 // when the runtime guard is not enabled for the feature.
-// TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRuntimeGuard) {
-//   TestScopedRuntime scoped_runtime;
-//   // When the runtime-guarded   feature is NOT enabled, invalid header values
-//   // should be accepted by the codec.
-//   Runtime::LoaderSingleton::getExisting()->mergeValues(
-//       {{"envoy.reloadable_features.strict_header_validation", "false"}});
+TEST_F(Http1ServerConnectionImplTest, DISABLED_ HeaderInvalidCharsRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  // When the runtime-guarded   feature is NOT enabled, invalid header values
+  // should be accepted by the codec.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.strict_header_validation", "false"}});
 
-//   initialize();
+  initialize();
 
-//   Http::MockStreamDecoder decoder;
-//   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-//   Buffer::OwnedImpl buffer(
-//       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
-//   EXPECT_NO_THROW(codec_->dispatch(buffer));
-// }
+  Buffer::OwnedImpl buffer(
+      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
+  EXPECT_NO_THROW(codec_->dispatch(buffer));
+}
 
 // Ensures that requests with invalid HTTP header values are properly rejected
 // when the runtime guard is enabled for the feature.
@@ -484,7 +484,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
 // Mutate an HTTP GET with CR or LF. These can cause an exception or maybe
 // result in a valid decodeHeaders(). In any case, the validHeaderString()
 // ASSERTs should validate we never have any embedded CR or LF.
-TEST_F(Http1ServerConnectionImplTest, DISABLED_HeaderMutateEmbeddedCRLF) {
+TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedCRLF) {
   const std::string example_input = "GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: barbaz\r\n";
 
   for (const char c : {'\r', '\n'}) {
@@ -506,7 +506,7 @@ TEST_F(Http1ServerConnectionImplTest, DISABLED_HeaderMutateEmbeddedCRLF) {
   }
 }
 
-TEST_F(Http1ServerConnectionImplTest, DISABLED_CloseDuringHeadersComplete) {
+TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   initialize();
 
   InSequence sequence;
@@ -770,7 +770,7 @@ TEST_F(Http1ServerConnectionImplTest, HeadChunkedRequestResponse) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n", output);
 }
 
-TEST_F(Http1ServerConnectionImplTest, DISABLED_DoubleRequest) {
+TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
   initialize();
 
   NiceMock<Http::MockStreamDecoder> decoder;
@@ -872,7 +872,7 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequest) {
   codec_->dispatch(websocket_payload);
 }
 
-TEST_F(Http1ServerConnectionImplTest, DISABLED_UpgradeRequestWithEarlyData) {
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
   initialize();
 
   InSequence sequence;
@@ -887,7 +887,7 @@ TEST_F(Http1ServerConnectionImplTest, DISABLED_UpgradeRequestWithEarlyData) {
   codec_->dispatch(buffer);
 }
 
-TEST_F(Http1ServerConnectionImplTest, DISABLED_UpgradeRequestWithTEChunked) {
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithTEChunked) {
   initialize();
 
   InSequence sequence;
@@ -904,7 +904,7 @@ TEST_F(Http1ServerConnectionImplTest, DISABLED_UpgradeRequestWithTEChunked) {
   codec_->dispatch(buffer);
 }
 
-TEST_F(Http1ServerConnectionImplTest, DISABLED_UpgradeRequestWithNoBody) {
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
   initialize();
 
   InSequence sequence;
@@ -1242,7 +1242,7 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
 
 // Same data as above, but make sure directDispatch immediately hands off any
 // outstanding data.
-TEST_F(Http1ClientConnectionImplTest, DISABLED_UpgradeResponseWithEarlyData) {
+TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
   initialize();
 
   InSequence s;
