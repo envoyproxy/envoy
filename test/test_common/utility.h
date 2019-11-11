@@ -549,7 +549,7 @@ public:
   }
 
   /**
-   * Check that generated json as string is equal to expeceted response as unordered map.
+   * Check that generated json as string is equal to expected response as unordered map.
    *
    * @param json_string response as json string.
    * @param expected_map unordered map which contains expected data.
