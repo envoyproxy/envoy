@@ -178,7 +178,7 @@ resource hints are required.
 
 When the resource hints are specified, the management server must supply the requested resources if they exist. The client will
 silently ignore any supplied resources that were not explicitly requested. When the client sends a new request that changes
-the resource_names list, the server must resent any newly requested resource, even if it previously sent it without having
+the resource_names list, the server must resend any newly requested resource, even if it previously sent it without having
 been asked for it and the resource has not changed since that time.
 
 For LDS and CDS, it is expected that the management server will provide the complete state of the LDS/CDS resources in each
