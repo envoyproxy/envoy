@@ -39,7 +39,7 @@ ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
   Network::SocketSharedPtr socket =
       factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
   // Binding is done by now.
-    ENVOY_LOG(error, "================ createListenSocketAndApplyOptions {}", socket == nullptr ? 0 : socket->ioHandle().fd());
+    ENVOY_LOG(info, "Create listen socket for listener {} on address {}", listener_name_, local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
     bool ok = Network::Socket::applyOptions(options_, *socket,
                                             envoy::api::v2::core::SocketOption::STATE_BOUND);
@@ -59,13 +59,21 @@ ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
   return socket;
 }
 
+void ListenSocketFactoryImplBase::setLocalAddress(Network::Address::InstanceConstSharedPtr local_address) {
+
+  ENVOY_LOG(info, "Set socket factory local address to {}", local_address->asString());
+    local_address_ = local_address;
+  }
+
 TcpListenSocketFactory::TcpListenSocketFactory(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, const std::string& listener_name)
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Stream,
                                   options, bind_to_port, listener_name) {
-      std::cerr << "============= create TPC listen socket\n";
     socket_ = createListenSocketAndApplyOptions();
+    if (socket_ != nullptr && localAddress()->ip() !=nullptr && localAddress()->ip()->port() == 0) {
+    setLocalAddress(socket_->localAddress());
+    }
     }
 
 Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket() {
@@ -77,11 +85,14 @@ UdpListenSocketFactory::UdpListenSocketFactory(
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, const std::string& listener_name)
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Datagram,
                                   options, bind_to_port, listener_name) {
-       std::cerr << "============= create UDP listen socket\n";
     }
 
 Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket() {
-  return createListenSocketAndApplyOptions();
+  Network::SocketSharedPtr socket = createListenSocketAndApplyOptions();
+  if (socket != nullptr && localAddress()->ip() !=nullptr && localAddress()->ip()->port() == 0) {
+    setLocalAddress(socket->localAddress());
+ }
+  return socket;
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,

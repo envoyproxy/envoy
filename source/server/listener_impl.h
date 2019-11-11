@@ -36,7 +36,8 @@ public:
 
 protected:
   Network::SocketSharedPtr createListenSocketAndApplyOptions();
-
+  void setLocalAddress(Network::Address::InstanceConstSharedPtr local_address);
+  
 private:
   ListenerComponentFactory& factory_;
   Network::Address::InstanceConstSharedPtr local_address_;
