@@ -59,7 +59,7 @@ TEST_F(GrpcStreamTest, EstablishStream) {
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
-  grpc_stream_.onRemoteClose(Grpc::Status::GrpcStatus::Ok, "");
+  grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "");
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
   // Successful re-establishment
   {
