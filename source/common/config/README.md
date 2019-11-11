@@ -41,7 +41,7 @@ delta-specific logic; its GrpxMuxImpl implementation (TODO will be merged into N
 and has SotW-specific logic. Both the delta and SotW Subscription implementations (TODO will be merged) hold a shared_ptr<GrpcMux>.
 The shared_ptr allows for both non- and aggregated: if non-aggregated, you'll be the only holder of that shared_ptr.
 
-![xDS_code_diagram_june2019](xDS_code_diagram_june2019.png)
+![xDS_code_diagram](xDS_code_diagram.png)
 
 Note that the orange flow does not necessarily have to happen in response to the blue flow; there can be spontaneous updates. ACKs are not shown in this diagram; they are also carred by the [Delta]DiscoveryRequest protos.
 What does GrpcXdsContext even do in this diagram? Just own things and pass through function calls? Answer: it sequences the requests and ACKs that the various type_urls send.

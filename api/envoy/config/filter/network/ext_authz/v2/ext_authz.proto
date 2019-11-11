@@ -31,4 +31,10 @@ message ExtAuthz {
   // communication failure between authorization service and the proxy.
   // Defaults to false.
   bool failure_mode_allow = 3;
+
+  // Specifies if the peer certificate is sent to the external service.
+  //
+  // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
+  // :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>`.
+  bool include_peer_certificate = 4;
 }
