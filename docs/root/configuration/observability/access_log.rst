@@ -221,6 +221,7 @@ The following command operators are supported:
     * **IH**: The request was rejected because it set an invalid value for a
       :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
+    * **DPE**: The downstream request had an HTTP protocol error.
 
 %RESPONSE_TX_DURATION%
   HTTP
@@ -351,6 +352,16 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+%FILTER_STATE(KEY):Z%
+  HTTP
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    look up the filter state object. The serialized proto will be logged as JSON string if possible.
+    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+
+  TCP
+    Same as HTTP, the filter state is from connection instead of a L7 request.
 
 %REQUESTED_SERVER_NAME%
   HTTP

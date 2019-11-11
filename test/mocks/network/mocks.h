@@ -164,6 +164,7 @@ public:
   MockListenerFilter();
   ~MockListenerFilter() override;
 
+  MOCK_METHOD0(destroy_, void());
   MOCK_METHOD1(onAccept, Network::FilterStatus(ListenerFilterCallbacks&));
 };
 
@@ -223,6 +224,7 @@ public:
   MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
+  MOCK_CONST_METHOD0(isOpen, bool());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
@@ -230,6 +232,7 @@ public:
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
+  bool socket_is_open_ = true;
 };
 
 class MockSocketOption : public Socket::Option {
@@ -272,10 +275,12 @@ public:
   MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
+  MOCK_CONST_METHOD0(isOpen, bool());
 
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
+  bool is_closed_;
 };
 
 class MockListenerFilterCallbacks : public ListenerFilterCallbacks {

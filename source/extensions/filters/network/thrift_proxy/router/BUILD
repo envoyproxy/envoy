@@ -2,16 +2,19 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "alpha",
     deps = [
         ":router_lib",
         "//include/envoy/registry",
@@ -39,7 +42,6 @@ envoy_cc_library(
         ":router_interface",
         "//include/envoy/router:router_ratelimit_interface",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -79,5 +81,6 @@ envoy_cc_library(
         ":router_ratelimit_interface",
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )

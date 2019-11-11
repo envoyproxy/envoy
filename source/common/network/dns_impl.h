@@ -1,11 +1,10 @@
 #pragma once
 
-#include <netdb.h>
-
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"

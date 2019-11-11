@@ -30,7 +30,6 @@ public:
   std::vector<Tag> tags(const SymbolTable& symbol_table) const;
   StatName tagExtractedStatName() const;
   void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const;
-  void iterateTags(const SymbolTable& symbol_table, const Metric::TagIterFn& fn) const;
   void clear(SymbolTable& symbol_table) { stat_names_.clear(symbol_table); }
 
 private:
@@ -76,9 +75,6 @@ public:
   StatName tagExtractedStatName() const override { return helper_.tagExtractedStatName(); }
   void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const override {
     helper_.iterateTagStatNames(fn);
-  }
-  void iterateTags(const Metric::TagIterFn& fn) const override {
-    helper_.iterateTags(constSymbolTable(), fn);
   }
 
   const SymbolTable& constSymbolTable() const override {

@@ -173,6 +173,7 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )

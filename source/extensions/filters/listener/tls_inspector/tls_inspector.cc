@@ -1,12 +1,11 @@
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
-#include <arpa/inet.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
@@ -112,7 +111,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
     return Network::FilterStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {

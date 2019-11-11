@@ -25,7 +25,6 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/json/config_schemas.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -224,13 +223,18 @@ ClusterManagerImpl::ClusterManagerImpl(
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
-  // the secondary clusters are loaded. As it currently stands all non-EDS clusters are primary and
-  // only EDS clusters are secondary. This two phase loading is done because in v2 configuration
-  // each EDS cluster individually sets up a subscription. When this subscription is an API source
-  // the cluster will depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
+  // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which
+  // load endpoint definition from file are primary and
+  // (REST,GRPC,DELTA_GRPC) EDS clusters are secondary. This two phase
+  // loading is done because in v2 configuration each EDS cluster individually sets up a
+  // subscription. When this subscription is an API source the cluster will depend on a non-EDS
+  // cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
-    if (cluster.type() != envoy::api::v2::Cluster::EDS) {
+    if (cluster.type() != envoy::api::v2::Cluster::EDS ||
+        (cluster.type() == envoy::api::v2::Cluster::EDS &&
+         cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
+             envoy::api::v2::core::ConfigSource::ConfigSourceSpecifierCase::kPath)) {
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
@@ -274,7 +278,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
-    if (cluster.type() == envoy::api::v2::Cluster::EDS) {
+    if (cluster.type() == envoy::api::v2::Cluster::EDS &&
+        cluster.eds_cluster_config().eds_config().config_source_specifier_case() !=
+            envoy::api::v2::core::ConfigSource::ConfigSourceSpecifierCase::kPath) {
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
@@ -1319,6 +1325,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
     return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           host->cluster().http1Settings(),
                                                            transport_socket_options);
   }
 }

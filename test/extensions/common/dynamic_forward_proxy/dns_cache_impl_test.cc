@@ -445,6 +445,11 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false)));
   EXPECT_CALL(callbacks1, onLoadDnsCacheComplete());
   resolve_cb1(TestUtility::makeDnsResponse({"10.0.0.2"}));
+
+  auto hosts = dns_cache_->hosts();
+  EXPECT_EQ(2, hosts.size());
+  EXPECT_THAT(hosts["bar.com"], DnsHostInfoEquals("10.0.0.1:443", "bar.com", false));
+  EXPECT_THAT(hosts["foo.com"], DnsHostInfoEquals("10.0.0.2:80", "foo.com", false));
 }
 
 // A successful resolve followed by a cache hit.

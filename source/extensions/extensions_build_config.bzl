@@ -42,6 +42,7 @@ EXTENSIONS = {
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
+    "envoy.filters.http.grpc_stats":                    "//source/extensions/filters/http/grpc_stats:config",
     "envoy.filters.http.grpc_web":                      "//source/extensions/filters/http/grpc_web:config",
     "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
@@ -79,8 +80,7 @@ EXTENSIONS = {
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
-    # NOTE: Kafka filter does not have a proper filter implemented right now. We are referencing to
-    #       codec implementation that is going to be used by the filter.
+    # WiP
     "envoy.filters.network.kafka":                      "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
     "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
@@ -124,6 +124,7 @@ EXTENSIONS = {
     "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
     "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
     "envoy.tracers.opencensus":                         "//source/extensions/tracers/opencensus:config",
+    # WiP
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
 
     #
@@ -132,12 +133,11 @@ EXTENSIONS = {
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
 
     # Retry host predicates
     "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
     "envoy.retry_host_predicates.omit_canary_hosts":            "//source/extensions/retry/host/omit_canary_hosts:config",
-    
+
     # Retry priorities
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 }

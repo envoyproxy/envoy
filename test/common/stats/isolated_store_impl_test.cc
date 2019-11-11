@@ -37,6 +37,11 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("scope1.c2", c2.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
+  OptionalCounter opt_counter = scope1->findCounter(c2.statName());
+  ASSERT_TRUE(opt_counter);
+  EXPECT_EQ(&c2, &opt_counter->get());
+  StatName not_found = pool_.add("not_found");
+  EXPECT_FALSE(scope1->findCounter(not_found));
 
   StatNameManagedStorage c1_name("c1", store_.symbolTable());
   c1.add(100);
@@ -55,6 +60,14 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("scope1.g2", g2.tagExtractedName());
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g2.tags().size());
+  OptionalGauge opt_gauge = scope1->findGauge(g2.statName());
+  ASSERT_TRUE(opt_gauge);
+  EXPECT_EQ(&g2, &opt_gauge->get());
+  EXPECT_FALSE(scope1->findGauge(not_found));
+  // TODO(jmarantz): There may be a bug with
+  // scope1->findGauge(h1.statName()), which finds the histogram added to
+  // the store, which is arguably not in the scope. Investigate what the
+  // behavior should be.
 
   StatNameManagedStorage g1_name("g1", store_.symbolTable());
   g1.set(100);
@@ -67,6 +80,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   Histogram& h1 = store_.histogram("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
+  EXPECT_TRUE(h1.use_count() == 1);
   Histogram& h2 = scope1->histogram("h2", Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
@@ -77,6 +91,14 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, h2.tags().size());
   h1.recordValue(200);
   h2.recordValue(200);
+  OptionalHistogram opt_histogram = scope1->findHistogram(h2.statName());
+  ASSERT_TRUE(opt_histogram);
+  EXPECT_EQ(&h2, &opt_histogram->get());
+  EXPECT_FALSE(scope1->findHistogram(not_found));
+  // TODO(jmarantz): There may be a bug with
+  // scope1->findHistogram(h1.statName()), which finds the histogram added to
+  // the store, which is arguably not in the scope. Investigate what the
+  // behavior should be.
 
   StatNameManagedStorage h1_name("h1", store_.symbolTable());
   auto found_histogram = store_.findHistogram(h1_name.statName());
@@ -97,6 +119,13 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(store_.findCounter(nonexistent_name.statName()), absl::nullopt);
   EXPECT_EQ(store_.findGauge(nonexistent_name.statName()), absl::nullopt);
   EXPECT_EQ(store_.findHistogram(nonexistent_name.statName()), absl::nullopt);
+}
+
+TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
+  ScopePtr scope1 = store_.createScope("scope1");
+  ScopePtr scope2 = scope1->createScope("scope2");
+  Counter& c1 = scope2->counter("c1");
+  EXPECT_EQ("scope1.scope2.c1", c1.name());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {

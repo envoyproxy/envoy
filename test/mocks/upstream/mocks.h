@@ -327,7 +327,6 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
                ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
-  MOCK_CONST_METHOD0(warmingClusterCount, std::size_t());
   MOCK_METHOD0(subscriptionFactory, Config::SubscriptionFactory&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;

@@ -98,7 +98,7 @@ MockDrainDecision::MockDrainDecision() = default;
 MockDrainDecision::~MockDrainDecision() = default;
 
 MockListenerFilter::MockListenerFilter() = default;
-MockListenerFilter::~MockListenerFilter() = default;
+MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
 MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
@@ -127,6 +127,10 @@ MockListenSocket::MockListenSocket()
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
+  ON_CALL(*this, close()).WillByDefault(Invoke([this]() { socket_is_open_ = false; }));
+  ON_CALL(testing::Const(*this), isOpen()).WillByDefault(Invoke([this]() {
+    return socket_is_open_;
+  }));
 }
 
 MockSocketOption::MockSocketOption() {

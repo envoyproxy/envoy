@@ -11,6 +11,7 @@ import "validate/validate.proto";
 // [#protodoc-title: gRPC HTTP/1.1 Reverse Bridge]
 // gRPC HTTP/1.1 Reverse Bridge :ref:`configuration overview
 // <config_http_filters_grpc_http1_reverse_bridge>`.
+// [#extension: envoy.filters.http.grpc_http1_reverse_bridge]
 
 // gRPC reverse bridge filter configuration
 message FilterConfig {

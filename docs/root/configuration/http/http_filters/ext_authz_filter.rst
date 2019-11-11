@@ -37,6 +37,7 @@ A sample filter configuration for a gRPC authorization server:
 
           # Default is 200ms; override if your server needs e.g. warmup time.
           timeout: 0.5s
+        include_peer_certificate: true
 
 .. code-block:: yaml
 
@@ -71,6 +72,7 @@ A sample filter configuration for a raw HTTP authorization server:
               cluster: ext-authz
               timeout: 0.25s
               failure_mode_allow: false
+        include_peer_certificate: true
 
 .. code-block:: yaml
 
@@ -131,3 +133,9 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."
+
+Runtime
+-------
+The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
+<envoy_api_field_core.runtimefractionalpercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` field.

@@ -18,7 +18,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
   auto status = response->mutable_status();
   status->set_code(response_status);
 
-  if (response_status != Grpc::Status::GrpcStatus::Ok) {
+  if (response_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     const auto denied_response = response->mutable_denied_response();
     if (!body.empty()) {
       denied_response->set_body(body);

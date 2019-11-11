@@ -24,7 +24,8 @@ RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
-      rate_limit_policy_(route.route().rate_limits()) {
+      rate_limit_policy_(route.route().rate_limits()),
+      strip_service_name_(route.route().strip_service_name()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -256,6 +257,14 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
+
+  if (route_entry_->stripServiceName()) {
+    const auto& method = metadata->methodName();
+    const auto pos = method.find(':');
+    if (pos != std::string::npos) {
+      metadata->setMethodName(method.substr(pos + 1));
+    }
+  }
 
   upstream_request_ =
       std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata, transport, protocol);

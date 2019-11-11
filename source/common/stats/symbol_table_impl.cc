@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -15,10 +16,6 @@ namespace Stats {
 
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
-
-StatName::StatName(const StatName& src, SymbolTable::Storage memory) : size_and_data_(memory) {
-  memcpy(memory, src.size_and_data_, src.size());
-}
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
@@ -380,7 +377,7 @@ void SymbolTableImpl::debugPrint() const {
 #endif
 
 SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
-  ASSERT(!absl::EndsWith(name, "."));
+  name = StringUtil::removeTrailingCharacters(name, '.');
   Encoding encoding;
   addTokensToEncoding(name, encoding);
   auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
