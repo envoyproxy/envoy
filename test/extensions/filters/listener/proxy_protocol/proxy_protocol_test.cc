@@ -35,6 +35,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -54,13 +55,14 @@ public:
         socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
-
+    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
     conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
-    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
   }
 
   // Network::ListenerConfig
@@ -899,6 +901,9 @@ public:
             socket_->localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
                                                 Network::Address::InstanceConstSharedPtr(),
@@ -911,7 +916,6 @@ public:
               std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
-    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
   }
 
   // Network::ListenerConfig
