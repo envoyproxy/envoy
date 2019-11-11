@@ -40,7 +40,8 @@ public:
   /**
    * @return fallback policy defined for this selector, or NOT_DEFINED
    */
-  virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy fallbackPolicy() const PURE;
+  virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+  fallbackPolicy() const PURE;
 
   /**
    * @return fallback keys subset defined for this selector, or empty set

@@ -487,7 +487,8 @@ class SubsetSelectorImpl : public SubsetSelector {
 public:
   SubsetSelectorImpl(
       const Protobuf::RepeatedPtrField<std::string>& selector_keys,
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy fallback_policy,
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+          fallback_policy,
       const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset)
       : selector_keys_(selector_keys.begin(), selector_keys.end()),
         fallback_policy_(fallback_policy),
@@ -496,7 +497,8 @@ public:
     if (fallback_policy_ !=
         envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
       if (!fallback_keys_subset_.empty()) {
-        throw EnvoyException("fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+        throw EnvoyException(
+            "fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
       }
       return;
     }
@@ -505,8 +507,7 @@ public:
       throw EnvoyException("fallback_keys_subset cannot be empty");
     }
 
-    if (!std::includes(selector_keys_.begin(), selector_keys_.end(),
-                       fallback_keys_subset_.begin(),
+    if (!std::includes(selector_keys_.begin(), selector_keys_.end(), fallback_keys_subset_.begin(),
                        fallback_keys_subset_.end())) {
       throw EnvoyException("fallback_keys_subset must be a subset of selector keys");
     }
@@ -547,9 +548,8 @@ public:
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(subset.keys(),
-                                                                            subset.fallback_policy(),
-                                                                            subset.fallback_keys_subset()));
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset()));
       }
     }
   }
