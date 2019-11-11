@@ -18,6 +18,8 @@ public:
 
   virtual Connection* createQuicHttpConnection(Network::Connection& connection,
                                                ConnectionCallbacks& callbacks) PURE;
+
+  static std::string category() { return "quiche_codec"; }
 };
 
 } // namespace Http
