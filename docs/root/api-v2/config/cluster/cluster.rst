@@ -5,6 +5,6 @@ Cluster
   :glob:
   :maxdepth: 2
 
-  aggregate/*
+  aggregate/v2alpha/*
   dynamic_forward_proxy/v2alpha/*
   redis/*
