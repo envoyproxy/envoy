@@ -481,6 +481,59 @@ public:
 };
 
 /**
+ * Implementation of SubsetSelector
+ */
+class SubsetSelectorImpl : public SubsetSelector {
+public:
+  SubsetSelectorImpl(
+      const Protobuf::RepeatedPtrField<std::string>& selector_keys,
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy fallback_policy,
+      const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset)
+      : selector_keys_(selector_keys.begin(), selector_keys.end()),
+        fallback_policy_(fallback_policy),
+        fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()) {
+
+    if (fallback_policy_ !=
+        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
+      if (!fallback_keys_subset_.empty()) {
+        throw EnvoyException("fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+      }
+      return;
+    }
+
+    if (fallback_keys_subset_.empty()) {
+      throw EnvoyException("fallback_keys_subset cannot be empty");
+    }
+
+    if (!std::includes(selector_keys_.begin(), selector_keys_.end(),
+                       fallback_keys_subset_.begin(),
+                       fallback_keys_subset_.end())) {
+      throw EnvoyException("fallback_keys_subset must be a subset of selector keys");
+    }
+
+    // Enforce that the fallback_keys_subset_ set is smaller than the selector_keys_ set. Otherwise
+    // we could end up with a infinite recursion of SubsetLoadBalancer::chooseHost().
+    if (selector_keys_.size() == fallback_keys_subset_.size()) {
+      throw EnvoyException("fallback_keys_subset cannot be equal to keys");
+    }
+  }
+
+  // SubsetSelector
+  const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
+  envoy::api::v2::Cluster_LbSubsetConfig_LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+  fallbackPolicy() const override {
+    return fallback_policy_;
+  }
+  const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+
+private:
+  const std::set<std::string> selector_keys_;
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+      fallback_policy_;
+  const std::set<std::string> fallback_keys_subset_;
+};
+
+/**
  * Implementation of LoadBalancerSubsetInfo.
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
@@ -494,12 +547,9 @@ public:
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        auto selector = std::make_shared<SubsetSelector>(SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
-                           subset.fallback_policy(),
-                           std::set<std::string>(subset.fallback_keys_subset().begin(),
-                                                 subset.fallback_keys_subset().end())});
-        validateSelector(*selector);
-        subset_selectors_.emplace_back(selector);
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(subset.keys(),
+                                                                            subset.fallback_policy(),
+                                                                            subset.fallback_keys_subset()));
       }
     }
   }
@@ -519,7 +569,6 @@ public:
   bool listAsAny() const override { return list_as_any_; }
 
 private:
-  void validateSelector(const SubsetSelector& selector) const;
   const bool enabled_;
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;

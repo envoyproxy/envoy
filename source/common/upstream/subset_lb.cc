@@ -116,9 +116,9 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
   selectors_ = std::make_shared<SubsetSelectorMap>();
   SubsetSelectorMapPtr selectors;
   for (const auto& subset_selector : subset_selectors_) {
-    const auto& selector_keys = subset_selector->selector_keys_;
-    const auto& selector_fallback_policy = subset_selector->fallback_policy_;
-    const auto& selector_fallback_keys_subset = subset_selector->fallback_keys_subset_;
+    const auto& selector_keys = subset_selector->selectorKeys();
+    const auto& selector_fallback_policy = subset_selector->fallbackPolicy();
+    const auto& selector_fallback_keys_subset = subset_selector->fallbackKeysSubset();
     if (selector_fallback_policy ==
         envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       continue;
@@ -366,7 +366,7 @@ void SubsetLoadBalancer::processSubsets(
     const bool adding_hosts = step.second;
     for (const auto& host : hosts) {
       for (const auto& subset_selector : subset_selectors_) {
-        const auto& keys = subset_selector->selector_keys_;
+        const auto& keys = subset_selector->selectorKeys();
         // For each host, for each subset key, attempt to extract the metadata corresponding to the
         // key from the host.
         std::vector<SubsetMetadata> all_kvs = extractSubsetMetadata(keys, *host);

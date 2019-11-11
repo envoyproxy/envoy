@@ -1553,13 +1553,13 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));
   EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys_,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
             std::set<std::string>({"selector_key1"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy_,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
             envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys_,
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
             std::set<std::string>({"selector_key2"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy_,
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
             envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 }
 
@@ -1584,18 +1584,18 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetFallbackValid) {
 
   auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
 
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy_,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
             envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys_,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
             std::set<std::string>({"key1", "key2", "key3"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_keys_subset_,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackKeysSubset(),
             std::set<std::string>({"key1", "key3"}));
 
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy_,
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
             envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys_,
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
             std::set<std::string>({"key1", "key3", "key4"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_keys_subset_,
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackKeysSubset(),
             std::set<std::string>({"key4"}));
 }
 
