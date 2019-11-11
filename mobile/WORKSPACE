@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 
 # Patch upstream Abseil to prevent Foundation dependency from leaking into Android builds.
 # Workaround for https://github.com/abseil/abseil-cpp/issues/326.
@@ -183,3 +183,9 @@ rules_proto_grpc_toolchains()
 load("@rules_proto_grpc//java:repositories.bzl", rules_proto_grpc_java_repos = "java_repos")
 
 rules_proto_grpc_java_repos()
+
+http_jar(
+    name = "kotlin_dokka",
+    url = "https://github.com/Kotlin/dokka/releases/download/0.9.18/dokka-fatjar-0.9.18.jar",
+    sha256 = "4c73eee92dd652ea8e2afd7b20732cf863d4938a30f634d12c88fe64def89fd8",
+)

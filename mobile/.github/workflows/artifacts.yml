@@ -8,20 +8,26 @@ on:
 jobs:
   master_android_dist:
     name: master_android_dist
-    runs-on: macOS-10.14
+    runs-on: ubuntu-18.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./ci/linux_ci_setup.sh
       - name: 'Build envoy.aar distributable'
-        run: ./bazelw build --config=release-android --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a //:android_dist
+        run: |
+          current_short_commit=$(git rev-parse --short HEAD)
+          ./bazelw build \
+              --config=release-android \
+              --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a \
+              --define=pom_version=master-$current_short_commit \
+              //:android_deploy
       - uses: actions/upload-artifact@v1
         with:
-          name: envoy_android_aar
-          path: dist/envoy.aar
+          name: envoy_android_aar_sources
+          path: dist/envoy_aar_sources.zip
   master_ios_dist:
     name: master_ios_dist
     runs-on: macOS-10.14
