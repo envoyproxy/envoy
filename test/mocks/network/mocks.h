@@ -298,10 +298,10 @@ class MockListenSocketFactory : public ListenSocketFactory {
 public:
   MockListenSocketFactory() = default;
 
-   MOCK_CONST_METHOD0(socketType, Network::Address::SocketType());
-   MOCK_CONST_METHOD0(localAddress, const Network::Address::InstanceConstSharedPtr&());
-   MOCK_METHOD0(createListenSocket, Network::SocketSharedPtr());
-   MOCK_CONST_METHOD0(sharedSocket, absl::optional<std::reference_wrapper<Socket>>());
+  MOCK_CONST_METHOD0(socketType, Network::Address::SocketType());
+  MOCK_CONST_METHOD0(localAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD0(createListenSocket, Network::SocketSharedPtr());
+  MOCK_CONST_METHOD0(sharedSocket, absl::optional<std::reference_wrapper<Socket>>());
 };
 
 class MockListenerConfig : public ListenerConfig {

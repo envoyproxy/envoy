@@ -311,8 +311,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   auto listener_it = listeners.cbegin();
   for (; listener_it != listeners.end(); ++listener_it) {
     EXPECT_THAT(response->body(),
-                HasSubstr(fmt::format("{}::{}", listener_it->get().name(),
-                                      listener_it->get().listenSocketFactory().localAddress()->asString())));
+                HasSubstr(fmt::format(
+                    "{}::{}", listener_it->get().name(),
+                    listener_it->get().listenSocketFactory().localAddress()->asString())));
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/listeners?format=json", response));

@@ -22,7 +22,9 @@ public:
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
 
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket , Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
+  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
+                     Network::SocketSharedPtr listen_socket,
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
 
   // TODO(#7465): Make this a callback.
   void onListenerShutdown();
@@ -43,8 +45,7 @@ private:
   friend class ActiveQuicListenerPeer;
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::Socket& listen_socket,
-                     std::unique_ptr<quic::QuicPacketWriter> writer,
+                     Network::Socket& listen_socket, std::unique_ptr<quic::QuicPacketWriter> writer,
                      Network::UdpListenerPtr&& listener, Network::ListenerConfig& listener_config,
                      const quic::QuicConfig& quic_config);
 

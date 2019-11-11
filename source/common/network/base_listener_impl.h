@@ -16,6 +16,10 @@ namespace Network {
  */
 class BaseListenerImpl : public virtual Listener {
 public:
+  /**
+   * @param socket the listening socket for this listener. It might be shared
+   * with other listeners if all listeners use single listen socket.
+   */
   BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket);
 
 protected:

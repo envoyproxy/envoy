@@ -33,13 +33,13 @@ ListenSocketFactoryImplBase::ListenSocketFactoryImplBase(
     : factory_(factory), local_address_(local_address), socket_type_(socket_type),
       options_(options), bind_to_port_(bind_to_port), listener_name_(listener_name) {}
 
-Network::SocketSharedPtr
-ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
+Network::SocketSharedPtr ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
   // socket might be nullptr depends on factory_ implementation.
   Network::SocketSharedPtr socket =
       factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
   // Binding is done by now.
-    ENVOY_LOG(info, "Create listen socket for listener {} on address {}", listener_name_, local_address_->asString());
+  ENVOY_LOG(info, "Create listen socket for listener {} on address {}", listener_name_,
+            local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
     bool ok = Network::Socket::applyOptions(options_, *socket,
                                             envoy::api::v2::core::SocketOption::STATE_BOUND);
@@ -59,39 +59,39 @@ ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
   return socket;
 }
 
-void ListenSocketFactoryImplBase::setLocalAddress(Network::Address::InstanceConstSharedPtr local_address) {
+void ListenSocketFactoryImplBase::setLocalAddress(
+    Network::Address::InstanceConstSharedPtr local_address) {
 
   ENVOY_LOG(info, "Set socket factory local address to {}", local_address->asString());
-    local_address_ = local_address;
-  }
+  local_address_ = local_address;
+}
 
 TcpListenSocketFactory::TcpListenSocketFactory(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, const std::string& listener_name)
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+    const std::string& listener_name)
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Stream,
                                   options, bind_to_port, listener_name) {
-    socket_ = createListenSocketAndApplyOptions();
-    if (socket_ != nullptr && localAddress()->ip() !=nullptr && localAddress()->ip()->port() == 0) {
+  socket_ = createListenSocketAndApplyOptions();
+  if (socket_ != nullptr && localAddress()->ip() != nullptr && localAddress()->ip()->port() == 0) {
     setLocalAddress(socket_->localAddress());
-    }
-    }
-
-Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket() {
-  return socket_;
+  }
 }
+
+Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket() { return socket_; }
 
 UdpListenSocketFactory::UdpListenSocketFactory(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, const std::string& listener_name)
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+    const std::string& listener_name)
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Datagram,
-                                  options, bind_to_port, listener_name) {
-    }
+                                  options, bind_to_port, listener_name) {}
 
 Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket() {
   Network::SocketSharedPtr socket = createListenSocketAndApplyOptions();
-  if (socket != nullptr && localAddress()->ip() !=nullptr && localAddress()->ip()->port() == 0) {
+  if (socket != nullptr && localAddress()->ip() != nullptr && localAddress()->ip()->port() == 0) {
     setLocalAddress(socket->localAddress());
- }
+  }
   return socket;
 }
 

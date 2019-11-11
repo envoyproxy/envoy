@@ -164,8 +164,9 @@ private:
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
                                      const Network::Address::Instance& address);
-  static bool shareSocketWithOtherListener(const ListenerList& list,
-                                    const Network::ListenSocketFactorySharedPtr& socket_factory);
+  static bool
+  shareSocketWithOtherListener(const ListenerList& list,
+                               const Network::ListenSocketFactorySharedPtr& socket_factory);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
     // restart.

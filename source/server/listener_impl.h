@@ -37,9 +37,11 @@ public:
 protected:
   Network::SocketSharedPtr createListenSocketAndApplyOptions();
   void setLocalAddress(Network::Address::InstanceConstSharedPtr local_address);
-  
+
 private:
   ListenerComponentFactory& factory_;
+  // Initially, its port number might be 0. Once a socket is created, its port
+  // will be set to the binding port.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::SocketType socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
@@ -62,6 +64,7 @@ public:
   }
 
 private:
+  // This will be shared across all worker threads if not setting SO_RESUSEPORT.
   Network::SocketSharedPtr socket_;
 };
 
@@ -74,10 +77,9 @@ public:
 
   // Network::ListenSocketFactory
   Network::SocketSharedPtr createListenSocket() override;
-    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
     return absl::nullopt;
   }
-
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by

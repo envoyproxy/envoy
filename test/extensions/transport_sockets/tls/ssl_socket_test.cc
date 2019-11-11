@@ -278,8 +278,8 @@ void testUtil(const TestUtilOptions& options) {
                                                    server_stats_store, std::vector<std::string>{});
 
   Event::DispatcherPtr dispatcher = server_api->allocateDispatcher();
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(options.version()),
-                                  nullptr, true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true);
@@ -558,8 +558,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
                                                    server_stats_store, server_names);
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher());
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(options.version()),
-                                  nullptr, true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true);
@@ -2162,8 +2162,8 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
- auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
@@ -2217,8 +2217,8 @@ TEST_P(SslSocketTest, HalfClose) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, true);
@@ -2298,8 +2298,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
@@ -2391,10 +2391,10 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   ServerSslSocketFactory server_ssl_socket_factory2(std::move(server_cfg2), manager,
                                                     server_stats_store, server_names2);
 
-  auto socket1 = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
-                                   true);
-  auto socket2 = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
-                                   true);
+  auto socket1 = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
+  auto socket2 = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher());
@@ -2809,10 +2809,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   ServerSslSocketFactory server2_ssl_socket_factory(std::move(server2_cfg), manager,
                                                     server_stats_store, std::vector<std::string>{});
 
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
-  auto socket2 = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                   true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+  auto socket2 = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
@@ -2847,7 +2847,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::TransportSocketFactory& tsf =
             accepted_socket->localAddress() == socket->localAddress() ? server_ssl_socket_factory
-                                                                     : server2_ssl_socket_factory;
+                                                                      : server2_ssl_socket_factory;
         server_connection = dispatcher_->createServerConnection(std::move(accepted_socket),
                                                                 tsf.createTransportSocket(nullptr));
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2887,7 +2887,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::TransportSocketFactory& tsf =
             accepted_socket->localAddress() == socket->localAddress() ? server_ssl_socket_factory
-                                                                     : server2_ssl_socket_factory;
+                                                                      : server2_ssl_socket_factory;
         server_connection = dispatcher_->createServerConnection(std::move(accepted_socket),
                                                                 tsf.createTransportSocket(nullptr));
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2924,8 +2924,8 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
@@ -3184,8 +3184,8 @@ TEST_P(SslSocketTest, SslError) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
@@ -3868,8 +3868,8 @@ protected:
     server_ssl_socket_factory_ = std::make_unique<ServerSslSocketFactory>(
         std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{});
 
-    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                   true);
+    socket_ = std::make_shared<Network::TcpListenSocket>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);

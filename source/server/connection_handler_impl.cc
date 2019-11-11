@@ -100,11 +100,11 @@ ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
 
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
                                                             Network::ListenerConfig& config)
-    : ActiveTcpListener(parent,
-                        parent.dispatcher_.createListener(
-                            config.listenSocketFactory().createListenSocket(), *this,
-                            config.bindToPort()),
-                        config) {}
+    : ActiveTcpListener(
+          parent,
+          parent.dispatcher_.createListener(config.listenSocketFactory().createListenSocket(),
+                                            *this, config.bindToPort()),
+          config) {}
 
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
                                                             Network::ListenerPtr&& listener,
@@ -404,10 +404,10 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
                                      Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
-    : ActiveUdpListener(parent,
-                        dispatcher.createUdpListener(
-                            config.listenSocketFactory().createListenSocket(), *this),
-                        config) {}
+    : ActiveUdpListener(
+          parent,
+          dispatcher.createUdpListener(config.listenSocketFactory().createListenSocket(), *this),
+          config) {}
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
                                      Network::UdpListenerPtr&& listener,

@@ -16,14 +16,13 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
     Network::Socket& listen_socket)
-    : EnvoyQuicConnection(
-          server_connection_id, initial_peer_address, helper, alarm_factory, writer, owns_writer,
-          quic::Perspective::IS_SERVER, supported_versions,
-          std::make_unique<Network::ConnectionSocketImpl>(
-              // Wraps the real IoHandle instance so that if the connection socket gets closed,
-              // the real IoHandle won't be affected.
-              std::make_unique<QuicIoHandleWrapper>(listen_socket.ioHandle()), nullptr,
-              quicAddressToEnvoyAddressInstance(initial_peer_address))),
+    : EnvoyQuicConnection(server_connection_id, initial_peer_address, helper, alarm_factory, writer,
+                          owns_writer, quic::Perspective::IS_SERVER, supported_versions,
+                          std::make_unique<Network::ConnectionSocketImpl>(
+                              // Wraps the real IoHandle instance so that if the connection socket
+                              // gets closed, the real IoHandle won't be affected.
+                              std::make_unique<QuicIoHandleWrapper>(listen_socket.ioHandle()),
+                              nullptr, quicAddressToEnvoyAddressInstance(initial_peer_address))),
       listener_config_(listener_config), listener_stats_(listener_stats) {}
 
 bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {

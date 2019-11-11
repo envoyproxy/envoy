@@ -594,18 +594,16 @@ private:
     FakeListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
 
     // Network::ListenSocketFactory
-     Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
 
-  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-    return socket_->localAddress();
-  }
+    const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+      return socket_->localAddress();
+    }
 
-  Network::SocketSharedPtr createListenSocket() override {
-    return socket_;
-  }
-  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-    return *socket_;
-  }
+    Network::SocketSharedPtr createListenSocket() override { return socket_; }
+    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+      return *socket_;
+    }
 
   private:
     Network::SocketSharedPtr socket_;
@@ -619,7 +617,9 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocketFactory& listenSocketFactory() override { return *parent_.socket_factory_; }
+    Network::ListenSocketFactory& listenSocketFactory() override {
+      return *parent_.socket_factory_;
+    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
@@ -637,7 +637,6 @@ private:
     }
 
     FakeUpstream& parent_;
-
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
   };

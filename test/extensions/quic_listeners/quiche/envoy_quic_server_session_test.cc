@@ -59,8 +59,7 @@ public:
                                 quic::QuicPacketWriter& writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Network::ListenerConfig& listener_config,
-                                Server::ListenerStats& stats,
-                                Network::Socket& listen_socket)
+                                Server::ListenerStats& stats, Network::Socket& listen_socket)
       : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
                                   quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
                                   helper, alarm_factory, &writer, /*owns_writer=*/false,
@@ -98,9 +97,9 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(new TestEnvoyQuicServerConnection(connection_helper_, alarm_factory_,
-                                                           writer_, quic_version_, listener_config_,
-                                                           listener_stats_, *listener_config_.socket_)),
+        quic_connection_(new TestEnvoyQuicServerConnection(
+            connection_helper_, alarm_factory_, writer_, quic_version_, listener_config_,
+            listener_stats_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),

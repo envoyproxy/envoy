@@ -56,10 +56,11 @@ class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::
 public:
   EnvoyQuicDispatcherTest()
       : version_(GetParam()), api_(Api::createApiForTest(time_system_)),
-        dispatcher_(api_->allocateDispatcher()),        listen_socket_(std::make_unique<Network::NetworkListenSocket<
-        Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
-        Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
- connection_helper_(*dispatcher_),
+        dispatcher_(api_->allocateDispatcher()),
+        listen_socket_(std::make_unique<Network::NetworkListenSocket<
+                           Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
+            Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
+        connection_helper_(*dispatcher_),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),

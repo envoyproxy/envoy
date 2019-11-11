@@ -99,7 +99,8 @@ protected:
     if (dispatcher_.get() == nullptr) {
       dispatcher_ = api_->allocateDispatcher();
     }
-    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()), nullptr, true);
+    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                         nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
@@ -272,7 +273,8 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
-  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()), nullptr, true);
+  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                       nullptr, true);
   if (socket_->localAddress()->ip()->version() == Address::IpVersion::v4) {
     broadcast_address.reset(new Address::Ipv4Instance("224.0.0.1", 0));
   } else {
@@ -951,7 +953,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   dispatcher_ = api_->allocateDispatcher();
-  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()), nullptr, true);
+  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                       nullptr, true);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -1926,7 +1929,8 @@ public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher();
-    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()), nullptr, true);
+    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                         nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(

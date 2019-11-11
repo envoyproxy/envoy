@@ -20,14 +20,13 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
-                                      Network::SocketSharedPtr listen_socket,
+                                       Network::SocketSharedPtr listen_socket,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : ActiveQuicListener(dispatcher, parent,
-                         *listen_socket,
+    : ActiveQuicListener(dispatcher, parent, *listen_socket,
                          std::make_unique<EnvoyQuicPacketWriter>(*listen_socket),
-dispatcher.createUdpListener(std::move(listen_socket), *this),
-                          listener_config, quic_config) {}
+                         dispatcher.createUdpListener(std::move(listen_socket), *this),
+                         listener_config, quic_config) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
@@ -36,9 +35,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, 
-                                                            listener_config),
-      udp_listener_(std::move(listener)), dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()), listen_socket_(listen_socket) {
+    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
+      udp_listener_(std::move(listener)), dispatcher_(dispatcher),
+      version_manager_(quic::CurrentSupportedVersions()), listen_socket_(listen_socket) {
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(

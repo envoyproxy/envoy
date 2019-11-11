@@ -56,14 +56,13 @@ protected:
 
   SocketSharedPtr createServerSocket(bool bind) {
     // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
-    return std::make_shared<UdpListenSocket>(
-        Network::Test::getAnyAddress(version_),
+    return std::make_shared<UdpListenSocket>(Network::Test::getAnyAddress(version_),
 #ifdef IP_FREEBIND
-        SocketOptionFactory::buildIpFreebindOptions(),
+                                             SocketOptionFactory::buildIpFreebindOptions(),
 #else
-        nullptr,
+                                             nullptr,
 #endif
-        bind);
+                                             bind);
   }
 
   SocketPtr createClientSocket(bool bind) {
@@ -103,7 +102,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
 // Test that socket options are set after the listener is setup.
 TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   MockUdpListenerCallbacks listener_callbacks;
-  auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
+  auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getAnyAddress(version_),
+                                                           nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))

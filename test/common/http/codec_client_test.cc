@@ -289,7 +289,8 @@ class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersi
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()) {
     dispatcher_ = api_->allocateDispatcher();
-    auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()), nullptr, true);
+    auto socket = std::make_shared<Network::TcpListenSocket>(
+        Network::Test::getAnyAddress(GetParam()), nullptr, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
     upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true);

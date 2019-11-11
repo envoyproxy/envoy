@@ -151,7 +151,6 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
-  std::cerr << "============ ProdListenerComponentFactory::createListenSocket\n";
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Address::SocketType::Stream ||
@@ -196,10 +195,8 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   if (socket_type == Network::Address::SocketType::Stream) {
-    std::cerr << "============ here1\n";
     return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
   } else {
-    std::cerr << "=============== here2\n";
     return std::make_shared<Network::UdpListenSocket>(address, options, bind_to_port);
   }
 }
@@ -368,14 +365,12 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
 
   bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
-    std::cerr << "============= existing warming listener\n";
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
     new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory());
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
-    std::cerr << "================== active listener \n";
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not. Either way we get the socket from the existing listener.
     new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory());
@@ -402,29 +397,26 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
       throw EnvoyException(message);
     }
 
-  std::cerr << "================== find draining_listen_socket_factory\n";
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not. Additionally, search through draining listeners
-    // to see if there is a listener that has a socket factory for the same address we are configured for and doesn't not use SO_REUSEPORT.
-    // This is an edge case, but may happen if a listener is removed and then added back with a same
-    // or different name and intended to listen on the same address. This should work and not fail.
+    // to see if there is a listener that has a socket factory for the same address we are
+    // configured for and doesn't not use SO_REUSEPORT. This is an edge case, but may happen if a
+    // listener is removed and then added back with a same or different name and intended to listen
+    // on the same address. This should work and not fail.
     Network::ListenSocketFactorySharedPtr draining_listen_socket_factory;
-    auto existing_draining_listener =
-        std::find_if(draining_listeners_.cbegin(), draining_listeners_.cend(),
-                     [&new_listener](const DrainingListener& listener) {
-                       return listener.listener_->listenSocketFactory().sharedSocket().has_value() &&
-listener.listener_->listenSocketFactory().sharedSocket()->get().isOpen() &&
-                           *new_listener->address() ==
-                              *listener.listener_->listenSocketFactory().localAddress();
-                     });
-    
-  std::cerr << "================== find draining_listen_socket_factory00000000 \n";
+    auto existing_draining_listener = std::find_if(
+        draining_listeners_.cbegin(), draining_listeners_.cend(),
+        [&new_listener](const DrainingListener& listener) {
+          return listener.listener_->listenSocketFactory().sharedSocket().has_value() &&
+                 listener.listener_->listenSocketFactory().sharedSocket()->get().isOpen() &&
+                 *new_listener->address() ==
+                     *listener.listener_->listenSocketFactory().localAddress();
+        });
+
     if (existing_draining_listener != draining_listeners_.cend()) {
-      std::cerr << "=========== found draining socket\n"; 
       draining_listen_socket_factory = existing_draining_listener->listener_->getSocketFactory();
     }
 
-  std::cerr << "================== find draining_listen_socket_factory 1111\n";
     new_listener->setSocketFactory(
         draining_listen_socket_factory
             ? draining_listen_socket_factory
@@ -461,8 +453,8 @@ bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
   return false;
 }
 
-bool ListenerManagerImpl::shareSocketWithOtherListener(const ListenerList& list,
-                                                const Network::ListenSocketFactorySharedPtr& socket_factory) {
+bool ListenerManagerImpl::shareSocketWithOtherListener(
+    const ListenerList& list, const Network::ListenSocketFactorySharedPtr& socket_factory) {
   ASSERT(socket_factory->sharedSocket().has_value());
   for (const auto& listener : list) {
     if (listener->getSocketFactory() == socket_factory) {
@@ -484,27 +476,29 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
-  stopListener(*draining_it->listener_, [this, share_socket = draining_it->listener_->listenSocketFactory().sharedSocket().has_value(), listener_tag]() {
-    if (!share_socket) {
-      return;
-    }
-    for (auto& listener : draining_listeners_) {
-      if (listener.listener_->listenerTag() == listener_tag) {
-        // Handle the edge case when new listener is added for the same address as the drained
-        // one. In this case the socket is shared between both listeners so one should avoid
-        // closing it.
-        const auto& socket_factory = listener.listener_->getSocketFactory();
-        if (!shareSocketWithOtherListener(active_listeners_, socket_factory) &&
-            !shareSocketWithOtherListener(warming_listeners_, socket_factory)) {
-          // Close the socket iff it is not used anymore.
-          ASSERT(listener.listener_->listenSocketFactory().sharedSocket().has_value());
-          std::cerr << "========== get here1\n";
-          listener.listener_->listenSocketFactory().sharedSocket()->get().close();
-          std::cerr << "========== get here2\n";
+  stopListener(
+      *draining_it->listener_,
+      [this,
+       share_socket = draining_it->listener_->listenSocketFactory().sharedSocket().has_value(),
+       listener_tag]() {
+        if (!share_socket) {
+          return;
         }
-      }
-    }
-  });
+        for (auto& listener : draining_listeners_) {
+          if (listener.listener_->listenerTag() == listener_tag) {
+            // Handle the edge case when new listener is added for the same address as the drained
+            // one. In this case the socket is shared between both listeners so one should avoid
+            // closing it.
+            const auto& socket_factory = listener.listener_->getSocketFactory();
+            if (!shareSocketWithOtherListener(active_listeners_, socket_factory) &&
+                !shareSocketWithOtherListener(warming_listeners_, socket_factory)) {
+              // Close the socket iff it is not used anymore.
+              ASSERT(listener.listener_->listenSocketFactory().sharedSocket().has_value());
+              listener.listener_->listenSocketFactory().sharedSocket()->get().close();
+            }
+          }
+        }
+      });
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
@@ -696,17 +690,19 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
       // Close the socket once all workers stopped accepting its connections.
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
-      stopListener(listener, [this, share_socket = listener.listenSocketFactory().sharedSocket().has_value(), listener_tag]() {
-        if (!share_socket) {
-          return;
-        }
-        for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
-            listener->listenSocketFactory().sharedSocket()->get().close();
-          }
-        }
-        stats_.listener_stopped_.inc();
-      });
+      stopListener(listener,
+                   [this, share_socket = listener.listenSocketFactory().sharedSocket().has_value(),
+                    listener_tag]() {
+                     if (!share_socket) {
+                       return;
+                     }
+                     for (auto& listener : active_listeners_) {
+                       if (listener->listenerTag() == listener_tag) {
+                         listener->listenSocketFactory().sharedSocket()->get().close();
+                       }
+                     }
+                     stats_.listener_stopped_.inc();
+                   });
     }
   }
 }
@@ -766,11 +762,13 @@ ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Addre
       Network::Utility::protobufAddressSocketType(proto_address);
   switch (socket_type) {
   case Network::Address::SocketType::Stream:
-    return std::make_shared<TcpListenSocketFactory>(
-        factory_, listener.address(), listener.listenSocketOptions(), listener.bindToPort(), listener.name());
+    return std::make_shared<TcpListenSocketFactory>(factory_, listener.address(),
+                                                    listener.listenSocketOptions(),
+                                                    listener.bindToPort(), listener.name());
   case Network::Address::SocketType::Datagram:
-    return std::make_shared<UdpListenSocketFactory>(
-        factory_, listener.address(), listener.listenSocketOptions(), listener.bindToPort(), listener.name());
+    return std::make_shared<UdpListenSocketFactory>(factory_, listener.address(),
+                                                    listener.listenSocketOptions(),
+                                                    listener.bindToPort(), listener.name());
   }
 }
 

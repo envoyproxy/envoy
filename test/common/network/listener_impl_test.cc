@@ -26,8 +26,8 @@ static void errorCallbackTest(Address::IpVersion version) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher());
 
-  auto socket = std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher->createListener(socket, listener_callbacks, true);
@@ -76,8 +76,8 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 
-  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
@@ -90,8 +90,8 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 
-  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
@@ -103,8 +103,8 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
 }
 
 TEST_P(ListenerImplTest, UseActualDst) {
-  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   auto socketDst = std::make_shared<TcpListenSocket>(alt_address_, nullptr, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
@@ -135,7 +135,8 @@ TEST_P(ListenerImplTest, UseActualDst) {
 }
 
 TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
-  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
+  auto socket =
+      std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
@@ -174,7 +175,8 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
       .WillOnce(Return(true));
   options->emplace_back(std::move(option));
 
-  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_, true), options, true);
+  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_, true),
+                                                  options, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 
@@ -214,7 +216,8 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
 TEST_P(ListenerImplTest, DisableAndEnableListener) {
   testing::InSequence s1;
 
-  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
+  auto socket =
+      std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
   MockListenerCallbacks listener_callbacks;
   TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 

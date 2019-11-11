@@ -52,10 +52,12 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
 public:
   ProxyProtocolTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
-        socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
+        socket_(std::make_shared<Network::TcpListenSocket>(
+            Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
-    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, socketType())
+        .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
@@ -895,13 +897,15 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address
 public:
   WildcardProxyProtocolTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
-        socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()), nullptr, true)),
+        socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                           nullptr, true)),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
-    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, socketType())
+        .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
