@@ -673,16 +673,6 @@ def _fuzzit_linux():
 def _com_github_grpc_grpc():
     _repository_impl(
         "com_github_grpc_grpc",
-        patches = [
-            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
-            "@envoy//bazel:grpc-protoinfo-1.patch",
-            "@envoy//bazel:grpc-protoinfo-2.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/19860
-            "@envoy//bazel:grpc-protoinfo-3.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/18950
-            "@envoy//bazel:grpc-rename-gettid.patch",
-        ],
-        patch_args = ["-p1"],
     )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
