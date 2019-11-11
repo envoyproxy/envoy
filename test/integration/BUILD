@@ -922,3 +922,15 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "local_reply_integration_test",
+    srcs = [
+        "local_reply_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

@@ -763,21 +763,6 @@ TEST(AccessLogFormatterTest, bodyFormatterTest) {
   }
 }
 
-void verifyJsonOutput(std::string json_string,
-                      std::unordered_map<std::string, std::string> expected_map) {
-  const auto parsed = Json::Factory::loadFromString(json_string);
-
-  // Every json log line should have only one newline character, and it should be the last character
-  // in the string
-  const auto newline_pos = json_string.find('\n');
-  EXPECT_NE(newline_pos, std::string::npos);
-  EXPECT_EQ(newline_pos, json_string.length() - 1);
-
-  for (const auto& pair : expected_map) {
-    EXPECT_EQ(parsed->getString(pair.first), pair.second);
-  }
-}
-
 TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestHeaderMapImpl request_header;
@@ -797,7 +782,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
       {"plain_string", "plain_string_value"}};
   JsonFormatterImpl formatter(key_mapping);
 
-  verifyJsonOutput(
+  TestUtility::verifyJsonOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
@@ -819,7 +804,7 @@ TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   std::unordered_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
   JsonFormatterImpl formatter(key_mapping);
 
-  verifyJsonOutput(
+  TestUtility::verifyJsonOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
@@ -847,7 +832,7 @@ TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyJsonOutput(
+  TestUtility::verifyJsonOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
@@ -879,7 +864,7 @@ TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyJsonOutput(
+  TestUtility::verifyJsonOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
@@ -908,7 +893,7 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
 
   JsonFormatterImpl formatter(key_mapping);
 
-  verifyJsonOutput(
+  TestUtility::verifyJsonOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
@@ -939,7 +924,7 @@ TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
       {"all_zeroes", "%START_TIME(%f.%1f.%2f.%3f)%"}};
   JsonFormatterImpl formatter(key_mapping);
 
-  verifyJsonOutput(
+  TestUtility::verifyJsonOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }

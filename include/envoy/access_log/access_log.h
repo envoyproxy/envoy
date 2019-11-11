@@ -134,6 +134,7 @@ public:
    * @param response_headers supplies the response headers.
    * @param response_trailers supplies the response trailers.
    * @param stream_info supplies the stream info.
+   * @param response_body supplies the response body.
    * @return std::string containing a single value extracted from the given headers/trailers/stream.
    */
   virtual std::string format(const Http::HeaderMap& request_headers,

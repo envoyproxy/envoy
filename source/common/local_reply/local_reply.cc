@@ -12,13 +12,13 @@ ResponseRewriter::ResponseRewriter(absl::optional<uint32_t> response_code)
     : response_code_(response_code) {}
 
 void ResponseRewriter::rewrite(Http::Code& code) {
-  code = static_cast<Http::Code>(response_code_.value());
+  if (response_code_.has_value()) {
+    code = static_cast<Http::Code>(response_code_.value());
+  }
 }
 
-ResponseMapper::ResponseMapper(AccessLog::FilterPtr&& filter, ResponseRewriterPtr&& rewriter) {
-  filter_ = std::move(filter);
-  rewriter_ = std::move(rewriter);
-}
+ResponseMapper::ResponseMapper(AccessLog::FilterPtr&& filter, ResponseRewriterPtr&& rewriter)
+    : filter_(std::move(filter)), rewriter_(std::move(rewriter)) {}
 
 bool ResponseMapper::match(const Http::HeaderMap* request_headers,
                            const Http::HeaderMap* response_headers,
@@ -30,11 +30,8 @@ bool ResponseMapper::match(const Http::HeaderMap* request_headers,
 void ResponseMapper::rewrite(Http::Code& status_code) { rewriter_->rewrite(status_code); }
 
 LocalReply::LocalReply(std::list<ResponseMapperPtr> mappers, AccessLog::FormatterPtr&& formatter,
-                       std::string content_type) {
-  mappers_ = std::move(mappers);
-  formatter_ = std::move(formatter);
-  content_type_ = content_type;
-}
+                       std::string content_type)
+    : mappers_(std::move(mappers)), formatter_(std::move(formatter)), content_type_(content_type) {}
 
 void LocalReply::matchAndRewrite(const Http::HeaderMap* request_headers,
                                  const Http::HeaderMap* response_headers,

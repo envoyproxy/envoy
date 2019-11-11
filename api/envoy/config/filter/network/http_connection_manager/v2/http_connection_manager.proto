@@ -469,7 +469,6 @@ message HttpConnectionManager {
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
 
-  // [#not-implemented-hide:]
   // Configuration of local reply returned by Envoy. Allows to specify mappings and format of
   // response.
   LocalReplyConfig local_reply_config = 36;

@@ -745,6 +745,17 @@ void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max
   }
 }
 
+void ConfigHelper::setLocalReply(
+    envoy::config::filter::network::http_connection_manager::v2::LocalReplyConfig& config) {
+  auto filter = getFilterFromListener("envoy.http_connection_manager");
+  if (filter) {
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    hcm_config.mutable_local_reply_config()->MergeFrom(config);
+    storeHttpConnectionManager(hcm_config);
+  }
+}
+
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}
 
 void CdsHelper::setCds(const std::vector<envoy::api::v2::Cluster>& clusters) {

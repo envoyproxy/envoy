@@ -547,6 +547,27 @@ public:
     MessageUtil::jsonConvert(source, tmp);
     MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
   }
+
+  /**
+   * Check that generated json as string is equal to expeceted response as unordered map.
+   *
+   * @param json_string response as json string.
+   * @param expected_map unordered map which contains expected data.
+   */
+  static void verifyJsonOutput(std::string json_string,
+                               std::unordered_map<std::string, std::string> expected_map) {
+    const auto parsed = Json::Factory::loadFromString(json_string);
+
+    // Every json log line should have only one newline character, and it should be the last
+    // character in the string
+    const auto newline_pos = json_string.find('\n');
+    EXPECT_NE(newline_pos, std::string::npos);
+    EXPECT_EQ(newline_pos, json_string.length() - 1);
+
+    for (const auto& pair : expected_map) {
+      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    }
+  }
 };
 
 /**

@@ -45,8 +45,7 @@ message AccessLog {
   }
 }
 
-// [#next-major-version: In the v3 API, we should consider renaming
-// it to more generic filter]
+// [#next-major-version: In the v3 API, we should consider renaming it to more generic filter]
 // [#next-free-field: 12]
 message AccessLogFilter {
   oneof filter_specifier {

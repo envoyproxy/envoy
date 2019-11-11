@@ -444,8 +444,9 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReply) {
@@ -461,8 +462,9 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
       }));
-  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
@@ -488,8 +490,9 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
         const auto& encoded = Utility::PercentEncoding::encode(json);
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), encoded);
       }));
-  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::Unauthorized, json, absl::nullopt,
-                          false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{true, Http::Code::Unauthorized, json, absl::nullopt, false});
 }
 
 TEST(HttpUtility, RateLimitedGrpcStatus) {
@@ -501,8 +504,9 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
       }));
-  Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
-                          false);
+  Utility::sendLocalReply(
+      false, callbacks,
+      Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", absl::nullopt, false});
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
@@ -510,10 +514,11 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::ResourceExhausted)));
       }));
-  Utility::sendLocalReply(
-      true, callbacks, false, Http::Code::TooManyRequests, "",
-      absl::make_optional<Grpc::Status::GrpcStatus>(Grpc::Status::GrpcStatus::ResourceExhausted),
-      false);
+  Utility::sendLocalReply(false, callbacks,
+                          Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
+                                                  absl::make_optional<Grpc::Status::GrpcStatus>(
+                                                      Grpc::Status::GrpcStatus::ResourceExhausted),
+                                                  false});
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
@@ -524,8 +529,9 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
 
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
@@ -536,8 +542,9 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
         EXPECT_EQ(headers.ContentLength()->value().getStringView(),
                   fmt::format("{}", strlen("large")));
       }));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, true);
+  Utility::sendLocalReply(
+      is_reset, callbacks,
+      Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, true});
 }
 
 TEST(HttpUtility, TestExtractHostPathFromUri) {

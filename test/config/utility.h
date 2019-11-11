@@ -169,6 +169,9 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
+  void setLocalReply(
+      envoy::config::filter::network::http_connection_manager::v2::LocalReplyConfig& config);
+
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
