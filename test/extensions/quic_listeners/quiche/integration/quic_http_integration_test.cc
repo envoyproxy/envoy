@@ -67,7 +67,7 @@ public:
 
   // This call may fail because of INVALID_VERSION, because QUIC connection doesn't support
   // in-connection version negotiation.
-  // TODO(#8479) Popagate INVALID_VERSION error to caller and let caller to use server advertised
+  // TODO(#8479) Propagate INVALID_VERSION error to caller and let caller to use server advertised
   // version list to create a new connection with mutually supported version and make client codec
   // again.
   IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn) override {
