@@ -41,7 +41,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
-        "//source/common/config:filter_json_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
         "//source/extensions/filters/network:well_known_names",
     ],

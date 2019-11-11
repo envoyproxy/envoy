@@ -3116,6 +3116,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_test_tools_server_session_base_peer",
+    hdrs = [
+        "quiche/quic/test_tools/quic_server_session_base_peer.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_http_spdy_session_lib",
+        ":quic_core_utils_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "quic_test_tools_simple_quic_framer_lib",
     srcs = ["quiche/quic/test_tools/simple_quic_framer.cc"],
     hdrs = ["quiche/quic/test_tools/simple_quic_framer.h"],

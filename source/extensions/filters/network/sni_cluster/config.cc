@@ -10,13 +10,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SniCluster {
 
-Network::FilterFactoryCb
-SniClusterNetworkFilterConfigFactory::createFilterFactory(const Json::Object&,
-                                                          Server::Configuration::FactoryContext&) {
-  // Only used in v1 filters.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
-
 Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message&, Server::Configuration::FactoryContext&) {
   return [](Network::FilterManager& filter_manager) -> void {

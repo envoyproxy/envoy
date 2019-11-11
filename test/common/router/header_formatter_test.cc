@@ -688,6 +688,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
+      {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
@@ -755,6 +756,15 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Expected format PER_REQUEST_STATE(<data_name>), "
         "actual format PER_REQUEST_STATE no parens"}},
 
+      {"%REQ%",
+       {},
+       {"Invalid header configuration. Expected format REQ(<header-name>), "
+        "actual format REQ"}},
+      {"%REQ no parens%",
+       {},
+       {"Invalid header configuration. Expected format REQ(<header-name>), "
+        "actual format REQno parens"}},
+
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
        {},
@@ -775,6 +785,10 @@ TEST(HeaderParserTest, TestParseInternal) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+
+  Http::HeaderMapImpl request_headers;
+  request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
+  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 
   // Upstream metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
