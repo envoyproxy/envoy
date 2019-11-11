@@ -40,9 +40,10 @@ DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d
 EXTENSION_TEMPLATE = string.Template("""$anchor
 This extension may be referenced by the qualified name *$extension*
 
-$status
+.. note::
+  $status
 
-$security_posture
+  $security_posture
 
 """)
 

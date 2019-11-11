@@ -9,9 +9,13 @@ import sys
 
 
 def FormatItem(extension, metadata):
-  if metadata['undocumented'] or metadata['status'] == 'wip':
-    return '* %s' % extension
-  return '* :ref:`%s <extension_%s>`' % (extension, extension)
+  if metadata['undocumented']:
+    item = '* %s' % extension
+  else:
+    item = '* :ref:`%s <extension_%s>`' % (extension, extension)
+  if metadata['status'] == 'alpha':
+    item += ' (alpha)'
+  return item
 
 
 if __name__ == '__main__':
@@ -26,5 +30,7 @@ if __name__ == '__main__':
   for sp, extensions in security_postures.items():
     output_path = pathlib.Path(security_rst_root, 'secpos_%s.rst' % sp)
     content = '\n'.join(
-        FormatItem(extension, extension_db[extension]) for extension in sorted(extensions))
+        FormatItem(extension, extension_db[extension])
+        for extension in sorted(extensions)
+        if extension_db[extension]['status'] != 'wip')
     output_path.write_text(content)
