@@ -869,7 +869,7 @@ protected:
   bool use_tcp_for_dns_lookups() const override { return true; }
 };
 
-// Parametrize the DNS test server socket address.
+// Parameterize the DNS test server socket address.
 INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForTcpTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -896,7 +896,7 @@ protected:
   bool tcp_only() const override { return false; }
 };
 
-// Parametrize the DNS test server socket address.
+// Parameterize the DNS test server socket address.
 INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForUdpTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
