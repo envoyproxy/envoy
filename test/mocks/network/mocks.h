@@ -164,6 +164,7 @@ public:
   MockListenerFilter();
   ~MockListenerFilter() override;
 
+  MOCK_METHOD0(destroy_, void());
   MOCK_METHOD1(onAccept, Network::FilterStatus(ListenerFilterCallbacks&));
 };
 
