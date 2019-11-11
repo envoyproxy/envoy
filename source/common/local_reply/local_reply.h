@@ -31,7 +31,7 @@ private:
 using ResponseRewriterPtr = std::unique_ptr<ResponseRewriter>;
 
 /**
- * Configuration of response mapper which contains pair of filter and definiton of rewriter.
+ * Configuration of response mapper which contains pair of filter and definition of rewriter.
  */
 class ResponseMapper {
 public:
