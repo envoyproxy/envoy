@@ -489,35 +489,7 @@ public:
       const Protobuf::RepeatedPtrField<std::string>& selector_keys,
       envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
           fallback_policy,
-      const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset)
-      : selector_keys_(selector_keys.begin(), selector_keys.end()),
-        fallback_policy_(fallback_policy),
-        fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()) {
-
-    if (fallback_policy_ !=
-        envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
-      if (!fallback_keys_subset_.empty()) {
-        throw EnvoyException(
-            "fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
-      }
-      return;
-    }
-
-    if (fallback_keys_subset_.empty()) {
-      throw EnvoyException("fallback_keys_subset cannot be empty");
-    }
-
-    if (!std::includes(selector_keys_.begin(), selector_keys_.end(), fallback_keys_subset_.begin(),
-                       fallback_keys_subset_.end())) {
-      throw EnvoyException("fallback_keys_subset must be a subset of selector keys");
-    }
-
-    // Enforce that the fallback_keys_subset_ set is smaller than the selector_keys_ set. Otherwise
-    // we could end up with a infinite recursion of SubsetLoadBalancer::chooseHost().
-    if (selector_keys_.size() == fallback_keys_subset_.size()) {
-      throw EnvoyException("fallback_keys_subset cannot be equal to keys");
-    }
-  }
+      const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset);
 
   // SubsetSelector
   const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
