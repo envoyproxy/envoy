@@ -1,0 +1,180 @@
+From c22c215ea548838bc4cf2d400fd34ec409cb82af Mon Sep 17 00:00:00 2001
+From: Danjie Wenren <danjie.wenren@gmail.com>
+Date: Sat, 12 Oct 2019 19:54:29 -0700
+Subject: [PATCH 1/2] Move extra dependencies out of WORKSPACE to its own
+ macro.
+
+This could be useful for projects that use gRPC as an external
+repository. This could not be done within the same grpc_deps.bzl due to
+the problem discussed in
+- https://github.com/bazelbuild/bazel/issues/1550
+- https://github.com/bazelbuild/bazel/issues/1943
+---
+ WORKSPACE                 | 24 ++++-------------------
+ bazel/grpc_deps.bzl       | 10 +++++++++-
+ bazel/grpc_extra_deps.bzl | 40 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 53 insertions(+), 21 deletions(-)
+ create mode 100644 bazel/grpc_extra_deps.bzl
+
+diff --git a/WORKSPACE b/WORKSPACE
+index b48e85017ff..18bf641a6a8 100644
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -8,6 +8,10 @@ grpc_deps()
+ 
+ grpc_test_only_deps()
+ 
++load("//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
++
++grpc_extra_deps()
++
+ register_execution_platforms(
+     "//third_party/toolchains:local",
+     "//third_party/toolchains:local_large",
+@@ -50,23 +54,3 @@ load("@io_bazel_rules_python//python:pip.bzl", "pip_repositories")
+ load("@grpc_python_dependencies//:requirements.bzl", "pip_install")
+ pip_repositories()
+ pip_install()
+-
+-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+-protobuf_deps()
+-
+-load("@upb//bazel:workspace_deps.bzl", "upb_deps")
+-upb_deps()
+-
+-load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
+-api_dependencies()
+-
+-load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies", "go_register_toolchains")
+-go_rules_dependencies()
+-go_register_toolchains()
+-
+-
+-load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+-apple_rules_dependencies()
+-
+-load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
+-apple_support_dependencies()
+diff --git a/bazel/grpc_deps.bzl b/bazel/grpc_deps.bzl
+index fcc8077c035..69f341ffa9e 100644
+--- a/bazel/grpc_deps.bzl
++++ b/bazel/grpc_deps.bzl
+@@ -229,8 +229,16 @@ def grpc_deps():
+             sha256 = "bdc8e66e70b8a75da23b79f1f8c6207356df07d041d96d2189add7ee0780cf4e",
+         )
+ 
+-    grpc_python_deps()
++    if "build_bazel_apple_support" not in native.existing_rules():
++        http_archive(
++            name = "build_bazel_apple_support",
++            urls = [
++                "https://github.com/bazelbuild/apple_support/releases/download/0.7.1/apple_support.0.7.1.tar.gz",
++            ],
++            sha256 = "122ebf7fe7d1c8e938af6aeaee0efe788a3a2449ece5a8d6a428cb18d6f88033",
++        )
+ 
++    grpc_python_deps()
+ 
+ # TODO: move some dependencies from "grpc_deps" here?
+ def grpc_test_only_deps():
+diff --git a/bazel/grpc_extra_deps.bzl b/bazel/grpc_extra_deps.bzl
+new file mode 100644
+index 00000000000..4c1dfad2e86
+--- /dev/null
++++ b/bazel/grpc_extra_deps.bzl
+@@ -0,0 +1,37 @@
++"""Loads the dependencies necessary for the external repositories defined in grpc_deps.bzl."""
++
++load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
++load("@upb//bazel:workspace_deps.bzl", "upb_deps")
++load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
++load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
++load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
++load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
++
++def grpc_extra_deps():
++    """Loads the extra dependencies.
++
++    These are necessary for using the external repositories defined in
++    grpc_deps.bzl. Projects that depend on gRPC as an external repository need
++    to call both grpc_deps and grpc_extra_deps, if they have not already loaded
++    the extra dependencies. For example, they can do the following in their
++    WORKSPACE
++    ```
++    load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps", "grpc_test_only_deps")
++    grpc_deps()
++
++    grpc_test_only_deps()
++
++    load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
++
++    grpc_extra_deps()
++    ```
++    """
++    protobuf_deps()
++
++    upb_deps()
++
++    api_dependencies()
++
++    apple_rules_dependencies()
++
++    apple_support_dependencies()
+
+From 93e8830070e9afcbaa992c75817009ee3f4b63a0 Mon Sep 17 00:00:00 2001
+From: Danjie Wenren <danjie.wenren@gmail.com>
+Date: Mon, 14 Oct 2019 22:51:10 -0700
+Subject: [PATCH 2/2] Address comments.
+
+- Fix sanit test check_bazel_workspace.py.
+- Use the new `grpc_extra_deps` in the Bazel workspace test.
+---
+ bazel/test/python_test_repo/WORKSPACE           | 14 +++-----------
+ tools/run_tests/sanity/check_bazel_workspace.py |  2 ++
+ 2 files changed, 5 insertions(+), 11 deletions(-)
+
+diff --git a/bazel/test/python_test_repo/WORKSPACE b/bazel/test/python_test_repo/WORKSPACE
+index 10d2a87ef07..94e5c684f3e 100644
+--- a/bazel/test/python_test_repo/WORKSPACE
++++ b/bazel/test/python_test_repo/WORKSPACE
+@@ -4,17 +4,9 @@ local_repository(
+ )
+ 
+ load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+-grpc_deps()
+-
+-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+-protobuf_deps()
+ 
+-# TODO(https://github.com/grpc/grpc/issues/19835): Remove.
+-load("@upb//bazel:workspace_deps.bzl", "upb_deps")
+-upb_deps()
++grpc_deps()
+ 
+-load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+-apple_rules_dependencies()
++load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+ 
+-load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
+-apple_support_dependencies()
++grpc_extra_deps()
+diff --git a/tools/run_tests/sanity/check_bazel_workspace.py b/tools/run_tests/sanity/check_bazel_workspace.py
+index 0075e6e45c6..bb5b3ae59d7 100755
+--- a/tools/run_tests/sanity/check_bazel_workspace.py
++++ b/tools/run_tests/sanity/check_bazel_workspace.py
+@@ -64,6 +64,7 @@
+     _TWISTED_CONSTANTLY_DEP_NAME,
+     'io_bazel_rules_go',
+     'build_bazel_rules_apple',
++    'build_bazel_apple_support',
+ ]
+ 
+ _GRPC_BAZEL_ONLY_DEPS = [
+@@ -79,6 +80,7 @@
+     _TWISTED_CONSTANTLY_DEP_NAME,
+     'io_bazel_rules_go',
+     'build_bazel_rules_apple',
++    'build_bazel_apple_support',
+ ]
+ 
+ 

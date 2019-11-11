@@ -673,6 +673,10 @@ def _fuzzit_linux():
 def _com_github_grpc_grpc():
     _repository_impl(
         "com_github_grpc_grpc",
+        patches = [
+            "@envoy//bazel:grpc-extra-deps.patch",
+        ],
+        patch_args = ["-p1"],
     )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
