@@ -145,11 +145,9 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers,
     chargeStat(headers);
   }
   if (is_text_response_) {
-    headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
   } else {
-    headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.GrpcWebProto);
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
   return Http::FilterHeadersStatus::Continue;
 }

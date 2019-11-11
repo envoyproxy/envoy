@@ -347,6 +347,8 @@ private:
  * ContentLength() -> returns the header entry if it exists or nullptr.
  * insertContentLength() -> inserts the header if it does not exist, and returns a reference to it.
  * removeContentLength() -> removes the header if it exists.
+ *
+ * TODO(asraa): Remove functions with a non-const HeaderEntry return value.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
@@ -375,6 +377,7 @@ public:
    * Calling addReference multiple times for the same header will result in:
    * - Comma concatenation for predefined inline headers.
    * - Multiple headers being present in the HeaderMap for other headers.
+   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL NOT be copied.
@@ -440,6 +443,7 @@ public:
    *
    * Calling setReference multiple times for the same header will result in only the last header
    * being present in the HeaderMap.
+   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to set; it WILL NOT be copied.
    * @param value specifies the value of the header to set; it WILL NOT be copied.

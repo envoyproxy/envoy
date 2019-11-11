@@ -196,11 +196,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const absl::optional<std::chrono::milliseconds>& timeout) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(service_full_name.c_str(),
-                                                 service_full_name.size());
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
+  message->headers().setPath(absl::StrCat("/", service_full_name, "/", method_name));
   message->headers().setHost(upstream_cluster);
   // According to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md TE should appear
   // before Timeout and ContentType.
