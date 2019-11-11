@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.tracers.xray.daemon;
+
+// see https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
+message Segment {
+  string name = 1;
+  string id = 2;
+  string trace_id = 3;
+  double start_time = 4;
+  double end_time = 5;
+  string parent_id = 6;
+  map<string, string> annotations = 7;
+  http_annotations http = 8;
+  message http_annotations {
+    map<string, string> request = 1;
+    map<string, string> response = 2;
+  }
+}
+
+message Header {
+  string format = 1;
+  uint32 version = 2;
+}
