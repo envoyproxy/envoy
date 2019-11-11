@@ -494,13 +494,12 @@ public:
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        auto selector =
-            SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
+        auto selector = std::make_shared<SubsetSelector>(SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
                            subset.fallback_policy(),
                            std::set<std::string>(subset.fallback_keys_subset().begin(),
-                                                 subset.fallback_keys_subset().end())};
-        validateSelector(selector);
-        subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(selector));
+                                                 subset.fallback_keys_subset().end())});
+        validateSelector(*selector);
+        subset_selectors_.emplace_back(selector);
       }
     }
   }

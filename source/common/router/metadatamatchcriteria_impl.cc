@@ -50,7 +50,9 @@ MetadataMatchCriteriaImpl::filterMatchCriteria(const std::set<std::string>& name
       v.emplace_back(it);
     }
   }
-
+  if (v.empty()) {
+    return nullptr;
+  }
   return MetadataMatchCriteriaImplConstPtr(new MetadataMatchCriteriaImpl(v));
 };
 

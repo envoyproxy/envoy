@@ -791,7 +791,7 @@ void LoadBalancerSubsetInfoImpl::validateSelector(const SubsetSelector& selector
   if (!std::includes(selector.selector_keys_.begin(), selector.selector_keys_.end(),
                      selector.fallback_keys_subset_.begin(),
                      selector.fallback_keys_subset_.end())) {
-    throw EnvoyException("fallback_keys_subset should be a subset of selector keys");
+    throw EnvoyException("fallback_keys_subset must be a subset of selector keys");
   }
 
   // Enforce that the fallback_keys_subset_ set is smaller than the selector_keys_ set. Otherwise

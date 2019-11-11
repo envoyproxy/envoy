@@ -13,6 +13,11 @@ public:
   MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
       : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)){};
 
+  // MetadataMatchCriteria
+  const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
+    return metadata_match_criteria_;
+  }
+
   MetadataMatchCriteriaConstPtr
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const override {
     return MetadataMatchCriteriaImplConstPtr(
@@ -21,11 +26,6 @@ public:
 
   MetadataMatchCriteriaConstPtr
   filterMatchCriteria(const std::set<std::string>& names) const override;
-
-  // MetadataMatchCriteria
-  const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
-    return metadata_match_criteria_;
-  }
 
 private:
   MetadataMatchCriteriaImpl(const std::vector<MetadataMatchCriterionConstSharedPtr>& criteria)

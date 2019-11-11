@@ -1624,7 +1624,7 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetNotASubsetInvalid) {
   selector->add_fallback_keys_subset("key3");
 
   EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
-                            "fallback_keys_subset should be a subset of selector keys");
+                            "fallback_keys_subset must be a subset of selector keys");
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEmptyInvalid) {

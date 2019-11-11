@@ -132,6 +132,7 @@ private:
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
                                const std::set<std::string>& filtered_metadata_match_criteria_names);
 
+    // LoadBalancerContext
     absl::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
       return metadata_match_.get();
