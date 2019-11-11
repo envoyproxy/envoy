@@ -64,7 +64,7 @@ public:
   }
 
 private:
-  // This will be shared across all worker threads if not setting SO_RESUSEPORT.
+  // This will be shared across all worker threads if not setting SO_REUSEPORT.
   Network::SocketSharedPtr socket_;
 };
 
