@@ -85,8 +85,8 @@ export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOM
 
 if [ "$1" != "-nofetch" ]; then
   # Setup Envoy consuming project.
-  if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
-  then
+  if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
+    rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   fi
 

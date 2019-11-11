@@ -17,7 +17,7 @@ import "validate/validate.proto";
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ExtAuthz {
   // External authorization service configuration.
   oneof services {
@@ -90,6 +90,12 @@ message ExtAuthz {
   //
   // If this field is not specified, the filter will be enabled for all requests.
   api.v2.core.RuntimeFractionalPercent filter_enabled = 9;
+
+  // Specifies if the peer certificate is sent to the external service.
+  //
+  // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
+  // :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>`.
+  bool include_peer_certificate = 10;
 }
 
 // Configuration for buffering the request data.
