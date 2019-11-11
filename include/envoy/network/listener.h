@@ -28,7 +28,7 @@ public:
   /**
    * Called during actual listener creation.
    * @return the socket to be used for a certain listener, which might be shared
-   * with other listners of the same config on other worker threads.
+   * with other listeners of the same config on other worker threads.
    */
   virtual SocketSharedPtr createListenSocket() PURE;
 
@@ -47,6 +47,7 @@ public:
   /**
    * @return the socket if createListenSocket() returns a shared socket among
    * each call. nullopt otherwise.
+   */
   virtual absl::optional<std::reference_wrapper<Socket>> sharedSocket() const PURE;
 };
 
