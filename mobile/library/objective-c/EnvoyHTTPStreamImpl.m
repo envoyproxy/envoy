@@ -153,7 +153,6 @@ static void ios_on_cancel(void *context) {
   // effect cleanup, with appropriate timing.
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
-  EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
     if (callbacks.onCancel) {
       callbacks.onCancel();
