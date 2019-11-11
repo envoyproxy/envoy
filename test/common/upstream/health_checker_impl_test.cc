@@ -1045,6 +1045,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   const std::string value_user_agent = "CoolEnvoy/HC";
   const std::string value_upstream_metadata = "value";
   const std::string value_protocol = "HTTP/1.1";
+  const std::string value_downstream_remote_address = "127.0.0.1:0";
   const std::string value_downstream_remote_address_without_port = "127.0.0.1";
   const std::string value_downstream_local_address = "127.0.0.1:0";
   const std::string value_downstream_local_address_without_port = "127.0.0.1";
