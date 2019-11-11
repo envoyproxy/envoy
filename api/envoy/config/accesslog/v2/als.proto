@@ -19,6 +19,7 @@ import "validate/validate.proto";
 // :ref:`AccessLog <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`. This configuration will
 // populate :ref:`StreamAccessLogsMessage.http_logs
 // <envoy_api_field_service.accesslog.v2.StreamAccessLogsMessage.http_logs>`.
+// [#extension: envoy.access_loggers.http_grpc]
 message HttpGrpcAccessLogConfig {
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 
@@ -37,6 +38,7 @@ message HttpGrpcAccessLogConfig {
 
 // Configuration for the built-in *envoy.tcp_grpc_access_log* type. This configuration will
 // populate *StreamAccessLogsMessage.tcp_logs*.
+// [#extension: envoy.access_loggers.tcp_grpc]
 message TcpGrpcAccessLogConfig {
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 }

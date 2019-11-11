@@ -86,29 +86,11 @@ detect issues during their execution on ClusterFuzz. A soak period of 5 days pro
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
 
-### Confidentiality, integrity and availability
+### Threat model
 
-We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
-highest priority concerns. Availability, in particular in areas relating to DoS and resource
-exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
-Envoy in edge deployments.
-
-The Envoy availability stance around CPU and memory DoS, as well as Query-of-Death (QoD), is still
-evolving. We will continue to iterate and fix well known resource issues in the open, e.g. overload
-manager and watermark improvements. We will activate the security process for disclosures that
-appear to present a risk profile that is significantly greater than the current Envoy availability
-hardening status quo. Examples of disclosures that would elicit this response:
-* QoD; where a single query from a client can bring down an Envoy server.
-* Highly asymmetric resource exhaustion attacks, where very little traffic can cause resource
-  exhaustion, e.g. that delivered by a single client.
-
-Note that we do not currently consider the default settings for Envoy to be safe from an availability
-perspective. It is necessary for operators to explicitly configure watermarks, the overload manager,
-circuit breakers and other resource related features in Envoy to provide a robust availability
-story. We will not act on any security disclosure that relates to a lack of safe defaults. Over
-time, we will work towards improved safe-by-default configuration, but due to backwards
-compatibility and performance concerns, this will require following the breaking change deprecation
-policy.
+See https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model.
+Vulnerabilities are evaluated against this threat model when deciding whether to activate the Envoy
+security release process.
 
 ### Fix Team Organization
 

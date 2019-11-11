@@ -14,6 +14,7 @@ import "validate/validate.proto";
 // for matching load balancer subsets, logging, etc.
 //
 // Header to Metadata :ref:`configuration overview <config_http_filters_header_to_metadata>`.
+// [#extension: envoy.filters.http.header_to_metadata]
 
 message Config {
   enum ValueType {

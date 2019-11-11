@@ -89,7 +89,6 @@ public:
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
-  MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
   MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());

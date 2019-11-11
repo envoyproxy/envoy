@@ -672,7 +672,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
                request.error_detail().code(), expected_error_code,
                request.error_detail().message());
   }
-  if (expected_error_code != Grpc::Status::GrpcStatus::Ok &&
+  if (expected_error_code != Grpc::Status::WellKnownGrpcStatus::Ok &&
       request.error_detail().message().find(expected_error_substring) == std::string::npos) {
     return AssertionFailure() << "\"" << expected_error_substring
                               << "\" is not a substring of actual error message \""

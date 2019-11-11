@@ -39,6 +39,7 @@ message AttributeContext {
   // The node can be either a service or an application that sends, forwards,
   // or receives the request. Service peers should fill in the `service`,
   // `principal`, and `labels` as appropriate.
+  // [#next-free-field: 6]
   message Peer {
     // The address of the peer, this is typically the IP address.
     // It can also be UDS path, or others.
@@ -66,6 +67,10 @@ message AttributeContext {
     // *    SPIFFE format is `spiffe://trust-domain/path`
     // *    Google account format is `https://accounts.google.com/{userid}`
     string principal = 4;
+
+    // The X.509 certificate used to authenticate the identify of this peer.
+    // When present, the certificate contents are encoded in URL and PEM format.
+    string certificate = 5;
   }
 
   // Represents a network request, such as an HTTP request.
