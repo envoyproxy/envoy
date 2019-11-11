@@ -71,7 +71,7 @@ private:
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
-class BaseVerifierImpl : public Verifier {
+class BaseVerifierImpl : public Logger::Loggable<Logger::Id::jwt>, public Verifier {
 public:
   BaseVerifierImpl(const BaseVerifierImpl* parent) : parent_(parent) {}
 
@@ -106,13 +106,14 @@ protected:
 class ProviderVerifierImpl : public BaseVerifierImpl {
 public:
   ProviderVerifierImpl(const std::string& provider_name, const AuthFactory& factory,
-                       const JwtProvider& provider, const BaseVerifierImpl* parent)
+                       const JwtProvider& provider, bool allow_missing, const BaseVerifierImpl* parent)
       : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(provider)),
-        provider_name_(absl::make_optional<std::string>(provider_name)) {}
+        provider_name_(absl::make_optional<std::string>(provider_name)),
+        allow_missing_(allow_missing) {}
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false);
+    auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false, allow_missing_);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
@@ -136,14 +137,15 @@ private:
   const AuthFactory& auth_factory_;
   const ExtractorConstPtr extractor_;
   const absl::optional<std::string> provider_name_;
+  const bool allow_missing_;
 };
 
 class ProviderAndAudienceVerifierImpl : public ProviderVerifierImpl {
 public:
   ProviderAndAudienceVerifierImpl(const std::string& provider_name, const AuthFactory& factory,
-                                  const JwtProvider& provider, const BaseVerifierImpl* parent,
+                                  const JwtProvider& provider, bool allow_missing, const BaseVerifierImpl* parent,
                                   const std::vector<std::string>& config_audiences)
-      : ProviderVerifierImpl(provider_name, factory, provider, parent),
+      : ProviderVerifierImpl(provider_name, factory, provider, allow_missing, parent),
         check_audience_(std::make_unique<CheckAudience>(config_audiences)) {}
 
 private:
@@ -162,7 +164,40 @@ public:
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(nullptr, absl::nullopt, true);
+    auto auth = auth_factory_.create(nullptr, absl::nullopt, true, true);
+    extractor_.sanitizePayloadHeaders(ctximpl.headers());
+    auth->verify(
+        ctximpl.headers(), ctximpl.parentSpan(), extractor_.extract(ctximpl.headers()),
+        [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
+          ctximpl.addPayload(name, payload);
+        },
+        [this, context](const Status& status) {
+          onComplete(status, static_cast<ContextImpl&>(*context));
+        });
+    if (!ctximpl.getCompletionState(this).is_completed_) {
+      ctximpl.storeAuth(std::move(auth));
+    } else {
+      auth->onDestroy();
+    }
+  }
+
+private:
+  const AuthFactory& auth_factory_;
+  const Extractor& extractor_;
+};
+
+// DONOTSUBMIT - prototy for "allow-missing" verifier. Doesn't needed if use allow_missing boolean.
+class AllowMissingVerifierImpl : public BaseVerifierImpl {
+public:
+  AllowMissingVerifierImpl(const AuthFactory& factory, const Extractor& extractor,
+                          const BaseVerifierImpl* parent)
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(extractor) {}
+
+  void verify(ContextSharedPtr context) const override {
+    ENVOY_LOG(debug, "Called AllowMissingVerifierImpl.verify : {}", __func__);
+
+    auto& ctximpl = static_cast<ContextImpl&>(*context);
+    auto auth = auth_factory_.create(nullptr, absl::nullopt, false /* allow failed */, true /* allow missing */);
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_.extract(ctximpl.headers()),
@@ -293,6 +328,8 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                                              extractor_for_allow_fail, parent);
   case JwtRequirement::RequiresTypeCase::kAllowMissingOrFailed:
     return std::make_unique<AllowFailedVerifierImpl>(factory, extractor_for_allow_fail, parent);
+  // case JwtRequirement::RequiresTypeCase::kAllowMissing:
+  //   return std::make_unique<AllowMissingVerifierImpl>(factory, extractor_for_allow_fail, parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   default:
@@ -304,9 +341,9 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
     throw EnvoyException(fmt::format("Required provider ['{}'] is not configured.", provider_name));
   }
   if (audiences.empty()) {
-    return std::make_unique<ProviderVerifierImpl>(provider_name, factory, it->second, parent);
+    return std::make_unique<ProviderVerifierImpl>(provider_name, factory, it->second, requirement.allow_missing(), parent);
   }
-  return std::make_unique<ProviderAndAudienceVerifierImpl>(provider_name, factory, it->second,
+  return std::make_unique<ProviderAndAudienceVerifierImpl>(provider_name, factory, it->second, requirement.allow_missing(),
                                                            parent, audiences);
 }
 

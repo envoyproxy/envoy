@@ -370,6 +370,31 @@ TEST_F(AllowFailedInAndOfOrListTest, TwoGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
+TEST_F(AllVerifierTest, TestAllowMissing) {
+  std::vector<std::string> names{"a", "b", "c"};
+  for (const auto& it : names) {
+    auto header =
+        (*proto_config_.mutable_providers())[std::string(ProviderName)].add_from_headers();
+    header->set_name(it);
+    header->set_value_prefix("Prefix ");
+  }
+  proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing();
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{
+      {"a", "Prefix " + std::string(GoodToken)},
+      {"b", "Prefix " + std::string(NonExistKidToken)},
+      {"c", "Prefix "},
+  };
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_FALSE(headers.has("a"));
+  EXPECT_TRUE(headers.has("b"));
+  EXPECT_TRUE(headers.has("c"));
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

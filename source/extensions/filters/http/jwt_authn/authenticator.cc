@@ -30,12 +30,12 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::jwt>,
                           public Common::JwksFetcher::JwksReceiver {
 public:
   AuthenticatorImpl(const CheckAudience* check_audience,
-                    const absl::optional<std::string>& provider, bool allow_failed,
+                    const absl::optional<std::string>& provider, bool allow_failed, bool allow_missing,
                     JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager,
                     CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
-        provider_(provider), is_allow_failed_(allow_failed), time_source_(time_source) {}
+        provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing), time_source_(time_source) {}
 
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
@@ -91,6 +91,7 @@ private:
   // specific provider or not when it is allow missing or failed.
   const absl::optional<std::string> provider_;
   const bool is_allow_failed_;
+  const bool is_allow_missing_;
   TimeSource& time_source_;
 };
 
@@ -117,6 +118,8 @@ void AuthenticatorImpl::startVerify() {
   ASSERT(!tokens_.empty());
   curr_token_ = std::move(tokens_.back());
   tokens_.pop_back();
+
+
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
   const Status status = jwt_->parseFromString(curr_token_->token());
   if (status != Status::Ok) {
@@ -244,9 +247,16 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "JWT token verification completed with: {}",
             ::google::jwt_verify::getStatusString(status));
   // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
-  if ((Status::Ok == status && !is_allow_failed_) || tokens_.empty()) {
+  if ((Status::Ok == status && !is_allow_failed_ && !is_allow_missing_ ) || tokens_.empty()) {
     tokens_.clear();
-    callback_(is_allow_failed_ ? Status::Ok : status);
+    if (is_allow_failed_) {
+      callback_(Status::Ok);
+    } else if (is_allow_missing_ && status == Status::JwtMissed) {
+      callback_(Status::Ok);
+    } else {
+      callback_(status);
+    }
+
     callback_ = nullptr;
     return;
   }
@@ -257,11 +267,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        const absl::optional<std::string>& provider,
-                                       bool allow_failed, JwksCache& jwks_cache,
+                                       bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
                                        CreateJwksFetcherCb create_jwks_fetcher_cb,
                                        TimeSource& time_source) {
-  return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, jwks_cache,
+  return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, allow_missing, jwks_cache,
                                              cluster_manager, create_jwks_fetcher_cb, time_source);
 }
 
