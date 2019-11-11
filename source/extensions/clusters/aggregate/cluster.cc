@@ -6,7 +6,7 @@ namespace Clusters {
 namespace Aggregate {
 
 Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
-                 const envoy::config::cluster::aggregate::ClusterConfig& config,
+                 const envoy::config::cluster::aggregate::v2alpha::ClusterConfig& config,
                  Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -135,7 +135,7 @@ AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context)
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
     const envoy::api::v2::Cluster& cluster,
-    const envoy::config::cluster::aggregate::ClusterConfig& proto_config,
+    const envoy::config::cluster::aggregate::v2alpha::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {

@@ -60,7 +60,7 @@ static_resources:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
+        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
         clusters:
         - name: cluster_1
         - name: cluster_2

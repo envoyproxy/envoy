@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/cluster/aggregate/cluster.pb.h"
-#include "envoy/config/cluster/aggregate/cluster.pb.validate.h"
+#include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.h"
+#include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.validate.h"
 
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -19,7 +19,7 @@ using PriorityContext = std::pair<Upstream::PrioritySetImpl,
 class Cluster : public Upstream::ClusterImplBase, Upstream::ClusterUpdateCallbacks {
 public:
   Cluster(const envoy::api::v2::Cluster& cluster,
-          const envoy::config::cluster::aggregate::ClusterConfig& config,
+          const envoy::config::cluster::aggregate::v2alpha::ClusterConfig& config,
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Runtime::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -135,7 +135,7 @@ struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
 };
 
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                           envoy::config::cluster::aggregate::ClusterConfig> {
+                           envoy::config::cluster::aggregate::v2alpha::ClusterConfig> {
 public:
   ClusterFactory()
       : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Aggregate) {}
@@ -144,7 +144,7 @@ private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster,
-      const envoy::config::cluster::aggregate::ClusterConfig& proto_config,
+      const envoy::config::cluster::aggregate::v2alpha::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;

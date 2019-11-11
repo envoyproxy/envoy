@@ -19,6 +19,6 @@ envoy_cc_library(
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
         "//source/extensions/clusters:well_known_names",
-        "@envoy_api//envoy/config/cluster/aggregate:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/aggregate/v2alpha:pkg_cc_proto",
     ],
 )

@@ -6,7 +6,7 @@ Version history
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * api: remove all support for v1
 * build: official released binary is now built against libc++.
-* cluster: added aggregate cluster that allows load balancing between clusters.
+* cluster: added :ref: `aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
 * redis: performance improvement for larger split commands by avoiding string copies.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.

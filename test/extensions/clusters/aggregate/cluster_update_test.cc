@@ -59,7 +59,7 @@ public:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
+        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
         clusters:
         - name: primary
         - name: secondary
@@ -245,7 +245,7 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
+        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
         clusters:
         - name: primary
         - name: secondary

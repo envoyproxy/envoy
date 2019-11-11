@@ -71,7 +71,7 @@ public:
 
   void initialize(const std::string& yaml_config) {
     envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml_config);
-    envoy::config::cluster::aggregate::ClusterConfig config;
+    envoy::config::cluster::aggregate::v2alpha::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
@@ -130,7 +130,7 @@ public:
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
+        "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
         clusters:
         - name: primary
         - name: secondary
