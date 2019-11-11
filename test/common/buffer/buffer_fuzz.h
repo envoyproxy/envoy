@@ -6,7 +6,7 @@ namespace Envoy {
 
 class BufferFuzz {
 public:
-  static void bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input, bool old_impl);
+  static void bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input);
 };
 
 } // namespace Envoy

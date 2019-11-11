@@ -727,6 +727,8 @@ message RouteAction {
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
+    //
+    // [#next-major-version: host_rewrite_literal]
     string host_rewrite = 6;
 
     // Indicates that during forwarding, the host header will be swapped with
@@ -744,6 +746,8 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
+    //
+    // [#next-major-version: host_rewrite_header]
     string auto_host_rewrite_header = 29;
   }
 
