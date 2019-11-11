@@ -39,9 +39,6 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     return;
   }
   cluster_ = callbacks_->clusterInfo();
-  if (!cluster_) {
-    return;
-  }
 
   // Fast route - if we are disabled, no need to merge.
   const FilterConfigPerRoute* specific_per_route_config =
@@ -90,6 +87,10 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  if (!config_->filterEnabled()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   request_headers_ = &headers;
   buffer_data_ = config_->withRequestBody() &&
                  !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
@@ -151,7 +152,6 @@ void Filter::onDestroy() {
 }
 
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
-  ASSERT(cluster_);
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
@@ -180,7 +180,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
       }
     }
-    config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
+    if (cluster_) {
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
+    }
+    stats_.ok_.inc();
     continueDecoding();
     break;
   }
@@ -188,27 +191,39 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Denied: {
     ENVOY_STREAM_LOG(trace, "ext_authz filter rejected the request. Response status code: '{}",
                      *callbacks_, enumToInt(response->status_code));
-    config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
-    Http::CodeStats::ResponseStatInfo info{config_->scope(),
-                                           cluster_->statsScope(),
-                                           empty_stat_name,
-                                           enumToInt(response->status_code),
-                                           true,
-                                           empty_stat_name,
-                                           empty_stat_name,
-                                           empty_stat_name,
-                                           empty_stat_name,
-                                           false};
-    config_->httpContext().codeStats().chargeResponseStat(info);
+    stats_.denied_.inc();
+
+    if (cluster_) {
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
+
+      Http::CodeStats::ResponseStatInfo info{config_->scope(),
+                                             cluster_->statsScope(),
+                                             empty_stat_name,
+                                             enumToInt(response->status_code),
+                                             true,
+                                             empty_stat_name,
+                                             empty_stat_name,
+                                             empty_stat_name,
+                                             empty_stat_name,
+                                             false};
+      config_->httpContext().codeStats().chargeResponseStat(info);
+    }
+
     callbacks_->sendLocalReply(
         response->status_code, response->body,
         [& headers = response->headers_to_add,
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
+          // First remove all headers requested by the ext_authz filter,
+          // to ensure that they will override existing headers
+          for (const auto& header : headers) {
+            response_headers.remove(header.first);
+          }
+          // Then set all of the requested headers, allowing the
+          // same header to be set multiple times, e.g. `Set-Cookie`
           for (const auto& header : headers) {
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
-            response_headers.remove(header.first);
             response_headers.addCopy(header.first, header.second);
           }
         },
@@ -218,10 +233,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   case CheckStatus::Error: {
-    config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
+    if (cluster_) {
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
+    }
+    stats_.error_.inc();
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
-      config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
+      stats_.failure_mode_allowed_.inc();
+      if (cluster_) {
+        config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
+      }
       continueDecoding();
     } else {
       ENVOY_STREAM_LOG(

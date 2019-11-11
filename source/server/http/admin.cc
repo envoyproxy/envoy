@@ -880,7 +880,7 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   for (const Stats::Tag& tag : tags) {
     buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
   }
-  return StringUtil::join(buf, ",");
+  return absl::StrJoin(buf, ",");
 }
 
 std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {

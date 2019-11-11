@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/platform.h" // Avert format.h including windows.h
+
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
 #include "fmt/ostream.h"

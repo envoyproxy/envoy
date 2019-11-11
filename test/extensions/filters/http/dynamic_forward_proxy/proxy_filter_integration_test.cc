@@ -1,3 +1,5 @@
+#include "envoy/api/v2/auth/cert.pb.h"
+
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
@@ -29,7 +31,8 @@ public:
 
     const std::string filter = fmt::format(R"EOF(
 name: envoy.filters.http.dynamic_forward_proxy
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
@@ -56,11 +59,13 @@ config:
     cluster_.set_lb_policy(envoy::api::v2::Cluster::CLUSTER_PROVIDED);
 
     if (upstream_tls_) {
-      auto context = cluster_.mutable_tls_context();
+      envoy::api::v2::auth::UpstreamTlsContext tls_context;
       auto* validation_context =
-          context->mutable_common_tls_context()->mutable_validation_context();
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      cluster_.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      cluster_.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
     }
 
     const std::string cluster_type_config =

@@ -48,8 +48,8 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
 
@@ -255,6 +255,7 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
 
@@ -286,6 +287,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
 
@@ -319,7 +321,7 @@ envoy_cc_library(
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
 
@@ -335,6 +337,7 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
         "//source/server:configuration_lib",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
 
@@ -422,6 +425,7 @@ envoy_cc_library(
         "//source/common/upstream:health_discovery_service_lib",
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )

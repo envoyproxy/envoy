@@ -25,7 +25,8 @@ public:
   ListenSocketFactoryImplBase(ListenerComponentFactory& factory,
                               Network::Address::InstanceConstSharedPtr local_address,
                               Network::Address::SocketType socket_type,
-                              const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+                              const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+                              const std::string& listener_name);
 
   // Network::ListenSocketFactory
   Network::Address::SocketType socketType() const override { return socket_type_; }
@@ -34,7 +35,7 @@ public:
   }
 
 protected:
-  Network::SocketSharedPtr createListenSocketAndApplyOptions(std::string listener_name);
+  Network::SocketSharedPtr createListenSocketAndApplyOptions();
 
 private:
   ListenerComponentFactory& factory_;
@@ -42,17 +43,19 @@ private:
   Network::Address::SocketType socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
+  const std::string& listener_name_;
 };
 
 class TcpListenSocketFactory : public ListenSocketFactoryImplBase {
 public:
   TcpListenSocketFactory(ListenerComponentFactory& factory,
                          Network::Address::InstanceConstSharedPtr local_address,
-                         const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+                         const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+                         const std::string& listener_name);
 
   // Network::ListenSocketFactory
   // If |socket_| is nullptr, create a new socket for it. Otherwise, always return |socket_|.
-  Network::SocketSharedPtr createListenSocket(const std::string& listener_name) override;
+  Network::SocketSharedPtr createListenSocket() override;
   absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
     return *socket_;
   }
@@ -65,10 +68,11 @@ class UdpListenSocketFactory : public ListenSocketFactoryImplBase {
 public:
   UdpListenSocketFactory(ListenerComponentFactory& factory,
                          Network::Address::InstanceConstSharedPtr local_address,
-                         const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+                         const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+                         const std::string& listener_name);
 
   // Network::ListenSocketFactory
-  Network::SocketSharedPtr createListenSocket(const std::string& listener_name) override;
+  Network::SocketSharedPtr createListenSocket() override;
     absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
     return absl::nullopt;
   }
@@ -122,7 +126,7 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
-  const envoy::api::v2::Listener& config() { return config_; }
+  const envoy::api::v2::Listener& config() const { return config_; }
   const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
@@ -130,7 +134,7 @@ public:
   void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
-  const std::string& versionInfo() { return version_info_; }
+  const std::string& versionInfo() const { return version_info_; }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }

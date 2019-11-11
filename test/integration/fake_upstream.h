@@ -600,7 +600,7 @@ private:
     return socket_->localAddress();
   }
 
-  Network::SocketSharedPtr createListenSocket(const std::string& /*listener_name*/) override {
+  Network::SocketSharedPtr createListenSocket() override {
     return socket_;
   }
   absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {

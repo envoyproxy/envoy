@@ -15,7 +15,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
     : ActiveQuicListener(dispatcher, parent,
-                         listener_config.listenSocketFactory().createListenSocket(listener_config.name()),
+                         listener_config.listenSocketFactory().createListenSocket(),
                          listener_config, quic_config) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
@@ -36,9 +36,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, std::move(listener),
+    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, 
                                                             listener_config),
-      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()), listen_socket_(listen_socket) {
+      udp_listener_(std::move(listener)), dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()), listen_socket_(listen_socket) {
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(

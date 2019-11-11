@@ -83,6 +83,8 @@ public:
   void SetUp() override {
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
+    EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
+        .WillRepeatedly(Return(1024 * 1024));
   }
 
   void TearDown() override {
@@ -145,7 +147,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EnvoyQuicDispatcherTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
-  quic::SetVerbosityLogThreshold(2);
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
@@ -163,10 +164,17 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
       }));
   std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
   Network::MockConnectionCallbacks network_connection_callbacks;
+  testing::StrictMock<Stats::MockCounter> read_total;
+  testing::StrictMock<Stats::MockGauge> read_current;
+  testing::StrictMock<Stats::MockCounter> write_total;
+  testing::StrictMock<Stats::MockGauge> write_current;
+
   std::vector<Network::FilterFactoryCb> filter_factory(
       {[&](Network::FilterManager& filter_manager) {
         filter_manager.addReadFilter(read_filter);
         read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
+        read_filter->callbacks_->connection().setConnectionStats(
+            {read_total, read_current, write_total, write_current, nullptr, nullptr});
       }});
   EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());

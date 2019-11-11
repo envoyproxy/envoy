@@ -38,9 +38,9 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
     ],
 )

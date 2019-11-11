@@ -48,6 +48,5 @@ envoy_cc_library(
         "//source/extensions/stat_sinks/metrics_service:metrics_service_grpc_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/metrics/v2:pkg_cc_proto",
     ],
 )

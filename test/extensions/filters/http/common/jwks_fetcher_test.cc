@@ -53,6 +53,7 @@ public:
   void SetUp() override { TestUtility::loadFromYaml(JwksUri, uri_); }
   HttpUri uri_;
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
+  NiceMock<Tracing::MockSpan> parent_span_;
 };
 
 // Test findByIssuer
@@ -66,7 +67,7 @@ TEST_F(JwksFetcherTest, TestGetSuccess) {
   EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
 
   // Act
-  fetcher->fetch(uri_, receiver);
+  fetcher->fetch(uri_, parent_span_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestGet400) {
@@ -79,7 +80,7 @@ TEST_F(JwksFetcherTest, TestGet400) {
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
 
   // Act
-  fetcher->fetch(uri_, receiver);
+  fetcher->fetch(uri_, parent_span_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestGetNoBody) {
@@ -92,7 +93,7 @@ TEST_F(JwksFetcherTest, TestGetNoBody) {
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
 
   // Act
-  fetcher->fetch(uri_, receiver);
+  fetcher->fetch(uri_, parent_span_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
@@ -105,7 +106,7 @@ TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks)).Times(1);
 
   // Act
-  fetcher->fetch(uri_, receiver);
+  fetcher->fetch(uri_, parent_span_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestHttpFailure) {
@@ -119,7 +120,7 @@ TEST_F(JwksFetcherTest, TestHttpFailure) {
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
 
   // Act
-  fetcher->fetch(uri_, receiver);
+  fetcher->fetch(uri_, parent_span_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestCancel) {
@@ -134,11 +135,31 @@ TEST_F(JwksFetcherTest, TestCancel) {
   EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
 
   // Act
-  fetcher->fetch(uri_, receiver);
+  fetcher->fetch(uri_, parent_span_, receiver);
   // Proper cancel
   fetcher->cancel();
   // Re-entrant cancel
   fetcher->cancel();
+}
+
+TEST_F(JwksFetcherTest, TestSpanPassedDown) {
+  // Setup
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
+  NiceMock<MockJwksReceiver> receiver;
+  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+
+  // Expectations for span
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [this](Http::MessagePtr&, Http::AsyncClient::Callbacks&,
+                 const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            EXPECT_TRUE(options.parent_span_ == &this->parent_span_);
+            EXPECT_TRUE(options.child_span_name_ == "JWT Remote PubKey Fetch");
+            return nullptr;
+          }));
+
+  // Act
+  fetcher->fetch(uri_, parent_span_, receiver);
 }
 
 } // namespace

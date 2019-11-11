@@ -66,7 +66,7 @@ udp_listener_config:
   EXPECT_EQ(1u, manager_->listeners().size());
   EXPECT_FALSE(manager_->listeners()[0].get().udpListenerFactory()->isTransportConnectionless());
  manager_->listeners().front().get().listenSocketFactory().createListenSocket(
-           listener_proto.name());
+           );
 
   // No filter chain found with non-matching transport protocol.
   EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));

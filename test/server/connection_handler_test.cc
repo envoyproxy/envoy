@@ -120,7 +120,7 @@ public:
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, socket_factory_));
       EXPECT_CALL(*socket_factory_, socketType()).WillOnce(Return(socket_type));
-      EXPECT_CALL(*socket_factory_, createListenSocket(name)).WillOnce(Return(listeners_.back()->socket_));
+      EXPECT_CALL(*socket_factory_, createListenSocket()).WillOnce(Return(listeners_.back()->socket_));
       if (socket_type == Network::Address::SocketType::Stream) {
      EXPECT_CALL(dispatcher_, createListener_(_, _, _))
       .WillOnce(

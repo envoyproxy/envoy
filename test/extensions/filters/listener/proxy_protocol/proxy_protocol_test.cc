@@ -60,7 +60,7 @@ public:
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
-    EXPECT_CALL(socket_factory_, createListenSocket(_)).WillOnce(Return(socket_));
+    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
   }
 
   // Network::ListenerConfig
@@ -911,7 +911,7 @@ public:
               std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
-    EXPECT_CALL(socket_factory_, createListenSocket(_)).WillOnce(Return(socket_));
+    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
   }
 
   // Network::ListenerConfig

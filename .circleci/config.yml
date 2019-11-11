@@ -10,38 +10,6 @@ executors:
     working_directory: /source
 
 jobs:
-   release:
-     executor: ubuntu-build
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run:
-           command:
-             ci/do_circle_ci.sh bazel.release
-           no_output_timeout: 60m
-       - persist_to_workspace:
-           root: .
-           paths:
-             - build_release
-             - build_release_stripped
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
-   docker:
-     docker:
-       - image: google/cloud-sdk
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - attach_workspace:
-           at: .
-       - setup_remote_docker
-       - run: ci/docker_build.sh
-       - run: ci/docker_push.sh
-       - run: ci/docker_tag.sh
-
    api:
      executor: ubuntu-build
      steps:
@@ -104,16 +72,6 @@ jobs:
            at: /build/envoy/generated
        - run: ci/coverage_publish.sh
 
-   clang_tidy:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run:
-           command:
-             ci/do_circle_ci.sh bazel.clang_tidy
-           no_output_timeout: 60m
-
    docs:
      executor: ubuntu-build
      steps:
@@ -131,22 +89,12 @@ workflows:
   version: 2
   all:
     jobs:
-      - release:
-          filters:
-            tags:
-              only: /^v.*/
-      - docker:
-          requires: [release]
-          filters:
-            tags:
-              only: /^v.*/
       - api
       - go_control_plane_mirror
       - filter_example_mirror
       - coverage
       - coverage_publish:
           requires: [coverage]
-      - clang_tidy
       - docs:
           filters:
             tags:

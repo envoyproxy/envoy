@@ -29,20 +29,22 @@ namespace Server {
 ListenSocketFactoryImplBase::ListenSocketFactoryImplBase(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::SocketType socket_type, const Network::Socket::OptionsSharedPtr& options,
-    bool bind_to_port)
+    bool bind_to_port, const std::string& listener_name)
     : factory_(factory), local_address_(local_address), socket_type_(socket_type),
-      options_(options), bind_to_port_(bind_to_port) {}
+      options_(options), bind_to_port_(bind_to_port), listener_name_(listener_name) {}
 
 Network::SocketSharedPtr
-ListenSocketFactoryImplBase::createListenSocketAndApplyOptions(std::string listener_name) {
+ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
+  // socket might be nullptr depends on factory_ implementation.
   Network::SocketSharedPtr socket =
       factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
-  // Binding is done.
-  if (options_ != nullptr) {
+  // Binding is done by now.
+    ENVOY_LOG(error, "================ createListenSocketAndApplyOptions {}", socket == nullptr ? 0 : socket->ioHandle().fd());
+  if (socket != nullptr && options_ != nullptr) {
     bool ok = Network::Socket::applyOptions(options_, *socket,
                                             envoy::api::v2::core::SocketOption::STATE_BOUND);
     const std::string message =
-        fmt::format("{}: Setting socket options {}", listener_name, ok ? "succeeded" : "failed");
+        fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
       ENVOY_LOG(warn, "{}", message);
       throw EnvoyException(message);
@@ -59,25 +61,27 @@ ListenSocketFactoryImplBase::createListenSocketAndApplyOptions(std::string liste
 
 TcpListenSocketFactory::TcpListenSocketFactory(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, const std::string& listener_name)
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Stream,
-                                  options, bind_to_port) {}
+                                  options, bind_to_port, listener_name) {
+      std::cerr << "============= create TPC listen socket\n";
+    socket_ = createListenSocketAndApplyOptions();
+    }
 
-Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket(const std::string& listener_name) {
-  if (socket_ == nullptr) {
-    socket_ = createListenSocketAndApplyOptions(listener_name);
-  }
+Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket() {
   return socket_;
 }
 
 UdpListenSocketFactory::UdpListenSocketFactory(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, const std::string& listener_name)
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Datagram,
-                                  options, bind_to_port) {}
+                                  options, bind_to_port, listener_name) {
+       std::cerr << "============= create UDP listen socket\n";
+    }
 
-Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket(const std::string& listener_name) {
-  return createListenSocketAndApplyOptions(listener_name);
+Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket() {
+  return createListenSocketAndApplyOptions();
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
@@ -226,11 +230,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                    (matcher.transport_protocol().empty() &&
                     (!matcher.server_names().empty() || !matcher.application_protocols().empty()));
           }) &&
-      not std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
-                      [](const auto& filter) {
-                        return filter.name() ==
-                               Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
-                      });
+      !std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
+                   [](const auto& filter) {
+                     return filter.name() ==
+                            Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
+                   });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
     const std::string message =

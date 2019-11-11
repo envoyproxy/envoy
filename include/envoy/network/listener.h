@@ -20,7 +20,7 @@ class ListenSocketFactory {
 public:
   virtual ~ListenSocketFactory() = default;
 
-  virtual SocketSharedPtr createListenSocket(const std::string& listener_name) PURE;
+  virtual SocketSharedPtr createListenSocket() PURE;
 
   virtual Address::SocketType socketType() const PURE;
 
