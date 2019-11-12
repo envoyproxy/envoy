@@ -116,6 +116,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
                        *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
       if (!buffer_is_full) {
+        // Make sure data is available in initiateCall.
         callbacks_->addDecodedData(data, buffer_data_);
       }
       initiateCall(*request_headers_);
