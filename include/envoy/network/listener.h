@@ -160,8 +160,7 @@ public:
 };
 
 /**
- * Utility struct that encapsulates the information from a udp socket's
- * recvfrom/recvmmsg call.
+ * Utility struct that encapsulates the information from a udp socket's recvmmsg call.
  */
 struct UdpRecvData {
   struct LocalPeerAddresses {

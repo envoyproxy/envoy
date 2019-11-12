@@ -697,6 +697,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
                      if (!share_socket) {
                        // Each listener has its own socket and closes the socket
                        // on its own.
+                       stats_.listener_stopped_.inc();
                        return;
                      }
                      for (auto& listener : active_listeners_) {

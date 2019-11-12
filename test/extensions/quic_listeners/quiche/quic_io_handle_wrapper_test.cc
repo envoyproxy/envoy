@@ -53,10 +53,6 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_CALL(os_sys_calls_, close(1)).WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
 
   Network::Address::InstanceConstSharedPtr addr(new Network::Address::Ipv4Instance(12345));
-  EXPECT_CALL(os_sys_calls_, sendto(fd, data, 5u, 0, _, _))
-      .WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
-  wrapper_->sendto(slice, 0, *addr);
-
   EXPECT_CALL(os_sys_calls_, sendmsg(fd, _, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
 
@@ -79,7 +75,6 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   // Following calls shouldn't be delegated.
   wrapper_->readv(5, &slice, 1);
   wrapper_->writev(&slice, 1);
-  wrapper_->sendto(slice, 0, *addr);
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
   wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
 }
