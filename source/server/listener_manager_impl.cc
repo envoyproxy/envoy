@@ -482,6 +482,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
        share_socket = draining_it->listener_->listenSocketFactory().sharedSocket().has_value(),
        listener_tag]() {
         if (!share_socket) {
+          // Each listener has its individual socket and closes the socket on its own.
           return;
         }
         for (auto& listener : draining_listeners_) {
@@ -694,6 +695,8 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
                    [this, share_socket = listener.listenSocketFactory().sharedSocket().has_value(),
                     listener_tag]() {
                      if (!share_socket) {
+                       // Each listener has its own socket and closes the socket
+                       // on its own.
                        return;
                      }
                      for (auto& listener : active_listeners_) {

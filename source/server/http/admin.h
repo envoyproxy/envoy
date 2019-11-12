@@ -336,7 +336,7 @@ private:
     Network::SocketSharedPtr createListenSocket() override { return socket_; }
 
     absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-      return *socket_;
+      return absl::nullopt;
     }
 
   private:

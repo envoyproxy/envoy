@@ -34,15 +34,15 @@ ListenSocketFactoryImplBase::ListenSocketFactoryImplBase(
       options_(options), bind_to_port_(bind_to_port), listener_name_(listener_name) {}
 
 Network::SocketSharedPtr ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
-  // socket might be nullptr depends on factory_ implementation.
+  // socket might be nullptr depending on factory_ implementation.
   Network::SocketSharedPtr socket =
       factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
   // Binding is done by now.
   ENVOY_LOG(info, "Create listen socket for listener {} on address {}", listener_name_,
             local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
-    bool ok = Network::Socket::applyOptions(options_, *socket,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
+    const bool ok = Network::Socket::applyOptions(options_, *socket,
+                                                  envoy::api::v2::core::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -88,6 +88,8 @@ UdpListenSocketFactory::UdpListenSocketFactory(
                                   options, bind_to_port, listener_name) {}
 
 Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket() {
+  // TODO(danzh) add support of SO_REUSEPORT. Currently calling this method twice will fail because
+  // the port is already in use.
   Network::SocketSharedPtr socket = createListenSocketAndApplyOptions();
   if (socket != nullptr && localAddress()->ip() != nullptr && localAddress()->ip()->port() == 0) {
     setLocalAddress(socket->localAddress());

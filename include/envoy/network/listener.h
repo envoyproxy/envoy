@@ -28,7 +28,7 @@ public:
   /**
    * Called during actual listener creation.
    * @return the socket to be used for a certain listener, which might be shared
-   * with other listeners of the same config on other worker threads.
+   *         with other listeners of the same config on other worker threads.
    */
   virtual SocketSharedPtr createListenSocket() PURE;
 
@@ -39,14 +39,14 @@ public:
 
   /**
    * @return the listening address of the socket createListenSocket() returns. Before
-   * createListenSocket() is called, the return value might has 0 as port number if the config
-   * doesn't specify it.
+   *         createListenSocket() is called, the return value might has 0 as port number if the
+   * config doesn't specify it.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the socket if createListenSocket() returns a shared socket among
-   * each call. nullopt otherwise.
+   * @return the socket if createListenSocket() returns a shared socket among each call,
+   * nullopt otherwise.
    */
   virtual absl::optional<std::reference_wrapper<Socket>> sharedSocket() const PURE;
 };
@@ -86,8 +86,8 @@ public:
 
   /**
    * @return bool if a connection should be handed off to another Listener after the original
-   *         destination address has been restored. 'true' when 'use_original_dst' flag in
-   * listener configuration is set, false otherwise. Note that this flag is deprecated and will be
+   *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
+   *         configuration is set, false otherwise. Note that this flag is deprecated and will be
    *         removed from the v2 API.
    */
   virtual bool handOffRestoredDestinationConnections() const PURE;
