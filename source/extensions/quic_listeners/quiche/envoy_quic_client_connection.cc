@@ -48,6 +48,9 @@ void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
     MonotonicTime receive_time) {
+  if (!connected()) {
+    return;
+  }
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(
@@ -100,42 +103,13 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   // It's possible for a write event callback to close the connection, in such case ignore read
   // event processing.
   if (connected() && (events & Event::FileReadyType::Read)) {
-    uint32_t old_packets_dropped = packets_dropped_;
-    while (connected()) {
-      // Read till socket is drained.
-      // TODO(danzh): limit read times here.
-      MonotonicTime receive_time = dispatcher_.timeSource().monotonicTime();
-      Api::IoCallUint64Result result = Network::Utility::readFromSocket(
-          *connectionSocket(), *this, receive_time, &packets_dropped_);
-      if (!result.ok()) {
-        if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-          ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this,
-                         static_cast<int>(result.err_->getErrorCode()),
-                         result.err_->getErrorDetails());
-        }
-        // Stop reading.
-        break;
-      }
-
-      if (result.rc_ == 0) {
-        // TODO(conqerAtapple): Is zero length packet interesting? If so add stats
-        // for it. Otherwise remove the warning log below.
-        ENVOY_CONN_LOG(trace, "received 0-length packet", *this);
-      }
-
-      if (packets_dropped_ != old_packets_dropped) {
-        // The kernel tracks SO_RXQ_OVFL as a uint32 which can overflow to a smaller
-        // value. So as long as this count differs from previously recorded value,
-        // more packets are dropped by kernel.
-        uint32_t delta = (packets_dropped_ > old_packets_dropped)
-                             ? (packets_dropped_ - old_packets_dropped)
-                             : (packets_dropped_ +
-                                (std::numeric_limits<uint32_t>::max() - old_packets_dropped) + 1);
-        // TODO(danzh) add stats for this.
-        ENVOY_CONN_LOG(debug,
-                       "Kernel dropped {} more packets. Consider increase receive buffer size.",
-                       *this, delta);
-      }
+    Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
+        connectionSocket()->ioHandle(), *connectionSocket()->localAddress(), *this,
+        dispatcher_.timeSource(), packets_dropped_);
+    // TODO(danzh): Handle no error when we limit the number of packets read.
+    if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+      ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
+                     err->getErrorDetails());
     }
   }
 }

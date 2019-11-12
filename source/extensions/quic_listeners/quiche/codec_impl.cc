@@ -6,6 +6,10 @@
 namespace Envoy {
 namespace Quic {
 
+EnvoyQuicStream* quicStreamToEnvoyStream(quic::QuicStream* stream) {
+  return dynamic_cast<EnvoyQuicStream*>(stream);
+}
+
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
 
 void QuicHttpConnectionImplBase::runWatermarkCallbacksForEachStream(
@@ -13,7 +17,7 @@ void QuicHttpConnectionImplBase::runWatermarkCallbacksForEachStream(
     bool high_watermark) {
   for (auto& it : stream_map) {
     if (!it.second->is_static()) {
-      auto stream = dynamic_cast<EnvoyQuicStream*>(it.second.get());
+      auto stream = quicStreamToEnvoyStream(it.second.get());
       if (high_watermark) {
         // Only call watermark callbacks on non QUIC static streams which are
         // crypto stream and Google QUIC headers stream.
@@ -53,8 +57,10 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSessio
 
 Http::StreamEncoder&
 QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
-  auto stream = dynamic_cast<EnvoyQuicClientStream*>(
-      quic_client_session_.CreateOutgoingBidirectionalStream());
+  auto stream = quicStreamToEnvoyStream(quic_client_session_.CreateOutgoingBidirectionalStream());
+  // TODO(danzh) handle stream creation failure gracefully. This can happen when
+  // there are already 100 open streams. In such case, caller should hold back
+  // the stream creation till an existing stream is closed.
   ASSERT(stream != nullptr, "Fail to create QUIC stream.");
   stream->setDecoder(response_decoder);
   if (quic_client_session_.aboveHighWatermark()) {
