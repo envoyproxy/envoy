@@ -73,5 +73,5 @@ Making Requests
 
 Now that you have an Envoy Mobile instance, you can start making requests:
 
-- `HTTP requests and streams <_http>`_
-- `gRPC streams <_grpc>`_
+- :ref:`HTTP requests and streams <api_http>`
+- :ref:`gRPC streams <api_grpc>`

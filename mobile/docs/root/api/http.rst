@@ -1,3 +1,5 @@
+.. _api_http:
+
 HTTP requests and streams
 =========================
 
@@ -11,7 +13,7 @@ convenience functions on top of streams.
 -----------
 
 Creating a stream is done by initializing a ``Request`` via a ``RequestBuilder``, then passing it to
-a previously created `Envoy instance <_starting_envoy>`_.
+a previously created :ref:`Envoy instance <api_starting_envoy>`.
 
 **Kotlin**::
 
@@ -93,7 +95,7 @@ For full documentation of how these retry rules perform, see Envoy's documentati
 -----------------
 
 Once a ``Request`` and ``ResponseHandler`` have been created, a stream can be opened using an
-`Envoy instance <_starting_envoy>`_.
+:ref:`Envoy instance <api_starting_envoy>`.
 
 Doing so returns a ``StreamEmitter`` which allows the sender to interact with the stream.
 
