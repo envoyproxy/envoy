@@ -3,7 +3,7 @@
 gRPC streams
 ============
 
-Envoy Mobile provides support for gRPC as a thin interface built on top of its `HTTP APIs <_http>`_.
+Envoy Mobile provides support for gRPC as a thin interface built on top of its :ref:`HTTP APIs <api_http>`.
 
 gRPC APIs are designed to be used in conjunction with protobuf libraries such as
 `SwiftProtobuf <https://github.com/apple/swift-protobuf>`_ and
@@ -23,7 +23,7 @@ Envoy Mobile implements the gRPC protocol, accepting and returning serialized pr
 The ``GRPCClient`` type provides the ability to start gRPC streams, and is backed by Envoy Mobile's
 ``HTTPClient`` type that is instantiated using the ``EnvoyClientBuilder``.
 
-To create a ``GRPCClient``, simply `create an HTTP client <_http>`_ and pass it to the initializer:
+To create a ``GRPCClient``, simply :ref:`create an HTTP client <api_starting_envoy>` and pass it to the initializer:
 
 ``grpcClient = GRPCClient(httpClient)``
 
