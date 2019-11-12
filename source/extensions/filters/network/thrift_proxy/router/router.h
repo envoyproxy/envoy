@@ -44,7 +44,7 @@ public:
   virtual bool stripServiceName() const PURE;
 
   /**
-   * @return const std::string& the header to use to determine the cluster.
+   * @return const Http::LowerCaseString& the header used to determine the cluster.
    */
   virtual const Http::LowerCaseString& clusterHeader() const PURE;
 };
