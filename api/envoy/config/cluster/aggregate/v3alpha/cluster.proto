@@ -12,18 +12,8 @@ import "validate/validate.proto";
 
 // Configuration for the aggregate cluster. See the :ref:`architecture overview
 // <arch_overview_aggregate_cluster>` for more information.
+// [#extension: envoy.clusters.aggregate]
 message ClusterConfig {
-  // Load balancing clusters in aggregate cluster with explicit priority.
-  message LbCluster {
-    // Cluster name.
-    string name = 1;
-
-    // [#not-implemented-hide:] Cluster priority. If no priority is specified, the clusters will be
-    // prioritized by the ordering in :ref:`list
-    // <envoy_api_field_config.cluster.aggregate.v3alpha.ClusterConfig.clusters>`
-    uint32 priority = 2;
-  }
-
-  // Load balancing clusters in aggregate cluster with explicit priority.
-  repeated LbCluster clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  // Load balancing clusters in aggregate cluster. Clusters are prioritized by the orderings in the list.
+  repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 }

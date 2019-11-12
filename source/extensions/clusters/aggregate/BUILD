@@ -2,19 +2,20 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "cluster",
     srcs = ["cluster.cc"],
     hdrs = [
         "cluster.h",
         "lb_context.h",
     ],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",

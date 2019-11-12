@@ -62,8 +62,8 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
         clusters:
-        - name: cluster_1
-        - name: cluster_2
+        - cluster_1
+        - cluster_2
   listeners:
   - name: http
     address:

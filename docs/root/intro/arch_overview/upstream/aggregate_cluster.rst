@@ -6,8 +6,7 @@ Aggregate Cluster
 Aggregate cluster is used for failover between clusters with different service, e.g., from EDS upstream cluster to STRICT_DNS upstream cluster, 
 from cluster using ROUND_ROBIN load balaning policy to cluster using MAGLEV, from cluster with 0.1 connection timeout to cluster with 1s connection timeout, etc.
 Aggregate cluster loosely couples multiple clusters by referencing their name in the :ref:`configuration <envoy_api_msg_config.cluster.aggregate.v2alpha.ClusterConfig>`. 
-The fallback priority is defined implicitly by the ordering in the :ref:`clusters <envoy_api_field_config.cluster.aggregate.v2alpha.ClusterConfig.clusters>` 
-if priority is not specified; otherwise, clusters will be ordered by the priority.
+The fallback priority is defined implicitly by the ordering in the :ref:`clusters <envoy_api_field_config.cluster.aggregate.v2alpha.ClusterConfig.clusters>`.
 Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and piority first and then delegates the load balancing from that priority
 to the load balancer of the selected cluster. The top level load balancer reuses the existing load balancing algorithm by linearizing the 
 priority set of multiple clusters into one. 
@@ -54,9 +53,9 @@ A sample aggregate cluster configuration could be:
       "@type": type.googleapis.com/envoy.config.cluster.aggregate.v2alpha.ClusterConfig
       clusters:
       # cluster primary, secondary and tertiary should be defined outside.
-      - name: primary
-      - name: secondary
-      - name: tertiary
+      - primary
+      - secondary
+      - tertiary
 
 Note: :ref:`PriorityLoad retry plugins <envoy_api_field_route.RetryPolicy.retry_priority>` won't work for aggregate cluster because the aggregate load balancer
 will override the *PriorityLoad* during load balancing.

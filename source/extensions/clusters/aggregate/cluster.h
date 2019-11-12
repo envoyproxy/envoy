@@ -38,12 +38,12 @@ public:
     refresh([](const std::string&) { return false; });
   }
 
-  std::vector<std::string> clusters_;
   Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   ThreadLocal::SlotPtr tls_;
+  std::vector<std::string> clusters_;
 
 private:
   // Upstream::ClusterImplBase

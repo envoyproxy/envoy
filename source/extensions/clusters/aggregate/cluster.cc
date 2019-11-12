@@ -14,11 +14,7 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
                                 added_via_api),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
-      tls_(tls.allocateSlot()) {
-  for (const auto& inner_cluster : config.clusters()) {
-    clusters_.emplace_back(inner_cluster.name());
-  }
-}
+      tls_(tls.allocateSlot()), clusters_(config.clusters().begin(), config.clusters().end()) {}
 
 PriorityContext
 Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
