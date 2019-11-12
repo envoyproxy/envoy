@@ -1,5 +1,4 @@
 #include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/grpc/status.h"
 #include "envoy/service/auth/v2/external_auth.pb.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -120,7 +119,7 @@ public:
   void sendExtAuthzResponse() {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v2::CheckResponse check_response;
-    check_response.mutable_status()->set_code(Grpc::Status::GrpcStatus::Ok);
+    check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
     ext_authz_request_->sendGrpcMessage(check_response);
     ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
   }
