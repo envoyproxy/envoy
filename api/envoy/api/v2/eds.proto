@@ -126,6 +126,7 @@ message ClusterLoadAssignment {
   repeated endpoint.LocalityLbEndpoints endpoints = 2;
 
   // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  // [#not-implemented-hide:]
   map<string, endpoint.Endpoint> named_endpoints = 5;
 
   // Load balancing policy settings.

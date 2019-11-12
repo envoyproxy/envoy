@@ -9,29 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "address_json_lib",
-    srcs = ["address_json.cc"],
-    hdrs = ["address_json.h"],
-    deps = [
-        "//include/envoy/json:json_object_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/network:cidr_range_lib",
-        "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "base_json_lib",
-    srcs = ["base_json.cc"],
-    hdrs = ["base_json.h"],
-    deps = [
-        "//include/envoy/json:json_object_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "config_provider_lib",
     srcs = ["config_provider_impl.cc"],
     hdrs = ["config_provider_impl.h"],
@@ -137,42 +114,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_json_lib",
-    srcs = ["filter_json.cc"],
-    hdrs = ["filter_json.h"],
-    deps = [
-        ":address_json_lib",
-        ":json_utility_lib",
-        ":protocol_json_lib",
-        ":rds_json_lib",
-        ":utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/stats:stats_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
-        "//source/extensions/access_loggers:well_known_names",
-        "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/health_check/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/lua/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/squash/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "grpc_mux_lib",
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
@@ -253,16 +194,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "json_utility_lib",
-    hdrs = ["json_utility.h"],
-    deps = [
-        "//include/envoy/json:json_object_interface",
-        "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "metadata_lib",
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
@@ -292,35 +223,6 @@ envoy_cc_library(
     deps = [
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "protocol_json_lib",
-    srcs = ["protocol_json.cc"],
-    hdrs = ["protocol_json.h"],
-    deps = [
-        ":json_utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "rds_json_lib",
-    srcs = ["rds_json.cc"],
-    hdrs = ["rds_json.h"],
-    deps = [
-        ":base_json_lib",
-        ":json_utility_lib",
-        ":metadata_lib",
-        "//include/envoy/json:json_object_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -387,7 +289,6 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        ":json_utility_lib",
         ":resources_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
@@ -400,7 +301,6 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
         "//source/common/grpc:common_lib",
-        "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",

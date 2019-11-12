@@ -41,7 +41,7 @@ public:
 /**
  * Static registration for the IP resolver. @see RegisterFactory.
  */
-static Registry::RegisterFactory<IpResolver, Resolver> ip_registered_;
+REGISTER_FACTORY(IpResolver, Resolver);
 
 InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& address) {
   switch (address.address_case()) {

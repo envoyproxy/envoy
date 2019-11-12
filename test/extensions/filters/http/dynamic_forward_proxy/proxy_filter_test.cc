@@ -195,6 +195,32 @@ TEST_F(ProxyFilterTest, HostRewrite) {
   filter_->onDestroy();
 }
 
+TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
+  InSequence s;
+
+  envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig proto_config;
+  proto_config.set_auto_host_rewrite_header("x-set-header");
+  ProxyPerRouteConfig config(proto_config);
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(callbacks_.route_->route_entry_,
+              perFilterConfig(HttpFilterNames::get().DynamicForwardProxy))
+      .WillOnce(Return(&config));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar:82"), 80, _))
+      .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
+
+  Http::TestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar:82"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(headers, false));
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
 } // namespace
 } // namespace DynamicForwardProxy
 } // namespace HttpFilters

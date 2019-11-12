@@ -3328,17 +3328,21 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  // Connection using defaults (client) and TLSv1.0 (server) succeeds.
+  TestUtilOptionsV2 unsupported_protocol_test_options(listener, client, false, GetParam());
+  unsupported_protocol_test_options.setExpectedServerStats("ssl.connection_error")
+      .setExpectedTransportFailureReasonContains("UNSUPPORTED_PROTOCOL");
+
+  // Connection using defaults (client) and TLSv1.0 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(tls_v1_test_options);
+  testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  // Connection using defaults (client) and TLSv1.1 (server) succeeds.
+  // Connection using defaults (client) and TLSv1.1 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  testUtilV2(tls_v1_1_test_options);
+  testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 

@@ -45,7 +45,7 @@ public:
  */
 #define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
   static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
-  static Envoy::Registry::RegisterFactory<                                                         \
+  static Envoy::Registry::RegisterInternalFactory<                                                 \
       Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>, Envoy::Singleton::Registration>   \
       NAME##_singleton_registered_;
 

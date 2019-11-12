@@ -20,6 +20,7 @@ build:clang --action_env=CXX=clang++
 build:clang --action_env=LD_LIBRARY_PATH=$(llvm-config --libdir)
 build:clang --test_env=LD_LIBRARY_PATH=$(llvm-config --libdir)
 
+build:clang-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:clang-asan --copt=-fsanitize=vptr,function
 build:clang-asan --linkopt=-fsanitize=vptr,function
 build:clang-asan --linkopt=-L${RT_LIBRARY_PATH}

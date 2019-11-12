@@ -48,6 +48,7 @@ import "validate/validate.proto";
 //         cluster_refresh_timeout: 0.5s
 //         redirect_refresh_interval: 10s
 //         redirect_refresh_threshold: 10
+// [#extension: envoy.clusters.redis]
 
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.

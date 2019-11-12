@@ -87,14 +87,6 @@ class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilter
 public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
-  createFilterFactory(const Json::Object&,
-                      Server::Configuration::FactoryContext& context) override {
-    return [&context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
-    };
-  }
-
-  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext& context) override {
     return [&context](Network::FilterManager& filter_manager) -> void {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 . tools/shell_utils.sh
 
@@ -53,9 +53,26 @@ rm -rf bazel-bin/external/envoy_api
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
 
+export EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+
+# Generate extension database. This maps from extension name to extension
+# metadata, based on the envoy_cc_extension() Bazel target attributes.
+./docs/generate_extension_db.py "${EXTENSION_DB_PATH}"
+
+# Generate RST for the lists of trusted/untrusted extensions in
+# intro/arch_overview/security docs.
+mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
+./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
+
+# Generate the extensions docs
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
-  --action_env=ENVOY_BLOB_SHA --host_force_python=PY3
+  --action_env=ENVOY_BLOB_SHA --action_env=EXTENSION_DB_PATH="${EXTENSION_DB_PATH}" --host_force_python=PY3
+
+# Fill in boiler plate for extensions that have google.protobuf.Empty as their
+# config.
+bazel run ${BAZEL_BUILD_OPTIONS} //tools/protodoc:generate_empty -- \
+  "${PWD}"/docs/empty_extensions.json "${PWD}/${GENERATED_RST_DIR}"/api-v2/config
 
 # We do ** matching below to deal with Bazel cache blah (source proto artifacts
 # are nested inside source package targets).

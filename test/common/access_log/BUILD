@@ -35,6 +35,7 @@ envoy_cc_test(
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/router:string_accessor_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
