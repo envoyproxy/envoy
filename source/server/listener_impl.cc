@@ -61,8 +61,8 @@ Network::SocketSharedPtr ListenSocketFactoryImplBase::createListenSocketAndApply
 
 void ListenSocketFactoryImplBase::setLocalAddress(
     Network::Address::InstanceConstSharedPtr local_address) {
-
-  ENVOY_LOG(info, "Set socket factory local address to {}", local_address->asString());
+  ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
+            local_address->asString());
   local_address_ = local_address;
 }
 

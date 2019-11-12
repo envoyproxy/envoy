@@ -333,7 +333,12 @@ private:
       return socket_->localAddress();
     }
 
-    Network::SocketSharedPtr createListenSocket() override { return socket_; }
+    Network::SocketSharedPtr createListenSocket() override {
+      // This is only supposed to be called once.
+      RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");
+      socket_create_ = true;
+      return socket_;
+    }
 
     absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
       return absl::nullopt;
@@ -341,6 +346,7 @@ private:
 
   private:
     Network::SocketSharedPtr socket_;
+    bool socket_create_{false};
   };
 
   class AdminListener : public Network::ListenerConfig {

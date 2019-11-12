@@ -773,6 +773,7 @@ ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Addre
                                                     listener.listenSocketOptions(),
                                                     listener.bindToPort(), listener.name());
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server
