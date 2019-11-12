@@ -56,9 +56,9 @@ envoy_cc_library(
         "abseil_symbolize",
     ],
     deps = [
-        ":envoy_main_common_lib",
-    ] + envoy_cc_platform_dep("platform_impl_lib")
-      + envoy_cc_platform_dep("platform_checks_lib"),
+               ":envoy_main_common_lib",
+           ] + envoy_cc_platform_dep("platform_impl_lib") +
+           envoy_cc_platform_dep("platform_checks_lib"),
 )
 
 envoy_cc_library(
@@ -66,23 +66,23 @@ envoy_cc_library(
     srcs = ["main_common.cc"],
     hdrs = ["main_common.h"],
     deps = [
-        ":envoy_common_lib",
-        ":process_wide_lib",
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:compiler_requirements_lib",
-        "//source/common/common:perf_annotation_lib",
-        "//source/common/stats:fake_symbol_table_lib",
-        "//source/server:hot_restart_lib",
-        "//source/server:hot_restart_nop_lib",
-        "//source/server/config_validation:server_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
-            ":terminate_handler_lib",
-        ],
-    }) + envoy_cc_platform_dep("platform_checks_lib")
-       + envoy_cc_platform_dep("platform_impl_lib"),
+               ":envoy_common_lib",
+               ":process_wide_lib",
+               "//source/common/api:os_sys_calls_lib",
+               "//source/common/common:compiler_requirements_lib",
+               "//source/common/common:perf_annotation_lib",
+               "//source/common/stats:fake_symbol_table_lib",
+               "//source/server:hot_restart_lib",
+               "//source/server:hot_restart_nop_lib",
+               "//source/server/config_validation:server_lib",
+           ] + select({
+               "//bazel:disable_signal_trace": [],
+               "//conditions:default": [
+                   "//source/common/signal:sigaction_lib",
+                   ":terminate_handler_lib",
+               ],
+           }) + envoy_cc_platform_dep("platform_checks_lib") +
+           envoy_cc_platform_dep("platform_impl_lib"),
 )
 
 envoy_cc_library(
@@ -105,10 +105,10 @@ envoy_cc_posix_library(
     external_deps = ["abseil_optional"],
     strip_include_prefix = "posix",
     deps = [
-     	"//source/common/common:assert_lib",
-	"//source/common/filesystem:filesystem_lib",
-	"//source/common/common:logger_lib"
-    ],	
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/filesystem:filesystem_lib",
+    ],
 )
 
 envoy_cc_posix_library(
