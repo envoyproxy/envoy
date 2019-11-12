@@ -627,7 +627,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
                discovery_request.error_detail().code(), expected_error_code,
                discovery_request.error_detail().message());
   }
-  if (expected_error_code != Grpc::Status::GrpcStatus::Ok &&
+  if (expected_error_code != Grpc::Status::WellKnownGrpcStatus::Ok &&
       discovery_request.error_detail().message().find(expected_error_substring) ==
           std::string::npos) {
     return AssertionFailure() << "\"" << expected_error_substring
