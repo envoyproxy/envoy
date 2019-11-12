@@ -12,6 +12,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Gzip]
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
+// [#extension: envoy.filters.http.gzip]
 
 // [#next-free-field: 10]
 message Gzip {
