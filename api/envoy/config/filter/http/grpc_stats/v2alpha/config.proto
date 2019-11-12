@@ -10,6 +10,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: gRPC statistics] gRPC statistics filter
 // :ref:`configuration overview <config_http_filters_grpc_stats>`.
+// [#extension: envoy.filters.http.grpc_stats]
 
 // gRPC statistics filter configuration
 message FilterConfig {

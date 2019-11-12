@@ -14,6 +14,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Router]
 // Router :ref:`configuration overview <config_http_filters_router>`.
+// [#extension: envoy.filters.http.router]
 
 // [#next-free-field: 7]
 message Router {

@@ -565,7 +565,6 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       callbacks_->streamInfo().filterState());
 

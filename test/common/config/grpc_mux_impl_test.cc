@@ -66,7 +66,7 @@ public:
   void expectSendMessage(const std::string& type_url,
                          const std::vector<std::string>& resource_names, const std::string& version,
                          bool first = false, const std::string& nonce = "",
-                         const Protobuf::int32 error_code = Grpc::Status::GrpcStatus::Ok,
+                         const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
     envoy::api::v2::DiscoveryRequest expected_request;
     if (first) {
@@ -80,7 +80,7 @@ public:
     }
     expected_request.set_response_nonce(nonce);
     expected_request.set_type_url(type_url);
-    if (error_code != Grpc::Status::GrpcStatus::Ok) {
+    if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
@@ -163,7 +163,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   EXPECT_CALL(random_, random());
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_, _));
-  grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+  grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "", true);
@@ -227,7 +227,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
         }));
 
     expectSendMessage(
-        "foo", {"x", "y"}, "", false, "", Grpc::Status::GrpcStatus::Internal,
+        "foo", {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
         fmt::format("bar does not match the message-wide type URL foo in DiscoveryResponse {}",
                     invalid_response->DebugString()));
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(invalid_response));
