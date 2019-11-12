@@ -782,9 +782,6 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.ConfigSource lrs_server = 42;
-
-  // set sni value automatically, dynamic setting of sni field on tls_context
-  bool auto_sni = 45;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
