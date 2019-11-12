@@ -8,6 +8,7 @@ Version history
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
+* health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * http: support :ref:`auto_host_rewrite_header<envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig.auto_host_rewrite_header>` in the dynamic forward proxy.
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
 * redis: performance improvement for larger split commands by avoiding string copies.
