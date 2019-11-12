@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-class OwnedImplTest : public BufferImplementationParamTest {
+class OwnedImplTest : public testing::Test {
 public:
   bool release_callback_called_ = false;
 
@@ -36,14 +36,10 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(OwnedImplTest, OwnedImplTest,
-                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
-
-TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
+TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, nullptr);
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.addBufferFragment(frag);
   EXPECT_EQ(11, buffer.length());
 
@@ -51,13 +47,12 @@ TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_P(OwnedImplTest, AddBufferFragmentWithCleanup) {
+TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, [this](const void*, size_t, const BufferFragmentImpl*) {
     release_callback_called_ = true;
   });
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.addBufferFragment(frag);
   EXPECT_EQ(11, buffer.length());
 
@@ -70,7 +65,7 @@ TEST_P(OwnedImplTest, AddBufferFragmentWithCleanup) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
+TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   char input_stack[] = "hello world";
   char* input = new char[11];
   std::copy(input_stack, input_stack + 11, input);
@@ -83,7 +78,6 @@ TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
       });
 
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.addBufferFragment(*frag);
   EXPECT_EQ(11, buffer.length());
 
@@ -96,14 +90,13 @@ TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_P(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
+TEST_F(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
   char input[] = "hello world";
   const size_t expected_length = sizeof(input) - 1;
   auto frag = OwnedBufferFragmentImpl::create(
       {input, expected_length},
       [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.addBufferFragment(*frag);
   EXPECT_EQ(expected_length, buffer.length());
 
@@ -118,7 +111,7 @@ TEST_P(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
 }
 
 // Verify that OwnedBufferFragment work correctly when input buffer is allocated on the heap.
-TEST_P(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
+TEST_F(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
   char input_stack[] = "hello world";
   const size_t expected_length = sizeof(input_stack) - 1;
   char* input = new char[expected_length];
@@ -133,7 +126,6 @@ TEST_P(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
                    .release();
 
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.addBufferFragment(*frag);
   EXPECT_EQ(expected_length, buffer.length());
 
@@ -147,11 +139,9 @@ TEST_P(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_P(OwnedImplTest, Add) {
+TEST_F(OwnedImplTest, Add) {
   const std::string string1 = "Hello, ", string2 = "World!";
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
-
   buffer.add(string1);
   EXPECT_EQ(string1.size(), buffer.length());
   EXPECT_EQ(string1, buffer.toString());
@@ -173,10 +163,9 @@ TEST_P(OwnedImplTest, Add) {
   EXPECT_EQ(string1 + string2 + big_suffix, buffer.toString());
 }
 
-TEST_P(OwnedImplTest, Prepend) {
+TEST_F(OwnedImplTest, Prepend) {
   const std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.add(suffix);
   buffer.prepend(prefix);
 
@@ -196,10 +185,9 @@ TEST_P(OwnedImplTest, Prepend) {
   EXPECT_EQ(big_prefix + prefix + suffix, buffer.toString());
 }
 
-TEST_P(OwnedImplTest, PrependToEmptyBuffer) {
+TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
   std::string data = "Hello, World!";
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.prepend(data);
 
   EXPECT_EQ(data.size(), buffer.length());
@@ -211,13 +199,11 @@ TEST_P(OwnedImplTest, PrependToEmptyBuffer) {
   EXPECT_EQ(data, buffer.toString());
 }
 
-TEST_P(OwnedImplTest, PrependBuffer) {
+TEST_F(OwnedImplTest, PrependBuffer) {
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   buffer.add(suffix);
   Buffer::OwnedImpl prefixBuffer;
-  verifyImplementation(buffer);
   prefixBuffer.add(prefix);
 
   buffer.prepend(prefixBuffer);
@@ -227,12 +213,11 @@ TEST_P(OwnedImplTest, PrependBuffer) {
   EXPECT_EQ(0, prefixBuffer.length());
 }
 
-TEST_P(OwnedImplTest, Write) {
+TEST_F(OwnedImplTest, Write) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   Network::IoSocketHandleImpl io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
@@ -278,12 +263,11 @@ TEST_P(OwnedImplTest, Write) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_P(OwnedImplTest, Read) {
+TEST_F(OwnedImplTest, Read) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   Network::IoSocketHandleImpl io_handle;
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   Api::IoCallUint64Result result = buffer.read(io_handle, 100);
@@ -309,7 +293,7 @@ TEST_P(OwnedImplTest, Read) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_P(OwnedImplTest, ReserveCommit) {
+TEST_F(OwnedImplTest, ReserveCommit) {
   // This fragment will later be added to the buffer. It is declared in an enclosing scope to
   // ensure it is not destructed until after the buffer is.
   const std::string input = "Hello, world";
@@ -317,8 +301,6 @@ TEST_P(OwnedImplTest, ReserveCommit) {
 
   {
     Buffer::OwnedImpl buffer;
-    verifyImplementation(buffer);
-
     // A zero-byte reservation should fail.
     static constexpr uint64_t NumIovecs = 16;
     Buffer::RawSlice iovecs[NumIovecs];
@@ -335,12 +317,6 @@ TEST_P(OwnedImplTest, ReserveCommit) {
     iovecs[0].len_ = 1;
     commitReservation(iovecs, num_reserved, buffer);
     EXPECT_EQ(1, buffer.length());
-
-    // The remaining tests validate internal optimizations of the new deque-of-slices
-    // implementation, so they're not valid for the old evbuffer implementation.
-    if (buffer.usesOldImpl()) {
-      return;
-    }
 
     // Request a reservation that fits in the remaining space at the end of the last slice.
     num_reserved = buffer.reserve(1, iovecs, NumIovecs);
@@ -391,10 +367,8 @@ TEST_P(OwnedImplTest, ReserveCommit) {
   }
 }
 
-TEST_P(OwnedImplTest, ReserveCommitReuse) {
+TEST_F(OwnedImplTest, ReserveCommitReuse) {
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
-
   static constexpr uint64_t NumIovecs = 2;
   Buffer::RawSlice iovecs[NumIovecs];
 
@@ -429,10 +403,8 @@ TEST_P(OwnedImplTest, ReserveCommitReuse) {
   EXPECT_EQ(second_slice, iovecs[1].mem_);
 }
 
-TEST_P(OwnedImplTest, ReserveReuse) {
+TEST_F(OwnedImplTest, ReserveReuse) {
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
-
   static constexpr uint64_t NumIovecs = 2;
   Buffer::RawSlice iovecs[NumIovecs];
 
@@ -454,12 +426,11 @@ TEST_P(OwnedImplTest, ReserveReuse) {
   EXPECT_EQ(second_slice, iovecs[1].mem_);
 }
 
-TEST_P(OwnedImplTest, Search) {
+TEST_F(OwnedImplTest, Search) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the search implementation.
   static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   for (const auto& input : Inputs) {
     buffer.appendSliceForTest(input);
   }
@@ -482,12 +453,11 @@ TEST_P(OwnedImplTest, Search) {
   EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0));
 }
 
-TEST_P(OwnedImplTest, StartsWith) {
+TEST_F(OwnedImplTest, StartsWith) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the startsWith implementation.
   static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   for (const auto& input : Inputs) {
     buffer.appendSliceForTest(input);
   }
@@ -505,9 +475,8 @@ TEST_P(OwnedImplTest, StartsWith) {
   EXPECT_FALSE(buffer.startsWith({"ba", 2}));
 }
 
-TEST_P(OwnedImplTest, ToString) {
+TEST_F(OwnedImplTest, ToString) {
   Buffer::OwnedImpl buffer;
-  verifyImplementation(buffer);
   EXPECT_EQ("", buffer.toString());
   auto append = [&buffer](absl::string_view str) { buffer.add(str.data(), str.size()); };
   append("Hello, ");
@@ -521,7 +490,7 @@ TEST_P(OwnedImplTest, ToString) {
   EXPECT_EQ(absl::StrCat("Hello, world!" + long_string), buffer.toString());
 }
 
-TEST_P(OwnedImplTest, AppendSliceForTest) {
+TEST_F(OwnedImplTest, AppendSliceForTest) {
   static constexpr size_t NumInputs = 3;
   static constexpr const char* Inputs[] = {"one", "2", "", "four", ""};
   Buffer::OwnedImpl buffer;
@@ -547,7 +516,7 @@ TEST_P(OwnedImplTest, AppendSliceForTest) {
 // Regression test for oss-fuzz issue
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=13263, where prepending
 // an empty buffer resulted in a corrupted libevent internal state.
-TEST_P(OwnedImplTest, PrependEmpty) {
+TEST_F(OwnedImplTest, PrependEmpty) {
   Buffer::OwnedImpl buf;
   Buffer::OwnedImpl other_buf;
   char input[] = "foo";
@@ -564,7 +533,7 @@ TEST_P(OwnedImplTest, PrependEmpty) {
 // Regression test for oss-fuzz issues
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=14466, empty commit
 // following a reserve resulted in a corrupted libevent internal state.
-TEST_P(OwnedImplTest, ReserveZeroCommit) {
+TEST_F(OwnedImplTest, ReserveZeroCommit) {
   BufferFragmentImpl frag("", 0, nullptr);
   Buffer::OwnedImpl buf;
   buf.addBufferFragment(frag);

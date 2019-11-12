@@ -204,7 +204,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
   "
-  setup_clang_libcxx_toolchain
+  ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
+  setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
 
@@ -277,7 +278,7 @@ elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
   echo "Building fuzzers and run under Fuzzit"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} \
-    --test_env=FUZZIT_API_KEY --test_timeout=1200 --run_under=//bazel:fuzzit_wrapper
+    --test_env=FUZZIT_API_KEY --test_env=ENVOY_BUILD_IMAGE --test_timeout=1200 --run_under=//bazel:fuzzit_wrapper
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.

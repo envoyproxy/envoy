@@ -148,10 +148,11 @@ public:
   }
 
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
-    if (grpc_status == Status::GrpcStatus::InvalidCode) {
+    if (grpc_status == Status::WellKnownGrpcStatus::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
-    } else if (grpc_status > Status::GrpcStatus::MaximumValid) {
-      EXPECT_CALL(*this, onRemoteClose(Status::GrpcStatus::InvalidCode, _)).WillExitIfNeeded();
+    } else if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown) {
+      EXPECT_CALL(*this, onRemoteClose(Status::WellKnownGrpcStatus::InvalidCode, _))
+          .WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
     }
