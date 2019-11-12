@@ -73,17 +73,17 @@ protected:
 
   // Validates receive data, source/destination address and received time.
   void validateRecvCallbackParams(const UdpRecvData& data) {
-    ASSERT_NE(data.local_address_, nullptr);
+    ASSERT_NE(data.addresses_.local_, nullptr);
 
-    ASSERT_NE(data.peer_address_, nullptr);
-    ASSERT_NE(data.peer_address_->ip(), nullptr);
+    ASSERT_NE(data.addresses_.peer_, nullptr);
+    ASSERT_NE(data.addresses_.peer_->ip(), nullptr);
 
-    EXPECT_EQ(data.local_address_->asString(), send_to_addr_->asString());
+    EXPECT_EQ(data.addresses_.local_->asString(), send_to_addr_->asString());
 
-    EXPECT_EQ(data.peer_address_->ip()->addressAsString(),
+    EXPECT_EQ(data.addresses_.peer_->ip()->addressAsString(),
               client_socket_->localAddress()->ip()->addressAsString());
 
-    EXPECT_EQ(*data.local_address_, *send_to_addr_);
+    EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
     EXPECT_EQ(time_system_.monotonicTime(), data.receive_time_);
     // Advance time so that next onData() should have different received time.
     time_system_.sleep(std::chrono::milliseconds(100));
@@ -196,7 +196,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
 
-        test_peer_address = data.peer_address_;
+        test_peer_address = data.addresses_.peer_;
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, first);
