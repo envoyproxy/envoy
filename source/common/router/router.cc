@@ -13,7 +13,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/network/upstream_server_name.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -25,9 +24,10 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
-#include "common/network/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
+#include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -484,10 +484,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  Http::ConnectionPool::Instance* conn_pool;    
+  Http::ConnectionPool::Instance* conn_pool;
   auto url_str = headers.Host()->value().getStringView();
   if (cluster_->auto_sni() && !Network::Utility::isIpAddress(url_str.data())) {
-    sconn_pool = getConnPool(true, url_str);
+    conn_pool = getConnPool(true, url_str);
   } else {
     conn_pool = getConnPool();
   }
@@ -576,7 +576,9 @@ Http::ConnectionPool::Instance* Filter::getConnPool(bool update_sni, absl::strin
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
   if (update_sni) {
-    callbacks_->streamInfo().filterState().setData(Network::UpstreamServerName::key(), std::make_unique<Network::UpstreamServerName>(url), StreamInfo::FilterState::StateType::ReadOnly);
+    callbacks_->streamInfo().filterState().setData(
+        Network::UpstreamServerName::key(), std::make_unique<Network::UpstreamServerName>(url),
+        StreamInfo::FilterState::StateType::ReadOnly);
   }
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       callbacks_->streamInfo().filterState());

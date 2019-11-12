@@ -251,6 +251,19 @@ TEST(NetworkUtility, InternalAddress) {
   EXPECT_FALSE(Utility::isInternalAddress(Address::PipeInstance("/hello")));
 }
 
+TEST(NetworkUtility, isIpAddress) {
+  EXPECT_TRUE(Utility::isIpAddress("1.2.3.4:0"));
+  EXPECT_TRUE(Utility::isIpAddress("0.0.0.0:0"));
+  EXPECT_TRUE(Utility::isIpAddress("127.0.0.1:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[::1]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[::]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[1::2:3]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[a::1]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[a:b:c:d::]:0"));
+  EXPECT_FALSE(Utility::isIpAddress("hoge.hoge.com"));
+  EXPECT_FALSE(Utility::isIpAddress("hoge.hoge.com:8000"));
+}
+
 TEST(NetworkUtility, LoopbackAddress) {
   {
     Address::Ipv4Instance address("127.0.0.1");

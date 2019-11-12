@@ -21,6 +21,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -560,13 +561,13 @@ bool Utility::isIpAddress(const std::string& host) {
   auto pure_host = host;
   if (colon_pos != absl::string_view::npos) {
     if (host.front() == '[' || host.back() == ']') {
-      return true;  
+      return true;
     }
     pure_host = host.substr(0, colon_pos);
   }
   try {
     Network::Utility::parseInternetAddress(pure_host);
-    return true;   
+    return true;
   } catch (const EnvoyException&) {
     return false;
   }
