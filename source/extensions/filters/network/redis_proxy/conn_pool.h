@@ -41,7 +41,8 @@ public:
  * resp value. This is for performance reason to avoid creating RespValueSharedPtr for each
  * composite arrays.
  */
-using RespVariant = absl::variant<const Common::Redis::RespValue, Common::Redis::RespValueConstSharedPtr>;
+using RespVariant =
+    absl::variant<const Common::Redis::RespValue, Common::Redis::RespValueConstSharedPtr>;
 
 /**
  * A redis connection pool. Wraps M connections to N upstream hosts, consistent hashing,

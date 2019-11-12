@@ -23,10 +23,9 @@ ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
  * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
  *         for some reason.
  */
-Common::Redis::Client::PoolRequest*
-makeSingleServerRequest(const RouteSharedPtr& route, const std::string& command,
-                        const std::string& key, Common::Redis::RespValueConstSharedPtr incoming_request,
-                        ConnPool::PoolCallbacks& callbacks) {
+Common::Redis::Client::PoolRequest* makeSingleServerRequest(
+    const RouteSharedPtr& route, const std::string& command, const std::string& key,
+    Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks) {
   auto handler =
       route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request), callbacks);
   if (handler) {
