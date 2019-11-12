@@ -348,7 +348,6 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
 
 namespace {
 
-// TOOD(yanavlasov, PiotrSikora) fix up tests with this true
 const char InvalidHttpMessagingOverrideKey[] =
     "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging";
 const char MaxOutboundFramesOverrideKey[] =
