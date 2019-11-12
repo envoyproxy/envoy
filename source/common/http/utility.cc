@@ -69,22 +69,6 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   return true;
 }
 
-bool Utility::Url::is_raw_ipv4_address() {
-  assert(host_and_port_.size() != 0);
-  std::vector<std::string> address_segments = absl::StrSplit(host_and_port_, absl::ByAnyChar(".:"));
-
-  if (address_segments.size() == 4 || address_segments.size() == 5) {
-    for (const auto& address_segment : address_segments) {
-      uint32_t tmp_addr_segment;
-      if (!absl::SimpleAtoi(address_segment, &tmp_addr_segment)) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return false;
-}
-
 void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
     return;

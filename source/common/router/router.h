@@ -30,6 +30,8 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -505,7 +507,7 @@ private:
                                          Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
-  Http::ConnectionPool::Instance* getConnPool();
+  Http::ConnectionPool::Instance* getConnPool(bool update_sni = false, absl::string_view url = "");
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();

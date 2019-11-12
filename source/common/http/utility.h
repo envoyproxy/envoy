@@ -32,7 +32,6 @@ public:
   absl::string_view scheme() { return scheme_; }
   absl::string_view host_and_port() { return host_and_port_; }
   absl::string_view path_and_query_params() { return path_and_query_params_; }
-  bool is_raw_ipv4_address();
 
 private:
   absl::string_view scheme_;

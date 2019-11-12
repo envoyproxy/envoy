@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/network/upstream_server_name.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -24,6 +25,7 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
+#include "common/network/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/router/config_impl.h"
@@ -429,24 +431,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
   cluster_ = cluster->info();
 
-  if (cluster_->auto_sni()) {
-    auto url_obj = Http::Utility::Url{};
-    auto url_str = headers.Host()->value().getStringView();
-    if (!url_obj.initialize(url_str)) {
-      throw EnvoyException(fmt::format("cluster: failed to parse inbound URL {}", url_str));
-    }
-    if (cluster_->upstreamTlsContext() == absl::nullopt) {
-      throw EnvoyException(
-          fmt::format("cluster: tls_context is needed on cluster config if you set auto_sni true"));
-    }
-    auto& tls_context = cluster_->upstreamTlsContext().value();
-    if (!url_obj.is_raw_ipv4_address() &&
-        (tls_context.sni().size() == 0 || tls_context.sni() != url_obj.host_and_port())) {
-      tls_context.clear_sni();
-      tls_context.set_sni(std::string(url_obj.host_and_port()));
-    }
-  }
-
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
@@ -500,7 +484,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  Http::ConnectionPool::Instance* conn_pool = getConnPool();
+  Http::ConnectionPool::Instance* conn_pool;    
+  auto url_str = headers.Host()->value().getStringView();
+  if (cluster_->auto_sni() && !Network::Utility::isIpAddress(url_str.data())) {
+    sconn_pool = getConnPool(true, url_str);
+  } else {
+    conn_pool = getConnPool();
+  }
+
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
@@ -580,10 +571,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::ConnectionPool::Instance* Filter::getConnPool() {
+Http::ConnectionPool::Instance* Filter::getConnPool(bool update_sni, absl::string_view url) {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
+  if (update_sni) {
+    callbacks_->streamInfo().filterState().setData(Network::UpstreamServerName::key(), std::make_unique<Network::UpstreamServerName>(url), StreamInfo::FilterState::StateType::ReadOnly);
+  }
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       callbacks_->streamInfo().filterState());
 

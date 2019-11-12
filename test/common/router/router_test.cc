@@ -1061,51 +1061,13 @@ TEST_F(RouterTest, RewriteSniField) {
       .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
       }));
-  absl::optional<envoy::api::v2::auth::UpstreamTlsContext> upstream_tls_context(
-      envoy::api::v2::auth::UpstreamTlsContext{});
-  upstream_tls_context.value().set_sni(EMPTY_STRING);
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, auto_sni()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamTlsContext())
-      .WillRepeatedly(ReturnRef(upstream_tls_context));
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  std::string url("api.sample.com");
-  headers.removeHost();
-  headers.insertHost().value("https://" + url);
+  std::string s = "api.sample.com";
+  headers.Host()->value(s);
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(url, upstream_tls_context.value().sni());
-}
-
-TEST_F(RouterTest, NotToRewriteSniField) {
-  NiceMock<Http::MockStreamEncoder> encoder;
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-        return nullptr;
-      }));
-
-  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
-  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
-  EXPECT_CALL(encoder, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
-        encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-      }));
-  absl::optional<envoy::api::v2::auth::UpstreamTlsContext> upstream_tls_context(
-      envoy::api::v2::auth::UpstreamTlsContext{});
-  upstream_tls_context.value().set_sni(EMPTY_STRING);
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, auto_sni()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamTlsContext())
-      .WillRepeatedly(ReturnRef(upstream_tls_context));
-  Http::TestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  std::string url("123.456.678.890:9000");
-  headers.removeHost();
-  headers.insertHost().value("https://" + url);
-  router_.decodeHeaders(headers, true);
-  EXPECT_EQ(EMPTY_STRING, upstream_tls_context.value().sni());
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
 TEST_F(RouterTest, NotToRewriteSniFieldWithoutHost) {
@@ -1125,19 +1087,13 @@ TEST_F(RouterTest, NotToRewriteSniFieldWithoutHost) {
       .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
       }));
-  absl::optional<envoy::api::v2::auth::UpstreamTlsContext> upstream_tls_context(
-      envoy::api::v2::auth::UpstreamTlsContext{});
-  upstream_tls_context.value().set_sni(EMPTY_STRING);
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, auto_sni()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamTlsContext())
-      .WillRepeatedly(ReturnRef(upstream_tls_context));
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  std::string url("123.456.678.890");
-  headers.removeHost();
-  headers.insertHost().value("https://" + url);
+  std::string s = "12.46.78.80";
+  headers.Host()->value(s);
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(EMPTY_STRING, upstream_tls_context.value().sni());
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
 TEST_F(RouterTest, ResetDuringEncodeHeaders) {

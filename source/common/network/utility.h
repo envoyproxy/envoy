@@ -315,6 +315,12 @@ public:
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped);
 
+  /**
+   * Check whether that is valid FQDN or IPv4/IPv6 address, if host is IPv4 or IPv6, that returns true
+   * @param host is hostname
+   */
+  static bool isIpAddress(const std::string& host);
+
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
 

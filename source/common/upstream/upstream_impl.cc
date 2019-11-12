@@ -655,10 +655,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
       auto_sni_(config.auto_sni()),
-      tls_context_(
-          config.has_tls_context()
-              ? absl::make_optional<envoy::api::v2::auth::UpstreamTlsContext>(config.tls_context())
-              : absl::nullopt),
       cluster_type_(config.has_cluster_type()
                         ? absl::make_optional<envoy::api::v2::Cluster::CustomClusterType>(
                               config.cluster_type())

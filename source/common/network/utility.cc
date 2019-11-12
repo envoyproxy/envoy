@@ -555,5 +555,22 @@ Api::IoCallUint64Result Utility::readFromSocket(Network::Socket& socket,
   return result;
 }
 
+bool Utility::isIpAddress(const std::string& host) {
+  const auto colon_pos = host.rfind(':');
+  auto pure_host = host;
+  if (colon_pos != absl::string_view::npos) {
+    if (host.front() == '[' || host.back() == ']') {
+      return true;  
+    }
+    pure_host = host.substr(0, colon_pos);
+  }
+  try {
+    Network::Utility::parseInternetAddress(pure_host);
+    return true;   
+  } catch (const EnvoyException&) {
+    return false;
+  }
+}
+
 } // namespace Network
 } // namespace Envoy
