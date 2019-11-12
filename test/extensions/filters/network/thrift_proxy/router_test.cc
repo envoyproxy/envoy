@@ -102,32 +102,18 @@ public:
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
-                    const bool strip_service_name = false, const std::string cluster_header = "") {
-    Http::LowerCaseString header(cluster_header);
-    std::string empty_cluster = "";
-
+                    const bool strip_service_name = false) {
     EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
-
-    if (!cluster_header.empty()) {
-      EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(empty_cluster));
-      EXPECT_CALL(route_entry_, clusterHeader()).WillOnce(ReturnRef(header));
-    } else {
-      EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-    }
+    EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
 
     if (strip_service_name) {
       EXPECT_CALL(route_entry_, stripServiceName()).WillOnce(Return(true));
     }
 
     initializeMetadata(msg_type, method);
-
-    if (!cluster_header.empty()) {
-      auto& headers = metadata_->headers();
-      headers.addCopy(header, "cluster");
-    }
 
     EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
@@ -780,19 +766,6 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceNameDisabled) {
 
   EXPECT_EQ("Service:method", metadata_->methodName());
 
-  returnResponse();
-  destroyRouter();
-}
-
-// Ensure we can do cluster header based routing.
-TEST_P(ThriftRouterFieldTypeTest, ClusterHeaderRouting) {
-  FieldType field_type = GetParam();
-
-  initializeRouter();
-  startRequest(MessageType::Call, "", false, "x-cluster");
-  connectUpstream();
-  sendTrivialStruct(field_type);
-  completeRequest();
   returnResponse();
   destroyRouter();
 }

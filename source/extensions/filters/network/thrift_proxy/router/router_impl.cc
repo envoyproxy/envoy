@@ -52,12 +52,24 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
-  if (weighted_clusters_.empty()) {
-    return shared_from_this();
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
+                                                     const MessageMetadata& metadata) const {
+  if (!weighted_clusters_.empty()) {
+    return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
+                                            false);
   }
-  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
-                                          false);
+
+  const auto& cluster_header = clusterHeader();
+  if (!cluster_header.get().empty()) {
+    std::cout << "checkin header\n";
+    const auto& headers = metadata.headers();
+    const auto* entry = headers.get(cluster_header);
+    if (entry != nullptr) {
+      return std::make_shared<DynamicRouteEntry>(*this, entry->value().getStringView());
+    }
+  }
+
+  return shared_from_this();
 }
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
@@ -101,7 +113,7 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
     if (matches ^ invert_) {
-      return clusterEntry(random_value);
+      return clusterEntry(random_value, metadata);
     }
   }
 
@@ -131,7 +143,7 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
         (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name_));
 
     if (matches ^ invert_) {
-      return clusterEntry(random_value);
+      return clusterEntry(random_value, metadata);
     }
   }
 
@@ -211,8 +223,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   route_entry_ = route_->routeEntry();
-
-  const std::string& cluster_name = getClusterName(metadata);
+  const std::string& cluster_name = route_entry_->clusterName();
 
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
   if (!cluster) {
@@ -506,24 +517,6 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-}
-
-std::string Router::getClusterName(const MessageMetadataSharedPtr& metadata) const {
-  const auto& cluster_name = route_entry_->clusterName();
-  if (!cluster_name.empty()) {
-    return cluster_name;
-  }
-
-  const auto& cluster_header = route_entry_->clusterHeader();
-  if (!cluster_header.get().empty()) {
-    const auto& headers = metadata->headers();
-    const auto* entry = headers.get(cluster_header);
-    if (entry != nullptr) {
-      return std::string(entry->value().getStringView());
-    }
-  }
-
-  return "";
 }
 
 } // namespace Router
