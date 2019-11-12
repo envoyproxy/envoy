@@ -117,7 +117,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                        *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
       if (!buffer_is_full) {
         // Make sure data is available in initiateCall.
-        callbacks_->addDecodedData(data, buffer_data_);
+        callbacks_->addDecodedData(data, true);
       }
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
