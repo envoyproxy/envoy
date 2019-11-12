@@ -40,6 +40,7 @@ public:
   }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   bool stripServiceName() const override { return strip_service_name_; };
+  const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
@@ -72,6 +73,7 @@ private:
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
+    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -91,6 +93,7 @@ private:
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const bool strip_service_name_;
+  const Http::LowerCaseString cluster_header_;
 };
 
 using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
@@ -213,6 +216,7 @@ private:
 
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
+  std::string getClusterName(const MessageMetadataSharedPtr& metadata) const;
 
   Upstream::ClusterManager& cluster_manager_;
 
