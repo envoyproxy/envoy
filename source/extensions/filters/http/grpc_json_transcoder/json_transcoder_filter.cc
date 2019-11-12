@@ -465,7 +465,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   response_in_.finish();
 
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-      Grpc::Common::getGrpcStatus(trailers);
+      Grpc::Common::getGrpcStatus(trailers, true);
   if (grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers)) {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -486,7 +486,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   // so there is no need to copy headers from one to the other.
   bool is_trailers_only_response = response_headers_ == &trailers;
 
-  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
+  if (!grpc_status || grpc_status.value() == Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
@@ -568,8 +568,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
     return false;
   }
 
-  if (grpc_status == Grpc::Status::GrpcStatus::Ok ||
-      grpc_status == Grpc::Status::GrpcStatus::InvalidCode) {
+  if (grpc_status == Grpc::Status::WellKnownGrpcStatus::Ok ||
+      grpc_status == Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
     return false;
   }
 

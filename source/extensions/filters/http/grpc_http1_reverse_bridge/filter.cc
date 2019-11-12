@@ -33,7 +33,7 @@ Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
   // from the standard but is key in being able to transform a successful
   // upstream HTTP response into a gRPC response.
   if (http_response_status == 200) {
-    return Grpc::Status::GrpcStatus::Ok;
+    return Grpc::Status::WellKnownGrpcStatus::Ok;
   } else {
     return Grpc::Utility::httpToGrpcStatus(http_response_status);
   }
@@ -111,7 +111,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
       decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
-                                         Grpc::Status::GrpcStatus::Unknown,
+                                         Grpc::Status::WellKnownGrpcStatus::Unknown,
                                          RcDetails::get().GrpcBridgeFailedTooSmall);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -133,7 +133,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
     if (content_type == nullptr ||
         content_type->value().getStringView() != upstream_content_type_) {
       headers.insertGrpcMessage().value(badContentTypeMessage(headers));
-      headers.insertGrpcStatus().value(Envoy::Grpc::Status::GrpcStatus::Unknown);
+      headers.insertGrpcStatus().value(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
       headers.insertStatus().value(enumToInt(Http::Code::OK));
 
       if (content_type != nullptr) {
