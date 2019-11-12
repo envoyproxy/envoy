@@ -838,6 +838,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         cached_route_.value().get());
   }
 
+  stream_info_.setRequestHeaders(*request_headers_);
+
   const bool upgrade_rejected = createFilterChain() == false;
 
   // TODO if there are no filters when starting a filter iteration, the connection manager

@@ -127,22 +127,28 @@ public:
 /**
  * Utility struct that encapsulates the information from a udp socket's
  * recvfrom/recvmmsg call.
- *
- * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
- * class.
  */
 struct UdpRecvData {
-  Address::InstanceConstSharedPtr local_address_;
-  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
+  struct LocalPeerAddresses {
+    bool operator==(const LocalPeerAddresses& rhs) const {
+      // TODO(mattklein123): Implement a hash directly on Address that does not use strings.
+      return local_->asStringView() == rhs.local_->asStringView() &&
+             peer_->asStringView() == rhs.peer_->asStringView();
+    }
+
+    template <typename H> friend H AbslHashValue(H h, const LocalPeerAddresses& addresses) {
+      // TODO(mattklein123): Implement a hash directly on Address that does not use strings.
+      return H::combine(std::move(h), addresses.local_->asStringView(),
+                        addresses.peer_->asStringView());
+    }
+
+    Address::InstanceConstSharedPtr local_;
+    Address::InstanceConstSharedPtr peer_;
+  };
+
+  LocalPeerAddresses addresses_;
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
-
-  // TODO(conquerAtapple):
-  // Add UdpReader here so that the callback handler can
-  // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
-  // has data. We could also just return a `ReaderFactory` that returns either a
-  // `recvfrom` reader (with peer information) or a `read/recvmmsg` reader. This
-  // is still being flushed out (Jan, 2019).
 };
 
 /**

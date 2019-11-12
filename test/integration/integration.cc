@@ -297,8 +297,8 @@ void BaseIntegrationTest::createUpstreams() {
       fake_upstreams_.emplace_back(
           new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
     } else {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(endpoint, upstream_protocol_, *time_system_, enable_half_close_));
+      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
+                                                    enable_half_close_, udp_fake_upstream_));
     }
   }
 }
@@ -672,7 +672,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
                request.error_detail().code(), expected_error_code,
                request.error_detail().message());
   }
-  if (expected_error_code != Grpc::Status::GrpcStatus::Ok &&
+  if (expected_error_code != Grpc::Status::WellKnownGrpcStatus::Ok &&
       request.error_detail().message().find(expected_error_substring) == std::string::npos) {
     return AssertionFailure() << "\"" << expected_error_substring
                               << "\" is not a substring of actual error message \""

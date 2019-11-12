@@ -14,6 +14,7 @@ import "validate/validate.proto";
 
 // Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
+// [#extension: envoy.clusters.dynamic_forward_proxy]
 message ClusterConfig {
   // The DNS cache configuration that the cluster will attach to. Note this configuration must
   // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
