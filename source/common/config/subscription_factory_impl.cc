@@ -50,7 +50,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::make_shared<GrpcMuxSotw>(Utility::factoryForGrpcApiConfigSource(
                                             cm_.grpcAsyncClientManager(), api_config_source, scope)
                                             ->create(),
-                                        dispatcher_, deltaGrpcMethod(type_url), random_, scope,
+                                        dispatcher_, sotwGrpcMethod(type_url), random_, scope,
                                         Utility::parseRateLimitSettings(api_config_source),
                                         local_info_,
                                         api_config_source.set_node_on_first_message_only()),

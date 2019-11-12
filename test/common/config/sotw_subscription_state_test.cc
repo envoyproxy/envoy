@@ -133,25 +133,25 @@ TEST_F(SotwSubscriptionStateTest, AckGenerated) {
   {
     UpdateAck ack = deliverDiscoveryResponse({"name1", "name2"}, "version1", "nonce1");
     EXPECT_EQ("nonce1", ack.nonce_);
-    EXPECT_EQ(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The next response updates 1 and 2, and adds 3.
   {
     UpdateAck ack = deliverDiscoveryResponse({"name1", "name2", "name3"}, "version2", "nonce2");
     EXPECT_EQ("nonce2", ack.nonce_);
-    EXPECT_EQ(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The next response tries but fails to update all 3, and so should produce a NACK.
   {
     UpdateAck ack = deliverBadDiscoveryResponse("version3", "nonce3");
     EXPECT_EQ("nonce3", ack.nonce_);
-    EXPECT_NE(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The last response successfully updates all 3.
   {
     UpdateAck ack = deliverDiscoveryResponse({"name1", "name2", "name3"}, "version4", "nonce4");
     EXPECT_EQ("nonce4", ack.nonce_);
-    EXPECT_EQ(Grpc::Status::GrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
 }
 

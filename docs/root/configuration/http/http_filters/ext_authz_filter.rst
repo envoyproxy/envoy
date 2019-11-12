@@ -37,6 +37,7 @@ A sample filter configuration for a gRPC authorization server:
 
           # Default is 200ms; override if your server needs e.g. warmup time.
           timeout: 0.5s
+        include_peer_certificate: true
 
 .. code-block:: yaml
 
@@ -71,6 +72,7 @@ A sample filter configuration for a raw HTTP authorization server:
               cluster: ext-authz
               timeout: 0.25s
               failure_mode_allow: false
+        include_peer_certificate: true
 
 .. code-block:: yaml
 

@@ -150,18 +150,18 @@ WatchMap& NewGrpcMuxImpl::watchMapFor(const std::string& type_url) {
 void NewGrpcMuxImpl::trySendDiscoveryRequests() {
   while (true) {
     // Do any of our subscriptions even want to send a request?
-    absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
-    if (!maybe_request_type.has_value()) {
+    absl::optional<std::string> request_type_if_any = whoWantsToSendDiscoveryRequest();
+    if (!request_type_if_any.has_value()) {
       break;
     }
     // If so, which one (by type_url)?
-    std::string next_request_type_url = maybe_request_type.value();
+    std::string next_request_type_url = request_type_if_any.value();
     SubscriptionState& sub = subscriptionStateFor(next_request_type_url);
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
     }
-    // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
+    // Get our subscription state to generate the appropriate discovery request, and send.
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
       // safe to assume it's of the type_url that we're wanting to send.
@@ -177,8 +177,8 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
   maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
 }
 
-// Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
-// whether we *want* to send a DeltaDiscoveryRequest).
+// Checks whether external conditions allow sending a discovery request. (Does not check
+// whether we *want* to send a discovery request).
 bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
   RELEASE_ASSERT(
       !pausable_ack_queue_.paused(type_url),
@@ -196,9 +196,9 @@ bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
   return true;
 }
 
-// Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
-// a subscription update. (Does not check whether we *can* send that DeltaDiscoveryRequest).
-// Returns the type_url we should send the DeltaDiscoveryRequest for (if any).
+// Checks whether we have something to say in a discovery request, which can be an ACK and/or
+// a subscription update. (Does not check whether we *can* send that discovery request).
+// Returns the type_url we should send the discovery request for (if any).
 // First, prioritizes ACKs over non-ACK subscription interest updates.
 // Then, prioritizes non-ACK updates in the order the various types
 // of subscriptions were activated.

@@ -14,6 +14,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Dubbo Proxy]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
+// [#extension: envoy.filters.network.dubbo_proxy]
 
 // Dubbo Protocol types supported by Envoy.
 enum ProtocolType {

@@ -49,7 +49,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   auto shared_mux = subscription_->getGrpcMuxForTest();
   static_cast<GrpcMuxSotw*>(shared_mux.get())
       ->grpcStreamForTest()
-      .onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+      .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
   verifyControlPlaneStats(0);
 

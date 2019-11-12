@@ -14,6 +14,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Rate limit]
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
+// [#extension: envoy.filters.http.ratelimit]
 
 // [#next-free-field: 8]
 message RateLimit {
