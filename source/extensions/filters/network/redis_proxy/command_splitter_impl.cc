@@ -25,7 +25,7 @@ ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
  */
 Common::Redis::Client::PoolRequest*
 makeSingleServerRequest(const RouteSharedPtr& route, const std::string& command,
-                        const std::string& key, Common::Redis::RespValueSharedPtr incoming_request,
+                        const std::string& key, Common::Redis::RespValueConstSharedPtr incoming_request,
                         ConnPool::PoolCallbacks& callbacks) {
   auto handler =
       route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request), callbacks);

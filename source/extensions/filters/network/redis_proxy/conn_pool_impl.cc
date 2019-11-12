@@ -22,9 +22,9 @@ Common::Redis::Client::DoNothingPoolCallbacks null_client_callbacks;
 
 const Common::Redis::RespValue& getRequest(const RespVariant& request) {
   if (request.index() == 0) {
-    return absl::get<Common::Redis::RespValue>(request);
+    return absl::get<const Common::Redis::RespValue>(request);
   } else {
-    return *(absl::get<Common::Redis::RespValueSharedPtr>(request));
+    return *(absl::get<Common::Redis::RespValueConstSharedPtr>(request));
   }
 }
 } // namespace

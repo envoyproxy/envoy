@@ -151,7 +151,7 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
 MATCHER_P(RespVariantEq, rhs, "RespVariant should be equal") {
   const ConnPool::RespVariant& obj = arg;
   EXPECT_EQ(obj.index(), 1);
-  EXPECT_EQ(*(absl::get<Common::Redis::RespValueSharedPtr>(obj)), rhs);
+  EXPECT_EQ(*(absl::get<Common::Redis::RespValueConstSharedPtr>(obj)), rhs);
   return true;
 }
 
@@ -397,7 +397,7 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
 
 MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
   const ConnPool::RespVariant& obj = arg;
-  const auto& lhs = absl::get<Common::Redis::RespValue>(obj);
+  const auto& lhs = absl::get<const Common::Redis::RespValue>(obj);
   EXPECT_TRUE(lhs.type() == Common::Redis::RespType::CompositeArray);
   EXPECT_EQ(lhs.asCompositeArray().size(), rhs.size());
   std::vector<std::string> array;
