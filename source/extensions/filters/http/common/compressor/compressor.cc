@@ -22,49 +22,26 @@ const std::vector<std::string>& defaultContentEncoding() {
                           "application/xhtml+xml"});
 }
 
+// List of CompressorFilterConfig objects registered for a stream.
+struct CompressorRegistry : public StreamInfo::FilterState::Object {
+  std::list<CompressorFilterConfigSharedPtr> filter_configs_;
+};
+
+// Key to per stream CompressorRegistry objects.
+const std::string& compressorRegistryKey() { CONSTRUCT_ON_FIRST_USE(std::string, "compressors"); }
+
 } // namespace
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::config::filter::http::compressor::v2::Compressor& compressor,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     const std::string& content_encoding)
-    : compressor_registry_(compressorRegistry()),
-      content_length_(contentLengthUint(compressor.content_length().value())),
+    : content_length_(contentLengthUint(compressor.content_length().value())),
       content_type_values_(contentTypeSet(compressor.content_type())),
       disable_on_etag_header_(compressor.disable_on_etag_header()),
       remove_accept_encoding_header_(compressor.remove_accept_encoding_header()),
       stats_(generateStats(stats_prefix, scope)), runtime_(runtime),
-      content_encoding_(content_encoding) {
-  Thread::LockGuard lock(compressor_registry_.mutex_);
-  compressor_registry_.compressors_.insert({this, compressor_registry_.registration_count_});
-  compressor_registry_.registration_count_++;
-  updateRegisteredEncodings();
-}
-
-CompressorFilterConfig::~CompressorFilterConfig() {
-  Thread::LockGuard lock(compressor_registry_.mutex_);
-  ASSERT(compressor_registry_.compressors_.count(this) > 0);
-  compressor_registry_.compressors_.erase(this);
-  updateRegisteredEncodings();
-}
-
-void CompressorFilterConfig::updateRegisteredEncodings() {
-  compressor_registry_.encodings_.clear();
-
-  // There could be many compressors registered for the same content encoding, e.g. consider a case
-  // when there are two gzip filters using different compression levels for different content sizes.
-  // In such case we ignore duplicates (or different filters for the same encoding) registered last.
-  for (const auto& item : compressor_registry_.compressors_) {
-    auto enc = compressor_registry_.encodings_.find(item.first->content_encoding_);
-    if (enc != compressor_registry_.encodings_.end()) {
-      if (enc->second > item.second) {
-        enc->second = item.second;
-      }
-    } else {
-      compressor_registry_.encodings_.insert({item.first->content_encoding_, item.second});
-    }
-  }
-}
+      content_encoding_(content_encoding) {}
 
 StringUtil::CaseUnorderedSet
 CompressorFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types) {
@@ -76,15 +53,6 @@ CompressorFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::str
 
 uint32_t CompressorFilterConfig::contentLengthUint(Protobuf::uint32 length) {
   return length > 0 ? length : DefaultMinimumContentLength;
-}
-
-CompressorFilterConfig::CompressorRegistry& CompressorFilterConfig::compressorRegistry() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(CompressorRegistry);
-}
-
-const std::map<std::string, uint32_t> CompressorFilterConfig::registeredCompressors() const {
-  Thread::LockGuard lock(compressor_registry_.mutex_);
-  return compressor_registry_.encodings_;
 }
 
 CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
@@ -102,6 +70,21 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::HeaderMap& heade
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  decoder_callbacks_ = &callbacks;
+
+  absl::string_view key = compressorRegistryKey();
+  StreamInfo::FilterState& filter_state = callbacks.streamInfo().filterState();
+  if (filter_state.hasData<CompressorRegistry>(key)) {
+    CompressorRegistry& registry = filter_state.getDataMutable<CompressorRegistry>(key);
+    registry.filter_configs_.push_back(config_);
+  } else {
+    auto registry_ptr = std::make_unique<CompressorRegistry>();
+    registry_ptr->filter_configs_.push_back(config_);
+    filter_state.setData(key, std::move(registry_ptr), StreamInfo::FilterState::StateType::Mutable);
+  }
 }
 
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::HeaderMap& headers,
@@ -156,9 +139,21 @@ CompressorFilter::chooseEncoding(const Http::HeaderEntry* accept_encoding) const
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
 
-  // allowed_compressors might be updated down the way so we have to copy the entire map,
-  // but the map is expected to be tiny.
-  std::map<std::string, uint32_t> allowed_compressors(config_->registeredCompressors());
+  // There could be many compressors registered for the same content encoding, e.g. consider a case
+  // when there are two gzip filters using different compression levels for different content sizes.
+  // In such case we ignore duplicates (or different filters for the same encoding) registered last.
+  std::map<std::string, uint32_t> allowed_compressors;
+  uint32_t registration_count{0};
+  for (const auto& filter_config : decoder_callbacks_->streamInfo()
+                                       .filterState()
+                                       .getDataReadOnly<CompressorRegistry>(compressorRegistryKey())
+                                       .filter_configs_) {
+    auto enc = allowed_compressors.find(filter_config->contentEncoding());
+    if (enc == allowed_compressors.end()) {
+      allowed_compressors.insert({filter_config->contentEncoding(), registration_count});
+      ++registration_count;
+    }
+  }
 
   for (const auto token : StringUtil::splitToken(accept_encoding->value().getStringView(), ",",
                                                  false /* keep_empty */)) {
@@ -264,7 +259,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   const absl::string_view encoding_decision_key{"encoding_decision"};
 
   // Check if we have already cached our decision on encoding.
-  const StreamInfo::FilterState& filter_state = decoder_callbacks_->streamInfo().filterState();
+  StreamInfo::FilterState& filter_state = decoder_callbacks_->streamInfo().filterState();
   if (filter_state.hasData<CompressorFilter::EncodingDecision>(encoding_decision_key)) {
     const CompressorFilter::EncodingDecision& decision =
         filter_state.getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
@@ -296,8 +291,8 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
 
   std::unique_ptr<CompressorFilter::EncodingDecision> decision = chooseEncoding(accept_encoding);
   bool result = StringUtil::caseCompare(config_->contentEncoding(), decision->encoding());
-  decoder_callbacks_->streamInfo().filterState().setData(
-      encoding_decision_key, std::move(decision), StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData(encoding_decision_key, std::move(decision),
+                       StreamInfo::FilterState::StateType::ReadOnly);
   return result;
 }
 

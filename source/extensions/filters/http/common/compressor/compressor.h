@@ -57,6 +57,7 @@ class CompressorFilterConfig {
 
 public:
   CompressorFilterConfig() = delete;
+  virtual ~CompressorFilterConfig() = default;
 
   virtual const std::string featureName() const PURE;
   virtual std::unique_ptr<Compressor::Compressor> makeCompressor() PURE;
@@ -69,8 +70,6 @@ public:
   uint32_t minimumLength() const { return content_length_; }
   const std::string contentEncoding() const { return content_encoding_; };
   const std::map<std::string, uint32_t> registeredCompressors() const;
-
-  virtual ~CompressorFilterConfig();
 
 protected:
   CompressorFilterConfig(const envoy::config::filter::http::compressor::v2::Compressor& compressor,
@@ -86,17 +85,6 @@ private:
   static CompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return CompressorStats{ALL_COMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
-
-  struct CompressorRegistry {
-    Thread::MutexBasicLockable mutex_;
-    absl::flat_hash_map<CompressorFilterConfig*, uint32_t> compressors_ ABSL_GUARDED_BY(mutex_);
-    uint32_t registration_count_ ABSL_GUARDED_BY(mutex_){0};
-    std::map<std::string, uint32_t> encodings_ ABSL_GUARDED_BY(mutex_);
-  };
-
-  static CompressorRegistry& compressorRegistry();
-  CompressorRegistry& compressor_registry_;
-  void updateRegisteredEncodings() ABSL_EXCLUSIVE_LOCKS_REQUIRED(compressor_registry_.mutex_);
 
   uint32_t content_length_;
 
@@ -127,9 +115,7 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    decoder_callbacks_ = &callbacks;
-  };
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {

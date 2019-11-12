@@ -347,7 +347,8 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     EXPECT_EQ(7, stats_.counter("test.test.header_not_valid").value());
   }
   {
-    // Compressor "test2" should overshadow "test"
+    // Compressor "test2" from an independent filter chain should not overshadow "test".
+    // The independence is simulated with a new instance DecoderFilterCallbacks set for "test2".
     Stats::IsolatedStoreImpl stats;
     NiceMock<Runtime::MockLoader> runtime;
     envoy::config::filter::http::compressor::v2::Compressor compressor;
@@ -359,10 +360,10 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
 
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "test;Q=.5,test2;q=0.75"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
     EXPECT_TRUE(isAcceptEncodingAllowed(headers, filter2));
-    EXPECT_EQ(1, stats_.counter("test.test.header_compressor_overshadowed").value());
-    EXPECT_EQ(6, stats_.counter("test.test.header_compressor_used").value());
+    EXPECT_EQ(0, stats_.counter("test.test.header_compressor_overshadowed").value());
+    EXPECT_EQ(7, stats_.counter("test.test.header_compressor_used").value());
     EXPECT_EQ(1, stats.counter("test2.test2.header_compressor_used").value());
   }
   {
