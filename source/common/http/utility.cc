@@ -399,8 +399,8 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
   const auto& connection_header_value = headers.Connection()->value();
 
   StringUtil::CaseUnorderedSet headers_to_remove{};
-  std::vector<std::string> connection_header_tokens =
-      absl::StrSplit(connection_header_value.getStringView(), ',');
+  std::vector<absl::string_view> connection_header_tokens =
+      StringUtil::splitToken(connection_header_value.getStringView(), ",", false);
 
   // If we have 10 or more nominated headers, fail this request
   if (connection_header_tokens.size() >= MAX_ALLOWED_NOMINATED_HEADERS) {
@@ -444,6 +444,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
                !token_sv.find(':')) {
       // If pseudo headers or X-Forwarded* headers are nominated, this could be
       // an invalid request. Reject the request
+      ENVOY_LOG_MISC(trace, "Invalid nomination of {} header", token_sv);
       return false;
     } else {
       // Examine the value of all other nominated headers
@@ -462,7 +463,8 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
       }
 
       if (is_te_header) {
-        for (const auto& header_value : absl::StrSplit(nominated_header_value_sv, ',')) {
+        for (const auto& header_value :
+             StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
 
           const absl::string_view header_sv = StringUtil::trim(header_value);
 
@@ -476,7 +478,6 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
         }
 
         if (keep_header) {
-          nominated_header->value().clear();
           nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
                                             Http::Headers::get().TEValues.Trailers.size());
         }

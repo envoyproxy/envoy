@@ -1279,6 +1279,39 @@ TEST_P(HeaderIntegrationTest, TestNominatedPseudoHeader) {
       });
 }
 
+// Validate that we can sanitize the headers when splitting
+// the Connection header results in empty tokens
+TEST_P(HeaderIntegrationTest, TestSanitizeEmptyTokensFromHeaders) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, foo,, bar, close"},
+          {"te", "trailers"},
+          {"foo", "monday"},
+          {"bar", "friday"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"server", "envoy"},
+      },
+      Http::TestHeaderMapImpl{
+          {":status", "400"},
+          {"server", "envoy"},
+      });
+}
+
 // Validate that we fail the request if there are too many
 // nominated headers
 TEST_P(HeaderIntegrationTest, TestTooManyNominatedHeaders) {

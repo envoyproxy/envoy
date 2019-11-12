@@ -3,6 +3,7 @@ Version history
 
 1.13.0 (pending)
 ================
+* http: added the ability to sanitize headers nominated by the Connection header.  This new behavior is guarded by envoy.reloadable_features.connection_header_sanitization which defaults to true.
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * api: remove all support for v1
 * build: official released binary is now built against libc++.

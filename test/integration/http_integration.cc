@@ -337,9 +337,7 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
 absl::optional<uint64_t>
 HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices,
                                                 std::chrono::milliseconds connection_wait_timeout) {
-
   absl::optional<uint64_t> upstream_with_request;
-
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
 
