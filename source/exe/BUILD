@@ -100,11 +100,14 @@ envoy_cc_library(
 
 envoy_cc_posix_library(
     name = "platform_checks_lib",
+    srcs = ["posix/platform_checks.cc"],
     hdrs = ["posix/platform_checks.h"],
+    external_deps = ["abseil_optional"],
     strip_include_prefix = "posix",
     deps = [
      	"//source/common/common:assert_lib",
-	"//source/common/filesystem:filesystem_lib"
+	"//source/common/filesystem:filesystem_lib",
+	"//source/common/common:logger_lib"
     ],	
 )
 

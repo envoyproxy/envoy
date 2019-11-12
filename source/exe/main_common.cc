@@ -90,7 +90,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     break;
   }
 
-  check_platform_settings(file_system);
+  checkPlatformSettings(file_system);
 }
 
 void MainCommonBase::configureComponentLogLevels() {
