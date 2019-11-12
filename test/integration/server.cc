@@ -156,10 +156,10 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::serverReady() {
   pending_listeners_ = server().listenerManager().listeners().size();
-  server_set_.setReady();
   if (on_server_ready_cb_ != nullptr) {
     on_server_ready_cb_(*this);
   }
+  server_set_.setReady();
 }
 
 void IntegrationTestServer::threadRoutine(
