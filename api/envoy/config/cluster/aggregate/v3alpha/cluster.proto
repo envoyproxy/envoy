@@ -14,6 +14,7 @@ import "validate/validate.proto";
 // <arch_overview_aggregate_cluster>` for more information.
 // [#extension: envoy.clusters.aggregate]
 message ClusterConfig {
-  // Load balancing clusters in aggregate cluster. Clusters are prioritized by the orderings in the list.
+  // Load balancing clusters in aggregate cluster. Clusters are prioritized by the orderings in the
+  // list.
   repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 }
