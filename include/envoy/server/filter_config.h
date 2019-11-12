@@ -9,7 +9,6 @@
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
 #include "envoy/init/manager.h"
-#include "envoy/json/json_object.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -249,6 +248,13 @@ public:
   virtual Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.listener"; }
 };
 
 /**
@@ -270,6 +276,13 @@ public:
   virtual Network::UdpListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.udp_listener"; }
 };
 
 /**
@@ -313,40 +326,34 @@ public:
 
   /**
    * Create a particular network filter factory implementation. If the implementation is unable to
-   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
-   * of general error or a Json::Exception if the json configuration is erroneous. The returned
+   * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param context supplies the filter's context.
    * @return Network::FilterFactoryCb the factory creation function.
    */
-  virtual Network::FilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                       FactoryContext& context) PURE;
-
-  /**
-   * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
-   * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
-   */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                FactoryContext& context) {
-    UNREFERENCED_PARAMETER(config);
-    UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                                                                FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
-   *         is deprecated.
+   *         JSON and then parsed into this empty proto.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.network"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -380,6 +387,13 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.upstream_network"; }
 };
 
 /**
@@ -392,40 +406,24 @@ public:
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to
-   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
-   * of
-   * general error or a Json::Exception if the json configuration is erroneous. The returned
+   * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
-   * @param config supplies the general json configuration for the filter
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+   * configuration.
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual Http::FilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                    const std::string& stat_prefix,
-                                                    FactoryContext& context) PURE;
-
-  /**
-   * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This
-   * may be optionally implemented today, but will in the future become compulsory once v1 is
-   * deprecated.
-   */
   virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                              const std::string& stat_prefix,
-                                                             FactoryContext& context) {
-    UNREFERENCED_PARAMETER(config);
-    UNREFERENCED_PARAMETER(stat_prefix);
-    UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                                                             FactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
-   *         is deprecated.
+   *         JSON and then parsed into this empty proto.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
@@ -453,6 +451,13 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

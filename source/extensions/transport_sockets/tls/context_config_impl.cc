@@ -273,7 +273,7 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
+const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
 const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
 
 const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =

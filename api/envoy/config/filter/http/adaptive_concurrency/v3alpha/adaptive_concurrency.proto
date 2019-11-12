@@ -18,6 +18,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Adaptive Concurrency]
 // Adaptive Concurrency Control :ref:`configuration overview
 // <config_http_filters_adaptive_concurrency>`.
+// [#extension: envoy.filters.http.adaptive_concurrency]
 
 // Configuration parameters for the gradient controller.
 message GradientControllerConfig {

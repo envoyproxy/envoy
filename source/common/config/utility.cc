@@ -9,10 +9,8 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
-#include "common/config/json_utility.h"
 #include "common/config/resources.h"
 #include "common/config/well_known_names.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_matcher_impl.h"
@@ -185,20 +183,6 @@ Utility::configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSourc
       PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 15000));
 }
 
-void Utility::translateRdsConfig(
-    const Json::Object& json_rds,
-    envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
-  json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-
-  const std::string name = json_rds.getString("route_config_name", "");
-  rds.set_route_config_name(name);
-
-  translateApiConfigSource(json_rds.getString("cluster"),
-                           json_rds.getInteger("refresh_delay_ms", 30000),
-                           json_rds.getString("api_type", ApiType::get().UnsupportedRestLegacy),
-                           *rds.mutable_config_source()->mutable_api_config_source());
-}
-
 RateLimitSettings
 Utility::parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   RateLimitSettings rate_limit_settings;
@@ -309,28 +293,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   if (!config.fields().empty()) {
     MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
-}
-
-bool Utility::allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config) {
-  if (!config.getBoolean("deprecated_v1", false)) {
-    return false;
-  }
-
-  constexpr char error[] =
-      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will "
-      "be removed from Envoy soon. Please see "
-      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
-      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
-      "enable this feature once the deprecation becomes fail by default.";
-
-  if (!runtime.snapshot().deprecatedFeatureEnabled(
-          "envoy.deprecated_features.v1_filter_json_config")) {
-    throw EnvoyException(error);
-  } else {
-    ENVOY_LOG_MISC(warn, "{}", error);
-  }
-
-  return true;
 }
 
 BackOffStrategyPtr Utility::prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,

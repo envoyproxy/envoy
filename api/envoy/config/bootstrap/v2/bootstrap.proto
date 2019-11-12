@@ -153,7 +153,7 @@ message Bootstrap {
 
   // Optional proxy version which will be used to set the value of :ref:`server.version statistic
   // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
-  // :ref:<stats sinks <envoy_api_msg_config.metrics.v2.StatsSink>.
+  // :ref:`stats sinks <envoy_api_msg_config.metrics.v2.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 }
 

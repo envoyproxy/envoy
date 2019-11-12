@@ -16,6 +16,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Health check]
 // Health check :ref:`configuration overview <config_http_filters_health_check>`.
+// [#extension: envoy.filters.http.health_check]
 
 // [#next-free-field: 6]
 message HealthCheck {

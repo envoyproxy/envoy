@@ -11,32 +11,36 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 
 function setup_gcc_toolchain() {
+  if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
+    echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+    exit 1
+  fi
   if [[ -z "${ENVOY_RBE}" ]]; then
     export CC=gcc
     export CXX=g++
     export BAZEL_COMPILER=gcc
     echo "$CC/$CXX toolchain configured"
   else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-gcc ${BAZEL_BUILD_OPTIONS}"
+    export BAZEL_BUILD_OPTIONS="--config=remote-gcc ${BAZEL_BUILD_OPTIONS}"
   fi
 }
 
 function setup_clang_toolchain() {
+  ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
+    fi
   else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang ${BAZEL_BUILD_OPTIONS}"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang ${BAZEL_BUILD_OPTIONS}"
+    fi
   fi
-  echo "clang toolchain configured"
-}
-
-function setup_clang_libcxx_toolchain() {
-  if [[ -z "${ENVOY_RBE}" ]]; then
-    export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
-  else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
-  fi
-  echo "clang toolchain with libc++ configured"
+  echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
@@ -68,11 +72,12 @@ fi
 
 bazel/setup_clang.sh /opt/llvm
 
-# Not sandboxing, since non-privileged Docker can't do nested namespaces.
+[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
+
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --local_cpu_resources=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
-  --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
+  --test_env=HOME --test_env=PYTHONUSERBASE --test_output=errors \
   --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
@@ -80,13 +85,13 @@ export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOM
 
 if [ "$1" != "-nofetch" ]; then
   # Setup Envoy consuming project.
-  if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
-  then
+  if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
+    rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   fi
 
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f af5aa34dc85b80646d9db12c5b901ef18cee9f45)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 03b45933284b332fd1df42cfb3270751fe543842)
   sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
   cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 fi

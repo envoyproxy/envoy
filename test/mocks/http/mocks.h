@@ -465,7 +465,7 @@ private:
 // Test that a HeaderMap argument contains exactly one header with the given
 // key, whose value satisfies the given expectation. The expectation can be a
 // matcher, or a string that the value should equal.
-template <typename T, typename K> HeaderValueOfMatcher HeaderValueOf(K key, T matcher) {
+template <typename T, typename K> HeaderValueOfMatcher HeaderValueOf(K key, const T& matcher) {
   return HeaderValueOfMatcher(LowerCaseString(key),
                               testing::SafeMatcherCast<absl::string_view>(matcher));
 }

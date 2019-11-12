@@ -45,7 +45,10 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
-    "./test/common/protobuf/utility_test.cc", "./test/common/grpc/codec_test.cc")
+    "./test/common/protobuf/utility_test.cc",
+    "./test/common/grpc/codec_test.cc",
+    "./test/common/grpc/codec_fuzz_test.cc",
+)
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
@@ -294,7 +297,8 @@ def whitelistedForHistogramSiSuffix(name):
 
 
 def whitelistedForStdRegex(file_path):
-  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
+  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST or file_path.endswith(
+      DOCS_SUFFIX)
 
 
 def whitelistedForGrpcInit(file_path):

@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -36,12 +37,13 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "redis_cluster",
     srcs = [
         "redis_cluster.cc",
         "redis_cluster.h",
     ],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "redis_cluster_lb",
         "//include/envoy/api:api_interface",

@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.resource_monitor.injected_reso
 import "validate/validate.proto";
 
 // [#protodoc-title: Injected resource]
+// [#extension: envoy.resource_monitors.injected_resource]
 
 // The injected resource monitor allows injecting a synthetic resource pressure into Envoy
 // via a text file, which must contain a floating-point number in the range [0..1] representing
