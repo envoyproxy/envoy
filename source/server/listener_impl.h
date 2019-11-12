@@ -220,9 +220,6 @@ private:
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
 
-  static Network::ListenSocketFactory
-  createListenSocketFactory(const envoy::api::v2::core::Address& proto_address);
-
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;
