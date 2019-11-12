@@ -264,7 +264,7 @@ public:
 
   // FormatterProvider::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo& stream_info) const override;
+                     const StreamInfo::StreamInfo& stream_info, const absl::string_view&) const override;
 
 private:
   std::string key_;
