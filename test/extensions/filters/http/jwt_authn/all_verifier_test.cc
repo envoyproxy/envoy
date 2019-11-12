@@ -81,7 +81,20 @@ public:
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
-                                 *filter_config_, filter_config_->getExtractor());
+                                 *filter_config_);
+  }
+
+  void addTokenLocation(const std::vector<std::string>& headers) {
+    for (const auto& it : headers) {
+      auto header =
+        (*proto_config_.mutable_providers())[std::string(ProviderName)].add_from_headers();
+      header->set_name(it);
+      header->set_value_prefix("Prefix ");
+    }
+  }
+
+  void modifyRequirement(const std::string& yaml) {
+    TestUtility::loadFromYaml(yaml, *proto_config_.mutable_rules(0)->mutable_requires());
   }
 
   void modifyRequirement(const std::string& yaml) {
@@ -110,6 +123,7 @@ TEST_F(AllVerifierTest, TestAllAllow) {
   verifier_->verify(context_);
 }
 
+<<<<<<< HEAD
 // tests requires allow missing or failed. The `allow_missing_or_failed` is defined in a single
 // requirement by itself.
 class AllowFailedInSingleRequirementTest : public AllVerifierTest {
@@ -120,6 +134,20 @@ protected:
     createVerifier();
   }
 };
+=======
+// tests requires allow missing or failed
+TEST_F(AllVerifierTest, TestAllowFailed) {
+  addTokenLocation({"a", "b", "c"});
+  const char allow_failed_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing_or_failed: {}
+)";
+  modifyRequirement(allow_failed_yaml);
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+>>>>>>> Fix tests
 
 TEST_F(AllowFailedInSingleRequirementTest, NoJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
@@ -370,15 +398,72 @@ TEST_F(AllowFailedInAndOfOrListTest, TwoGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
+TEST_F(AllVerifierTest, TestAllowFailed_InOrListMissing) {
+  addTokenLocation({"a", "b", "c"});
+  const char allow_failed_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing_or_failed: {}
+)";
+  modifyRequirement(allow_failed_yaml);
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(AllVerifierTest, TestAllowFailed_InOrListFailed) {
+  addTokenLocation({"a", "b", "c"});
+  const char allow_failed_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing_or_failed: {}
+)";
+  modifyRequirement(allow_failed_yaml);
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{
+      {"b", "Prefix " + std::string(NonExistKidToken)}
+  };
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(AllVerifierTest, TestAllowFailed_InAndList) {
+  addTokenLocation({"a", "b", "c"});
+  const char allow_failed_yaml[] = R"(
+requires_all:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing_or_failed: {}
+)";
+  modifyRequirement(allow_failed_yaml);
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{};
+
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
 TEST_F(AllVerifierTest, TestAllowMissing) {
-  std::vector<std::string> names{"a", "b", "c"};
-  for (const auto& it : names) {
-    auto header =
-        (*proto_config_.mutable_providers())[std::string(ProviderName)].add_from_headers();
-    header->set_name(it);
-    header->set_value_prefix("Prefix ");
-  }
-  proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing();
+  addTokenLocation({"a", "b", "c"});
+  const char allow_missing_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing: {}
+)";
+  modifyRequirement(allow_missing_yaml);
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
@@ -393,6 +478,44 @@ TEST_F(AllVerifierTest, TestAllowMissing) {
   EXPECT_FALSE(headers.has("a"));
   EXPECT_TRUE(headers.has("b"));
   EXPECT_TRUE(headers.has("c"));
+}
+
+TEST_F(AllVerifierTest, TestAllowMissing_InOrListMissing) {
+  addTokenLocation({"a", "b", "c"});
+  const char allow_failed_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing: {}
+)";
+  modifyRequirement(allow_failed_yaml);
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(AllVerifierTest, TestAllowMissing_InOrListFailed) {
+  addTokenLocation({"a", "b", "c"});
+  const char allow_failed_yaml[] = R"(
+requires_any:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing: {}
+)";
+  modifyRequirement(allow_failed_yaml);
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{
+      {"b", "Prefix " + std::string(NonExistKidToken)}
+  };
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
 }
 
 } // namespace

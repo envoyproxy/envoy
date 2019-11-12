@@ -74,10 +74,7 @@ public:
           return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
         }));
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
-                                 mock_factory_, mock_extractor_);
-    ON_CALL(mock_extractor_, extract(_)).WillByDefault(Invoke([](const Http::HeaderMap&) {
-      return std::vector<JwtLocationConstPtr>{};
-    }));
+                                 mock_factory_);
   }
   void createSyncMockAuthsAndVerifier(const StatusMap& statuses) {
     for (const auto& it : statuses) {
@@ -134,7 +131,6 @@ public:
   std::unordered_map<std::string, std::unique_ptr<MockAuthenticator>> mock_auths_;
   NiceMock<MockAuthFactory> mock_factory_;
   ContextSharedPtr context_;
-  NiceMock<MockExtractor> mock_extractor_;
   NiceMock<Tracing::MockSpan> parent_span_;
 };
 

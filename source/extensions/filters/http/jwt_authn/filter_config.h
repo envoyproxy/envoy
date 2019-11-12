@@ -147,8 +147,6 @@ private:
   ThreadLocal::SlotPtr tls_;
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
-  // The object to extract tokens. TODO: REMOVE THIS
-  // ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
   // The filter state name to lookup filter_state_rules.
