@@ -10,10 +10,11 @@ import "validate/validate.proto";
 
 // [#protodoc-title: MySQL proxy]
 // MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
+// [#extension: envoy.filters.network.mysql_proxy]
 message MySQLProxy {
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mysql_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // [#not-implemented-hide:] The optional path to use for writing MySQL access logs.
   // If the access log field is empty, access logs will not be written.

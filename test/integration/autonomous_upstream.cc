@@ -92,10 +92,8 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
 
 bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
-bool AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
-                                                      Network::UdpReadFilterCallbacks&) {
-  return true;
-}
+void AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                                      Network::UdpReadFilterCallbacks&) {}
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
   Thread::LockGuard lock(headers_lock_);

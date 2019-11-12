@@ -116,7 +116,6 @@ MockFilterChainManager::~MockFilterChainManager() = default;
 
 MockFilterChainFactory::MockFilterChainFactory() {
   ON_CALL(*this, createListenerFilterChain(_)).WillByDefault(Return(true));
-  ON_CALL(*this, createUdpListenerFilterChain(_, _)).WillByDefault(Return(true));
 }
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 
