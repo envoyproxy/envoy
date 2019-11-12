@@ -422,6 +422,9 @@ void InstanceImpl::initialize(const Options& options,
 void InstanceImpl::startWorkers() {
   listener_manager_->startWorkers(*guard_dog_);
   initialization_timer_->complete();
+  // Set the server state as soon as initialization is done.
+  server_stats_->state_.set(
+      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   workers_started_ = true;
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.
