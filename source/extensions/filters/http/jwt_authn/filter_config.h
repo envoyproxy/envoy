@@ -71,12 +71,11 @@ public:
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalCache>(proto_config_, time_source_, api_);
     });
-    extractor_ = Extractor::create(proto_config_);
 
     for (const auto& rule : proto_config_.rules()) {
       rule_pairs_.emplace_back(
           Matcher::create(rule),
-          Verifier::create(rule.requires(), proto_config_.providers(), *this, getExtractor()));
+          Verifier::create(rule.requires(), proto_config_.providers(), *this));
     }
 
     if (proto_config_.has_filter_state_rules()) {
@@ -84,7 +83,7 @@ public:
       for (const auto& it : proto_config_.filter_state_rules().requires()) {
         filter_state_verifiers_.emplace(
             it.first,
-            Verifier::create(it.second, proto_config_.providers(), *this, getExtractor()));
+            Verifier::create(it.second, proto_config_.providers(), *this));
       }
     }
   }
@@ -96,9 +95,6 @@ public:
 
   Upstream::ClusterManager& cm() const { return cm_; }
   TimeSource& timeSource() const { return time_source_; }
-
-  // Get the token  extractor.
-  const Extractor& getExtractor() const { return *extractor_; }
 
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
@@ -151,8 +147,8 @@ private:
   ThreadLocal::SlotPtr tls_;
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
-  // The object to extract tokens.
-  ExtractorConstPtr extractor_;
+  // The object to extract tokens. TODO: REMOVE THIS
+  // ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
   // The filter state name to lookup filter_state_rules.

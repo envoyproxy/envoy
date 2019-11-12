@@ -292,17 +292,18 @@ message JwtRequirement {
     // All of them must pass, if one of them fails or missing, it fails.
     JwtRequirementAndList requires_all = 4;
 
-    // Set both allow_missing and allow_invalid instead to have the same effect.
     // The requirement is always satisfied even if JWT is missing or the JWT
     // verification fails. A typical usage is: this filter is used to only verify
     // JWTs and pass the verified JWT payloads to another filter, the other filter
     // will make decision. In this mode, all JWT tokens will be verified.
     google.protobuf.Empty allow_missing_or_failed = 5;
-  }
 
-  // This is used only when requirement type is `provider_name` or `provider_and_audiences`. If set,
-  // the requirement is satisfied even if JWT is missing, but will failed if it is valid.
-  bool allow_missing = 6;
+    // The requirement is satisfied if JWT is missing, but failed if JWT is
+    // presented but invalid. Similar to allow_missing_or_failed, this is used
+    // to only verify JWTs and pass the verified payload to another filter. The
+    // different is this mode will reject requests with invalid tokens.
+    google.protobuf.Empty allow_missing = 6;
+  }
 }
 
 // This message specifies a list of RequiredProvider.

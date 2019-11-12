@@ -49,6 +49,9 @@ public:
   TimeSource& timeSource() { return time_source_; }
 
 private:
+  // Returns the name of the authenticator. For debug logging only.
+  std::string name() const;
+
   // Verify with a specific public key.
   void verifyKey();
 
@@ -95,6 +98,13 @@ private:
   TimeSource& time_source_;
 };
 
+std::string AuthenticatorImpl::name() const {
+  if (provider_) return provider_.value() + (is_allow_missing_ ? "-OPTIONAL" : "");
+  if (is_allow_failed_) return "_IS_ALLOW_FALED_";
+  if (is_allow_missing_) return "_IS_ALLOW_MISSING_";
+  return "_UNKNOWN_";
+}
+
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
                                SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
@@ -105,7 +115,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
   set_payload_cb_ = std::move(set_payload_cb);
   callback_ = std::move(callback);
 
-  ENVOY_LOG(debug, "JWT authentication starts (allow_failed={})", is_allow_failed_);
+  ENVOY_LOG(debug, "{}: JWT authentication starts (allow_failed={}), tokens size={}", name(), is_allow_failed_, tokens_.size());
   if (tokens_.empty()) {
     doneWithStatus(Status::JwtMissed);
     return;
@@ -116,6 +126,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
 
 void AuthenticatorImpl::startVerify() {
   ASSERT(!tokens_.empty());
+  ENVOY_LOG(debug, "{}: startVerify: tokens size {}", name(), tokens_.size());
   curr_token_ = std::move(tokens_.back());
   tokens_.pop_back();
 
@@ -127,7 +138,7 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
-  ENVOY_LOG(debug, "Verifying JWT token of issuer {}", jwt_->iss_);
+  ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
   // Check if token extracted from the location contains the issuer specified by config.
   if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
     doneWithStatus(Status::JwtUnknownIssuer);
@@ -244,7 +255,7 @@ void AuthenticatorImpl::verifyKey() {
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
-  ENVOY_LOG(debug, "JWT token verification completed with: {}",
+  ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
   // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
   if ((Status::Ok == status && !is_allow_failed_ && !is_allow_missing_ ) || tokens_.empty()) {
