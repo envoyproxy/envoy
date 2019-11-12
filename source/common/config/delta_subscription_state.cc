@@ -110,7 +110,7 @@ void DeltaSubscriptionState::handleGoodResponse(
 
 void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
   // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
-  ack.error_detail_.set_code(Grpc::Status::GrpcStatus::Internal);
+  ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
   ack.error_detail_.set_message(e.what());
   disableInitFetchTimeoutTimer();
   ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
@@ -158,7 +158,7 @@ envoy::api::v2::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   envoy::api::v2::DeltaDiscoveryRequest request = getNextRequestAckless();
   request.set_response_nonce(ack.nonce_);
-  if (ack.error_detail_.code() != Grpc::Status::GrpcStatus::Ok) {
+  if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
     // Don't needlessly make the field present-but-empty if status is ok.
     request.mutable_error_detail()->CopyFrom(ack.error_detail_);
   }

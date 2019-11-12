@@ -36,6 +36,13 @@ public:
   virtual const std::string name() const PURE;
 
   /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "wasm.null_vms"; }
+
+  /**
    * Create an instance of the plugin.
    */
   virtual std::unique_ptr<NullVmPlugin> create() const PURE;

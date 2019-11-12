@@ -35,7 +35,7 @@ public:
 };
 
 TestNullVmPlugin* test_null_vm_plugin_ = nullptr;
-Envoy::Registry::RegisterFactory<PluginFactory, Null::NullVmPluginFactory> register_;
+REGISTER_FACTORY(PluginFactory, Null::NullVmPluginFactory);
 
 std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   auto result = std::make_unique<TestNullVmPlugin>();

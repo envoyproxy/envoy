@@ -59,7 +59,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         ":redis_mocks",
-        "//source/common/config:json_utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",

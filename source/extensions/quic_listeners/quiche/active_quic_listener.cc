@@ -58,9 +58,10 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
-  quic::QuicSocketAddress peer_address(envoyAddressInstanceToQuicSocketAddress(data.peer_address_));
+  quic::QuicSocketAddress peer_address(
+      envoyAddressInstanceToQuicSocketAddress(data.addresses_.peer_));
   quic::QuicSocketAddress self_address(
-      envoyAddressInstanceToQuicSocketAddress(data.local_address_));
+      envoyAddressInstanceToQuicSocketAddress(data.addresses_.local_));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMilliseconds(std::chrono::duration_cast<std::chrono::milliseconds>(

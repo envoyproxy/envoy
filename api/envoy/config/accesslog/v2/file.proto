@@ -11,6 +11,7 @@ import "google/protobuf/struct.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: File access log]
+// [#extension: envoy.access_loggers.file]
 
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`
 // that writes log entries directly to a file. Configures the built-in *envoy.file_access_log*
