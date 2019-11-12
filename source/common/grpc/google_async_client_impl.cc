@@ -189,7 +189,7 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
-  if (grpc_status < 0 || grpc_status > Status::WellKnownGrpcStatus::MaximumKnown) {
+  if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown || grpc_status < 0) {
     ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
     // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
     // crash..

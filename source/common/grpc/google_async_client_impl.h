@@ -1,7 +1,6 @@
 #pragma once
 
 #include <queue>
-#include <unordered_map>
 
 #include "envoy/api/api.h"
 #include "envoy/common/platform.h"

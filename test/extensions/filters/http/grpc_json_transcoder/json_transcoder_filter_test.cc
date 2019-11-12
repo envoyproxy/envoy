@@ -318,7 +318,6 @@ protected:
     const std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                                     "\",\"services\": [\"bookstore.Bookstore\"]}";
     envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
-    proto_config.set_convert_grpc_status(true);
     TestUtility::loadFromJson(json_string, proto_config);
     return proto_config;
   }
