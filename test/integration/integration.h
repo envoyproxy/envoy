@@ -329,6 +329,7 @@ protected:
   // Will not return until that server is listening.
   virtual IntegrationTestServerPtr
   createIntegrationTestServer(const std::string& bootstrap_path,
+                              std::function<void(IntegrationTestServer&)> on_server_ready_function,
                               std::function<void()> on_server_init_function,
                               Event::TestTimeSystem& time_system);
 
@@ -344,6 +345,9 @@ protected:
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
   absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
+
+  // Steps that should be done before the envoy server starting.
+  std::function<void(IntegrationTestServer&)> on_server_ready_function_;
 
   // Steps that should be done in parallel with the envoy server starting. E.g., xDS
   // pre-init, control plane synchronization needed for server start.

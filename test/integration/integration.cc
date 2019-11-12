@@ -429,9 +429,9 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
                                                        bool reject_unknown_dynamic_fields,
                                                        bool allow_lds_rejection) {
   test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_init_function_, deterministic_, timeSystem(), *api_,
-      defer_listener_finalization_, process_object_, allow_unknown_static_fields,
-      reject_unknown_dynamic_fields, concurrency_);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_,
+      allow_unknown_static_fields, reject_unknown_dynamic_fields, concurrency_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -483,7 +483,7 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = createIntegrationTestServer(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr,
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr, nullptr,
       timeSystem());
   registerTestServerPorts(port_names);
 }
@@ -505,12 +505,12 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
   connection.run();
 }
 
-IntegrationTestServerPtr
-BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
-                                                 std::function<void()> on_server_init_function,
-                                                 Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function,
-                                       deterministic_, time_system, *api_,
+IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
+    const std::string& bootstrap_path,
+    std::function<void(IntegrationTestServer&)> on_server_ready_function,
+    std::function<void()> on_server_init_function, Event::TestTimeSystem& time_system) {
+  return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
+                                       on_server_init_function, deterministic_, time_system, *api_,
                                        defer_listener_finalization_);
 }
 
