@@ -154,10 +154,7 @@ message VirtualHost {
 
 // A filter-defined action type.
 message FilterAction {
-  oneof action {
-    google.protobuf.Any filter_action = 1;
-    google.protobuf.Struct typed_filter_action = 2;
-  }
+  google.protobuf.Any action = 1;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
