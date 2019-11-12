@@ -220,6 +220,8 @@ message Cluster {
         // If KEYS_SUBSET is selected, subset selector matching is performed again with metadata
         // keys reduced to
         // :ref:`fallback_keys_subset<envoy_api_field_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.fallback_keys_subset>`.
+        // It allows for a fallback to a different, less specific selector if some of the keys of
+        // the selector are considered "optional".
         KEYS_SUBSET = 4;
       }
 
