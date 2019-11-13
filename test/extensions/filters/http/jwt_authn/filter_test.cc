@@ -79,6 +79,24 @@ TEST_F(FilterTest, InlineOK) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
+// This test verifies Verifier::Callback is not called for CORS preflight request.
+TEST_F(FilterTest, CorsPreflight) {
+  auto headers = Http::TestHeaderMapImpl{
+      {":method", "OPTIONS"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+      {"origin", "test-origin"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+  EXPECT_EQ(1U, mock_config_->stats().cors_preflight_bypassed_.value());
+  EXPECT_EQ(0U, mock_config_->stats().denied_.value());
+}
+
 // This test verifies the setPayload call is handled correctly
 TEST_F(FilterTest, TestSetPayloadCall) {
   setupMockConfig();

@@ -1,5 +1,6 @@
 #include "extensions/filters/http/jwt_authn/filter.h"
 
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -29,11 +30,29 @@ void Filter::onDestroy() {
   }
 }
 
+bool isCorsPreflightRequest(const Http::HeaderMap& headers) {
+  return headers.Method() &&
+         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
+         headers.Origin() && !headers.Origin()->value().empty() &&
+         headers.AccessControlRequestMethod() &&
+         !headers.AccessControlRequestMethod()->value().empty();
+}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
   state_ = Calling;
   stopped_ = false;
+
+  if (isCorsPreflightRequest(headers)) {
+    // The CORS preflight doesn't include user credentials, allow regardless of JWT policy.
+    // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
+    ENVOY_LOG(debug, "CORS preflight request allowed regardless of JWT policy");
+    stats_.cors_preflight_bypassed_.inc();
+    onComplete(Status::Ok);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // Verify the JWT token, onComplete() will be called when completed.
   const auto* verifier =
       config_->findVerifier(headers, decoder_callbacks_->streamInfo().filterState());

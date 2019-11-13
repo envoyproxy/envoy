@@ -26,3 +26,6 @@ via HTTP/HTTPS.
 The JWT Authentication filter also supports to write the payloads of the successfully verified JWT
 to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>` so that later filters could use
 it to make their own decisions based on the JWT payloads.
+
+The JWT Authentication filter will bypass the `CORS preflight request
+<http://www.w3.org/TR/cors/#cross-origin-request-with-preflight>`_ for JWT authentication.

@@ -46,7 +46,8 @@ private:
 // clang-format off
 #define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
   COUNTER(allowed)                                                                                 \
-  COUNTER(denied)
+  COUNTER(cors_preflight_bypassed)                                                                 \
+  COUNTER(denied)                                                                                  \
 // clang-format on
 
 /**
