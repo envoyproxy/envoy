@@ -893,6 +893,16 @@ message RetryPolicy {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
+  message RetryBudget {
+    // Specifies the limit on concurrent retries as a percentage of outstanding requests.
+    // Defaults to 20%.
+    type.Percent percent_budget = 1;
+
+    // Specifies the minimum retry concurrency allowed for the retry budget.
+    // Defaults to 3.
+    google.protobuf.UInt32Value min_concurrency = 2;
+  }
+
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
   // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
@@ -949,6 +959,13 @@ message RetryPolicy {
 
   // HTTP headers which must be present in the request for retries to be attempted.
   repeated HeaderMatcher retriable_request_headers = 10;
+
+  // Specifies a limit on concurrent retries. This parameter is optional.
+  //
+  // .. note::
+  //
+  //   It is not recommended to use retry budgets with retry circuit breakers.
+  RetryBudget retry_budget = 11;
 }
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
