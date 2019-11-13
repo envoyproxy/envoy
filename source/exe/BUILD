@@ -55,8 +55,8 @@ envoy_cc_library(
     ],
     deps = [
         ":envoy_main_common_lib",
+        ":platform_checks_lib",
         ":platform_impl_lib",
-	":platform_checks_lib"
     ],
 )
 
@@ -67,7 +67,7 @@ envoy_cc_library(
     deps = [
         ":envoy_common_lib",
         ":platform_impl_lib",
-	":platform_checks_lib",
+        ":platform_checks_lib",
         ":process_wide_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
@@ -115,19 +115,6 @@ envoy_cc_library(
 )
 
 envoy_cc_posix_library(
-    name = "platform_checks_lib",
-    srcs = ["posix/platform_checks.cc"],
-    hdrs = ["posix/platform_checks.h"],
-    external_deps = ["abseil_optional"],
-    strip_include_prefix = "posix",
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-        "//source/common/filesystem:filesystem_lib",
-    ],
-)
-
-envoy_cc_posix_library(
     name = "platform_impl_lib",
     srcs = ["posix/platform_impl.cc"],
     deps = [
@@ -148,11 +135,39 @@ envoy_cc_win32_library(
     ],
 )
 
+envoy_cc_library(
+    name = "platform_checks_lib",
+    deps = envoy_cc_platform_dep("platform_checks_lib"),
+)
+
+envoy_cc_library(
+    name = "platform_checks_interface_lib",
+    hdrs = ["platform_checks.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+    ],
+)
+
+envoy_cc_posix_library(
+    name = "platform_checks_lib",
+    srcs = ["posix/platform_checks.cc"],
+    external_deps = ["abseil_optional"],
+    strip_include_prefix = "posix",
+    deps = [
+        ":platform_checks_interface_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/filesystem:filesystem_lib",
+    ],
+)
+
 envoy_cc_win32_library(
     name = "platform_checks_lib",
-    hdrs = ["win32/platform_checks.h"],
+    hdrs = ["win32/platform_checks.cc"],
     strip_include_prefix = "win32",
     deps = [
+        ":platform_checks_interface_lib",
+        "//source/common/common:logger_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
 )
