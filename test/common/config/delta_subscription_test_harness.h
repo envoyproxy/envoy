@@ -2,7 +2,7 @@
 
 #include <queue>
 
-#include "common/config/delta_subscription_impl.h"
+#include "common/config/grpc_subscription_impl.h"
 #include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -34,11 +34,11 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    xds_context_ = std::make_shared<NewGrpcMuxImpl>(
+    grpc_mux_ = std::make_shared<GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        random_, stats_store_, rate_limit_settings_, local_info_);
-    subscription_ = std::make_unique<DeltaSubscriptionImpl>(
-        xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+        random_, stats_store_, rate_limit_settings_, local_info_, false);
+    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
+        grpc_mux_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
         init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
@@ -76,7 +76,7 @@ public:
                          bool expect_node = false) override {
     UNREFERENCED_PARAMETER(version);
     UNREFERENCED_PARAMETER(expect_node);
-    expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "", {});
+    expectSendMessage(cluster_names, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   }
 
   void expectSendMessage(const std::set<std::string>& subscribe,
@@ -101,7 +101,7 @@ public:
       (*expected_request.mutable_initial_resource_versions())[resource.first] = resource.second;
     }
 
-    if (error_code != Grpc::Status::GrpcStatus::Ok) {
+    if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
@@ -146,10 +146,10 @@ public:
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-      expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
+      expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
-    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
-        ->onDiscoveryResponse(std::move(response));
+    auto shared_mux = subscription_->getGrpcMuxForTest();
+    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -163,7 +163,7 @@ public:
                         cluster_names.begin(), cluster_names.end(),
                         std::inserter(unsub, unsub.begin()));
 
-    expectSendMessage(sub, unsub, Grpc::Status::GrpcStatus::Ok, "", {});
+    expectSendMessage(sub, unsub, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
     subscription_->updateResourceInterest(cluster_names);
     last_cluster_names_ = cluster_names;
   }
@@ -189,8 +189,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  std::shared_ptr<NewGrpcMuxImpl> xds_context_;
-  std::unique_ptr<DeltaSubscriptionImpl> subscription_;
+  std::shared_ptr<GrpcMux> grpc_mux_;
+  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;

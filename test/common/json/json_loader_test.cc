@@ -385,48 +385,6 @@ TEST_F(JsonLoaderTest, AsJsonString) {
   EXPECT_TRUE(json2->getBoolean("name2"));
 }
 
-TEST_F(JsonLoaderTest, ListAsString) {
-  {
-    std::list<std::string> list = {};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_TRUE(output.empty());
-  }
-
-  {
-    std::list<std::string> list = {"one"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(1, output.size());
-    EXPECT_EQ("one", output[0]->asString());
-  }
-
-  {
-    std::list<std::string> list = {"one", "two", "three", "four"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(4, output.size());
-    EXPECT_EQ("one", output[0]->asString());
-    EXPECT_EQ("two", output[1]->asString());
-    EXPECT_EQ("three", output[2]->asString());
-    EXPECT_EQ("four", output[3]->asString());
-  }
-
-  {
-    std::list<std::string> list = {"127.0.0.1:46465", "127.0.0.1:52211", "127.0.0.1:58941"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(3, output.size());
-    EXPECT_EQ("127.0.0.1:46465", output[0]->asString());
-    EXPECT_EQ("127.0.0.1:52211", output[1]->asString());
-    EXPECT_EQ("127.0.0.1:58941", output[2]->asString());
-  }
-}
-
 TEST_F(JsonLoaderTest, YamlScalar) {
   EXPECT_EQ(true, Factory::loadFromYamlString("true")->asBoolean());
   EXPECT_EQ("true", Factory::loadFromYamlString("\"true\"")->asString());

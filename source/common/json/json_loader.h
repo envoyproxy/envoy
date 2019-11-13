@@ -25,8 +25,6 @@ public:
    * Constructs a Json Object from a YAML string.
    */
   static ObjectSharedPtr loadFromYamlString(const std::string& yaml);
-
-  static const std::string listAsJsonString(const std::list<std::string>& items);
 };
 
 } // namespace Json

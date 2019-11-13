@@ -42,7 +42,7 @@ public:
     EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
   }
 
-  void callHttpCheckAndValidateRequestAttributes() {
+  void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate) {
     Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                             {":path", "/bar"}};
     envoy::service::auth::v2::CheckRequest request;
@@ -54,7 +54,8 @@ public:
     (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
 
     CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                       std::move(metadata_context), request, false);
+                                       std::move(metadata_context), request, false,
+                                       include_peer_certificate);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -67,6 +68,12 @@ public:
                          .fields()
                          .at("foo")
                          .string_value());
+
+    if (include_peer_certificate) {
+      EXPECT_EQ(cert_data_, request.attributes().source().certificate());
+    } else {
+      EXPECT_EQ(0, request.attributes().source().certificate().size());
+    }
   }
 
   static Buffer::InstancePtr newTestBuffer(uint64_t size) {
@@ -88,9 +95,11 @@ public:
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Buffer::InstancePtr buffer_;
+  const std::string cert_data_{"cert-data"};
 };
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
+// Verify that the source certificate is not set by default.
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
   envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
@@ -101,7 +110,27 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  CheckRequestUtils::createTcpCheck(&net_callbacks_, request);
+  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false);
+
+  EXPECT_EQ(request.attributes().source().certificate().size(), 0);
+}
+
+// Verify that createTcpCheck's dependencies are invoked when it's called.
+// Verify that createTcpCheck populates the source certificate correctly.
+TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
+  envoy::service::auth::v2::CheckRequest request;
+  EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  EXPECT_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(cert_data_));
+
+  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, true);
+
+  EXPECT_EQ(cert_data_, request.attributes().source().certificate());
 }
 
 // Verify that createHttpCheck's dependencies are invoked when it's called.
@@ -121,7 +150,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
                                      Protobuf::Map<std::string, std::string>(),
-                                     envoy::api::v2::core::Metadata(), request_, size);
+                                     envoy::api::v2::core::Metadata(), request_, size, false);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
@@ -141,7 +170,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
-                                     envoy::api::v2::core::Metadata(), request_, size);
+                                     envoy::api::v2::core::Metadata(), request_, size, false);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
@@ -157,9 +186,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
   expectBasicHttp();
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<std::string, std::string>(),
-                                     envoy::api::v2::core::Metadata(), request_, buffer_->length());
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
+      envoy::api::v2::core::Metadata(), request_, buffer_->length(), false);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -169,6 +198,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
 // proto object.
+// Verify that the source certificate is not set by default.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                           {":path", "/bar"}};
@@ -185,7 +215,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  callHttpCheckAndValidateRequestAttributes();
+  callHttpCheckAndValidateRequestAttributes(false);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -197,7 +227,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
-  callHttpCheckAndValidateRequestAttributes();
+  callHttpCheckAndValidateRequestAttributes(false);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -215,7 +245,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
   Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";
 
-  callHttpCheckAndValidateRequestAttributes();
+  callHttpCheckAndValidateRequestAttributes(false);
 }
 
 // Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
@@ -233,7 +263,19 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextSubject) {
   std::string subject_local = "destination";
   EXPECT_CALL(*ssl_, subjectLocalCertificate()).WillOnce(ReturnRef(subject_local));
 
-  callHttpCheckAndValidateRequestAttributes();
+  callHttpCheckAndValidateRequestAttributes(false);
+}
+
+// Verify that the source certificate is populated correctly.
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
+  expectBasicHttp();
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  EXPECT_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(cert_data_));
+
+  callHttpCheckAndValidateRequestAttributes(true);
 }
 
 } // namespace

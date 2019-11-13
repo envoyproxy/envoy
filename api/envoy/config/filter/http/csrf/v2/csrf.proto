@@ -13,6 +13,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: CSRF]
 // Cross-Site Request Forgery :ref:`configuration overview <config_http_filters_csrf>`.
+// [#extension: envoy.filters.http.csrf]
 
 // CSRF filter config.
 message CsrfPolicy {

@@ -45,7 +45,7 @@ public:
         failure_mode_deny_(config.failure_mode_deny()),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
-                ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
+                ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
         http_context_(http_context), stat_names_(scope.symbolTable()) {}
   const std::string& domain() const { return domain_; }

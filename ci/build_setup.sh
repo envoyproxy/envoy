@@ -72,11 +72,12 @@ fi
 
 bazel/setup_clang.sh /opt/llvm
 
-# Not sandboxing, since non-privileged Docker can't do nested namespaces.
+[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
+
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --local_cpu_resources=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
-  --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
+  --test_env=HOME --test_env=PYTHONUSERBASE --test_output=errors \
   --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
@@ -84,8 +85,8 @@ export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOM
 
 if [ "$1" != "-nofetch" ]; then
   # Setup Envoy consuming project.
-  if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
-  then
+  if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
+    rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   fi
 

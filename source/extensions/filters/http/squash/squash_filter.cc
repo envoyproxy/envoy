@@ -142,11 +142,10 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, 
   ENVOY_LOG(debug, "Squash: Holding request and requesting debug attachment");
 
   Http::MessagePtr request(new Http::RequestMessageImpl());
-  request->headers().insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
-  request->headers().insertPath().value().setReference(POST_ATTACHMENT_PATH);
-  request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
-  request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
+  request->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  request->headers().setReferencePath(POST_ATTACHMENT_PATH);
+  request->headers().setReferenceHost(SERVER_AUTHORITY);
+  request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
 
   is_squashing_ = true;
@@ -268,9 +267,9 @@ void SquashFilter::scheduleRetry() {
 
 void SquashFilter::pollForAttachment() {
   Http::MessagePtr request(new Http::RequestMessageImpl());
-  request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  request->headers().insertPath().value().setReference(debug_attachment_path_);
-  request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
+  request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
+  request->headers().setReferencePath(debug_attachment_path_);
+  request->headers().setReferenceHost(SERVER_AUTHORITY);
 
   in_flight_request_ =
       cm_.httpAsyncClientForCluster(config_->clusterName())

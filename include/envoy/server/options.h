@@ -185,11 +185,6 @@ public:
   virtual bool mutexTracingEnabled() const PURE;
 
   /**
-   * @return whether to use the old libevent evbuffer-based Buffer implementation.
-   */
-  virtual bool libeventBufferEnabled() const PURE;
-
-  /**
    * @return whether to use the fake symbol table implementation.
    */
   virtual bool fakeSymbolTableEnabled() const PURE;

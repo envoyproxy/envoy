@@ -5,6 +5,7 @@ Version history
 ================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * api: remove all support for v1
+* buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
@@ -13,8 +14,11 @@ Version history
 * http: added the ability to sanitize headers nominated by the Connection header. This new behavior is guarded by envoy.reloadable_features.connection_header_sanitization which defaults to true.
 * redis: performance improvement for larger split commands by avoiding string copies.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
+* server: fixed a bug in config validation for configs with runtime layers
+* tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 * tls: remove TLS 1.0 and 1.1 from client defaults
+* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 
 1.12.0 (October 31, 2019)
 =========================
@@ -72,7 +76,6 @@ Version history
 * listeners: added :ref:`connection balancer <envoy_api_field_Listener.connection_balance_config>`
   configuration for TCP listeners.
 * listeners: listeners now close the listening socket as part of the draining stage as soon as workers stop accepting their connections.
-* logger: added `--log-format-escaped` command line option to escape newline characters in application logs.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
 * lua: extended `dynamicMetadata:set()` to allow setting complex values.
 * metrics_service: added support for flushing histogram buckets.
