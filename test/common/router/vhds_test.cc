@@ -50,8 +50,8 @@ vhds:
       name: $0
       domains: [$1]
       routes:
-      - match: {{ prefix: "/" }}
-        route: {{ cluster: "my_service" }}
+      - match: { prefix: "/" }
+        route: { cluster: "my_service" }
     )EOF",
                                                                                        name,
                                                                                        domain));
