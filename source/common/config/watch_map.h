@@ -70,6 +70,8 @@ public:
   //    Y will be in removed_.
   AddedRemoved updateWatchInterest(Watch* watch,
                                    const std::set<std::string>& update_to_these_names);
+  // Adds the extra set of resource names that the given watch should watch.
+  AddedRemoved addToWatchInterest(Watch* watch, const std::set<std::string>& add_these_names);
 
   // Expects that the watch to be removed has already had all of its resource names removed via
   // updateWatchInterest().

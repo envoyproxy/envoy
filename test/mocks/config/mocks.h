@@ -72,6 +72,10 @@ public:
                Watch*(const std::string& type_url, Watch* watch,
                       const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
                       std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD5(addToWatch,
+               Watch*(const std::string& type_url, Watch* watch,
+                      const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
+                      std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));

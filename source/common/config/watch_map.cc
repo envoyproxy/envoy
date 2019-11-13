@@ -40,6 +40,17 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
                       findRemovals(newly_removed_from_watch, watch));
 }
 
+AddedRemoved WatchMap::addToWatchInterest(Watch* watch,
+                                          const std::set<std::string>& add_these_names) {
+  std::vector<std::string> newly_added_to_watch(add_these_names.begin(), add_these_names.end());
+  std::vector<std::string> newly_removed_from_watch;
+  watch->resource_names_.insert(add_these_names.begin(), add_these_names.end());
+  std::set<std::string> additions = add_these_names;
+
+  return AddedRemoved(findAdditions(newly_added_to_watch, watch),
+                      findRemovals(newly_removed_from_watch, watch));
+}
+
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
   const auto watches_interested = watch_interest_.find(resource_name);

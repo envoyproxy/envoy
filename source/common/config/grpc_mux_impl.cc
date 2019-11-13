@@ -22,11 +22,24 @@ Watch* GrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                      SubscriptionCallbacks& callbacks,
                                      std::chrono::milliseconds init_fetch_timeout) {
   if (watch == nullptr) {
-    return addWatch(type_url, resources, callbacks, init_fetch_timeout);
-  } else {
-    updateWatch(type_url, watch, resources);
-    return watch;
+    watch = addWatch(type_url, callbacks, init_fetch_timeout);
   }
+  // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
+  updateWatch(type_url, watch, resources);
+  return watch;
+}
+
+Watch* NewGrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
+                                  const std::set<std::string>& resources,
+                                  SubscriptionCallbacks& callbacks,
+                                  std::chrono::milliseconds init_fetch_timeout) {
+  if (watch == nullptr) {
+    watch = addWatch(type_url, callbacks, init_fetch_timeout);
+  }
+  // addToWatch() queues a discovery request for any of *extra* 'resources' we are not yet
+  // subscribed.
+  addToWatch(type_url, watch, resources);
+  return watch;
 }
 
 void GrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
@@ -95,9 +108,8 @@ void GrpcMuxImpl::handleStreamEstablishmentFailure() {
   } while (all_subscribed.size() != subscriptions_.size());
 }
 
-Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                             SubscriptionCallbacks& callbacks,
-                             std::chrono::milliseconds init_fetch_timeout) {
+Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, SubscriptionCallbacks& callbacks,
+                                std::chrono::milliseconds init_fetch_timeout) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
@@ -108,9 +120,22 @@ Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::st
   }
 
   Watch* watch = watch_map->second->addWatch(callbacks);
-  // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-  updateWatch(type_url, watch, resources);
   return watch;
+}
+
+void NewGrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
+                                const std::set<std::string>& resources) {
+  ASSERT(watch != nullptr);
+  SubscriptionState& sub = subscriptionStateFor(type_url);
+  WatchMap& watch_map = watchMapFor(type_url);
+
+  auto added_removed = watch_map.addToWatchInterest(watch, resources);
+  sub.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
+
+  // Tell the server about our change in interest, if any.
+  if (sub.subscriptionUpdatePending()) {
+    trySendDiscoveryRequests();
+  }
 }
 
 // Updates the list of resource names watched by the given watch. If an added name is new across

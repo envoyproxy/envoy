@@ -224,6 +224,10 @@ public:
    * @return Config::SubscriptionFactory& the subscription factory.
    */
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
+
+  virtual void updateClusterInterest(const std::set<std::string>& update_to_these_names) PURE;
+
+  virtual void addToClusterInterest(const std::set<std::string>& add_these_names) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -250,6 +254,16 @@ public:
    * @return std::string last accepted version from fetch.
    */
   virtual const std::string versionInfo() const PURE;
+
+  /**
+   * Update watch set of cluster resources interested.
+   */
+  virtual void updateClusterInterest(const std::set<std::string>& update_to_these_names) PURE;
+
+  /**
+   * Add watch set of cluster resources interested.
+   */
+  virtual void addToClusterInterest(const std::set<std::string>& add_these_names) PURE;
 };
 
 using CdsApiPtr = std::unique_ptr<CdsApi>;

@@ -33,6 +33,14 @@ public:
   }
   const std::string versionInfo() const override { return system_version_info_; }
 
+  void updateClusterInterest(const std::set<std::string>& update_to_these_names) override {
+    subscription_->updateResourceInterest(update_to_these_names);
+  }
+
+  void addToClusterInterest(const std::set<std::string>& add_these_names) override {
+    subscription_->addToResourceInterest(add_these_names);
+  }
+
 private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

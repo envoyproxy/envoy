@@ -50,6 +50,12 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   subscription_->resume();
 }
 
+TEST_F(DeltaSubscriptionImplTest, AddResourceCauseRequest) {
+  startSubscription({});
+  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->addToResourceInterest({"name1", "name2"});
+}
+
 TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
   startSubscription({"name1"});
   deliverConfigUpdate({"name1"}, "someversion", true);

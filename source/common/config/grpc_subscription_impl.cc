@@ -39,6 +39,11 @@ void GrpcSubscriptionImpl::updateResourceInterest(
   stats_.update_attempt_.inc();
 }
 
+void GrpcSubscriptionImpl::addToResourceInterest(const std::set<std::string>& add_these_names) {
+  watch_ = grpc_mux_->addToWatch(type_url_, watch_, add_these_names, *this, init_fetch_timeout_);
+  stats_.update_attempt_.inc();
+}
+
 // Config::SubscriptionCallbacks
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

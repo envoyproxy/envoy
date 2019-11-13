@@ -73,6 +73,14 @@ public:
                                   const std::set<std::string>& resources,
                                   SubscriptionCallbacks& callbacks,
                                   std::chrono::milliseconds init_fetch_timeout) PURE;
+  /**
+   * The only difference between addToWatch() and addOrUpdateWatch() is that the 'resources' here
+   * means the *extra* resources we interested in.
+   */
+  virtual Watch* addToWatch(const std::string& type_url, Watch* watch,
+                            const std::set<std::string>& resources,
+                            SubscriptionCallbacks& callbacks,
+                            std::chrono::milliseconds init_fetch_timeout) PURE;
 
   /**
    * Cleanup of a Watch* added by addOrUpdateWatch(). Receiving a Watch* from addOrUpdateWatch()
