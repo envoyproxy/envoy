@@ -37,9 +37,13 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       formatter = std::make_unique<AccessLog::FormatterImpl>(fal_config.format());
     }
   } else if (fal_config.access_log_format_case() ==
-             envoy::config::accesslog::v2::FileAccessLog::kJsonFormat) {
+                 envoy::config::accesslog::v2::FileAccessLog::kJsonFormat ||
+             fal_config.access_log_format_case() ==
+                 envoy::config::accesslog::v2::FileAccessLog::kTypedJsonFormat) {
     auto json_format_map = this->convertJsonFormatToMap(fal_config.json_format());
-    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map);
+    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(
+        json_format_map, fal_config.access_log_format_case() ==
+                             envoy::config::accesslog::v2::FileAccessLog::kTypedJsonFormat);
   } else {
     throw EnvoyException(
         "Invalid access_log format provided. Only 'format' and 'json_format' are supported.");

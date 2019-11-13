@@ -60,10 +60,12 @@ Format Dictionaries
 -------------------
 
 Format dictionaries are dictionaries that specify a structured access log output format,
-specified using the ``json_format`` key. This allows logs to be output in a structured format
-such as JSON.
-Similar to format strings, command operators are evaluated and their values inserted into the format
-dictionary to construct the log output.
+specified using the ``json_format`` or ``typed_json_format`` keys. This allows logs to be output in
+a structured format such as JSON. Similar to format strings, command operators are evaluated and
+their values inserted into the format dictionary to construct the log output.
+
+The ``typed_json_format`` differs from ``json_format`` in that values are rendered as JSON numbers
+where applicable.
 
 For example, with the following format provided in the configuration:
 
@@ -89,7 +91,12 @@ This allows you to specify a custom key for each command operator.
 
 Format dictionaries have the following restrictions:
 
-* The dictionary must map strings to strings (specifically, strings to command operators). Nesting is not currently supported.
+* The dictionary must map strings to strings (specifically, strings to command operators). Nesting
+  is not currently supported.
+* When using the ``typed_json_format`` command operators will only produce numeric output if the
+  command operator is the only string that appears in the dictionary value. For example,
+  ``"%DURATION%"`` will log a numeric duration value, but ``"%DURATION%.0"`` will log a string
+  value.
 
 Command Operators
 -----------------
@@ -281,7 +288,7 @@ The following command operators are supported:
 
   .. note::
 
-    This is always the physical remote address of the peer even if the downstream remote address has 
+    This is always the physical remote address of the peer even if the downstream remote address has
     been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
@@ -291,7 +298,7 @@ The following command operators are supported:
 
   .. note::
 
-    This is always the physical remote address of the peer even if the downstream remote address has 
+    This is always the physical remote address of the peer even if the downstream remote address has
     been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
@@ -446,4 +453,3 @@ The following command operators are supported:
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
-
