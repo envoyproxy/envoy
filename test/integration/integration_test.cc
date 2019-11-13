@@ -947,6 +947,25 @@ TEST_P(IntegrationTest, ProcessObjectUnealthy) {
   EXPECT_THAT(response->headers(), HttpStatusIs("500"));
 }
 
+TEST_P(IntegrationTest, TrailersDroppedDuringEncoding) { testTrailers(10, 10, false, false); }
+
+TEST_P(IntegrationTest, TrailersEncodedUpstream) {
+  // Enable the encoding of trailers upstream
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
+    }
+  });
+  testTrailers(10, 10, true, false);
+}
+
+TEST_P(IntegrationTest, TrailersEncodedDownstream) {
+  config_helper_.addConfigModifier(setEnableEncodeTrailersHttp1());
+  testTrailers(10, 10, false, true);
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

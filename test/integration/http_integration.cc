@@ -260,6 +260,13 @@ void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstre
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
+ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableEncodeTrailersHttp1() {
+  return
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_http_protocol_options()->set_enable_trailers(true);
+      };
+}
+
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
     const Http::TestHeaderMapImpl& response_headers, uint32_t response_size, int upstream_index,
@@ -1045,7 +1052,8 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   EXPECT_EQ(512U, response->body().size());
 }
 
-void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size) {
+void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size,
+                                       bool check_request, bool check_response) {
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
 
@@ -1068,12 +1076,20 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
+  if (check_request) {
+    EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
+  } else {
+    EXPECT_EQ(upstream_request_->trailers(), nullptr);
+  }
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response_size, response->body().size());
-  EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+  if (check_response) {
+    EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+  } else {
+    EXPECT_EQ(response->trailers(), nullptr);
+  }
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
