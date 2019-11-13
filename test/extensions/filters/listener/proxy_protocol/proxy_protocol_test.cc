@@ -69,7 +69,7 @@ public:
   const Network::Socket& socket() const override { return socket_; }
   bool reusePort() override { return false; }
   Network::SocketSharedPtr createReusePortSocket() override {
-    ASSERT_TRUE(false); // should be never called
+    ASSERT(0); // should be never called
     return nullptr;
   }
   bool bindToPort() override { return true; }
