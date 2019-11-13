@@ -3,13 +3,12 @@
 Aggregate Cluster
 =================
 
-Aggregate cluster is used for failover between clusters with different service, e.g., from EDS upstream cluster to STRICT_DNS upstream cluster, 
-from cluster using ROUND_ROBIN load balaning policy to cluster using MAGLEV, from cluster with 0.1 connection timeout to cluster with 1s connection timeout, etc.
+Aggregate cluster is used for failover between clusters with different configuration, e.g., from EDS upstream cluster to STRICT_DNS upstream cluster, 
+from cluster using ROUND_ROBIN load balaning policy to cluster using MAGLEV, from cluster with 0.1s connection timeout to cluster with 1s connection timeout, etc.
 Aggregate cluster loosely couples multiple clusters by referencing their name in the :ref:`configuration <envoy_api_msg_config.cluster.aggregate.v2alpha.ClusterConfig>`. 
 The fallback priority is defined implicitly by the ordering in the :ref:`clusters <envoy_api_field_config.cluster.aggregate.v2alpha.ClusterConfig.clusters>`.
-Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and piority first and then delegates the load balancing from that priority
-to the load balancer of the selected cluster. The top level load balancer reuses the existing load balancing algorithm by linearizing the 
-priority set of multiple clusters into one. 
+Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and piority first and then delegates the load balancing to the load balancer of the selected cluster. 
+The top level load balancer reuses the existing load balancing algorithm by linearizing the priority set of multiple clusters into one. 
 
 Linearize Priority Set
 ----------------------
@@ -64,7 +63,7 @@ will override the *PriorityLoad* during load balancing.
 Load Balancing Example
 ----------------------
 
-Aggregate cluster uses tiered load balancing algorithm and the fist tier is distributing traffic to different clusters according to the health score across 
+Aggregate cluster uses tiered load balancing algorithm and the top tier is distributing traffic to different clusters according to the health score across 
 all priorities in each cluster.
  
 +-----------------------------------------------------------------------------------------------------------------------+--------------------+----------------------+
