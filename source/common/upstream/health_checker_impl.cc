@@ -638,6 +638,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
 
+  Grpc::Common::toGrpcTimeout(parent_.timeout_,
+                              headers_message->headers().insertGrpcTimeout().value());
+
   Router::FilterUtility::setUpstreamScheme(
       headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());
 

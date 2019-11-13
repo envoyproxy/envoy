@@ -52,12 +52,16 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
+    std::function<void(IntegrationTestServer&)> server_ready_function,
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
+  if (server_ready_function != nullptr) {
+    server->setOnServerReadyCb(server_ready_function);
+  }
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
                 process_object, allow_unknown_static_fields, reject_unknown_dynamic_fields,
                 concurrency);
@@ -152,6 +156,9 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::serverReady() {
   pending_listeners_ = server().listenerManager().listeners().size();
+  if (on_server_ready_cb_ != nullptr) {
+    on_server_ready_cb_(*this);
+  }
   server_set_.setReady();
 }
 
