@@ -189,7 +189,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
-  if (connection_.disable_trailers_) {
+  if (!connection_.enable_trailers_) {
     return endEncode();
   }
   // Trailers only matter if it is a chunk transfer encoding
@@ -379,8 +379,8 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
-                               HeaderKeyFormatterPtr&& header_key_formatter, bool disable_trailers)
-    : disable_trailers_(disable_trailers),
+                               HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
+    : enable_trailers_(enable_trailers),
       connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
       header_key_formatter_(std::move(header_key_formatter)),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
@@ -618,7 +618,7 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
                                            Http1Settings settings, uint32_t max_request_headers_kb,
                                            const uint32_t max_request_headers_count)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
-                     max_request_headers_count, formatter(settings), settings.disable_trailers_),
+                     max_request_headers_count, formatter(settings), settings.enable_trailers_),
       callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
@@ -798,7 +798,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stat
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count, formatter(settings), settings.disable_trailers_) {}
+                     max_response_headers_count, formatter(settings), settings.enable_trailers_) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

@@ -85,9 +85,8 @@ message Http1ProtocolOptions {
   // are lower cased.
   HeaderKeyFormat header_key_format = 4;
 
-  // Disables encoding trailers for HTTP1. Setting this to true will drop the
-  // trailers during encoding.
-  bool disable_trailers = 5;
+  // Enables encoding of trailers for HTTP1.
+  bool enable_trailers = 5;
 }
 
 // [#next-free-field: 13]

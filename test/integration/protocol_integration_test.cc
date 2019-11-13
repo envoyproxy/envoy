@@ -43,10 +43,10 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
-// Disable the encoding of Http1 trailers downstream
-void setDisableEncodeTrailersHttp1(
+// Enable the encoding of Http1 trailers downstream
+void setEnableEncodeTrailersHttp1(
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-  hcm.mutable_http_protocol_options()->set_disable_trailers(true);
+  hcm.mutable_http_protocol_options()->set_enable_trailers(true);
 };
 
 // Tests for DownstreamProtocolIntegrationTest will be run with all protocols
@@ -83,20 +83,22 @@ protected:
 // downstream and H1/H2 upstreams.
 using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
-TEST_P(ProtocolIntegrationTest, TrailerSupport) { testTrailers(10, 20); }
+TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
+  config_helper_.addConfigModifier(&setEnableEncodeTrailersHttp1);
 
-TEST_P(ProtocolIntegrationTest, TrailerHttp1Disabled) {
-  config_helper_.addConfigModifier(&setDisableEncodeTrailersHttp1);
-
-  // Disable the encoding of trailers upstream
+  // Enable the encoding of trailers upstream
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http_protocol_options()->set_disable_trailers(true);
+      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
     }
   });
 
+  testTrailers(10, 20);
+}
+
+TEST_P(ProtocolIntegrationTest, TrailerHttp1Disabled) {
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
 
