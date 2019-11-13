@@ -8,16 +8,28 @@
 namespace Envoy {
 namespace Http {
 
-// A factory to create Http::Connection instance for QUIC. It has two registered
-// subclasses QuicHttpClientConnectionFactory and QuicHttpServerConnectionFactory.
-class QuicHttpConnectionFactory {
+// A factory to create Http::ServerConnection instance for QUIC.
+class QuicHttpServerConnectionFactory {
 public:
-  virtual ~QuicHttpConnectionFactory() {}
+  virtual ~QuicHttpServerConnectionFactory() {}
 
   virtual std::string name() const PURE;
 
-  virtual Connection* createQuicHttpConnection(Network::Connection& connection,
-                                               ConnectionCallbacks& callbacks) PURE;
+  virtual ServerConnection* createQuicServerConnection(Network::Connection& connection,
+                                                       ConnectionCallbacks& callbacks) PURE;
+
+  static std::string category() { return "quic_codec"; }
+};
+
+// A factory to create Http::ClientConnection instance for QUIC.
+class QuicHttpClientConnectionFactory {
+public:
+  virtual ~QuicHttpClientConnectionFactory() {}
+
+  virtual std::string name() const PURE;
+
+  virtual ClientConnection* createQuicClientConnection(Network::Connection& connection,
+                                                       ConnectionCallbacks& callbacks) PURE;
 
   static std::string category() { return "quic_codec"; }
 };

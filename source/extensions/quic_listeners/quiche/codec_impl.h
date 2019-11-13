@@ -77,25 +77,25 @@ private:
 };
 
 // A factory to create QuicHttpClientConnection.
-class QuicHttpClientConnectionFactory : public Http::QuicHttpConnectionFactory {
+class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectionFactory {
 public:
-  Http::Connection* createQuicHttpConnection(Network::Connection& connection,
-                                             Http::ConnectionCallbacks& callbacks) override;
+  Http::ClientConnection* createQuicClientConnection(Network::Connection& connection,
+                                                     Http::ConnectionCallbacks& callbacks) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Client; }
 };
 
 // A factory to create QuicHttpServerConnection.
-class QuicHttpServerConnectionFactory : public Http::QuicHttpConnectionFactory {
+class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectionFactory {
 public:
-  Http::Connection* createQuicHttpConnection(Network::Connection& connection,
-                                             Http::ConnectionCallbacks& callbacks) override;
+  Http::ServerConnection* createQuicServerConnection(Network::Connection& connection,
+                                                     Http::ConnectionCallbacks& callbacks) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Server; }
 };
 
-DECLARE_FACTORY(QuicHttpClientConnectionFactory);
-DECLARE_FACTORY(QuicHttpServerConnectionFactory);
+DECLARE_FACTORY(QuicHttpClientConnectionFactoryImpl);
+DECLARE_FACTORY(QuicHttpServerConnectionFactoryImpl);
 
 } // namespace Quic
 } // namespace Envoy

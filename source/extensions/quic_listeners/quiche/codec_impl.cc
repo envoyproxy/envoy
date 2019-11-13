@@ -6,6 +6,9 @@
 namespace Envoy {
 namespace Quic {
 
+// Converts a QuicStream instance to EnvoyQuicStream instance. The current stream implementation
+// inherits from these two interfaces, with the former one providing Quic interface and the latter
+// providing Envoy interface.
 EnvoyQuicStream* quicStreamToEnvoyStream(quic::QuicStream* stream) {
   return dynamic_cast<EnvoyQuicStream*>(stream);
 }
@@ -77,23 +80,21 @@ void QuicHttpClientConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
   runWatermarkCallbacksForEachStream(quic_client_session_.stream_map(), false);
 }
 
-Http::Connection*
-QuicHttpClientConnectionFactory::createQuicHttpConnection(Network::Connection& connection,
-                                                          Http::ConnectionCallbacks& callbacks) {
+Http::ClientConnection* QuicHttpClientConnectionFactoryImpl::createQuicClientConnection(
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
   return new Quic::QuicHttpClientConnectionImpl(
       dynamic_cast<Quic::EnvoyQuicClientSession&>(connection), callbacks);
 }
 
-Http::Connection*
-QuicHttpServerConnectionFactory::createQuicHttpConnection(Network::Connection& connection,
-                                                          Http::ConnectionCallbacks& callbacks) {
+Http::ServerConnection* QuicHttpServerConnectionFactoryImpl::createQuicServerConnection(
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks) {
   return new Quic::QuicHttpServerConnectionImpl(
       dynamic_cast<Quic::EnvoyQuicServerSession&>(connection),
       dynamic_cast<Http::ServerConnectionCallbacks&>(callbacks));
 }
 
-REGISTER_FACTORY(QuicHttpClientConnectionFactory, Http::QuicHttpConnectionFactory);
-REGISTER_FACTORY(QuicHttpServerConnectionFactory, Http::QuicHttpConnectionFactory);
+REGISTER_FACTORY(QuicHttpClientConnectionFactoryImpl, Http::QuicHttpClientConnectionFactory);
+REGISTER_FACTORY(QuicHttpServerConnectionFactoryImpl, Http::QuicHttpServerConnectionFactory);
 
 } // namespace Quic
 } // namespace Envoy

@@ -420,9 +420,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersCount());
   case CodecType::HTTP3:
     return std::unique_ptr<Http::ServerConnection>(dynamic_cast<Http::ServerConnection*>(
-        Config::Utility::getAndCheckFactory<Http::QuicHttpConnectionFactory>(
+        Config::Utility::getAndCheckFactory<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Server)
-            .createQuicHttpConnection(connection, callbacks)));
+            .createQuicServerConnection(connection, callbacks)));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
