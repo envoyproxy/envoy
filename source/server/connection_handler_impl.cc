@@ -102,8 +102,8 @@ ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImp
                                                             Network::ListenerConfig& config)
     : ActiveTcpListener(
           parent,
-          parent.dispatcher_.createListener(config.listenSocketFactory().getListenSocket(),
-                                            *this, config.bindToPort()),
+          parent.dispatcher_.createListener(config.listenSocketFactory().getListenSocket(), *this,
+                                            config.bindToPort()),
           config) {}
 
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,

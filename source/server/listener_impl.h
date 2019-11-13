@@ -65,7 +65,8 @@ public:
   }
 
 private:
-  // This is currently always shared across all workers. In the future SO_REUSEPORT support will be added.
+  // This is currently always shared across all workers. In the future SO_REUSEPORT support will be
+  // added.
   Network::SocketSharedPtr socket_;
 };
 
