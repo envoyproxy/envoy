@@ -116,7 +116,7 @@ MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _))
       .WillByDefault(
           Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
-            config.listenSocketFactory().createListenSocket();
+            config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
           }));

@@ -199,7 +199,6 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
-
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
 

@@ -59,7 +59,7 @@ public:
     EXPECT_CALL(socket_factory_, socketType())
         .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
-    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
+    EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
     conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
@@ -907,7 +907,7 @@ public:
     EXPECT_CALL(socket_factory_, socketType())
         .WillOnce(Return(Network::Address::SocketType::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
-    EXPECT_CALL(socket_factory_, createListenSocket()).WillOnce(Return(socket_));
+    EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
                                                 Network::Address::InstanceConstSharedPtr(),

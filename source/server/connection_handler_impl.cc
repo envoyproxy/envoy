@@ -102,7 +102,7 @@ ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImp
                                                             Network::ListenerConfig& config)
     : ActiveTcpListener(
           parent,
-          parent.dispatcher_.createListener(config.listenSocketFactory().createListenSocket(),
+          parent.dispatcher_.createListener(config.listenSocketFactory().getListenSocket(),
                                             *this, config.bindToPort()),
           config) {}
 
@@ -411,7 +411,7 @@ ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
                                      Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
     : ActiveUdpListener(
           parent,
-          dispatcher.createUdpListener(config.listenSocketFactory().createListenSocket(), *this),
+          dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
           config) {}
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,

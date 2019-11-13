@@ -301,7 +301,7 @@ public:
 
   MOCK_CONST_METHOD0(socketType, Network::Address::SocketType());
   MOCK_CONST_METHOD0(localAddress, const Network::Address::InstanceConstSharedPtr&());
-  MOCK_METHOD0(createListenSocket, Network::SocketSharedPtr());
+  MOCK_METHOD0(getListenSocket, Network::SocketSharedPtr());
   MOCK_CONST_METHOD0(sharedSocket, absl::optional<std::reference_wrapper<Socket>>());
 };
 

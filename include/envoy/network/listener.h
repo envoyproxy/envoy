@@ -17,9 +17,9 @@ namespace Network {
 class ActiveUdpListenerFactory;
 
 /**
- * ListenSocketFactory is used to create listening socket for each listener.
- * Listeners created from the same ListenConfig instance share the same
- * ListenSocketFactory instance.
+ * ListenSocketFactory is a member of ListenConfig to provide listen socket.
+ * Listeners created from the same ListenConfig instance have listening sockets
+ * provided by the same ListenSocketFactory instance.
  */
 class ListenSocketFactory {
 public:
@@ -28,24 +28,23 @@ public:
   /**
    * Called during actual listener creation.
    * @return the socket to be used for a certain listener, which might be shared
-   *         with other listeners of the same config on other worker threads.
+   * with other listeners of the same config on other worker threads.
    */
-  virtual SocketSharedPtr createListenSocket() PURE;
+  virtual SocketSharedPtr getListenSocket() PURE;
 
   /**
-   * @return the type of the socket createListenSocket() returns.
+   * @return the type of the socket getListenSocket() returns.
    */
   virtual Address::SocketType socketType() const PURE;
 
   /**
-   * @return the listening address of the socket createListenSocket() returns. Before
-   *         createListenSocket() is called, the return value might has 0 as port number if the
-   * config doesn't specify it.
+   * @return the listening address of the socket getListenSocket() returns. Before getListenSocket()
+   * is called, the return value might has 0 as port number if the config doesn't specify it.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the socket if createListenSocket() returns a shared socket among each call,
+   * @return the socket if getListenSocket() returns a shared socket among each call,
    * nullopt otherwise.
    */
   virtual absl::optional<std::reference_wrapper<Socket>> sharedSocket() const PURE;

@@ -694,10 +694,10 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
       stopListener(listener,
                    [this, share_socket = listener.listenSocketFactory().sharedSocket().has_value(),
                     listener_tag]() {
+                     stats_.listener_stopped_.inc();
                      if (!share_socket) {
                        // Each listener has its own socket and closes the socket
                        // on its own.
-                       stats_.listener_stopped_.inc();
                        return;
                      }
                      for (auto& listener : active_listeners_) {
@@ -705,7 +705,6 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
                          listener->listenSocketFactory().sharedSocket()->get().close();
                        }
                      }
-                     stats_.listener_stopped_.inc();
                    });
     }
   }

@@ -58,14 +58,14 @@ public:
 
   // Network::ListenSocketFactory
   // If |socket_| is nullptr, create a new socket for it. Otherwise, always return |socket_|.
-  Network::SocketSharedPtr createListenSocket() override;
+  Network::SocketSharedPtr getListenSocket() override;
   absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
     ASSERT(socket_ != nullptr);
     return *socket_;
   }
 
 private:
-  // This is shared across all workers if not setting SO_REUSEPORT.
+  // This is currently always shared across all workers. In the future SO_REUSEPORT support will be added.
   Network::SocketSharedPtr socket_;
 };
 
@@ -77,7 +77,7 @@ public:
                          const std::string& listener_name);
 
   // Network::ListenSocketFactory
-  Network::SocketSharedPtr createListenSocket() override;
+  Network::SocketSharedPtr getListenSocket() override;
   absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
     return absl::nullopt;
   }

@@ -333,7 +333,7 @@ private:
       return socket_->localAddress();
     }
 
-    Network::SocketSharedPtr createListenSocket() override {
+    Network::SocketSharedPtr getListenSocket() override {
       // This is only supposed to be called once.
       RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");
       socket_create_ = true;

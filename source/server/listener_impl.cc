@@ -78,7 +78,7 @@ TcpListenSocketFactory::TcpListenSocketFactory(
   }
 }
 
-Network::SocketSharedPtr TcpListenSocketFactory::createListenSocket() { return socket_; }
+Network::SocketSharedPtr TcpListenSocketFactory::getListenSocket() { return socket_; }
 
 UdpListenSocketFactory::UdpListenSocketFactory(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
@@ -87,7 +87,7 @@ UdpListenSocketFactory::UdpListenSocketFactory(
     : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Datagram,
                                   options, bind_to_port, listener_name) {}
 
-Network::SocketSharedPtr UdpListenSocketFactory::createListenSocket() {
+Network::SocketSharedPtr UdpListenSocketFactory::getListenSocket() {
   // TODO(danzh) add support of SO_REUSEPORT. Currently calling this method twice will fail because
   // the port is already in use.
   Network::SocketSharedPtr socket = createListenSocketAndApplyOptions();

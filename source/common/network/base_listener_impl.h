@@ -27,7 +27,7 @@ protected:
 
   Address::InstanceConstSharedPtr local_address_;
   Event::DispatcherImpl& dispatcher_;
-  SocketSharedPtr socket_;
+  const SocketSharedPtr socket_;
 };
 
 } // namespace Network

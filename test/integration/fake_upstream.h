@@ -611,7 +611,7 @@ private:
       return socket_->localAddress();
     }
 
-    Network::SocketSharedPtr createListenSocket() override { return socket_; }
+    Network::SocketSharedPtr getListenSocket() override { return socket_; }
     absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
       return *socket_;
     }

@@ -15,7 +15,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
     : ActiveQuicListener(dispatcher, parent,
-                         listener_config.listenSocketFactory().createListenSocket(),
+                         listener_config.listenSocketFactory().getListenSocket(),
                          listener_config, quic_config) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
