@@ -6,6 +6,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
@@ -18,7 +19,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-const char kConfigTemplate[] = R"(
+constexpr char kConfigTemplate[] = R"(
 providers:
   example_provider:
     issuer: https://example.com
@@ -41,31 +42,31 @@ rules:
     path: "/"
 )";
 
-const std::string kExampleHeader{"x-example"};
-const std::string kOtherHeader{"x-other"};
+constexpr char kExampleHeader[] = "x-example";
+constexpr char kOtherHeader[] = "x-other";
 
 // Returns true if the jwt_header is empty, and the jwt_header payload exists.
 // Based on the JWT provider setup for this test, this matcher is equivalent to JWT verification
 // was success.
 MATCHER_P(JwtOutputSuccess, jwt_header, "") {
-  auto payload_header = std::string(jwt_header) + "-payload";
-  return !arg.has(jwt_header) && arg.has(payload_header);
+  auto payload_header = absl::StrCat(jwt_header, "-payload");
+  return !arg.has(std::string(jwt_header)) && arg.has(payload_header);
 }
 
 // Returns true if the jwt_header exists, and the jwt_header payload is empty.
 // Based on the JWT provider setup for this test, this matcher is equivalent to JWT verification
 // was failed.
 MATCHER_P(JwtOutputFailed, jwt_header, "") {
-  auto payload_header = jwt_header + "-payload";
-  return arg.has(jwt_header) && !arg.has(payload_header);
+  auto payload_header = absl::StrCat(jwt_header, "-payload");
+  return arg.has(std::string(jwt_header)) && !arg.has(payload_header);
 }
 
 // Returns true if both jwt_header and jwt_header payload are empty.
 // This is probably an undesirable outcome of JWT validation and should be fixed in the future.
 // We will address this as part of https://github.com/envoyproxy/envoy/issues/8909
 MATCHER_P(JwtOutputWeird, jwt_header, "") {
-  auto payload_header = jwt_header + "-payload";
-  return !arg.has(jwt_header) && !arg.has(payload_header);
+  auto payload_header = absl::StrCat(jwt_header, "-payload");
+  return !arg.has(std::string(jwt_header)) && !arg.has(payload_header);
 }
 
 class AllVerifierTest : public testing::Test {
