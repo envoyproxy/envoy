@@ -79,7 +79,8 @@ public:
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Http2Settings& http2_settings, const uint32_t max_request_headers_kb);
+                 const Http2Settings& http2_settings, const uint32_t max_headers_kb,
+                 const uint32_t max_headers_count);
 
   ~ConnectionImpl() override;
 
@@ -288,7 +289,8 @@ protected:
   nghttp2_session* session_{};
   CodecStats stats_;
   Network::Connection& connection_;
-  const uint32_t max_request_headers_kb_;
+  const uint32_t max_headers_kb_;
+  const uint32_t max_headers_count_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
   const bool stream_error_on_invalid_http_messaging_;
@@ -394,7 +396,8 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        Stats::Scope& stats, const Http2Settings& http2_settings,
-                       const uint32_t max_request_headers_kb);
+                       const uint32_t max_response_headers_kb,
+                       const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -426,7 +429,8 @@ class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
                        Stats::Scope& scope, const Http2Settings& http2_settings,
-                       const uint32_t max_request_headers_kb);
+                       const uint32_t max_request_headers_kb,
+                       const uint32_t max_request_headers_count);
 
 private:
   // ConnectionImpl

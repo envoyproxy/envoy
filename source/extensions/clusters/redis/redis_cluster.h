@@ -27,6 +27,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -56,6 +57,7 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
+#include "extensions/common/redis/redirection_mgr_impl.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
@@ -250,6 +252,8 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   const std::chrono::milliseconds cluster_refresh_rate_;
   const std::chrono::milliseconds cluster_refresh_timeout_;
+  const std::chrono::milliseconds redirect_refresh_interval_;
+  const uint32_t redirect_refresh_threshold_;
   std::list<DnsDiscoveryResolveTargetPtr> dns_discovery_resolve_targets_;
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -264,6 +268,8 @@ private:
   Upstream::HostMap all_hosts_;
 
   const std::string auth_password_;
+  const Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
+  const Common::Redis::RedirectionManager::HandlePtr registration_handle_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

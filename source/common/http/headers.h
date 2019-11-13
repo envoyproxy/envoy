@@ -235,9 +235,10 @@ public:
     const std::string Delete{"DELETE"};
     const std::string Get{"GET"};
     const std::string Head{"HEAD"};
+    const std::string Options{"OPTIONS"};
+    const std::string Patch{"PATCH"};
     const std::string Post{"POST"};
     const std::string Put{"PUT"};
-    const std::string Options{"OPTIONS"};
     const std::string Trace{"TRACE"};
   } MethodValues;
 
@@ -276,6 +277,7 @@ public:
     const std::string Http10String{"HTTP/1.0"};
     const std::string Http11String{"HTTP/1.1"};
     const std::string Http2String{"HTTP/2"};
+    const std::string Http3String{"HTTP/3"};
   } ProtocolStrings;
 
   struct {

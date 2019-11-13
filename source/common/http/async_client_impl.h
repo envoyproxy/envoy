@@ -89,6 +89,7 @@ public:
 protected:
   bool remoteClosed() { return remote_closed_; }
   void closeLocal(bool end_stream);
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
 
@@ -135,13 +136,17 @@ private:
     const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
       return retriable_headers_;
     }
+    const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
+      return retriable_request_headers_;
+    }
     absl::optional<std::chrono::milliseconds> baseInterval() const override {
       return absl::nullopt;
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
 
-    const std::vector<uint32_t> retriable_status_codes_{};
-    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
+    const std::vector<uint32_t> retriable_status_codes_;
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {
@@ -155,7 +160,8 @@ private:
   };
 
   struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
+                                      uint64_t) const override {
       return nullptr;
     }
 
@@ -165,6 +171,7 @@ private:
 
     const std::string& name() const override { return EMPTY_STRING; }
     bool usesVhds() const override { return false; }
+    bool mostSpecificHeaderMutationsWins() const override { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
@@ -179,7 +186,9 @@ private:
       return nullptr;
     }
     bool includeAttemptCount() const override { return false; }
-
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };
@@ -191,8 +200,14 @@ private:
 
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(const std::string& cluster_name,
-                   const absl::optional<std::chrono::milliseconds>& timeout)
-        : cluster_name_(cluster_name), timeout_(timeout) {}
+                   const absl::optional<std::chrono::milliseconds>& timeout,
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                       hash_policy)
+        : cluster_name_(cluster_name), timeout_(timeout) {
+      if (!hash_policy.empty()) {
+        hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
+      }
+    }
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -203,7 +218,7 @@ private:
     void finalizeRequestHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
     void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}
-    const Router::HashPolicy* hashPolicy() const override { return nullptr; }
+    const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
     const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
@@ -211,6 +226,9 @@ private:
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
     std::chrono::milliseconds timeout() const override {
       if (timeout_) {
@@ -227,6 +245,9 @@ private:
       return absl::nullopt;
     }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+      return nullptr;
+    }
+    const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
       return nullptr;
     }
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -251,6 +272,7 @@ private:
       return Router::InternalRedirectAction::PassThrough;
     }
     const std::string& routeName() const override { return route_name_; }
+    std::unique_ptr<const HashPolicyImpl> hash_policy_;
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
@@ -270,8 +292,10 @@ private:
 
   struct RouteImpl : public Router::Route {
     RouteImpl(const std::string& cluster_name,
-              const absl::optional<std::chrono::milliseconds>& timeout)
-        : route_entry_(cluster_name, timeout) {}
+              const absl::optional<std::chrono::milliseconds>& timeout,
+              const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                  hash_policy)
+        : route_entry_(cluster_name, timeout, hash_policy) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -297,7 +321,6 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -372,7 +395,7 @@ private:
   bool send_xff_{true};
 
   friend class AsyncClientImpl;
-  friend class AsyncClientImplRouteTest;
+  friend class AsyncClientImplUnitTest;
 };
 
 class AsyncRequestImpl final : public AsyncClient::Request,
@@ -409,6 +432,7 @@ private:
   AsyncClient::Callbacks& callbacks_;
   std::unique_ptr<MessageImpl> response_;
   bool cancelled_{};
+  Tracing::SpanPtr child_span_;
 
   friend class AsyncClientImpl;
 };

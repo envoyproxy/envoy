@@ -78,15 +78,16 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
                                      Stats::Scope& scope, TimeSource& time_source)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
-      scope_(scope), time_source_(time_source), stat_name_set_(scope.symbolTable()),
-      aborts_injected_(stat_name_set_.add("aborts_injected")),
-      delays_injected_(stat_name_set_.add("delays_injected")),
-      stats_prefix_(stat_name_set_.add(absl::StrCat(stats_prefix, "fault"))) {}
+      scope_(scope), time_source_(time_source),
+      stat_name_set_(scope.symbolTable().makeSet("Fault")),
+      aborts_injected_(stat_name_set_->add("aborts_injected")),
+      delays_injected_(stat_name_set_->add("delays_injected")),
+      stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
 void FaultFilterConfig::incCounter(absl::string_view downstream_cluster,
                                    Stats::StatName stat_name) {
   Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join(
-      {stats_prefix_, stat_name_set_.getDynamic(downstream_cluster), stat_name});
+      {stats_prefix_, stat_name_set_->getDynamic(downstream_cluster), stat_name});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
@@ -111,9 +112,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
     const auto* route_entry = decoder_callbacks_->route()->routeEntry();
 
-    const FaultSettings* tmp = route_entry->perFilterConfigTyped<FaultSettings>(name);
-    const FaultSettings* per_route_settings =
-        tmp ? tmp : route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
+    const auto* per_route_settings =
+        route_entry->mostSpecificPerFilterConfigTyped<FaultSettings>(name);
     fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
   }
 

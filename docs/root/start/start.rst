@@ -104,8 +104,11 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
                   socket_address:
                     address: www.google.com
                     port_value: 443
-        tls_context:
-          sni: www.google.com
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            sni: www.google.com
 
 
 Using the Envoy Docker Image
@@ -155,7 +158,7 @@ gauge peoples' interests we will add more sandboxes demonstrating different
 features. The following sandboxes are available:
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     sandboxes/cors
     sandboxes/csrf
@@ -176,7 +179,7 @@ In addition to the proxy itself, Envoy is also bundled as part of several open
 source distributions that target specific use cases.
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     distro/ambassador
     distro/gloo

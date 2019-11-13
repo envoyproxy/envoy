@@ -17,6 +17,7 @@ import "validate/validate.proto";
 
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
+// [#next-free-field: 8]
 message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
@@ -29,15 +30,12 @@ message ApiConfigSource {
     // the v2 protos is used.
     REST = 1;
 
-    // gRPC v2 API.
+    // "State of the world" gRPC v2 API, using Discovery{Request,Response} protos.
     GRPC = 2;
 
-    // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
-    // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
-    // with every update, the xDS server only sends what has changed since the last update.
-    //
-    // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
-    // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
+    // "Delta" gRPC v2 API, using DeltaDiscovery{Request,Response} protos.
+    // Rather than sending Envoy the entire state with every update, the xDS server
+    // only sends what has changed since the last update.
     DELTA_GRPC = 3;
   }
 
@@ -72,14 +70,14 @@ message ApiConfigSource {
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
-// set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
+// set in :ref:`ConfigSource <envoy_api_msg_api.v3alpha.core.ConfigSource>` can be used to
 // specify that ADS is to be used.
 message AggregatedConfigSource {
 }
 
 // [#not-implemented-hide:]
 // Self-referencing config source options. This is currently empty, but when
-// set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
+// set in :ref:`ConfigSource <envoy_api_msg_api.v3alpha.core.ConfigSource>` can be used to
 // specify that other data can be obtained from the same server.
 message SelfConfigSource {
 }
@@ -97,11 +95,11 @@ message RateLimitSettings {
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
 // <config_cluster_manager>`, :ref:`routes
-// <envoy_api_msg_RouteConfiguration>`, :ref:`endpoints
+// <envoy_api_msg_api.v3alpha.RouteConfiguration>`, :ref:`endpoints
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#comment:next free field: 6]
+// [#next-free-field: 6]
 message ConfigSource {
   oneof config_source_specifier {
     option (validate.required) = true;

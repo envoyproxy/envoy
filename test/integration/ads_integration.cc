@@ -19,10 +19,13 @@ using testing::AssertionResult;
 namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest()
-    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), AdsIntegrationConfig()) {
+    : HttpIntegrationTest(
+          Http::CodecClient::Type::HTTP2, ipVersion(),
+          AdsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
+  sotw_or_delta_ = sotwOrDelta();
 }
 
 void AdsIntegrationTest::TearDown() {
@@ -84,7 +87,8 @@ envoy::api::v2::Listener AdsIntegrationTest::buildListener(const std::string& na
       filter_chains:
         filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: {}
             codec_type: HTTP2
             rds:
@@ -107,7 +111,8 @@ envoy::api::v2::Listener AdsIntegrationTest::buildRedisListener(const std::strin
       filter_chains:
         filters:
         - name: envoy.redis_proxy
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
             settings: 
               op_timeout: 1s
             stat_prefix: {}
@@ -152,8 +157,8 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
     ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
     ads_cluster->set_name("ads_cluster");
-    auto* context = ads_cluster->mutable_tls_context();
-    auto* validation_context = context->mutable_common_tls_context()->mutable_validation_context();
+    envoy::api::v2::auth::UpstreamTlsContext context;
+    auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     validation_context->add_verify_subject_alt_name("foo.lyft.com");
@@ -163,6 +168,8 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
       ssl_creds->mutable_root_certs()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     }
+    ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+    ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   HttpIntegrationTest::initialize();
@@ -208,7 +215,7 @@ void AdsIntegrationTest::testBasicFlow() {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
   const ProtobufWkt::Timestamp first_active_listener_ts_1 =
-      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+      getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
   const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
       getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
   const ProtobufWkt::Timestamp first_route_config_ts_1 =
@@ -239,7 +246,7 @@ void AdsIntegrationTest::testBasicFlow() {
 
   makeSingleRequest();
   const ProtobufWkt::Timestamp first_active_listener_ts_2 =
-      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+      getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
   const ProtobufWkt::Timestamp first_active_cluster_ts_2 =
       getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
   const ProtobufWkt::Timestamp first_route_config_ts_2 =
@@ -272,7 +279,7 @@ void AdsIntegrationTest::testBasicFlow() {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   makeSingleRequest();
   const ProtobufWkt::Timestamp first_active_listener_ts_3 =
-      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+      getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
   const ProtobufWkt::Timestamp first_active_cluster_ts_3 =
       getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
   const ProtobufWkt::Timestamp first_route_config_ts_3 =

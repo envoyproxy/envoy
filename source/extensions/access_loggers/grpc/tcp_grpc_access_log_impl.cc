@@ -31,7 +31,7 @@ void TcpGrpcAccessLog::emitLog(const Http::HeaderMap&, const Http::HeaderMap&,
   // Common log properties.
   envoy::data::accesslog::v2::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
-                                                        stream_info);
+                                                        stream_info, config_.common_config());
 
   envoy::data::accesslog::v2::ConnectionProperties& connection_properties =
       *log_entry.mutable_connection_properties();

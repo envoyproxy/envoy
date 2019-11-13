@@ -16,7 +16,6 @@ import "validate/validate.proto";
 // [#protodoc-title: Thrift Proxy Route Configuration]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
-// [#comment:next free field: 3]
 message RouteConfiguration {
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
   string name = 1;
@@ -26,7 +25,6 @@ message RouteConfiguration {
   repeated Route routes = 2;
 }
 
-// [#comment:next free field: 3]
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
@@ -35,7 +33,6 @@ message Route {
   RouteAction route = 2 [(validate.rules).message = {required: true}];
 }
 
-// [#comment:next free field: 5]
 message RouteMatch {
   oneof match_specifier {
     option (validate.required) = true;
@@ -72,7 +69,7 @@ message RouteMatch {
   repeated api.v2.route.HeaderMatcher headers = 4;
 }
 
-// [#comment:next free field: 5]
+// [#next-free-field: 6]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -89,7 +86,7 @@ message RouteAction {
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
   // the upstream cluster with metadata matching what is set in this field will be considered.
-  // Note that this will be merged with what's provided in :ref: `WeightedCluster.MetadataMatch
+  // Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
   // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
@@ -99,6 +96,10 @@ message RouteAction {
   // N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
   // action with the header name ":method-name".
   repeated api.v2.route.RateLimit rate_limits = 4;
+
+  // Strip the service prefix from the method name, if there's a prefix. For
+  // example, the method call Service:method would end up being just method.
+  bool strip_service_name = 5;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the
@@ -116,7 +117,7 @@ message WeightedCluster {
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field, combined with what's
-    // provided in :ref: `RouteAction's metadata_match
+    // provided in :ref:`RouteAction's metadata_match
     // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.

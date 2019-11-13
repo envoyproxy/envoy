@@ -23,7 +23,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : ActiveQuicListener(dispatcher, parent, std::make_unique<EnvoyQuicPacketWriter>(*listener),
+    : ActiveQuicListener(dispatcher, parent,
+                         std::make_unique<EnvoyQuicPacketWriter>(listener_config.socket()),
                          std::move(listener), listener_config, quic_config) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
@@ -32,9 +33,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, std::move(listener),
-                                                            listener_config),
-      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()) {
+    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
+      udp_listener_(std::move(listener)), dispatcher_(dispatcher),
+      version_manager_(quic::CurrentSupportedVersions()) {
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
@@ -57,9 +58,10 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
-  quic::QuicSocketAddress peer_address(envoyAddressInstanceToQuicSocketAddress(data.peer_address_));
+  quic::QuicSocketAddress peer_address(
+      envoyAddressInstanceToQuicSocketAddress(data.addresses_.peer_));
   quic::QuicSocketAddress self_address(
-      envoyAddressInstanceToQuicSocketAddress(data.local_address_));
+      envoyAddressInstanceToQuicSocketAddress(data.addresses_.local_));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMilliseconds(std::chrono::duration_cast<std::chrono::milliseconds>(

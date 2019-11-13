@@ -95,6 +95,13 @@ public:
   virtual std::string name() PURE;
 
   /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "dubbo_proxy.serializers"; }
+
+  /**
    * Convenience method to lookup a factory by type.
    * @param TransportType the transport type
    * @return NamedSerializerConfigFactory& for the TransportType
@@ -110,6 +117,7 @@ public:
  * SerializerFactoryBase provides a template for a trivial NamedSerializerConfigFactory.
  */
 template <class SerializerImpl> class SerializerFactoryBase : public NamedSerializerConfigFactory {
+public:
   SerializerPtr createSerializer() override { return std::make_unique<SerializerImpl>(); }
 
   std::string name() override { return name_; }

@@ -28,7 +28,7 @@ message StreamMetricsResponse {
 message StreamMetricsMessage {
   message Identifier {
     // The node sending metrics over the stream.
-    envoy.api.v3alpha.core.Node node = 1 [(validate.rules).message.required = true];
+    api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
   }
 
   // Identifier data effectively is a structured metadata. As a performance optimization this will

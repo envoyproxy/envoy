@@ -38,9 +38,8 @@ ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePri
   return nullptr;
 }
 
-Host::CreateConnectionData
-ValidationClusterManager::tcpConnForCluster(const std::string&, LoadBalancerContext*,
-                                            Network::TransportSocketOptionsSharedPtr) {
+Host::CreateConnectionData ValidationClusterManager::tcpConnForCluster(const std::string&,
+                                                                       LoadBalancerContext*) {
   return Host::CreateConnectionData{nullptr, nullptr};
 }
 

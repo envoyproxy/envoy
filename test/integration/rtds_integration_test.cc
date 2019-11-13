@@ -110,7 +110,8 @@ public:
   uint32_t initial_keys_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest, DELTA_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();

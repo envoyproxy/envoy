@@ -1,30 +1,31 @@
 syntax = "proto3";
 
+package envoy.service.tap.v2alpha;
+
+option java_outer_classname = "TapdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
+option java_generic_services = true;
+
 import "envoy/api/v2/discovery.proto";
 import "envoy/service/tap/v2alpha/common.proto";
-import "validate/validate.proto";
-
-package envoy.service.tap.v2alpha;
 
 import "google/api/annotations.proto";
 
-option java_outer_classname = "TapDsProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
+import "validate/validate.proto";
 
 // [#protodoc-title: Tap discovery service]
 
 // [#not-implemented-hide:] Tap discovery service.
 service TapDiscoveryService {
-  rpc StreamTapConfigs(stream envoy.api.v2.DiscoveryRequest)
-      returns (stream envoy.api.v2.DiscoveryResponse) {
+  rpc StreamTapConfigs(stream api.v2.DiscoveryRequest) returns (stream api.v2.DiscoveryResponse) {
   }
 
-  rpc DeltaTapConfigs(stream envoy.api.v2.DeltaDiscoveryRequest)
-      returns (stream envoy.api.v2.DeltaDiscoveryResponse) {
+  rpc DeltaTapConfigs(stream api.v2.DeltaDiscoveryRequest)
+      returns (stream api.v2.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchTapConfigs(envoy.api.v2.DiscoveryRequest) returns (envoy.api.v2.DiscoveryResponse) {
+  rpc FetchTapConfigs(api.v2.DiscoveryRequest) returns (api.v2.DiscoveryResponse) {
     option (google.api.http) = {
       post: "/v2/discovery:tap_configs"
       body: "*"
@@ -36,7 +37,7 @@ service TapDiscoveryService {
 // The filter TapDS config references this name.
 message TapResource {
   // The name of the tap configuration.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Tap config to apply
   TapConfig config = 2;

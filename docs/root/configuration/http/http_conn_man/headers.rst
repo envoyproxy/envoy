@@ -616,6 +616,9 @@ Supported variable names are:
     Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
     identifying the organization that created the value and ending in a unique name for the data.
 
+%REQ(header-name)%
+    Populates the header with a value of the request header.
+
 %START_TIME%
     Request start time. START_TIME can be customized with specifiers as specified in
     :ref:`access log format rules<config_access_log_format_start_time>`.

@@ -13,6 +13,8 @@
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 
+#include "absl/strings/str_join.h"
+
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
 using Envoy::Config::ConfigProvider;
@@ -221,8 +223,10 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
     // In the case if factory_context_.initManager() is uninitialized, RDS is already paused either
     // by Server init or LDS init.
-    factory_context_.clusterManager().adsMux().pause(
-        Envoy::Config::TypeUrl::get().RouteConfiguration);
+    if (factory_context_.clusterManager().adsMux()) {
+      factory_context_.clusterManager().adsMux()->pause(
+          Envoy::Config::TypeUrl::get().RouteConfiguration);
+    }
     resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info] {
       // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
       // up.
@@ -234,8 +238,10 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       // New RDS subscriptions should have been created, now lift the floodgate.
       // Note in the case of partial acceptance, accepted RDS subscriptions should be started
       // despite of any error.
-      factory_context_.clusterManager().adsMux().resume(
-          Envoy::Config::TypeUrl::get().RouteConfiguration);
+      if (factory_context_.clusterManager().adsMux()) {
+        factory_context_.clusterManager().adsMux()->resume(
+            Envoy::Config::TypeUrl::get().RouteConfiguration);
+      }
     });
   }
   std::vector<std::string> exception_msgs;
@@ -251,7 +257,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   stats_.config_reload_.inc();
   if (!exception_msgs.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+                                     absl::StrJoin(exception_msgs, ", ")));
   }
 }
 
@@ -263,7 +269,8 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::api::v2::ScopedRouteConfiguration(iter->second->configProto()),
       std::make_shared<ConfigImpl>(rds_subscription.routeConfigUpdate()->routeConfiguration(),
-                                   factory_context_, false));
+                                   factory_context_.getServerFactoryContext(),
+                                   factory_context_.messageValidationVisitor(), false));
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =

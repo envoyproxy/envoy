@@ -26,7 +26,7 @@ public:
     UNREFERENCED_PARAMETER(end_stream);
 
     Tcp::ConnectionPool::Instance* pool = cluster_manager_.tcpConnPoolForCluster(
-        "cluster_0", Upstream::ResourcePriority::Default, nullptr, nullptr);
+        "cluster_0", Upstream::ResourcePriority::Default, nullptr);
     ASSERT(pool != nullptr);
 
     requests_.emplace_back(*this, data);
@@ -86,14 +86,6 @@ private:
 class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object&,
-                      Server::Configuration::FactoryContext& context) override {
-    return [&context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
-    };
-  }
-
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext& context) override {

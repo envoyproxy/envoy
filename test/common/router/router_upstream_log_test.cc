@@ -87,7 +87,7 @@ public:
       current_upstream_log->CopyFrom(upstream_log.value());
     }
 
-    config_.reset(new FilterConfig("prefix", context_, ShadowWriterPtr(new MockShadowWriter()),
+    config_.reset(new FilterConfig("prefix.", context_, ShadowWriterPtr(new MockShadowWriter()),
                                    router_proto));
     router_.reset(new TestFilter(*config_));
     router_->setDecoderFilterCallbacks(callbacks_);
@@ -177,7 +177,7 @@ public:
 
     router_->retry_state_->expectResetRetry();
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
-                putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+                putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
     per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
@@ -188,7 +188,7 @@ public:
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
-                          putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _));
+                          putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_,
                                     stream_info_);
               return nullptr;

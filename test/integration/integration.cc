@@ -31,6 +31,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -296,8 +297,8 @@ void BaseIntegrationTest::createUpstreams() {
       fake_upstreams_.emplace_back(
           new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
     } else {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(endpoint, upstream_protocol_, *time_system_, enable_half_close_));
+      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
+                                                    enable_half_close_, udp_fake_upstream_));
     }
   }
 }
@@ -415,15 +416,22 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   }
 }
 
+std::string getListenerDetails(Envoy::Server::Instance& server) {
+  const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
+  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")();
+  auto listener_info = Protobuf::down_cast<envoy::admin::v2alpha::ListenersConfigDump>(*details);
+  return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
+}
+
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names,
                                                        bool allow_unknown_static_fields,
                                                        bool reject_unknown_dynamic_fields,
                                                        bool allow_lds_rejection) {
   test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_init_function_, deterministic_, timeSystem(), *api_,
-      defer_listener_finalization_, process_object_, allow_unknown_static_fields,
-      reject_unknown_dynamic_fields);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
+      timeSystem(), *api_, defer_listener_finalization_, process_object_,
+      allow_unknown_static_fields, reject_unknown_dynamic_fields, concurrency_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -442,8 +450,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
       if (!allow_lds_rejection) {
         RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
                            test_server_->counter(rejected)->value() == 0,
-                       "Lds update failed. For details, run test with -l trace and look for "
-                       "\"Error adding/updating listener(s)\" in the logs.");
+                       absl::StrCat("Lds update failed. Details\n",
+                                    getListenerDetails(test_server_->server())));
       }
       time_system_.sleep(std::chrono::milliseconds(10));
     }
@@ -475,7 +483,7 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
 void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = createIntegrationTestServer(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr,
+      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr, nullptr,
       timeSystem());
   registerTestServerPorts(port_names);
 }
@@ -497,12 +505,12 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
   connection.run();
 }
 
-IntegrationTestServerPtr
-BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
-                                                 std::function<void()> on_server_init_function,
-                                                 Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function,
-                                       deterministic_, time_system, *api_,
+IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
+    const std::string& bootstrap_path,
+    std::function<void(IntegrationTestServer&)> on_server_ready_function,
+    std::function<void()> on_server_init_function, Event::TestTimeSystem& time_system) {
+  return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
+                                       on_server_init_function, deterministic_, time_system, *api_,
                                        defer_listener_finalization_);
 }
 
@@ -554,21 +562,37 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expect_node, expected_error_code, expected_error_message);
+                                       expect_node, expected_error_code, expected_error_substring);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, expected_error_code,
-                                        expected_error_message);
+                                        expected_resource_names_removed, expect_node,
+                                        expected_error_code, expected_error_substring);
   }
+}
+
+AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
+                            absl::string_view name) {
+  if (set1 == set2) {
+    return AssertionSuccess();
+  }
+  auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
+  for (const auto& x : set1) {
+    failure << x << ", ";
+  }
+  failure << "}\nActual: {";
+  for (const auto& x : set2) {
+    failure << x << ", ";
+  }
+  return failure << "}";
 }
 
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
   envoy::api::v2::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
@@ -576,34 +600,39 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     EXPECT_TRUE(discovery_request.has_node());
     EXPECT_FALSE(discovery_request.node().id().empty());
     EXPECT_FALSE(discovery_request.node().cluster().empty());
-  } else {
-    EXPECT_FALSE(discovery_request.has_node());
   }
 
   if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              discovery_request.type_url(), expected_type_url);
   }
-  if (!(expected_error_code == discovery_request.error_detail().code())) {
-    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
-                                             discovery_request.error_detail().code(),
-                                             expected_error_code);
-  }
-  EXPECT_TRUE(
-      IsSubstring("", "", expected_error_message, discovery_request.error_detail().message()));
-  const std::vector<std::string> resource_names(discovery_request.resource_names().cbegin(),
-                                                discovery_request.resource_names().cend());
-  if (expected_resource_names != resource_names) {
-    return AssertionFailure() << fmt::format(
-               "resources {} do not match expected {} in {}",
-               fmt::join(resource_names.begin(), resource_names.end(), ","),
-               fmt::join(expected_resource_names.begin(), expected_resource_names.end(), ","),
-               discovery_request.DebugString());
+
+  // Sort to ignore ordering.
+  std::set<std::string> expected_sub{expected_resource_names.begin(),
+                                     expected_resource_names.end()};
+  std::set<std::string> actual_sub{discovery_request.resource_names().cbegin(),
+                                   discovery_request.resource_names().cend()};
+  auto sub_result = compareSets(expected_sub, actual_sub, "resource_names");
+  if (!sub_result) {
+    return sub_result;
   }
   if (expected_version != discovery_request.version_info()) {
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
                                              discovery_request.version_info(), expected_version,
                                              discovery_request.DebugString());
+  }
+  if (discovery_request.error_detail().code() != expected_error_code) {
+    return AssertionFailure() << fmt::format(
+               "error code {} does not match expected {}. (Error message is {}).",
+               discovery_request.error_detail().code(), expected_error_code,
+               discovery_request.error_detail().message());
+  }
+  if (expected_error_code != Grpc::Status::WellKnownGrpcStatus::Ok &&
+      discovery_request.error_detail().message().find(expected_error_substring) ==
+          std::string::npos) {
+    return AssertionFailure() << "\"" << expected_error_substring
+                              << "\" is not a substring of actual error message \""
+                              << discovery_request.error_detail().message() << "\"";
   }
   return AssertionSuccess();
 }
@@ -612,43 +641,51 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+    bool expect_node, const Protobuf::int32 expected_error_code,
+    const std::string& expected_error_substring) {
   envoy::api::v2::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
-  EXPECT_TRUE(request.has_node());
-  EXPECT_FALSE(request.node().id().empty());
-  EXPECT_FALSE(request.node().cluster().empty());
+  if (expect_node) {
+    EXPECT_TRUE(request.has_node());
+    EXPECT_FALSE(request.node().id().empty());
+    EXPECT_FALSE(request.node().cluster().empty());
+  }
 
-  if (expected_type_url != request.type_url()) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
+  if (request.type_url() != expected_type_url) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
                                              request.type_url(), expected_type_url);
   }
-  if (!(expected_error_code == request.error_detail().code())) {
-    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
-                                             request.error_detail().code(), expected_error_code);
+  // Sort to ignore ordering.
+  std::set<std::string> expected_sub{expected_resource_subscriptions.begin(),
+                                     expected_resource_subscriptions.end()};
+  std::set<std::string> expected_unsub{expected_resource_unsubscriptions.begin(),
+                                       expected_resource_unsubscriptions.end()};
+  std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
+                                   request.resource_names_subscribe().end()};
+  std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
+                                     request.resource_names_unsubscribe().end()};
+  auto sub_result = compareSets(expected_sub, actual_sub, "resource_names_subscribe");
+  if (!sub_result) {
+    return sub_result;
   }
-  EXPECT_TRUE(IsSubstring("", "", expected_error_message, request.error_detail().message()));
+  auto unsub_result = compareSets(expected_unsub, actual_unsub, "resource_names_unsubscribe");
+  if (!unsub_result) {
+    return unsub_result;
+  }
+  // (We don't care about response_nonce or initial_resource_versions.)
 
-  const std::vector<std::string> resource_subscriptions(request.resource_names_subscribe().cbegin(),
-                                                        request.resource_names_subscribe().cend());
-  if (expected_resource_subscriptions != resource_subscriptions) {
+  if (request.error_detail().code() != expected_error_code) {
     return AssertionFailure() << fmt::format(
-               "newly subscribed resources {} do not match expected {} in {}",
-               fmt::join(resource_subscriptions.begin(), resource_subscriptions.end(), ","),
-               fmt::join(expected_resource_subscriptions.begin(),
-                         expected_resource_subscriptions.end(), ","),
-               request.DebugString());
+               "error code {} does not match expected {}. (Error message is {}).",
+               request.error_detail().code(), expected_error_code,
+               request.error_detail().message());
   }
-  const std::vector<std::string> resource_unsubscriptions(
-      request.resource_names_unsubscribe().cbegin(), request.resource_names_unsubscribe().cend());
-  if (expected_resource_unsubscriptions != resource_unsubscriptions) {
-    return AssertionFailure() << fmt::format(
-               "newly UNsubscribed resources {} do not match expected {} in {}",
-               fmt::join(resource_unsubscriptions.begin(), resource_unsubscriptions.end(), ","),
-               fmt::join(expected_resource_unsubscriptions.begin(),
-                         expected_resource_unsubscriptions.end(), ","),
-               request.DebugString());
+  if (expected_error_code != Grpc::Status::WellKnownGrpcStatus::Ok &&
+      request.error_detail().message().find(expected_error_substring) == std::string::npos) {
+    return AssertionFailure() << "\"" << expected_error_substring
+                              << "\" is not a substring of actual error message \""
+                              << request.error_detail().message() << "\"";
   }
   return AssertionSuccess();
 }

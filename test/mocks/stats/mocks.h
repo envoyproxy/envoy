@@ -19,6 +19,7 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_creator.h"
+#include "common/stats/timespan_impl.h"
 
 #include "test/test_common/global.h"
 
@@ -98,13 +99,6 @@ public:
     ASSERT((tag_names_and_values_.size() % 2) == 0);
     for (size_t i = 0; i < tag_names_and_values_.size(); i += 2) {
       if (!fn(tag_names_and_values_[i], tag_names_and_values_[i + 1])) {
-        return;
-      }
-    }
-  }
-  void iterateTags(const Metric::TagIterFn& fn) const override {
-    for (const Tag& tag : tags_) {
-      if (!fn(tag)) {
         return;
       }
     }
@@ -204,14 +198,16 @@ public:
   MockHistogram();
   ~MockHistogram() override;
 
-  MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(unit, Histogram::Unit());
+  MOCK_METHOD1(recordValue, void(uint64_t value));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
+  Unit unit_{Histogram::Unit::Unspecified};
   Store* store_;
 
 private:
@@ -228,6 +224,7 @@ public:
   const std::string bucketSummary() const override { return ""; };
 
   MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(unit, Histogram::Unit());
   MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
@@ -238,6 +235,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
   bool used_;
+  Unit unit_{Histogram::Unit::Unspecified};
   Store* store_;
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
@@ -288,7 +286,7 @@ public:
   MOCK_METHOD2(gauge, Gauge&(const std::string&, Gauge::ImportMode));
   MOCK_METHOD1(nullGauge, NullGaugeImpl&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
-  MOCK_METHOD1(histogram, Histogram&(const std::string& name));
+  MOCK_METHOD2(histogram, Histogram&(const std::string&, Histogram::Unit));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
 
   MOCK_CONST_METHOD1(findCounter, OptionalCounter(StatName));
@@ -301,8 +299,8 @@ public:
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     return gauge(symbol_table_->toString(name), import_mode);
   }
-  Histogram& histogramFromStatName(StatName name) override {
-    return histogram(symbol_table_->toString(name));
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+    return histogram(symbol_table_->toString(name), unit);
   }
 
   TestSymbolTable symbol_table_;

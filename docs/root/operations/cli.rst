@@ -94,6 +94,10 @@ following are the command line options that Envoy supports.
    *(optional)* The format string to use for laying out the log message metadata. If this is not
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
 
+   When used in conjunction with ``--log-format-escaped``, the logger can be configured
+   to log in a format that is parsable by log viewers. Known integrations are documented
+   in the :ref:`application logging configuration <config_application_logs>` section.
+
    The supported format flags are (with example output):
 
    :%v:	The actual message to log ("some user text")
@@ -125,6 +129,13 @@ following are the command line options that Envoy supports.
    :%T, %X:	ISO 8601 time format (HH:MM:SS), equivalent to %H:%M:%S ("13:25:06")
    :%z:	ISO 8601 offset from UTC in timezone ([+/-]HH:MM) ("-07:00")
    :%%:	The % sign ("%")
+
+.. option:: --log-format-escaped
+
+  *(optional)* This flag enables application log sanitization to escape C-style escape sequences.
+  This can be used to prevent a single log line from spanning multiple lines in the underlying log.
+  This sanitizes all escape sequences in `this list <https://en.cppreference.com/w/cpp/language/escape>`_.
+  Note that each line's trailing whitespace characters (such as EOL characters) will not be escaped.
 
 .. option:: --restart-epoch <integer>
 
@@ -200,13 +211,14 @@ following are the command line options that Envoy supports.
 
 .. option:: --drain-time-s <integer>
 
-  *(optional)* The time in seconds that Envoy will drain connections during a hot restart. See the
-  :ref:`hot restart overview <arch_overview_hot_restart>` for more information. Defaults to 600
-  seconds (10 minutes). Generally the drain time should be less than the parent shutdown time
-  set via the :option:`--parent-shutdown-time-s` option. How the two settings are configured
-  depends on the specific deployment. In edge scenarios, it might be desirable to have a very long
-  drain time. In service to service scenarios, it might be possible to make the drain and shutdown
-  time much shorter (e.g., 60s/90s).
+  *(optional)* The time in seconds that Envoy will drain connections during 
+  a :ref:`hot restart <arch_overview_hot_restart>` or when individual listeners are being
+  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`. 
+  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than 
+  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
+  settings are configured depends on the specific deployment. In edge scenarios, it might be
+  desirable to have a very long drain time. In service to service scenarios, it might be possible
+  to make the drain and shutdown ime much shorter (e.g., 60s/90s).
 
 .. option:: --parent-shutdown-time-s <integer>
 

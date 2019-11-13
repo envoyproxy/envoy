@@ -152,7 +152,7 @@ public:
    */
   struct CaseInsensitiveCompare {
     // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     bool operator()(absl::string_view lhs, absl::string_view rhs) const;
   };
 
@@ -163,7 +163,7 @@ public:
    */
   struct CaseInsensitiveHash {
     // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     uint64_t operator()(absl::string_view key) const;
   };
 
@@ -220,6 +220,15 @@ public:
    * @return trimmed string view.
    */
   static absl::string_view trim(absl::string_view source);
+
+  /**
+   * Removes any specific trailing characters from the end of a string_view.
+   *
+   * @param source the string_view.
+   * @param ch the character to strip from the end of the string_view.
+   * @return a view of the string with the end characters removed.
+   */
+  static absl::string_view removeTrailingCharacters(absl::string_view source, char ch);
 
   /**
    * Look up for an exactly token in a delimiter-separated string view.
@@ -328,14 +337,6 @@ public:
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
-
-  /**
-   * Join elements of a vector into a string delimited by delimiter.
-   * @param source supplies the strings to join.
-   * @param delimiter supplies the delimiter to join them together.
-   * @return string combining elements of `source` with `delimiter` in between each element.
-   */
-  static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
 
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a

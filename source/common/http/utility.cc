@@ -276,6 +276,13 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
   ret.accept_http_10_ = config.accept_http_10();
   ret.default_host_for_http_10_ = config.default_host_for_http_10();
+
+  if (config.header_key_format().has_proper_case_words()) {
+    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
+  } else {
+    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
+  }
+
   return ret;
 }
 
@@ -388,6 +395,8 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
     return Headers::get().ProtocolStrings.Http11String;
   case Protocol::Http2:
     return Headers::get().ProtocolStrings.Http2String;
+  case Protocol::Http3:
+    return Headers::get().ProtocolStrings.Http3String;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

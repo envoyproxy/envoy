@@ -1,6 +1,5 @@
 #include "server/server.h"
 
-#include <atomic>
 #include <csignal>
 #include <cstdint>
 #include <functional>
@@ -9,18 +8,18 @@
 #include <unordered_set>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v2//bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
@@ -36,6 +35,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
+#include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -47,18 +47,16 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address,
-                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
-                           Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory,
-                           Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system,
-                           std::unique_ptr<ProcessContext> process_context)
-    : workers_started_(false), shutdown_(false), options_(options),
-      validation_context_(options_.allowUnknownStaticFields(),
-                          !options.rejectUnknownDynamicFields()),
+InstanceImpl::InstanceImpl(
+    Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
+    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
+    HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
+    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
+    : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
+      options_(options), validation_context_(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
@@ -76,7 +74,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()) {
+      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
+      server_context_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -130,11 +129,14 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clust
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
-  listener_manager_->stopListeners();
+  listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+void InstanceImpl::failHealthcheck(bool fail) {
+  live_.store(!fail);
+  server_stats_->live_.set(live_.load());
+}
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   snapped_counters_ = store.counters();
@@ -200,6 +202,9 @@ void InstanceImpl::flushStatsInternal() {
       sslContextManager().daysUntilFirstCertExpires());
   server_stats_->state_.set(
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->stats_recent_lookups_.set(
+      stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
+
   InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
@@ -207,7 +212,7 @@ void InstanceImpl::flushStatsInternal() {
   }
 }
 
-bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
+bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
@@ -244,33 +249,9 @@ void InstanceImpl::initialize(const Options& options,
             restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
-  ENVOY_LOG(info, "  access_loggers: {}",
-            Registry::FactoryRegistry<Configuration::AccessLogInstanceFactory>::allFactoryNames());
-  ENVOY_LOG(
-      info, "  filters.http: {}",
-      Registry::FactoryRegistry<Configuration::NamedHttpFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  filters.listener: {}",
-            Registry::FactoryRegistry<
-                Configuration::NamedListenerFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(
-      info, "  filters.network: {}",
-      Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  stat_sinks: {}",
-            Registry::FactoryRegistry<Configuration::StatsSinkFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  tracers: {}",
-            Registry::FactoryRegistry<Configuration::TracerFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  transport_sockets.downstream: {}",
-            Registry::FactoryRegistry<
-                Configuration::DownstreamTransportSocketConfigFactory>::allFactoryNames());
-  ENVOY_LOG(info, "  transport_sockets.upstream: {}",
-            Registry::FactoryRegistry<
-                Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
-
-  // Enable the selected buffer implementation (old libevent evbuffer version or new native
-  // version) early in the initialization, before any buffers can be created.
-  Buffer::OwnedImpl::useOldImpl(options.libeventBufferEnabled());
-  ENVOY_LOG(info, "buffer implementation: {}",
-            Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
+  }
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
@@ -299,8 +280,8 @@ void InstanceImpl::initialize(const Options& options,
   validation_context_.dynamic_warning_validation_visitor().setCounter(
       server_stats_->dynamic_unknown_fields_);
 
-  initialization_timer_ =
-      std::make_unique<Stats::Timespan>(server_stats_->initialization_time_ms_, timeSource());
+  initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
@@ -309,17 +290,23 @@ void InstanceImpl::initialize(const Options& options,
 
   InstanceImpl::failHealthcheck(false);
 
+  // Check if bootstrap has server version override set, if yes, we should use that as
+  // 'server.version' stat.
   uint64_t version_int;
-  if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-    throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+  if (bootstrap_.stats_server_version_override().value() > 0) {
+    version_int = bootstrap_.stats_server_version_override().value();
+  } else {
+    if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+    }
   }
-
   server_stats_->version_.set(version_int);
+
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), std::move(local_address), options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
+      options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
@@ -510,14 +497,18 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
-    cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
+    if (cm.adsMux()) {
+      cm.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+    }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
-    cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
+    if (cm.adsMux()) {
+      cm.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration);
+    }
   });
 }
 

@@ -6,6 +6,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -77,6 +78,10 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -162,6 +167,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.
@@ -922,6 +928,10 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -985,6 +995,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.
