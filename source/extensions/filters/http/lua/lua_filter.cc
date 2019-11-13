@@ -127,7 +127,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   Buffer::InstancePtr body;
   if (raw_body != nullptr) {
     body = std::make_unique<Buffer::OwnedImpl>(raw_body, body_size);
-    headers->insertContentLength().value(body_size);
+    headers->setContentLength(body_size);
   }
 
   // Once we respond we treat that as the end of the script even if there is more code. Thus we
@@ -193,7 +193,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 
   if (body != nullptr) {
     message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
-    message->headers().insertContentLength().value(body_size);
+    message->headers().setContentLength(body_size);
   }
 
   absl::optional<std::chrono::milliseconds> timeout;

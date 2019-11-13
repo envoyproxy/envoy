@@ -102,6 +102,7 @@ void ValidationInstance::initialize(const Options& options,
       dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
       accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
+  runtime_loader_->initialize(clusterManager());
   http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }

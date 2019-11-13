@@ -167,6 +167,13 @@ TEST_P(StatNameTest, TestSymbolConsistency) {
   EXPECT_EQ(vec_2[0], vec_1[1]);
 }
 
+TEST_P(StatNameTest, TestIgnoreTrailingDots) {
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar."));
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar..."));
+  EXPECT_EQ("", encodeDecode("."));
+  EXPECT_EQ("", encodeDecode(".."));
+}
+
 TEST_P(StatNameTest, TestSameValueOnPartialFree) {
   // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
   // freed, we expect both instances of "foo" to have the same symbol.

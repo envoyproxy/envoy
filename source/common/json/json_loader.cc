@@ -774,18 +774,5 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   return handler.getRoot();
 }
 
-const std::string Factory::listAsJsonString(const std::list<std::string>& items) {
-  rapidjson::StringBuffer writer_string_buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(writer_string_buffer);
-
-  writer.StartArray();
-  for (const std::string& item : items) {
-    writer.String(item.c_str());
-  }
-  writer.EndArray();
-
-  return writer_string_buffer.GetString();
-}
-
 } // namespace Json
 } // namespace Envoy

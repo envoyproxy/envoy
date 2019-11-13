@@ -13,7 +13,7 @@ if [[ ! -z "${FUZZIT_API_KEY}" ]]; then
   "${FUZZIT}" create target --skip-if-exists --public-corpus envoyproxy/"${FUZZIT_TARGET_NAME}"
 
   # Run fuzzing first so this is not affected by local-regression timeout
-  "${FUZZIT}" create job --skip-if-not-exists --type fuzzing envoyproxy/"${FUZZIT_TARGET_NAME}" "${FUZZER_BINARY}"
+  "${FUZZIT}" create job --skip-if-not-exists --host "${ENVOY_BUILD_IMAGE}" --type fuzzing envoyproxy/"${FUZZIT_TARGET_NAME}" "${FUZZER_BINARY}"
 fi
 
-"${FUZZIT}" create job --skip-if-not-exists --type local-regression envoyproxy/"${FUZZIT_TARGET_NAME}" "${FUZZER_BINARY}"
+"${FUZZIT}" create job --skip-if-not-exists --host "${ENVOY_BUILD_IMAGE}" --type local-regression envoyproxy/"${FUZZIT_TARGET_NAME}" "${FUZZER_BINARY}"

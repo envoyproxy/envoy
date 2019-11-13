@@ -85,9 +85,9 @@ void TraceReporter::flushTraces() {
     driver_.tracerStats().traces_sent_.add(pendingTraces);
 
     Http::MessagePtr message(new Http::RequestMessageImpl());
-    message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-    message->headers().insertPath().value().setReference(encoder_->path());
-    message->headers().insertHost().value().setReference(driver_.cluster()->name());
+    message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+    message->headers().setReferencePath(encoder_->path());
+    message->headers().setReferenceHost(driver_.cluster()->name());
     for (auto& h : encoder_->headers()) {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }

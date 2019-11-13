@@ -199,6 +199,9 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
   const std::string proto_text = R"EOF(
     address: {
       socket_address: {
@@ -213,6 +216,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
 
   EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
   EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
