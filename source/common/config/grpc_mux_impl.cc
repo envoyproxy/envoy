@@ -1,4 +1,4 @@
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
