@@ -22,10 +22,11 @@ namespace RedisProxy {
 
 class MockRouter : public Router {
 public:
-  MockRouter();
+  MockRouter(RouteSharedPtr route);
   ~MockRouter() override;
 
   MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
+  RouteSharedPtr route_;
 };
 
 class MockRoute : public Route {
@@ -36,7 +37,18 @@ public:
   MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
   MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
   ConnPool::InstanceSharedPtr conn_pool_;
-  const MirrorPolicies policies_;
+  MirrorPolicies policies_;
+};
+
+class MockMirrorPolicy : public MirrorPolicy {
+public:
+  MockMirrorPolicy(ConnPool::InstanceSharedPtr);
+  ~MockMirrorPolicy() = default;
+
+  MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
+  MOCK_CONST_METHOD1(shouldMirror, bool(const std::string&));
+
+  ConnPool::InstanceSharedPtr conn_pool_;
 };
 
 namespace ConnPool {
