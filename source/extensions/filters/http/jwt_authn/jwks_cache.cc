@@ -1,5 +1,3 @@
-#include "extensions/filters/http/jwt_authn/jwks_cache.h"
-
 #include <chrono>
 #include <unordered_map>
 
@@ -8,6 +6,8 @@
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 #include "common/protobuf/utility.h"
+
+#include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include "jwt_verify_lib/check_audience.h"
 

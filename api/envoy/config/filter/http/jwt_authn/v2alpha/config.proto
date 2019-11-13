@@ -264,15 +264,18 @@ message ProviderWithAudiences {
 //          - provider_name: provider-C
 //
 //  # Example 7: A is optional (if token from A is provided, it must be valid, but also allows missing token.)
-//  requirements:
-//  - provider_name: provider-A
-//    allow_missing: true
+//  requires_any:
+//    requirements:
+//    - provider_name: provider-A
+//    - allow_missing: {}
 //
 //  # Example 8: A is optional and B is required.
 //  requires_all:
 //    requirements:
-//    - provider_name: provider-A
-//      allow_missing: true
+//    - requires_any:
+//        requirements:
+//        - provider_name: provider-A
+//        - allow_missing: {}
 //    - provider_name: provider-B
 //
 // [#next-free-field: 7]

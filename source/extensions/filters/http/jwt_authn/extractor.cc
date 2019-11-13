@@ -1,11 +1,11 @@
-#include "extensions/filters/http/jwt_authn/extractor.h"
-
 #include <memory>
 
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
+
+#include "extensions/filters/http/jwt_authn/extractor.h"
 
 #include "absl/strings/match.h"
 
@@ -86,7 +86,9 @@ class ExtractorImpl : public Logger::Loggable<Logger::Id::jwt>, public Extractor
 public:
   ExtractorImpl(const JwtProvider& provider);
 
-  ExtractorImpl(const std::vector<const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider*>& providers);
+  ExtractorImpl(
+      const std::vector<const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider*>&
+          providers);
 
   std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;
 

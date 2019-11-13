@@ -3,6 +3,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
+#include "extensions/filters/http/jwt_authn/filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "jwt_verify_lib/status.h"

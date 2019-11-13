@@ -1,8 +1,8 @@
-#include "extensions/filters/http/jwt_authn/matcher.h"
-
 #include "common/common/logger.h"
 #include "common/common/regex.h"
 #include "common/router/config_impl.h"
+
+#include "extensions/filters/http/jwt_authn/matcher.h"
 
 #include "absl/strings/match.h"
 

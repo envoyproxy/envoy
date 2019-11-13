@@ -380,12 +380,159 @@ TEST_F(AllowMissingInOrListTest, NoJwt) {
 }
 
 TEST_F(AllowMissingInOrListTest, BadJwt) {
+  // Bad JWT should fail.
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
-      {kExampleHeader, NonExistKidToken}
-  };
+  auto headers = Http::TestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(AllowMissingInOrListTest, OtherGoodJwt) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{{kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // x-other JWT should be ignored.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
+TEST_F(AllowMissingInOrListTest, BadAndGoodJwts) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  auto headers =
+      Http::TestHeaderMapImpl{{kExampleHeader, NonExistKidToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  // x-other JWT should be ignored.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
+class AllowMissingInAndListTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+    const char allow_failed_yaml[] = R"(
+requires_all:
+  requirements:
+  - provider_name: "example_provider"
+  - allow_missing: {}
+)";
+    modifyRequirement(allow_failed_yaml);
+    createVerifier();
+  }
+};
+
+TEST_F(AllowMissingInAndListTest, NoJwt) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(AllowMissingInAndListTest, BadJwt) {
+  // Bad JWT should fail.
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(AllowMissingInAndListTest, GoodJwt) {
+  // Bad JWT should fail.
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+}
+
+TEST_F(AllowMissingInAndListTest, TwoGoodJwts) {
+  // Bad JWT should fail.
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers =
+      Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
+class AllowMissingInAndOfOrListTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+    const char allow_failed_yaml[] = R"(
+requires_all:
+  requirements:
+  - requires_any:
+      requirements:
+      - provider_name: "example_provider"
+      - allow_missing: {}
+  - requires_any:
+      requirements:
+      - provider_name: "other_provider"
+      - allow_missing: {}
+)";
+    modifyRequirement(allow_failed_yaml);
+    createVerifier();
+  }
+};
+
+TEST_F(AllowMissingInAndOfOrListTest, NoJwt) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
+TEST_F(AllowMissingInAndOfOrListTest, BadJwt) {
+  // Bad JWT should fail.
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+}
+
+TEST_F(AllowMissingInAndOfOrListTest, OneGoodJwt) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers = Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+}
+
+TEST_F(AllowMissingInAndOfOrListTest, TwoGoodJwts) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  auto headers =
+      Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
+}
+
+TEST_F(AllowMissingInAndOfOrListTest, GoodAndBadJwts) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
+  // Use the token with example.com issuer for x-other.
+  auto headers = Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
+TEST_F(AllowMissingInAndOfOrListTest, BadAndGoodJwts) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired)).Times(1);
+  auto headers =
+      Http::TestHeaderMapImpl{{kExampleHeader, ExpiredToken}, {kOtherHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  // Short-circuit AND, the x-other JWT should be ignored.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 } // namespace

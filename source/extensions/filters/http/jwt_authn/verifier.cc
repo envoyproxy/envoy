@@ -158,7 +158,8 @@ class AllowFailedVerifierImpl : public BaseVerifierImpl {
 public:
   AllowFailedVerifierImpl(const AuthFactory& factory, const JwtProviderList& providers,
                           const BaseVerifierImpl* parent)
-      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {}
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {
+  }
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
@@ -188,14 +189,16 @@ private:
 class AllowMissingVerifierImpl : public BaseVerifierImpl {
 public:
   AllowMissingVerifierImpl(const AuthFactory& factory, const JwtProviderList& providers,
-                          const BaseVerifierImpl* parent)
-      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {}
+                           const BaseVerifierImpl* parent)
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {
+  }
 
   void verify(ContextSharedPtr context) const override {
     ENVOY_LOG(debug, "Called AllowMissingVerifierImpl.verify : {}", __func__);
 
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(nullptr, absl::nullopt, false /* allow failed */, true /* allow missing */);
+    auto auth = auth_factory_.create(nullptr, absl::nullopt, false /* allow failed */,
+                                     true /* allow missing */);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
@@ -265,20 +268,24 @@ public:
       case JwtRequirement::RequiresTypeCase::kAllowMissing:
         is_regular_requirement = false;
         if (by_pass_type_requirement == nullptr ||
-            by_pass_type_requirement->requires_type_case() == JwtRequirement::RequiresTypeCase::kAllowMissing) {
+            by_pass_type_requirement->requires_type_case() ==
+                JwtRequirement::RequiresTypeCase::kAllowMissing) {
           // We need to keep only one by_pass_type_requirement. If both
           // kAllowMissing and kAllowMissingOrFailed are set, use
           // kAllowMissingOrFailed.
           by_pass_type_requirement = &it;
         }
-      default: break;
+      default:
+        break;
       }
       if (is_regular_requirement) {
-        verifiers_.emplace_back(innerCreate(it, providers, factory, std::vector<std::string>{}, this));
+        verifiers_.emplace_back(
+            innerCreate(it, providers, factory, std::vector<std::string>{}, this));
       }
     }
     if (by_pass_type_requirement) {
-      verifiers_.emplace_back(innerCreate(*by_pass_type_requirement, providers, factory, used_providers, this));
+      verifiers_.emplace_back(
+          innerCreate(*by_pass_type_requirement, providers, factory, used_providers, this));
     }
   }
 
@@ -304,7 +311,8 @@ public:
                   const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : and_list.requirements()) {
-      verifiers_.emplace_back(innerCreate(it, providers, factory, std::vector<std::string>{}, this));
+      verifiers_.emplace_back(
+          innerCreate(it, providers, factory, std::vector<std::string>{}, this));
     }
   }
 

@@ -37,7 +37,8 @@ public:
 };
 
 using JwtLocationConstPtr = std::unique_ptr<const JwtLocation>;
-using JwtProviderList = std::vector<const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider*>;
+using JwtProviderList =
+    std::vector<const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider*>;
 
 class Extractor;
 using ExtractorConstPtr = std::unique_ptr<const Extractor>;
@@ -96,8 +97,7 @@ public:
    * @param the list of JwtProvider configs.
    * @return the extractor object.
    */
-  static ExtractorConstPtr
-  create(const JwtProviderList& providers);
+  static ExtractorConstPtr create(const JwtProviderList& providers);
 };
 
 } // namespace JwtAuthn
