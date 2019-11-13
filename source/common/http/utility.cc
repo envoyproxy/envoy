@@ -443,11 +443,11 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
                (lcs_header_to_remove == Http::Headers::get().ForwardedProto) ||
                !token_sv.find(':')) {
 
-      // If pseudo headers or X-Forwarded* headers are nominated, this could be
-      // an invalid request. Reject the request
-      //
-      // An attacker could nominate an X-Forwarded header, and its removal may mask
-      // the origin of the incoming request and alter its handling
+      // An attacker could nominate an X-Forwarded* header, and its removal may mask
+      // the origin of the incoming request and potentially alter its handling.
+      // Additionally, pseudo headers should never be nominated. In both cases, we
+      // should fail the request.
+      // See: https://nathandavison.com/blog/abusing-http-hop-by-hop-request-headers
 
       ENVOY_LOG_MISC(trace, "Invalid nomination of {} header", token_sv);
       return false;
