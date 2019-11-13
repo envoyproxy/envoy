@@ -40,7 +40,9 @@ GradientControllerConfig::GradientControllerConfig(
       max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
                                                     max_gradient, 2.0)),
       sample_aggregate_percentile_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)) {}
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)),
+      min_concurrency_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(),
+                                                       min_concurrency, 3)) {}
 
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
@@ -48,7 +50,7 @@ GradientController::GradientController(GradientControllerConfig config,
                                        Runtime::RandomGenerator& random)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
       stats_(generateStats(scope_, stats_prefix)), random_(random), deferred_limit_value_(1),
-      num_rq_outstanding_(0), concurrency_limit_(1),
+      num_rq_outstanding_(0), concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
@@ -82,13 +84,13 @@ GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
 void GradientController::enterMinRTTSamplingWindow() {
   absl::MutexLock ml(&sample_mutation_mtx_);
 
-  stats_.min_rtt_calculation_active_.set(1);
+  stats_.min_rtt_calculation_active_.set(config_.minConcurrency());
 
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
   // recalculation.
   deferred_limit_value_.store(concurrencyLimit());
-  updateConcurrencyLimit(1);
+  updateConcurrencyLimit(config_.minConcurrency());
 
   // Throw away any latency samples from before the recalculation window as it may not represent
   // the minRTT.

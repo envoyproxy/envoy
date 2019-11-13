@@ -196,21 +196,16 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& method_name,
                                         const absl::optional<std::chrono::milliseconds>& timeout) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(service_full_name.c_str(),
-                                                 service_full_name.size());
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
-  message->headers().insertHost().value(upstream_cluster);
+  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  message->headers().setPath(absl::StrCat("/", service_full_name, "/", method_name));
+  message->headers().setHost(upstream_cluster);
   // According to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md TE should appear
   // before Timeout and ContentType.
-  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+  message->headers().setReferenceTE(Http::Headers::get().TEValues.Trailers);
   if (timeout) {
     toGrpcTimeout(timeout.value(), message->headers().insertGrpcTimeout().value());
   }
-  message->headers().insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Grpc);
+  message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
   return message;
 }

@@ -143,15 +143,15 @@ const std::regex PromRegex("[^a-zA-Z0-9_]");
 const uint64_t RecentLookupsCapacity = 100;
 
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
-  header_map.insertStatus().value(std::to_string(enumToInt(code)));
+  header_map.setStatus(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map.ContentType() == nullptr) {
     // Default to text-plain if unset.
-    header_map.insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
+    header_map.setReferenceContentType(headers.ContentTypeValues.TextUtf8);
   }
   // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
   if (header_map.CacheControl() == nullptr) {
-    header_map.insertCacheControl().value().setReference(headers.CacheControlValues.NoCacheMaxAge0);
+    header_map.setReferenceCacheControl(headers.CacheControlValues.NoCacheMaxAge0);
   }
 
   // Under no circumstance should browsers sniff content-type.
@@ -521,8 +521,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
 
   if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
-    response_headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
     writeClustersAsText(response);
   }
@@ -541,8 +540,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
     any_message.PackFrom(*message);
   }
 
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
   return Http::Code::OK;
 }
@@ -552,8 +550,7 @@ Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& resp
                                         Buffer::Instance& response, AdminStream&) {
 
   if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
-    response_headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
     envoy::admin::v2alpha::MutexStats mutex_stats;
     mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
@@ -687,8 +684,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
 Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&) {
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v2alpha::Memory memory;
   memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
   memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
@@ -775,7 +771,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();
   response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
-  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;
 }
 
@@ -818,8 +814,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 
   if (const auto format_value = formatParam(params)) {
     if (format_value.value() == "json") {
-      response_headers.insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Json);
+      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
       response.add(
           AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only, regex));
     } else if (format_value.value() == "prometheus") {
@@ -1066,8 +1061,7 @@ Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap
 
   if (format_value.has_value() && format_value.value() == "json") {
     writeListenersAsJson(response);
-    response_headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
     writeListenersAsText(response);
   }
@@ -1078,8 +1072,7 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
                                    Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v2alpha::Certificates certificates;
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
     envoy::admin::v2alpha::Certificate& certificate = *certificates.add_certificates();
@@ -1099,8 +1092,7 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
                                      Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   // TODO(jsedgwick) Use proto to structure this output instead of arbitrary JSON
   rapidjson::Document document;
@@ -1388,8 +1380,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::I
 
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Html);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
 
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
 
@@ -1476,7 +1467,7 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
                               Http::HeaderMap& response_headers, std::string& body) {
   AdminFilter filter(*this);
   Http::HeaderMapImpl request_headers;
-  request_headers.insertMethod().value(method.data(), method.size());
+  request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);
   Buffer::OwnedImpl response;
 

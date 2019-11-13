@@ -49,7 +49,7 @@ public:
     }
 
     Http::MessagePtr message = Http::Utility::prepareHeaders(uri);
-    message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+    message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(std::chrono::milliseconds(
