@@ -61,8 +61,7 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge
       additional_request_chance_(hedge_policy.additional_request_chance()),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
-HedgePolicyImpl::HedgePolicyImpl()
-    : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
+HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -482,11 +481,11 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 
   std::string path(headers.Path()->value().getStringView());
   if (insert_envoy_original_path) {
-    headers.insertEnvoyOriginalPath().value(*headers.Path());
+    headers.setEnvoyOriginalPath(path);
   }
   ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
                          : absl::StartsWithIgnoreCase(path, matched_path));
-  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
+  headers.setPath(path.replace(0, matched_path.size(), rewrite));
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,

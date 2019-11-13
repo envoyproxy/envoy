@@ -98,7 +98,7 @@ MockDrainDecision::MockDrainDecision() = default;
 MockDrainDecision::~MockDrainDecision() = default;
 
 MockListenerFilter::MockListenerFilter() = default;
-MockListenerFilter::~MockListenerFilter() = default;
+MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
 MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
@@ -116,7 +116,6 @@ MockFilterChainManager::~MockFilterChainManager() = default;
 
 MockFilterChainFactory::MockFilterChainFactory() {
   ON_CALL(*this, createListenerFilterChain(_)).WillByDefault(Return(true));
-  ON_CALL(*this, createUdpListenerFilterChain(_, _)).WillByDefault(Return(true));
 }
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 

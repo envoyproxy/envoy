@@ -42,12 +42,6 @@ public:
   virtual SysCallSizeResult recv(int socket, void* buffer, size_t length, int flags) PURE;
 
   /**
-   * @see recv (man 2 recvfrom)
-   */
-  virtual SysCallSizeResult recvfrom(int sockfd, void* buffer, size_t length, int flags,
-                                     struct sockaddr* addr, socklen_t* addrlen) PURE;
-
-  /**
    * @see recvmsg (man 2 recvmsg)
    */
   virtual SysCallSizeResult recvmsg(int sockfd, struct msghdr* msg, int flags) PURE;
@@ -90,12 +84,6 @@ public:
    * @see man 2 socket
    */
   virtual SysCallIntResult socket(int domain, int type, int protocol) PURE;
-
-  /**
-   * @see man 2 sendto
-   */
-  virtual SysCallSizeResult sendto(int fd, const void* buffer, size_t size, int flags,
-                                   const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
    * @see man 2 sendmsg

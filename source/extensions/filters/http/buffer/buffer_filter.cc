@@ -101,7 +101,7 @@ void BufferFilter::maybeAddContentLength() {
     ASSERT(!settings_->disabled());
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.buffer_filter_populate_content_length")) {
-      request_headers_->insertContentLength().value(content_length_);
+      request_headers_->setContentLength(content_length_);
     }
   }
 }

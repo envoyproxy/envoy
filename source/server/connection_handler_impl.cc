@@ -264,6 +264,11 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
       socket_->setDetectedTransportProtocol(
           Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
     }
+    // TODO(lambdai): add integration test
+    // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
+    // Erase accept filter states because accept filters may not get the opportunity to clean up.
+    // Particularly the assigned events need to reset before assigning new events in the follow up.
+    accept_filters_.clear();
     // Create a new connection on this listener.
     listener_.newConnection(std::move(socket_));
   }

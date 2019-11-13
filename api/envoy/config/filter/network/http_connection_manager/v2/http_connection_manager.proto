@@ -22,6 +22,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
+// [#extension: envoy.filters.network.http_connection_manager]
 
 // [#next-free-field: 36]
 message HttpConnectionManager {

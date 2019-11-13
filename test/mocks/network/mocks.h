@@ -168,6 +168,7 @@ public:
   MockListenerFilter();
   ~MockListenerFilter() override;
 
+  MOCK_METHOD0(destroy_, void());
   MOCK_METHOD1(onAccept, Network::FilterStatus(ListenerFilterCallbacks&));
 };
 
@@ -210,7 +211,7 @@ public:
                     const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
   MOCK_METHOD2(createUdpListenerFilterChain,
-               bool(UdpListenerFilterManager& listener, UdpReadFilterCallbacks& callbacks));
+               void(UdpListenerFilterManager& listener, UdpReadFilterCallbacks& callbacks));
 };
 
 class MockListenSocket : public Socket {
