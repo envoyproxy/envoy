@@ -507,7 +507,7 @@ public:
         new Http::TestHeaderMapImpl{{":status", code}});
 
     if (degraded) {
-      response_headers->insertEnvoyDegraded().value(1);
+      response_headers->setEnvoyDegraded(1);
     }
 
     if (service_cluster) {
