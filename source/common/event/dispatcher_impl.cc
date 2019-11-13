@@ -134,17 +134,17 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::Socket& socket,
+Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::ListenerCallbacks& cb,
                                                     bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ListenerImpl>(*this, socket, cb, bind_to_port);
+  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port);
 }
 
-Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,
                                                           Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::UdpListenerImpl>(*this, socket, cb, timeSource());
+  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }

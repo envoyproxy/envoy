@@ -600,6 +600,26 @@ private:
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
                Event::TestTimeSystem& time_system, bool enable_half_close);
 
+  class FakeListenSocketFactory : public Network::ListenSocketFactory {
+  public:
+    FakeListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
+
+    // Network::ListenSocketFactory
+    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+
+    const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+      return socket_->localAddress();
+    }
+
+    Network::SocketSharedPtr getListenSocket() override { return socket_; }
+    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+      return *socket_;
+    }
+
+  private:
+    Network::SocketSharedPtr socket_;
+  };
+
   class FakeUpstreamUdpFilter : public Network::UdpListenerReadFilter {
   public:
     FakeUpstreamUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
@@ -622,8 +642,9 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::Socket& socket() override { return *parent_.socket_; }
-    const Network::Socket& socket() const override { return *parent_.socket_; }
+    Network::ListenSocketFactory& listenSocketFactory() override {
+      return *parent_.socket_factory_;
+    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
@@ -652,7 +673,8 @@ private:
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void onRecvDatagram(Network::UdpRecvData& data);
 
-  Network::SocketPtr socket_;
+  Network::SocketSharedPtr socket_;
+  Network::ListenSocketFactorySharedPtr socket_factory_;
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.
