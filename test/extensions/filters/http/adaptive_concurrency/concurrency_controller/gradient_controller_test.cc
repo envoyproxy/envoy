@@ -185,7 +185,7 @@ min_rtt_calc_params:
   EXPECT_EQ(config.jitterPercent(), .155);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger(_, 7)).WillOnce(Return(9));
-  EXPECT_EQ(config.(), 9);
+  EXPECT_EQ(config.minConcurrency(), 9);
 }
 
 TEST_F(GradientControllerConfigTest, DefaultValuesTest) {
@@ -221,19 +221,19 @@ min_rtt_calc_params:
     value: 0.0
   interval: 30s
   request_count: 50
-  min_concurrency: 4
+  min_concurrency: 1
 )EOF";
 
   auto controller = makeController(yaml);
   const auto min_rtt = std::chrono::milliseconds(13);
 
-  // The controller should be measuring minRTT upon creation, so the concurrency window is 4 (the
+  // The controller should be measuring minRTT upon creation, so the concurrency window is 1 (the
   // min concurrency).
   EXPECT_EQ(
-      4,
+      1,
       stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
           .value());
-  EXPECT_EQ(controller->concurrencyLimit(), 4);
+  EXPECT_EQ(controller->concurrencyLimit(), 1);
   tryForward(controller, true);
   tryForward(controller, false);
   tryForward(controller, false);
@@ -241,7 +241,7 @@ min_rtt_calc_params:
 
   // 49 more requests should cause the minRTT to be done calculating.
   for (int i = 0; i < 49; ++i) {
-    EXPECT_EQ(controller->concurrencyLimit(), 4);
+    EXPECT_EQ(controller->concurrencyLimit(), 1);
     tryForward(controller, true);
     tryForward(controller, false);
     controller->recordLatencySample(min_rtt);
@@ -298,6 +298,8 @@ min_rtt_calc_params:
 
   auto controller = makeController(yaml);
 
+  tryForward(controller, true);
+  tryForward(controller, true);
   tryForward(controller, true);
   tryForward(controller, false);
   controller->cancelLatencySample();
