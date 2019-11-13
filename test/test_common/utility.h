@@ -642,8 +642,8 @@ public:
   void remove(const std::string& key);
   std::string get_(const std::string& key) const;
   std::string get_(const LowerCaseString& key) const;
-  bool has(const std::string& key);
-  bool has(const LowerCaseString& key);
+  bool has(const std::string& key) const;
+  bool has(const LowerCaseString& key) const;
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's
