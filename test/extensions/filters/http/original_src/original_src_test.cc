@@ -16,7 +16,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Exactly;
 using testing::SaveArg;
 using testing::StrictMock;
 

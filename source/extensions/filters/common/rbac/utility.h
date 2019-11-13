@@ -47,16 +47,16 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats
 enum class EnforcementMode { Enforced, Shadow };
 
 template <class ConfigType>
-absl::optional<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
-  return config.has_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.rules())
-                            : absl::nullopt;
+std::unique_ptr<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
+  return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules())
+                            : nullptr;
 }
 
 template <class ConfigType>
-absl::optional<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
+std::unique_ptr<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
   return config.has_shadow_rules()
-             ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
-             : absl::nullopt;
+             ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
+             : nullptr;
 }
 
 } // namespace RBAC

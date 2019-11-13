@@ -38,20 +38,21 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
+  request_ = async_client_->send(service_method_, request, *this, parent_span,
+                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
 void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
                                Tracing::Span& span) {
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
-  if (response->status().code() == Grpc::Status::GrpcStatus::Ok) {
-    span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
+  if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
+    span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       toAuthzResponseHeader(authz_response, response->ok_response().headers());
     }
   } else {
-    span.setTag(Constants::get().TraceStatus, Constants::get().TraceUnauthz);
+    span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
     if (response->has_denied_response()) {
       toAuthzResponseHeader(authz_response, response->denied_response().headers());
@@ -69,7 +70,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckRe
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
-  ASSERT(status != Grpc::Status::GrpcStatus::Ok);
+  ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;

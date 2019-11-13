@@ -22,14 +22,11 @@ TEST(SingletonManagerImplDeathTest, NotRegistered) {
                              "invalid singleton name 'foo'. Make sure it is registered.");
 }
 
-static constexpr char test_singleton_name[] = "test_singleton";
-static Registry::RegisterFactory<Singleton::RegistrationImpl<test_singleton_name>,
-                                 Singleton::Registration>
-    test_singleton_registered_;
+SINGLETON_MANAGER_REGISTRATION(test);
 
 class TestSingleton : public Instance {
 public:
-  ~TestSingleton() { onDestroy(); }
+  ~TestSingleton() override { onDestroy(); }
 
   MOCK_METHOD0(onDestroy, void());
 };

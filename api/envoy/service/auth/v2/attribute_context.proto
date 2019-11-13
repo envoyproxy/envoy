@@ -7,11 +7,9 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 
 import "envoy/api/v2/core/address.proto";
+import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/timestamp.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Attribute Context ]
 
@@ -24,15 +22,28 @@ option (gogoproto.stable_marshaler_all) = true;
 // Each attribute has a type and a name, which is logically defined as a proto message field
 // of the `AttributeContext`. The `AttributeContext` is a collection of individual attributes
 // supported by Envoy authorization system.
+// [#comment: The following items are left out of this proto
+// Request.Auth field for jwt tokens
+// Request.Api for api management
+// Origin peer that originated the request
+// Caching Protocol
+// request_context return values to inject back into the filter chain
+// peer.claims -- from X.509 extensions
+// Configuration
+// - field mask to send
+// - which return values from request_context are copied back
+// - which return values are copied into request_headers]
+// [#next-free-field: 12]
 message AttributeContext {
   // This message defines attributes for a node that handles a network request.
   // The node can be either a service or an application that sends, forwards,
   // or receives the request. Service peers should fill in the `service`,
   // `principal`, and `labels` as appropriate.
+  // [#next-free-field: 6]
   message Peer {
     // The address of the peer, this is typically the IP address.
     // It can also be UDS path, or others.
-    envoy.api.v2.core.Address address = 1;
+    api.v2.core.Address address = 1;
 
     // The canonical service name of the peer.
     // It should be set to :ref:`the HTTP x-envoy-downstream-service-cluster
@@ -49,13 +60,17 @@ message AttributeContext {
     // The authenticated identity of this peer.
     // For example, the identity associated with the workload such as a service account.
     // If an X.509 certificate is used to assert the identity this field should be sourced from
-    // `Subject` or `Subject Alternative Names`. The primary identity should be the principal.
-    // The principal format is issuer specific.
+    // `URI Subject Alternative Names`, `DNS Subject Alternate Names` or `Subject` in that order.
+    // The primary identity should be the principal. The principal format is issuer specific.
     //
     // Example:
     // *    SPIFFE format is `spiffe://trust-domain/path`
     // *    Google account format is `https://accounts.google.com/{userid}`
     string principal = 4;
+
+    // The X.509 certificate used to authenticate the identify of this peer.
+    // When present, the certificate contents are encoded in URL and PEM format.
+    string certificate = 5;
   }
 
   // Represents a network request, such as an HTTP request.
@@ -65,12 +80,11 @@ message AttributeContext {
 
     // Represents an HTTP request or an HTTP-like request.
     HttpRequest http = 2;
-
-    // More request types are added here as necessary.
   }
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
+  // [#next-free-field: 12]
   message HttpRequest {
     // The unique ID for a request, which can be propagated to downstream
     // systems. The ID should have low probability of collision
@@ -83,7 +97,7 @@ message AttributeContext {
 
     // The HTTP request headers. If multiple headers share the same key, they
     // must be merged according to the HTTP spec. All header keys must be
-    // lowercased, because HTTP header keys are case-insensitive.
+    // lower-cased, because HTTP header keys are case-insensitive.
     map<string, string> headers = 3;
 
     // The request target, as it appears in the first line of the HTTP request. This includes
@@ -135,16 +149,7 @@ message AttributeContext {
   // information to the auth server without modifying the proto definition. It maps to the
   // internal opaque context in the filter chain.
   map<string, string> context_extensions = 10;
-}
 
-// The following items are left out of this proto
-// Request.Auth field for jwt tokens
-// Request.Api for api management
-// Origin peer that originated the request
-// Caching Protocol
-// request_context return values to inject back into the filter chain
-// peer.claims -- from X.509 extensions
-// Configuration
-// - field mask to send
-// - which return values from request_context are copied back
-// - which return values are copied into request_headers
+  // Dynamic metadata associated with the request.
+  api.v2.core.Metadata metadata_context = 11;
+}

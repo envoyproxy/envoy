@@ -4,6 +4,7 @@
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -13,7 +14,9 @@ namespace Quic {
 
 TEST(EnvoyQuicClockTest, TestNow) {
   Event::SimulatedTimeSystemHelper time_system;
-  EnvoyQuicClock clock(time_system);
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  EnvoyQuicClock clock(*dispatcher);
   uint64_t mono_time = std::chrono::duration_cast<std::chrono::microseconds>(
                            time_system.monotonicTime().time_since_epoch())
                            .count();
@@ -29,7 +32,6 @@ TEST(EnvoyQuicClockTest, TestNow) {
   time_system.sleep(std::chrono::microseconds(10));
   EXPECT_EQ(mono_time + 1000000 + 10, (clock.Now() - quic::QuicTime::Zero()).ToMicroseconds());
   EXPECT_EQ(sys_time + 1000000 + 10, clock.WallNow().ToUNIXMicroseconds());
-  EXPECT_EQ(clock.ApproximateNow(), clock.Now());
 
   // Advance time by 2ms.
   time_system.sleep(std::chrono::milliseconds(2));
@@ -41,13 +43,35 @@ TEST(EnvoyQuicClockTest, TestNow) {
 // Tests that Now() should never go back.
 TEST(EnvoyQuicClockTest, TestMonotonicityWithReadTimeSystem) {
   Event::TestRealTimeSystem time_system;
-  EnvoyQuicClock clock(time_system);
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  EnvoyQuicClock clock(*dispatcher);
   quic::QuicTime last_now = clock.Now();
   for (int i = 0; i < 1000; ++i) {
     quic::QuicTime now = clock.Now();
     ASSERT_LE(last_now, now);
     last_now = now;
   }
+}
+
+TEST(EnvoyQuicClockTest, ApproximateNow) {
+  Event::SimulatedTimeSystemHelper time_system;
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  EnvoyQuicClock clock(*dispatcher);
+
+  // ApproximateTime() is cached, it not change only because time passes.
+  const int kDeltaMicroseconds = 10;
+  quic::QuicTime approximate_now1 = clock.ApproximateNow();
+  time_system.sleep(std::chrono::microseconds(kDeltaMicroseconds));
+  quic::QuicTime approximate_now2 = clock.ApproximateNow();
+  EXPECT_EQ(approximate_now1, approximate_now2);
+
+  // Calling Now() updates ApproximateTime().
+  quic::QuicTime now = clock.Now();
+  approximate_now2 = clock.ApproximateNow();
+  EXPECT_EQ(now, approximate_now2);
+  EXPECT_EQ(now, approximate_now1 + quic::QuicTime::Delta::FromMicroseconds(kDeltaMicroseconds));
 }
 
 } // namespace Quic

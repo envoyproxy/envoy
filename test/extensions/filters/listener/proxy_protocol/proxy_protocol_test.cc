@@ -6,6 +6,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -31,7 +32,6 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -52,7 +52,7 @@ public:
   ProxyProtocolTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
-        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
 
     connection_handler_->addListener(*this);
@@ -73,9 +73,15 @@ public:
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return std::chrono::milliseconds();
   }
+  bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
+  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -161,6 +167,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.
@@ -285,7 +292,10 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -314,7 +324,10 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -525,7 +538,10 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -654,7 +670,10 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, 17);
 
@@ -700,7 +719,10 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -874,7 +896,7 @@ public:
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_.localAddress()->ip()->port())),
-        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
     connection_handler_->addListener(*this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
@@ -901,9 +923,15 @@ public:
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return std::chrono::milliseconds();
   }
+  bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
+  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -967,6 +995,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.

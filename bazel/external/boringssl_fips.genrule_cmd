@@ -65,7 +65,7 @@ PLATFORM="linux"
 
 curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \
   && echo "$$SHA256" ninja-"$$PLATFORM".zip | sha256sum --check
-unzip ninja-"$$PLATFORM".zip
+unzip -o ninja-"$$PLATFORM".zip
 
 export PATH="$$PWD:$$PATH"
 

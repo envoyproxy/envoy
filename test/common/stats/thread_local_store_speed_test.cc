@@ -4,8 +4,8 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/heap_stat_data.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -22,18 +22,18 @@ namespace Envoy {
 class ThreadLocalStorePerf {
 public:
   ThreadLocalStorePerf()
-      : heap_alloc_(symbol_table_), store_(heap_alloc_),
-        api_(Api::createApiForTest(store_, time_system_)) {
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), heap_alloc_(*symbol_table_),
+        store_(heap_alloc_), api_(Api::createApiForTest(store_, time_system_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
 
     Stats::TestUtil::forEachSampleStat(1000, [this](absl::string_view name) {
-      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, symbol_table_));
+      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, *symbol_table_));
     });
   }
 
   ~ThreadLocalStorePerf() {
     for (auto& stat_name_storage : stat_names_) {
-      stat_name_storage->free(symbol_table_);
+      stat_name_storage->free(*symbol_table_);
     }
     store_.shutdownThreading();
     if (tls_) {
@@ -54,9 +54,9 @@ public:
   }
 
 private:
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTablePtr symbol_table_;
   Event::SimulatedTimeSystem time_system_;
-  Stats::HeapStatDataAllocator heap_alloc_;
+  Stats::AllocatorImpl heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

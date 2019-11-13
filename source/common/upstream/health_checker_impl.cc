@@ -12,6 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
 // TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
@@ -28,9 +29,11 @@ public:
                                   Envoy::Runtime::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher,
                                   HealthCheckEventLoggerPtr&& event_logger,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor)
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api)
       : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
-        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor) {}
+        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor), api_(api) {
+  }
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
@@ -39,6 +42,7 @@ public:
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return validation_visitor_;
   }
+  Api::Api& api() override { return api_; }
 
 private:
   Upstream::Cluster& cluster_;
@@ -47,14 +51,14 @@ private:
   Event::Dispatcher& dispatcher_;
   HealthCheckEventLoggerPtr event_logger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Api::Api& api_;
 };
 
-HealthCheckerSharedPtr
-HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_check_config,
-                             Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             AccessLog::AccessLogManager& log_manager,
-                             ProtobufMessage::ValidationVisitor& validation_visitor) {
+HealthCheckerSharedPtr HealthCheckerFactory::create(
+    const envoy::api::v2::core::HealthCheck& health_check_config, Upstream::Cluster& cluster,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+    AccessLog::AccessLogManager& log_manager,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   HealthCheckEventLoggerPtr event_logger;
   if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
@@ -80,7 +84,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
             health_check_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
-                                            std::move(event_logger), validation_visitor));
+                                            std::move(event_logger), validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   default:
@@ -102,7 +106,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
-      codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
+      codec_client_type_(codecClientType(config.http_health_check().use_http2()
+                                             ? envoy::type::HTTP2
+                                             : config.http_health_check().codec_client_type())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -149,14 +155,25 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inRange(uint64_t http_status) con
   return false;
 }
 
+Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_type) {
+  switch (codec_client_type) {
+  case Http::CodecClient::Type::HTTP1:
+    return Http::Protocol::Http11;
+  case Http::CodecClient::Type::HTTP2:
+    return Http::Protocol::Http2;
+  case Http::CodecClient::Type::HTTP3:
+    return Http::Protocol::Http3;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
       hostname_(parent_.host_value_.empty() ? parent_.cluster_.info()->name()
                                             : parent_.host_value_),
-      protocol_(parent_.codec_client_type_ == Http::CodecClient::Type::HTTP1
-                    ? Http::Protocol::Http11
-                    : Http::Protocol::Http2),
+      protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
@@ -186,6 +203,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     // For the raw disconnect event, we are either between intervals in which case we already have
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.
+    response_headers_.reset();
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }
@@ -208,7 +226,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Host, hostname_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
-  Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
+  Router::FilterUtility::setUpstreamScheme(
+      request_headers, host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource());
   stream_info.setDownstreamLocalAddress(local_address_);
   stream_info.setDownstreamRemoteAddress(local_address_);
@@ -296,7 +315,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     }
   }
 
-  if (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2) {
+  if (response_headers_->ProxyConnection() && protocol_ < Http::Protocol::Http2) {
     const bool close =
         absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
                                Http::Headers::get().ConnectionValues.Close);
@@ -325,11 +344,17 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
-  if (use_http2) {
+Http::CodecClient::Type
+HttpHealthCheckerImpl::codecClientType(const envoy::type::CodecClientType& type) {
+  switch (type) {
+  case envoy::type::HTTP3:
+    return Http::CodecClient::Type::HTTP3;
+  case envoy::type::HTTP2:
     return Http::CodecClient::Type::HTTP2;
-  } else {
+  case envoy::type::HTTP1:
     return Http::CodecClient::Type::HTTP1;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -520,7 +545,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
     return;
   }
   if (!Grpc::Common::hasGrpcContentType(*headers)) {
-    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "invalid gRPC content-type", false);
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "invalid gRPC content-type", false);
     return;
   }
   if (end_stream) {
@@ -531,7 +556,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
       onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
       return;
     }
-    onRpcComplete(Grpc::Status::GrpcStatus::Internal,
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal,
                   "gRPC protocol violation: unexpected stream end", true);
   }
 }
@@ -539,7 +564,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Instance& data,
                                                                      bool end_stream) {
   if (end_stream) {
-    onRpcComplete(Grpc::Status::GrpcStatus::Internal,
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal,
                   "gRPC protocol violation: unexpected stream end", true);
     return;
   }
@@ -547,13 +572,14 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
   // We should end up with only one frame here.
   std::vector<Grpc::Frame> decoded_frames;
   if (!decoder_.decode(data, decoded_frames)) {
-    onRpcComplete(Grpc::Status::GrpcStatus::Internal, "gRPC wire protocol decode error", false);
+    onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "gRPC wire protocol decode error",
+                  false);
   }
   for (auto& frame : decoded_frames) {
     if (frame.length_ > 0) {
       if (health_check_response_) {
         // grpc.health.v1.Health.Check is unary RPC, so only one message is allowed.
-        onRpcComplete(Grpc::Status::GrpcStatus::Internal, "unexpected streaming", false);
+        onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal, "unexpected streaming", false);
         return;
       }
       health_check_response_ = std::make_unique<grpc::health::v1::HealthCheckResponse>();
@@ -561,8 +587,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
 
       if (frame.flags_ != Grpc::GRPC_FH_DEFAULT ||
           !health_check_response_->ParseFromZeroCopyStream(&stream)) {
-        onRpcComplete(Grpc::Status::GrpcStatus::Internal, "invalid grpc.health.v1 RPC payload",
-                      false);
+        onRpcComplete(Grpc::Status::WellKnownGrpcStatus::Internal,
+                      "invalid grpc.health.v1 RPC payload", false);
         return;
       }
     }
@@ -573,7 +599,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeTrailers(
     Http::HeaderMapPtr&& trailers) {
   auto maybe_grpc_status = Grpc::Common::getGrpcStatus(*trailers);
   auto grpc_status =
-      maybe_grpc_status ? maybe_grpc_status.value() : Grpc::Status::GrpcStatus::Internal;
+      maybe_grpc_status
+          ? maybe_grpc_status.value()
+          : static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::WellKnownGrpcStatus::Internal);
   const std::string grpc_message =
       maybe_grpc_status ? Grpc::Common::getGrpcMessage(*trailers) : "invalid gRPC status";
   onRpcComplete(grpc_status, grpc_message, true);
@@ -607,9 +635,14 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
                                    parent_.service_method_.name(), absl::nullopt);
-  headers_message->headers().insertUserAgent().value().setReference(
+  headers_message->headers().setReferenceUserAgent(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
-  Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());
+
+  Grpc::Common::toGrpcTimeout(parent_.timeout_,
+                              headers_message->headers().insertGrpcTimeout().value());
+
+  Router::FilterUtility::setUpstreamScheme(
+      headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());
 
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 
@@ -657,7 +690,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway() {
 
 bool GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::isHealthCheckSucceeded(
     Grpc::Status::GrpcStatus grpc_status) const {
-  if (grpc_status != Grpc::Status::GrpcStatus::Ok) {
+  if (grpc_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     return false;
   }
 
@@ -730,7 +763,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
     }
   }
   std::string grpc_status_message;
-  if (grpc_status != Grpc::Status::GrpcStatus::Ok && !grpc_message.empty()) {
+  if (grpc_status != Grpc::Status::WellKnownGrpcStatus::Ok && !grpc_message.empty()) {
     grpc_status_message = fmt::format("{} ({})", grpc_status, grpc_message);
   } else {
     grpc_status_message = fmt::format("{}", grpc_status);

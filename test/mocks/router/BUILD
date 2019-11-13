@@ -27,5 +27,6 @@ envoy_cc_mock(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/stats:stats_mocks",
     ],
 )

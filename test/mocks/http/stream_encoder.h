@@ -12,7 +12,7 @@ namespace Http {
 class MockStreamEncoder : public StreamEncoder {
 public:
   MockStreamEncoder();
-  ~MockStreamEncoder();
+  ~MockStreamEncoder() override;
 
   // Http::StreamEncoder
   MOCK_METHOD1(encode100ContinueHeaders, void(const HeaderMap& headers));

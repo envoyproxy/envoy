@@ -20,7 +20,7 @@ namespace Aws {
 
 class EvironmentCredentialsProviderTest : public testing::Test {
 public:
-  ~EvironmentCredentialsProviderTest() {
+  ~EvironmentCredentialsProviderTest() override {
     TestEnvironment::unsetEnvVar("AWS_ACCESS_KEY_ID");
     TestEnvironment::unsetEnvVar("AWS_SECRET_ACCESS_KEY");
     TestEnvironment::unsetEnvVar("AWS_SESSION_TOKEN");
@@ -330,7 +330,7 @@ public:
     EXPECT_CALL(factories_, createEnvironmentCredentialsProvider());
   }
 
-  ~DefaultCredentialsProviderChainTest() {
+  ~DefaultCredentialsProviderChainTest() override {
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN");
@@ -349,9 +349,9 @@ public:
                            Api::Api&,
                            const MetadataCredentialsProviderBase::MetadataFetcher& fetcher));
 
-    virtual CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
+    CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
         Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
-        const std::string& credential_uri, const std::string& authorization_token) const {
+        const std::string& credential_uri, const std::string& authorization_token) const override {
       return createTaskRoleCredentialsProviderMock(api, metadata_fetcher, credential_uri,
                                                    authorization_token);
     }

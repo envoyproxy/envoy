@@ -60,9 +60,8 @@ void RouteConfigUpdateReceiverImpl::updateVhosts(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
   for (const auto& resource : added_resources) {
     envoy::api::v2::route::VirtualHost vhost =
-        MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource.resource(),
-                                                                    validation_visitor_);
-    MessageUtil::validate(vhost);
+        MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource.resource());
+    MessageUtil::validate(vhost, validation_visitor_);
     auto found = vhosts.find(vhost.name());
     if (found != vhosts.end()) {
       vhosts.erase(found);

@@ -41,7 +41,7 @@ public:
 
 class FieldImpl : public Field {
 public:
-  explicit FieldImpl(const std::string& key, double value) : type_(Type::DOUBLE), key_(key) {
+  explicit FieldImpl(const std::string& key, double value) : type_(Type::Double), key_(key) {
     value_.double_value_ = value;
   }
 
@@ -55,11 +55,11 @@ public:
     value_.document_value_ = value;
   }
 
-  explicit FieldImpl(const std::string& key, ObjectId&& value) : type_(Type::OBJECT_ID), key_(key) {
+  explicit FieldImpl(const std::string& key, ObjectId&& value) : type_(Type::ObjectId), key_(key) {
     value_.object_id_value_ = std::move(value);
   }
 
-  explicit FieldImpl(const std::string& key, bool value) : type_(Type::BOOLEAN), key_(key) {
+  explicit FieldImpl(const std::string& key, bool value) : type_(Type::Boolean), key_(key) {
     value_.bool_value_ = value;
   }
 
@@ -67,79 +67,79 @@ public:
     value_.int64_value_ = value;
   }
 
-  explicit FieldImpl(const std::string& key) : type_(Type::NULL_VALUE), key_(key) {}
+  explicit FieldImpl(const std::string& key) : type_(Type::NullValue), key_(key) {}
 
-  explicit FieldImpl(const std::string& key, Regex&& value) : type_(Type::REGEX), key_(key) {
+  explicit FieldImpl(const std::string& key, Regex&& value) : type_(Type::Regex), key_(key) {
     value_.regex_value_ = std::move(value);
   }
 
-  explicit FieldImpl(const std::string& key, int32_t value) : type_(Type::INT32), key_(key) {
+  explicit FieldImpl(const std::string& key, int32_t value) : type_(Type::Int32), key_(key) {
     value_.int32_value_ = value;
   }
 
   // Bson::Field
   double asDouble() const override {
-    checkType(Type::DOUBLE);
+    checkType(Type::Double);
     return value_.double_value_;
   }
 
   const std::string& asString() const override {
-    checkType(Type::STRING);
+    checkType(Type::String);
     return value_.string_value_;
   }
 
   const std::string& asSymbol() const override {
-    checkType(Type::SYMBOL);
+    checkType(Type::Symbol);
     return value_.string_value_;
   }
 
   const Document& asDocument() const override {
-    checkType(Type::DOCUMENT);
+    checkType(Type::Document);
     return *value_.document_value_;
   }
 
   const Document& asArray() const override {
-    checkType(Type::ARRAY);
+    checkType(Type::Array);
     return *value_.document_value_;
   }
 
   const std::string& asBinary() const override {
-    checkType(Type::BINARY);
+    checkType(Type::Binary);
     return value_.string_value_;
   }
 
   const ObjectId& asObjectId() const override {
-    checkType(Type::OBJECT_ID);
+    checkType(Type::ObjectId);
     return value_.object_id_value_;
   }
 
   bool asBoolean() const override {
-    checkType(Type::BOOLEAN);
+    checkType(Type::Boolean);
     return value_.bool_value_;
   }
 
   int64_t asDatetime() const override {
-    checkType(Type::DATETIME);
+    checkType(Type::Datetime);
     return value_.int64_value_;
   }
 
   const Regex& asRegex() const override {
-    checkType(Type::REGEX);
+    checkType(Type::Regex);
     return value_.regex_value_;
   }
 
   int32_t asInt32() const override {
-    checkType(Type::INT32);
+    checkType(Type::Int32);
     return value_.int32_value_;
   }
 
   int64_t asTimestamp() const override {
-    checkType(Type::TIMESTAMP);
+    checkType(Type::Timestamp);
     return value_.int64_value_;
   }
 
   int64_t asInt64() const override {
-    checkType(Type::INT64);
+    checkType(Type::Int64);
     return value_.int64_value_;
   }
 
@@ -195,27 +195,27 @@ public:
   }
 
   DocumentSharedPtr addString(const std::string& key, std::string&& value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::STRING, key, std::move(value)));
+    fields_.emplace_back(new FieldImpl(Field::Type::String, key, std::move(value)));
     return shared_from_this();
   }
 
   DocumentSharedPtr addSymbol(const std::string& key, std::string&& value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::SYMBOL, key, std::move(value)));
+    fields_.emplace_back(new FieldImpl(Field::Type::Symbol, key, std::move(value)));
     return shared_from_this();
   }
 
   DocumentSharedPtr addDocument(const std::string& key, DocumentSharedPtr value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::DOCUMENT, key, value));
+    fields_.emplace_back(new FieldImpl(Field::Type::Document, key, value));
     return shared_from_this();
   }
 
   DocumentSharedPtr addArray(const std::string& key, DocumentSharedPtr value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::ARRAY, key, value));
+    fields_.emplace_back(new FieldImpl(Field::Type::Array, key, value));
     return shared_from_this();
   }
 
   DocumentSharedPtr addBinary(const std::string& key, std::string&& value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::BINARY, key, std::move(value)));
+    fields_.emplace_back(new FieldImpl(Field::Type::Binary, key, std::move(value)));
     return shared_from_this();
   }
 
@@ -230,7 +230,7 @@ public:
   }
 
   DocumentSharedPtr addDatetime(const std::string& key, int64_t value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::DATETIME, key, value));
+    fields_.emplace_back(new FieldImpl(Field::Type::Datetime, key, value));
     return shared_from_this();
   }
 
@@ -250,12 +250,12 @@ public:
   }
 
   DocumentSharedPtr addTimestamp(const std::string& key, int64_t value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::TIMESTAMP, key, value));
+    fields_.emplace_back(new FieldImpl(Field::Type::Timestamp, key, value));
     return shared_from_this();
   }
 
   DocumentSharedPtr addInt64(const std::string& key, int64_t value) override {
-    fields_.emplace_back(new FieldImpl(Field::Type::INT64, key, value));
+    fields_.emplace_back(new FieldImpl(Field::Type::Int64, key, value));
     return shared_from_this();
   }
 
@@ -268,7 +268,7 @@ public:
   const std::list<FieldPtr>& values() const override { return fields_; }
 
 private:
-  DocumentImpl() {}
+  DocumentImpl() = default;
 
   void fromBuffer(Buffer::Instance& data);
 

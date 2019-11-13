@@ -27,7 +27,7 @@ constexpr uint32_t PROXY_PROTO_V2_AF_UNIX = 0x3;
 struct WireHeader {
   WireHeader(size_t extensions_length)
       : extensions_length_(extensions_length), protocol_version_(Network::Address::IpVersion::v4),
-        remote_address_(0), local_address_(0), local_command_(true) {}
+        remote_address_(nullptr), local_address_(nullptr), local_command_(true) {}
   WireHeader(size_t extensions_length, Network::Address::IpVersion protocol_version,
              Network::Address::InstanceConstSharedPtr remote_address,
              Network::Address::InstanceConstSharedPtr local_address)

@@ -15,13 +15,6 @@ namespace Echo {
 class EchoConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<EchoFilter>());
-    };
-  }
-
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
@@ -35,6 +28,7 @@ public:
   }
 
   std::string name() override { return NetworkFilterNames::get().Echo; }
+  bool isTerminalFilter() override { return true; }
 };
 
 /**

@@ -27,7 +27,8 @@ public:
     filter_chains:
       filters:
        -  name: envoy.filters.network.rbac
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
             stat_prefix: tcp.
             rules:
               policies:
@@ -37,6 +38,8 @@ public:
                   principals:
                     - not_id:
                         any: true
+       -  name: envoy.echo
+          config:
 )EOF";
   }
 
@@ -67,7 +70,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrat
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
   initializeFilter(R"EOF(
 name: envoy.filters.network.rbac
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
   stat_prefix: tcp.
   rules:
     policies:
@@ -99,7 +103,8 @@ config:
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
   initializeFilter(R"EOF(
 name: envoy.filters.network.rbac
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
   stat_prefix: tcp.
   rules:
     policies:

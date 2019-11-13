@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/config/config_provider.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/init/manager.h"
@@ -20,11 +18,11 @@ namespace Envoy {
 namespace Config {
 
 // This file provides a set of base classes, (ImmutableConfigProviderBase,
-// MutableConfigProviderCommonBase, MutableConfigProviderBase, DeltaMutableConfigProviderBase,
-// ConfigProviderManagerImplBase, ConfigSubscriptionCommonBase, ConfigSubscriptionInstance,
-// DeltaConfigSubscriptionInstance), conforming to the ConfigProvider/ConfigProviderManager
-// interfaces, which in tandem provide a framework for implementing statically defined (i.e.,
-// immutable) and dynamic (mutable via subscriptions) configuration for Envoy.
+// MutableConfigProviderCommonBase, ConfigProviderManagerImplBase, ConfigSubscriptionCommonBase,
+// ConfigSubscriptionInstance, DeltaConfigSubscriptionInstance), conforming to the
+// ConfigProvider/ConfigProviderManager interfaces, which in tandem provide a framework for
+// implementing statically defined (i.e., immutable) and dynamic (mutable via subscriptions)
+// configuration for Envoy.
 //
 // The mutability property applies to the ConfigProvider itself and _not_ the underlying config
 // proto, which is always immutable. MutableConfigProviderCommonBase objects receive config proto
@@ -58,11 +56,12 @@ namespace Config {
 //   interface.
 //
 // For mutable (xDS) providers:
-//   1) According to the API type, create a class derived from MutableConfigProviderBase or
-//   DeltaMutableConfigProviderBase and implement the required interface.
-//   2) According to the API type, create a class derived from ConfigSubscriptionInstance or
-//   DeltaConfigSubscriptionInstance; this is the entity responsible for owning and managing the
-//   Envoy::Config::Subscription<ConfigProto> that provides the underlying config subscription.
+//   1) According to the API type, create a class derived from MutableConfigProviderCommonBase and
+//   implement the required interface.
+//   2) According to the API type, create a class derived from
+//   ConfigSubscriptionInstance or DeltaConfigSubscriptionInstance; this is the entity responsible
+//   for owning and managing the Envoy::Config::Subscription<ConfigProto> that provides the
+//   underlying config subscription, and the Config implementation shared by associated providers.
 //     a) For a ConfigProvider::ApiType::Full subscription instance (i.e., a
 //     ConfigSubscriptionInstance child):
 //     - When subscription callbacks (onConfigUpdate, onConfigUpdateFailed) are issued by the
@@ -78,8 +77,8 @@ namespace Config {
 //    - When subscription callbacks (onConfigUpdate, onConfigUpdateFailed) are issued by the
 //    underlying subscription, the corresponding ConfigSubscriptionInstance functions must be called
 //    as well.
-//    - On a successful config update, applyConfigUpdate() should be called to propagate the config
-//    updates to all bound config providers and worker threads.
+//    - On a successful config update, applyConfigUpdate() should be called to propagate the
+//    config updates to all bound config providers and worker threads.
 
 class ConfigProviderManagerImplBase;
 
@@ -130,12 +129,13 @@ private:
 class MutableConfigProviderCommonBase;
 
 /**
- * Provides common DS API subscription functionality required by the ConfigProvider::ApiType
- * specific base classes (see ConfigSubscriptionInstance and DeltaConfigSubscriptionInstance).
+ * Provides common DS API subscription functionality required by the ConfigProvider::ApiType.
  *
- * To do so, this class keeps track of a set of MutableConfigProviderCommonBase instances associated
- * with an underlying subscription; providers are bound/unbound as needed as they are created and
- * destroyed.
+ * This class can not be instantiated directly; instead, it provides the foundation for
+ * config subscription implementations which derive from it.
+ *
+ * A subscription is intended to be co-owned by config providers with the same config source, it's
+ * designed to be created/destructed on admin thread only.
  *
  * xDS config providers and subscriptions are split to avoid lifetime issues with arguments
  * required by the config providers. An example is the Server::Configuration::FactoryContext, which
@@ -143,11 +143,15 @@ class MutableConfigProviderCommonBase;
  * in use (see #3960). This split enables single ownership of the config providers, while enabling
  * shared ownership of the underlying subscription.
  *
- * This class can not be instantiated directly; instead, it provides the foundation for
- * config subscription implementations which derive from it.
  */
 class ConfigSubscriptionCommonBase : protected Logger::Loggable<Logger::Id::config> {
 public:
+  // Callback for updating a Config implementation held in each worker thread, the callback is
+  // called in applyConfigUpdate() with the current version Config, and is expected to return the
+  // new version Config.
+  using ConfigUpdateCb =
+      std::function<ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>;
+
   struct LastConfigInfo {
     absl::optional<uint64_t> last_config_hash_;
     std::string last_config_version_;
@@ -165,6 +169,10 @@ public:
   const SystemTime& lastUpdated() const { return last_updated_; }
 
   const absl::optional<LastConfigInfo>& configInfo() const { return config_info_; }
+
+  ConfigProvider::ConfigConstSharedPtr getConfig() const {
+    return tls_->getTyped<ThreadLocalConfig>().config_;
+  }
 
   /**
    * Must be called by derived classes when the onConfigUpdate() callback associated with the
@@ -184,26 +192,32 @@ public:
     init_target_.ready();
   }
 
-  /**
-   * Returns one of the bound mutable config providers.
-   * @return const MutableConfigProviderCommonBase* a const pointer to a
-   *         bound MutableConfigProviderCommonBase or nullptr when there are none.
-   */
-  MutableConfigProviderCommonBase* getAnyBoundMutableConfigProvider() const {
-    return !mutable_config_providers_.empty() ? *mutable_config_providers_.begin() : nullptr;
-  }
-
 protected:
+  struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
+    explicit ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
+        : config_(std::move(initial_config)) {}
+
+    ConfigProvider::ConfigConstSharedPtr config_;
+  };
+
   ConfigSubscriptionCommonBase(const std::string& name, const uint64_t manager_identifier,
                                ConfigProviderManagerImplBase& config_provider_manager,
-                               TimeSource& time_source, const SystemTime& last_updated,
-                               const LocalInfo::LocalInfo& local_info)
-      : name_(name),
+                               Server::Configuration::FactoryContext& factory_context)
+      : name_(name), tls_(factory_context.threadLocal().allocateSlot()),
         init_target_(fmt::format("ConfigSubscriptionCommonBase {}", name_), [this]() { start(); }),
         manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
-        time_source_(time_source), last_updated_(last_updated) {
-    Envoy::Config::Utility::checkLocalInfo(name, local_info);
+        time_source_(factory_context.timeSource()),
+        last_updated_(factory_context.timeSource().systemTime()) {
+    Envoy::Config::Utility::checkLocalInfo(name, factory_context.localInfo());
   }
+
+  /**
+   * Propagates a config update to worker threads.
+   *
+   * @param update_fn the callback to run on each thread, it takes the previous version Config and
+   * returns a updated/new version Config.
+   */
+  void applyConfigUpdate(const ConfigUpdateCb& update_fn);
 
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
 
@@ -212,16 +226,12 @@ protected:
   }
 
   const std::string name_;
-  std::unordered_set<MutableConfigProviderCommonBase*> mutable_config_providers_;
   absl::optional<LastConfigInfo> config_info_;
+  // This slot holds a Config implementation in each thread, which is intended to be shared between
+  // config providers from the same config source.
+  ThreadLocal::SlotPtr tls_;
 
 private:
-  void bindConfigProvider(MutableConfigProviderCommonBase* provider);
-
-  void unbindConfigProvider(MutableConfigProviderCommonBase* provider) {
-    mutable_config_providers_.erase(provider);
-  }
-
   Init::TargetImpl init_target_;
   const uint64_t manager_identifier_;
   ConfigProviderManagerImplBase& config_provider_manager_;
@@ -235,28 +245,34 @@ private:
   // TODO(AndresGuedez): Investigate whether a shared ownership model avoiding the <shared_ptr>s and
   // instead centralizing lifetime management in the ConfigProviderManagerImplBase with explicit
   // reference counting would be more maintainable.
-  friend class MutableConfigProviderCommonBase;
-  friend class MutableConfigProviderBase;
-  friend class DeltaMutableConfigProviderBase;
   friend class ConfigProviderManagerImplBase;
-  friend class MockMutableConfigProviderBase;
 };
 
 using ConfigSubscriptionCommonBaseSharedPtr = std::shared_ptr<ConfigSubscriptionCommonBase>;
 
 /**
  * Provides common subscription functionality required by ConfigProvider::ApiType::Full DS APIs.
+ * A single Config instance is shared across all providers and all workers associated with this
+ * subscription.
  */
 class ConfigSubscriptionInstance : public ConfigSubscriptionCommonBase {
-protected:
+public:
   ConfigSubscriptionInstance(const std::string& name, const uint64_t manager_identifier,
                              ConfigProviderManagerImplBase& config_provider_manager,
-                             TimeSource& time_source, const SystemTime& last_updated,
-                             const LocalInfo::LocalInfo& local_info)
-      : ConfigSubscriptionCommonBase(name, manager_identifier, config_provider_manager, time_source,
-                                     last_updated, local_info) {}
+                             Server::Configuration::FactoryContext& factory_context)
+      : ConfigSubscriptionCommonBase(name, manager_identifier, config_provider_manager,
+                                     factory_context) {}
 
-  ~ConfigSubscriptionInstance() override = default;
+  /**
+   * Must be called by the derived class' constructor.
+   * @param initial_config supplies an initial Envoy::Config::ConfigProvider::Config associated
+   * with the underlying subscription, shared across all providers and workers.
+   */
+  void initialize(const ConfigProvider::ConfigConstSharedPtr& initial_config) {
+    tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ThreadLocalConfig>(initial_config);
+    });
+  }
 
   /**
    * Determines whether a configuration proto is a new update, and if so, propagates it to all
@@ -264,79 +280,13 @@ protected:
    * @param config_proto supplies the newly received config proto.
    * @param config_name supplies the name associated with the config.
    * @param version_info supplies the version associated with the config.
-   * @return bool false when the config proto has no delta from the previous config, true otherwise.
+   * @return bool false when the config proto has no delta from the previous config, true
+   * otherwise.
    */
   bool checkAndApplyConfigUpdate(const Protobuf::Message& config_proto,
                                  const std::string& config_name, const std::string& version_info);
-};
-
-using ConfigSharedPtr = std::shared_ptr<Envoy::Config::ConfigProvider::Config>;
-
-/**
- * Provides common subscription functionality required by ConfigProvider::ApiType::Delta DS APIs.
- */
-class DeltaConfigSubscriptionInstance : public ConfigSubscriptionCommonBase {
-protected:
-  DeltaConfigSubscriptionInstance(const std::string& name, const uint64_t manager_identifier,
-                                  ConfigProviderManagerImplBase& config_provider_manager,
-                                  TimeSource& time_source, const SystemTime& last_updated,
-                                  const LocalInfo::LocalInfo& local_info)
-      : ConfigSubscriptionCommonBase(name, manager_identifier, config_provider_manager, time_source,
-                                     last_updated, local_info) {}
-
-  ~DeltaConfigSubscriptionInstance() override = default;
-
-  /**
-   * Propagates a config update to the config providers and worker threads associated with the
-   * subscription.
-   *
-   * @param update_fn the callback to run on each worker thread.
-   */
-  void applyDeltaConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& update_fn);
-};
-
-/**
- * Provides generic functionality required by the ConfigProvider::ApiType specific dynamic config
- * providers (see MutableConfigProviderBase and DeltaMutableConfigProviderBase).
- *
- * This class can not be instantiated directly; instead, it provides the foundation for
- * dynamic config provider implementations which derive from it.
- */
-class MutableConfigProviderCommonBase : public ConfigProvider {
-public:
-  ~MutableConfigProviderCommonBase() override { subscription_->unbindConfigProvider(this); }
-
-  // Envoy::Config::ConfigProvider
-  SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
-  ApiType apiType() const override { return api_type_; }
 
 protected:
-  MutableConfigProviderCommonBase(ConfigSubscriptionCommonBaseSharedPtr&& subscription,
-                                  Server::Configuration::FactoryContext& factory_context,
-                                  ApiType api_type)
-      : tls_(factory_context.threadLocal().allocateSlot()), subscription_(subscription),
-        api_type_(api_type) {}
-
-  ThreadLocal::SlotPtr tls_;
-  ConfigSubscriptionCommonBaseSharedPtr subscription_;
-
-private:
-  ApiType api_type_;
-};
-
-/**
- * Provides common mutable (dynamic) config provider functionality required by
- * ConfigProvider::ApiType::Full DS APIs.
- */
-class MutableConfigProviderBase : public MutableConfigProviderCommonBase {
-public:
-  // Envoy::Config::ConfigProvider
-  // NOTE: This is being promoted to public for internal uses to avoid an unnecessary dynamic_cast
-  // in the public API (ConfigProvider::config<T>()).
-  ConfigConstSharedPtr getConfig() const override {
-    return tls_->getTyped<ThreadLocalConfig>().config_;
-  }
-
   /**
    * Called when a new config proto is received via an xDS subscription.
    * On successful validation of the config, must return a shared_ptr to a ConfigProvider::Config
@@ -347,96 +297,59 @@ public:
    * @param config_proto supplies the configuration proto.
    * @return ConfigConstSharedPtr the ConfigProvider::Config to share with other providers.
    */
-  virtual ConfigConstSharedPtr onConfigProtoUpdate(const Protobuf::Message& config_proto) PURE;
+  virtual ConfigProvider::ConfigConstSharedPtr
+  onConfigProtoUpdate(const Protobuf::Message& config_proto) PURE;
+};
+
+/**
+ * Provides common subscription functionality required by ConfigProvider::ApiType::Delta DS APIs.
+ */
+class DeltaConfigSubscriptionInstance : public ConfigSubscriptionCommonBase {
+protected:
+  using ConfigSubscriptionCommonBase::ConfigSubscriptionCommonBase;
 
   /**
    * Must be called by the derived class' constructor.
-   * @param initial_config supplies an initial Envoy::Config::ConfigProvider::Config associated with
-   *                       the underlying subscription.
+   * @param init_cb supplies an initial Envoy::Config::ConfigProvider::Config associated with the
+   * underlying subscription for each worker thread.
    */
-  void initialize(const ConfigConstSharedPtr& initial_config) {
-    subscription_->bindConfigProvider(this);
-    tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalConfig>(initial_config);
+  void initialize(const std::function<ConfigProvider::ConfigConstSharedPtr()>& init_cb) {
+    tls_->set([init_cb](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ThreadLocalConfig>(init_cb());
     });
   }
-
-  /**
-   * Propagates a newly instantiated Envoy::Config::ConfigProvider::Config to all workers.
-   * @param config supplies the newly instantiated config.
-   */
-  void onConfigUpdate(const ConfigConstSharedPtr& config) {
-    if (getConfig() == config) {
-      return;
-    }
-    tls_->runOnAllThreads(
-        [this, config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = config; });
-  }
-
-protected:
-  MutableConfigProviderBase(ConfigSubscriptionCommonBaseSharedPtr&& subscription,
-                            Server::Configuration::FactoryContext& factory_context,
-                            ApiType api_type)
-      : MutableConfigProviderCommonBase(std::move(subscription), factory_context, api_type) {}
-
-  ~MutableConfigProviderBase() override = default;
-
-private:
-  struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
-        : config_(std::move(initial_config)) {}
-
-    ConfigProvider::ConfigConstSharedPtr config_;
-  };
 };
 
 /**
- * Provides common mutable (dynamic) config provider functionality required by
- * ConfigProvider::ApiType::Delta DS APIs.
+ * Provides generic functionality required by the ConfigProvider::ApiType specific dynamic config
+ * providers.
+ *
+ * This class can not be instantiated directly; instead, it provides the foundation for
+ * dynamic config provider implementations which derive from it.
  */
-class DeltaMutableConfigProviderBase : public MutableConfigProviderCommonBase {
+class MutableConfigProviderCommonBase : public ConfigProvider {
 public:
   // Envoy::Config::ConfigProvider
-  // This promotes getConfig() to public so that internal uses can avoid an unnecessary dynamic_cast
-  // in the public API (ConfigProvider::config<T>()).
-  ConfigConstSharedPtr getConfig() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-
-  /**
-   * Non-const overload for use within the framework.
-   * @return ConfigSharedPtr the config implementation associated with the provider.
-   */
-  virtual ConfigSharedPtr getConfig() PURE;
-
-  /**
-   * Propagates a delta config update to all workers.
-   * @param updateCb the callback to run on each worker.
-   */
-  void onConfigUpdate(Envoy::Event::PostCb update_cb) {
-    tls_->runOnAllThreads(std::move(update_cb));
-  }
+  SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
+  ApiType apiType() const override { return api_type_; }
 
 protected:
-  DeltaMutableConfigProviderBase(ConfigSubscriptionCommonBaseSharedPtr&& subscription,
-                                 Server::Configuration::FactoryContext& factory_context,
-                                 ApiType api_type)
-      : MutableConfigProviderCommonBase(std::move(subscription), factory_context, api_type) {}
+  MutableConfigProviderCommonBase(ConfigSubscriptionCommonBaseSharedPtr&& subscription,
+                                  ApiType api_type)
+      : subscription_(subscription), api_type_(api_type) {}
 
-  ~DeltaMutableConfigProviderBase() override = default;
+  // Envoy::Config::ConfigProvider
+  ConfigConstSharedPtr getConfig() const override { return subscription_->getConfig(); }
 
-  /**
-   * Must be called by the derived class' constructor.
-   * @param initializeCb supplies the initialization callback to be issued for each worker
-   * thread.
-   */
-  void initialize(ThreadLocal::Slot::InitializeCb initializeCb) {
-    subscription_->bindConfigProvider(this);
-    tls_->set(std::move(initializeCb));
-  }
+  ConfigSubscriptionCommonBaseSharedPtr subscription_;
+
+private:
+  ApiType api_type_;
 };
 
 /**
- * Provides generic functionality required by all config provider managers, such as managing shared
- * lifetime of subscriptions and dynamic config providers, along with determining which
+ * Provides generic functionality required by all config provider managers, such as managing
+ * shared lifetime of subscriptions and dynamic config providers, along with determining which
  * subscriptions should be associated with newly instantiated providers.
  *
  * The implementation of this class is not thread safe. Note that ImmutableConfigProviderBase
@@ -445,17 +358,15 @@ protected:
  *
  * All config processing is done on the main thread, so instantiation of *ConfigProvider* objects
  * via createStaticConfigProvider() and createXdsConfigProvider() is naturally thread safe. Care
- * must be taken with regards to destruction of these objects, since it must also happen on the main
- * thread _prior_ to destruction of the ConfigProviderManagerImplBase object from which they were
- * created.
+ * must be taken with regards to destruction of these objects, since it must also happen on the
+ * main thread _prior_ to destruction of the ConfigProviderManagerImplBase object from which they
+ * were created.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
 class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
 public:
-  ~ConfigProviderManagerImplBase() override = default;
-
   /**
    * This is invoked by the /config_dump admin handler.
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated
@@ -483,8 +394,8 @@ protected:
   const ConfigProviderSet& immutableConfigProviders(ConfigProviderInstanceType type) const;
 
   /**
-   * Returns the subscription associated with the config_source_proto; if none exists, a new one is
-   * allocated according to the subscription_factory_fn.
+   * Returns the subscription associated with the config_source_proto; if none exists, a new one
+   * is allocated according to the subscription_factory_fn.
    * @param config_source_proto supplies the proto specifying the config subscription parameters.
    * @param init_manager supplies the init manager.
    * @param subscription_factory_fn supplies a function to be called when a new subscription needs

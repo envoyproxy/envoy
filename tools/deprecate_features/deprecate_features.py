@@ -49,8 +49,8 @@ def deprecate_proto():
 # Sorts out the list of features which should be default enabled and returns a tuple of
 # email and code changes.
 def flip_runtime_features():
-  grep_output = subprocess.check_output(
-      'grep -r "envoy.reloadable_features\." source/*', shell=True)
+  grep_output = subprocess.check_output('grep -r "envoy.reloadable_features\." source/*',
+                                        shell=True)
 
   features_to_flip = set()
 

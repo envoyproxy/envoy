@@ -20,7 +20,7 @@ namespace Ssl {
 class MockContextManager : public ContextManager {
 public:
   MockContextManager();
-  ~MockContextManager();
+  ~MockContextManager() override;
 
   MOCK_METHOD2(createSslClientContext,
                ClientContextSharedPtr(Stats::Scope& scope, const ClientContextConfig& config));
@@ -29,37 +29,38 @@ public:
                                       const std::vector<std::string>& server_names));
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
+  MOCK_METHOD0(privateKeyMethodManager, Ssl::PrivateKeyMethodManager&());
 };
 
 class MockConnectionInfo : public ConnectionInfo {
 public:
   MockConnectionInfo();
-  ~MockConnectionInfo();
+  ~MockConnectionInfo() override;
 
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
-  MOCK_CONST_METHOD0(uriSanLocalCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(uriSanLocalCertificate, absl::Span<const std::string>());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, const std::string&());
-  MOCK_CONST_METHOD0(serialNumberPeerCertificate, std::string());
-  MOCK_CONST_METHOD0(issuerPeerCertificate, std::string());
-  MOCK_CONST_METHOD0(subjectPeerCertificate, std::string());
-  MOCK_CONST_METHOD0(uriSanPeerCertificate, std::vector<std::string>());
-  MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
+  MOCK_CONST_METHOD0(serialNumberPeerCertificate, const std::string&());
+  MOCK_CONST_METHOD0(issuerPeerCertificate, const std::string&());
+  MOCK_CONST_METHOD0(subjectPeerCertificate, const std::string&());
+  MOCK_CONST_METHOD0(uriSanPeerCertificate, absl::Span<const std::string>());
+  MOCK_CONST_METHOD0(subjectLocalCertificate, const std::string&());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, const std::string&());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificateChain, const std::string&());
-  MOCK_CONST_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
-  MOCK_CONST_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(dnsSansPeerCertificate, absl::Span<const std::string>());
+  MOCK_CONST_METHOD0(dnsSansLocalCertificate, absl::Span<const std::string>());
   MOCK_CONST_METHOD0(validFromPeerCertificate, absl::optional<SystemTime>());
   MOCK_CONST_METHOD0(expirationPeerCertificate, absl::optional<SystemTime>());
-  MOCK_CONST_METHOD0(sessionId, std::string());
+  MOCK_CONST_METHOD0(sessionId, const std::string&());
   MOCK_CONST_METHOD0(ciphersuiteId, uint16_t());
   MOCK_CONST_METHOD0(ciphersuiteString, std::string());
-  MOCK_CONST_METHOD0(tlsVersion, std::string());
+  MOCK_CONST_METHOD0(tlsVersion, const std::string&());
 };
 
 class MockClientContext : public ClientContext {
 public:
   MockClientContext();
-  ~MockClientContext();
+  ~MockClientContext() override;
 
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_CONST_METHOD0(getCaCertInformation, CertificateDetailsPtr());
@@ -69,7 +70,7 @@ public:
 class MockClientContextConfig : public ClientContextConfig {
 public:
   MockClientContextConfig();
-  ~MockClientContextConfig();
+  ~MockClientContextConfig() override;
 
   MOCK_CONST_METHOD0(alpnProtocols, const std::string&());
   MOCK_CONST_METHOD0(cipherSuites, const std::string&());
@@ -91,7 +92,7 @@ public:
 class MockServerContextConfig : public ServerContextConfig {
 public:
   MockServerContextConfig();
-  ~MockServerContextConfig();
+  ~MockServerContextConfig() override;
 
   MOCK_CONST_METHOD0(alpnProtocols, const std::string&());
   MOCK_CONST_METHOD0(cipherSuites, const std::string&());
@@ -106,6 +107,32 @@ public:
 
   MOCK_CONST_METHOD0(requireClientCertificate, bool());
   MOCK_CONST_METHOD0(sessionTicketKeys, const std::vector<SessionTicketKey>&());
+};
+
+class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {
+public:
+  MockPrivateKeyMethodManager();
+  ~MockPrivateKeyMethodManager() override;
+
+  MOCK_METHOD2(createPrivateKeyMethodProvider,
+               PrivateKeyMethodProviderSharedPtr(
+                   const envoy::api::v2::auth::PrivateKeyProvider& config,
+                   Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
+};
+
+class MockPrivateKeyMethodProvider : public PrivateKeyMethodProvider {
+public:
+  MockPrivateKeyMethodProvider();
+  ~MockPrivateKeyMethodProvider() override;
+
+  MOCK_METHOD3(registerPrivateKeyMethod,
+               void(SSL* ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
+  MOCK_METHOD1(unregisterPrivateKeyMethod, void(SSL* ssl));
+  MOCK_METHOD0(checkFips, bool());
+
+#ifdef OPENSSL_IS_BORINGSSL
+  MOCK_METHOD0(getBoringSslPrivateKeyMethod, BoringSslPrivateKeyMethodSharedPtr());
+#endif
 };
 
 } // namespace Ssl

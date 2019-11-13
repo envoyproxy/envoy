@@ -24,9 +24,12 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"
+
+#include "server/active_raw_udp_listener_config.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
@@ -62,6 +65,7 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  bool receivedData() { return received_data_; }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -150,7 +154,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -161,6 +165,11 @@ public:
   virtual void setEndStream(bool end) { end_stream_ = end; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+
+  Http::MetadataMap& metadata_map() { return metadata_map_; }
+  std::unordered_map<std::string, uint64_t>& duplicated_metadata_key_count() {
+    return duplicated_metadata_key_count_;
+  }
 
 protected:
   Http::HeaderMapPtr headers_;
@@ -178,6 +187,9 @@ private:
   std::vector<Grpc::Frame> decoded_grpc_frames_;
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
+  Http::MetadataMap metadata_map_;
+  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  bool received_data_{false};
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;
@@ -284,8 +296,8 @@ public:
 private:
   Network::Connection& connection_;
   Thread::MutexBasicLockable lock_;
-  Common::CallbackManager<> disconnect_callback_manager_ GUARDED_BY(lock_);
-  bool disconnected_ GUARDED_BY(lock_){};
+  Common::CallbackManager<> disconnect_callback_manager_ ABSL_GUARDED_BY(lock_);
+  bool disconnected_ ABSL_GUARDED_BY(lock_){};
   const bool allow_unexpected_disconnects_;
 };
 
@@ -330,7 +342,7 @@ public:
 private:
   SharedConnectionWrapper shared_connection_;
   Thread::MutexBasicLockable lock_;
-  bool parented_ GUARDED_BY(lock_);
+  bool parented_ ABSL_GUARDED_BY(lock_);
   const bool allow_unexpected_disconnects_;
 };
 
@@ -390,7 +402,7 @@ protected:
   bool initialized_{};
   Thread::CondVar connection_event_;
   Thread::MutexBasicLockable lock_;
-  bool half_closed_ GUARDED_BY(lock_){};
+  bool half_closed_ ABSL_GUARDED_BY(lock_){};
   Event::TestTimeSystem& time_system_;
 };
 
@@ -402,7 +414,8 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb);
+                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
+                     uint32_t max_request_headers_count);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -515,14 +528,15 @@ public:
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-               bool enable_half_close = false);
+               bool enable_half_close = false, bool udp_fake_upstream = false);
+
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system, bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system);
-  ~FakeUpstream();
+  ~FakeUpstream() override;
 
   FakeHttpConnection::Type httpType() { return http_type_; }
 
@@ -531,7 +545,8 @@ public:
   testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+                        uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -547,6 +562,15 @@ public:
                         FakeHttpConnectionPtr& connection,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  // Waits for 1 UDP datagram to be received.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  // Send a UDP datagram on the fake upstream thread.
+  void sendUdpDatagram(const std::string& buffer, const Network::Address::Instance& peer);
+
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
     return filter_chain_.get();
@@ -557,10 +581,11 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
-  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+  void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
-  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
+  void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   // Stops the dispatcher loop and joins the listening thread.
@@ -575,9 +600,23 @@ private:
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
                Event::TestTimeSystem& time_system, bool enable_half_close);
 
+  class FakeUpstreamUdpFilter : public Network::UdpListenerReadFilter {
+  public:
+    FakeUpstreamUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
+        : UdpListenerReadFilter(callbacks), parent_(parent) {}
+
+    // Network::UdpListenerReadFilter
+    void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
+
+  private:
+    FakeUpstream& parent_;
+  };
+
   class FakeListener : public Network::ListenerConfig {
   public:
-    FakeListener(FakeUpstream& parent) : parent_(parent), name_("fake_upstream") {}
+    FakeListener(FakeUpstream& parent)
+        : parent_(parent), name_("fake_upstream"),
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()) {}
 
   private:
     // Network::ListenerConfig
@@ -591,16 +630,27 @@ private:
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return std::chrono::milliseconds();
     }
+    bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
+    Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    envoy::api::v2::core::TrafficDirection direction() const override {
+      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    }
 
     FakeUpstream& parent_;
-    std::string name_;
+    const std::string name_;
+    Network::NopConnectionBalancerImpl connection_balancer_;
+    const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   };
 
   void threadRoutine();
-  SharedConnectionWrapper& consumeConnection() EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void onRecvDatagram(Network::UdpRecvData& data);
 
   Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
@@ -608,20 +658,22 @@ private:
   // main test thread.
   Thread::MutexBasicLockable lock_;
   Thread::ThreadPtr thread_;
-  Thread::CondVar new_connection_event_;
+  Thread::CondVar upstream_event_;
   Api::ApiPtr api_;
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);
+  std::list<QueuedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
-  std::list<QueuedConnectionWrapperPtr> consumed_connections_ GUARDED_BY(lock_);
+  std::list<QueuedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
   bool allow_unexpected_disconnects_;
+  bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
+  std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;

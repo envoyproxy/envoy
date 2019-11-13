@@ -5,13 +5,15 @@ package envoy.type.matcher;
 option java_outer_classname = "StringProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.matcher";
-option go_package = "matcher";
+
+import "envoy/type/matcher/regex.proto";
 
 import "validate/validate.proto";
 
 // [#protodoc-title: StringMatcher]
 
 // Specifies the way to match a string.
+// [#next-free-field: 6]
 message StringMatcher {
   oneof match_pattern {
     option (validate.required) = true;
@@ -29,7 +31,7 @@ message StringMatcher {
     // Examples:
     //
     // * *abc* matches the value *abc.xyz*
-    string prefix = 2 [(validate.rules).string.min_bytes = 1];
+    string prefix = 2 [(validate.rules).string = {min_bytes: 1}];
 
     // The input string must have the suffix specified here.
     // Note: empty prefix is not allowed, please use regex instead.
@@ -37,7 +39,7 @@ message StringMatcher {
     // Examples:
     //
     // * *abc* matches the value *xyz.abc*
-    string suffix = 3 [(validate.rules).string.min_bytes = 1];
+    string suffix = 3 [(validate.rules).string = {min_bytes: 1}];
 
     // The input string must match the regular expression specified here.
     // The regex grammar is defined `here
@@ -45,14 +47,21 @@ message StringMatcher {
     //
     // Examples:
     //
-    // * The regex *\d{3}* matches the value *123*
-    // * The regex *\d{3}* does not match the value *1234*
-    // * The regex *\d{3}* does not match the value *123.456*
-    string regex = 4 [(validate.rules).string.max_bytes = 1024];
+    // * The regex ``\d{3}`` matches the value *123*
+    // * The regex ``\d{3}`` does not match the value *1234*
+    // * The regex ``\d{3}`` does not match the value *123.456*
+    //
+    // .. attention::
+    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
+    //   untrusted input in all cases.
+    string regex = 4 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+
+    // The input string must match the regular expression specified here.
+    RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
   }
 }
 
 // Specifies a list of ways to match a string.
 message ListStringMatcher {
-  repeated StringMatcher patterns = 1 [(validate.rules).repeated .min_items = 1];
+  repeated StringMatcher patterns = 1 [(validate.rules).repeated = {min_items: 1}];
 }

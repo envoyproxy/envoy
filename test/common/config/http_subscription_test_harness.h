@@ -51,15 +51,16 @@ public:
         init_fetch_timeout, validation_visitor_);
   }
 
-  ~HttpSubscriptionTestHarness() {
+  ~HttpSubscriptionTestHarness() override {
     // Stop subscribing on the way out.
     if (request_in_progress_) {
       EXPECT_CALL(http_request_, cancel());
     }
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool expect_node = false) override {
+    UNREFERENCED_PARAMETER(expect_node);
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
@@ -105,10 +106,10 @@ public:
     subscription_->start(cluster_names);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) override {
+  void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResources(cluster_names);
+    subscription_->updateResourceInterest(cluster_names);
     timer_cb_();
   }
 
@@ -139,10 +140,11 @@ public:
           .WillOnce(ThrowOnRejectedConfig(accept));
     }
     if (!accept) {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
     }
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
-    EXPECT_CALL(*timer_, enableTimer(_));
+    EXPECT_CALL(*timer_, enableTimer(_, _));
     http_callbacks_->onSuccess(std::move(message));
     if (accept) {
       version_ = version;
@@ -152,19 +154,19 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout), _));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {
     EXPECT_CALL(*init_timeout_timer_, disableTimer());
   }
 
-  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
   void timerTick() {
     expectSendMessage(cluster_names_, version_);

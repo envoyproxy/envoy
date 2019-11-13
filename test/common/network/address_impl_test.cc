@@ -1,15 +1,9 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-
 #include <iostream>
 #include <memory>
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -144,6 +138,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
 
   Ipv4Instance address(&addr4);
   EXPECT_EQ("1.2.3.4:6502", address.asString());
+  EXPECT_EQ("1.2.3.4:6502", address.asStringView());
   EXPECT_EQ("1.2.3.4:6502", address.logicalName());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("1.2.3.4", address.ip()->addressAsString());
@@ -157,6 +152,7 @@ TEST(Ipv4InstanceTest, SocketAddress) {
 TEST(Ipv4InstanceTest, AddressOnly) {
   Ipv4Instance address("3.4.5.6");
   EXPECT_EQ("3.4.5.6:0", address.asString());
+  EXPECT_EQ("3.4.5.6:0", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("3.4.5.6", address.ip()->addressAsString());
   EXPECT_EQ(0U, address.ip()->port());
@@ -168,6 +164,7 @@ TEST(Ipv4InstanceTest, AddressOnly) {
 TEST(Ipv4InstanceTest, AddressAndPort) {
   Ipv4Instance address("127.0.0.1", 80);
   EXPECT_EQ("127.0.0.1:80", address.asString());
+  EXPECT_EQ("127.0.0.1:80", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("127.0.0.1", address.ip()->addressAsString());
   EXPECT_FALSE(address.ip()->isAnyAddress());
@@ -180,6 +177,7 @@ TEST(Ipv4InstanceTest, AddressAndPort) {
 TEST(Ipv4InstanceTest, PortOnly) {
   Ipv4Instance address(443);
   EXPECT_EQ("0.0.0.0:443", address.asString());
+  EXPECT_EQ("0.0.0.0:443", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("0.0.0.0", address.ip()->addressAsString());
   EXPECT_TRUE(address.ip()->isAnyAddress());
@@ -192,6 +190,7 @@ TEST(Ipv4InstanceTest, PortOnly) {
 TEST(Ipv4InstanceTest, Multicast) {
   Ipv4Instance address("230.0.0.1");
   EXPECT_EQ("230.0.0.1:0", address.asString());
+  EXPECT_EQ("230.0.0.1:0", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("230.0.0.1", address.ip()->addressAsString());
   EXPECT_FALSE(address.ip()->isAnyAddress());
@@ -204,6 +203,7 @@ TEST(Ipv4InstanceTest, Multicast) {
 TEST(Ipv4InstanceTest, Broadcast) {
   Ipv4Instance address("255.255.255.255");
   EXPECT_EQ("255.255.255.255:0", address.asString());
+  EXPECT_EQ("255.255.255.255:0", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("255.255.255.255", address.ip()->addressAsString());
   EXPECT_EQ(0U, address.ip()->port());
@@ -225,6 +225,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
 
   Ipv6Instance address(addr6);
   EXPECT_EQ("[1:23::ef]:32000", address.asString());
+  EXPECT_EQ("[1:23::ef]:32000", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("1:23::ef", address.ip()->addressAsString());
   EXPECT_FALSE(address.ip()->isAnyAddress());
@@ -238,6 +239,7 @@ TEST(Ipv6InstanceTest, SocketAddress) {
 TEST(Ipv6InstanceTest, AddressOnly) {
   Ipv6Instance address("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   EXPECT_EQ("[2001:db8:85a3::8a2e:370:7334]:0", address.asString());
+  EXPECT_EQ("[2001:db8:85a3::8a2e:370:7334]:0", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("2001:db8:85a3::8a2e:370:7334", address.ip()->addressAsString());
   EXPECT_EQ(0U, address.ip()->port());
@@ -250,6 +252,7 @@ TEST(Ipv6InstanceTest, AddressOnly) {
 TEST(Ipv6InstanceTest, AddressAndPort) {
   Ipv6Instance address("::0001", 80);
   EXPECT_EQ("[::1]:80", address.asString());
+  EXPECT_EQ("[::1]:80", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("::1", address.ip()->addressAsString());
   EXPECT_EQ(80U, address.ip()->port());
@@ -261,6 +264,7 @@ TEST(Ipv6InstanceTest, AddressAndPort) {
 TEST(Ipv6InstanceTest, PortOnly) {
   Ipv6Instance address(443);
   EXPECT_EQ("[::]:443", address.asString());
+  EXPECT_EQ("[::]:443", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("::", address.ip()->addressAsString());
   EXPECT_TRUE(address.ip()->isAnyAddress());
@@ -273,6 +277,7 @@ TEST(Ipv6InstanceTest, PortOnly) {
 TEST(Ipv6InstanceTest, Multicast) {
   Ipv6Instance address("FF00::");
   EXPECT_EQ("[ff00::]:0", address.asString());
+  EXPECT_EQ("[ff00::]:0", address.asStringView());
   EXPECT_EQ(Type::Ip, address.type());
   EXPECT_EQ("ff00::", address.ip()->addressAsString());
   EXPECT_FALSE(address.ip()->isAnyAddress());
@@ -311,6 +316,7 @@ TEST(PipeInstanceTest, AbstractNamespace) {
 #if defined(__linux__)
   PipeInstance address("@/foo");
   EXPECT_EQ("@/foo", address.asString());
+  EXPECT_EQ("@/foo", address.asStringView());
   EXPECT_EQ(Type::Pipe, address.type());
   EXPECT_EQ(nullptr, address.ip());
 #else
@@ -322,6 +328,29 @@ TEST(PipeInstanceTest, BadAddress) {
   std::string long_address(1000, 'X');
   EXPECT_THROW_WITH_REGEX(PipeInstance address(long_address), EnvoyException,
                           "exceeds maximum UNIX domain socket path size");
+}
+
+// Validate that embedded nulls in abstract socket addresses are included and represented with '@'.
+TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
+  std::string embedded_null("@/foo/bar");
+  embedded_null[5] = '\0'; // Set embedded null.
+#if defined(__linux__)
+  PipeInstance address(embedded_null);
+  EXPECT_EQ("@/foo@bar", address.asString());
+  EXPECT_EQ("@/foo@bar", address.asStringView());
+  EXPECT_EQ(Type::Pipe, address.type());
+  EXPECT_EQ(nullptr, address.ip());
+#else
+  EXPECT_THROW(PipeInstance address(embedded_null), EnvoyException);
+#endif
+}
+
+// Reject embedded nulls in filesystem pathname addresses.
+TEST(PipeInstanceTest, EmbeddedNullPathError) {
+  std::string embedded_null("/foo/bar");
+  embedded_null[4] = '\0'; // Set embedded null.
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(embedded_null), EnvoyException,
+                          "contains embedded null characters");
 }
 
 TEST(PipeInstanceTest, UnlinksExistingFile) {
@@ -415,7 +444,7 @@ struct TestCase {
   TestCase() = default;
   TestCase(enum InstanceType type, const std::string& address, uint32_t port)
       : address_(address), type_(type), port_(port) {}
-  TestCase(const TestCase& rhs) : address_(rhs.address_), type_(rhs.type_), port_(rhs.port_) {}
+  TestCase(const TestCase& rhs) = default;
 
   bool operator==(const TestCase& rhs) {
     return (type_ == rhs.type_ && address_ == rhs.address_ && port_ == rhs.port_);

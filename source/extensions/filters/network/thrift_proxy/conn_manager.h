@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/stats/timespan_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/decoder.h"
@@ -61,7 +62,7 @@ class ConnectionManager : public Network::ReadFilter,
 public:
   ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
                     TimeSource& time_system);
-  ~ConnectionManager();
+  ~ConnectionManager() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -153,8 +154,8 @@ private:
                      public ThriftFilters::DecoderFilterCallbacks,
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
-        : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_,
-                                                              parent_.time_source_)),
+        : parent_(parent), request_timer_(new Stats::HistogramCompletableTimespanImpl(
+                               parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_), local_response_sent_{false}, pending_transport_end_{
                                                                                false} {
@@ -164,7 +165,7 @@ private:
       stream_info_.setDownstreamRemoteAddress(
           parent_.read_callbacks_->connection().remoteAddress());
     }
-    ~ActiveRpc() {
+    ~ActiveRpc() override {
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
 

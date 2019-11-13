@@ -47,16 +47,19 @@ class Config {
 public:
   Config(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& config, Stats::Scope& scope)
       : stats_(generateStats(config.stat_prefix(), scope)),
-        failure_mode_allow_(config.failure_mode_allow()) {}
+        failure_mode_allow_(config.failure_mode_allow()),
+        include_peer_certificate_(config.include_peer_certificate()) {}
 
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
+  bool includePeerCertificate() const { return include_peer_certificate_; }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
   bool failure_mode_allow_;
+  const bool include_peer_certificate_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -73,7 +76,7 @@ class Filter : public Network::ReadFilter,
 public:
   Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
-  ~Filter() {}
+  ~Filter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

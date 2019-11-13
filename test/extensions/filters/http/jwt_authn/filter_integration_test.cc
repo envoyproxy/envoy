@@ -47,7 +47,8 @@ public:
   HeaderToFilterStateFilterConfig()
       : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(
           std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
@@ -72,7 +73,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name(HttpFilterNames::get().JwtAuthn);
-  TestUtility::jsonConvert(proto_config, *filter.mutable_config());
+  filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessage(filter);
 }
 
@@ -283,14 +284,18 @@ public:
         new FakeUpstream(0, GetParam().upstream_protocol, version_, timeSystem()));
   }
 
-  void initializeFilter() {
+  void initializeFilter(bool add_cluster) {
     config_helper_.addFilter(getFilterConfig(false));
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      jwks_cluster->set_name("pubkey_cluster");
-    });
+    if (add_cluster) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+        auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+        jwks_cluster->set_name("pubkey_cluster");
+      });
+    } else {
+      config_helper_.skipPortUsageValidation();
+    }
 
     initialize();
   }
@@ -337,7 +342,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, RemoteJwksIntegrationTest,
 // With remote Jwks, this test verifies a request is passed with a good Jwt token
 // and a good public key fetched from a remote server.
 TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
-  initializeFilter();
+  initializeFilter(/*add_cluster=*/true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -372,7 +377,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 // With remote Jwks, this test verifies a request is rejected even with a good Jwt token
 // when the remote jwks server replied with 500.
 TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
-  initializeFilter();
+  initializeFilter(/*add_cluster=*/true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -386,6 +391,26 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
 
   // Fails the jwks fetching.
   waitForJwksResponse("500", "");
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+
+  cleanup();
+}
+
+TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
+  initializeFilter(/*add_cluster=*/false);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+  });
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());

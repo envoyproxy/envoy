@@ -2,6 +2,7 @@
 
 #include "envoy/stats/scope.h"
 
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
@@ -83,7 +84,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
-  for (uint32_t i = 0; i <= Status::GrpcStatus::MaximumValid; ++i) {
+  for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::MaximumKnown; ++i) {
     stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
   }
 }
@@ -95,13 +96,14 @@ GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
   }
 }
 
-AsyncRequest*
-GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name, absl::string_view method_name,
-                               Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
-                               Tracing::Span& parent_span,
-                               const absl::optional<std::chrono::milliseconds>& timeout) {
+AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name,
+                                             absl::string_view method_name,
+                                             Buffer::InstancePtr&& request,
+                                             RawAsyncRequestCallbacks& callbacks,
+                                             Tracing::Span& parent_span,
+                                             const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new GoogleAsyncRequestImpl(
-      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, timeout);
+      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
   std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
 
   grpc_stream->initialize(true);
@@ -115,10 +117,10 @@ GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name, absl::string
 
 RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_name,
                                                 absl::string_view method_name,
-                                                RawAsyncStreamCallbacks& callbacks) {
-  const absl::optional<std::chrono::milliseconds> no_timeout;
+                                                RawAsyncStreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions& options) {
   auto grpc_stream = std::make_unique<GoogleAsyncStreamImpl>(*this, service_full_name, method_name,
-                                                             callbacks, no_timeout);
+                                                             callbacks, options);
 
   grpc_stream->initialize(false);
   if (grpc_stream->call_failed()) {
@@ -129,13 +131,14 @@ RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_n
   return active_streams_.front().get();
 }
 
-GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(
-    GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
-    absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-    const absl::optional<std::chrono::milliseconds>& timeout)
+GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
+                                             absl::string_view service_full_name,
+                                             absl::string_view method_name,
+                                             RawAsyncStreamCallbacks& callbacks,
+                                             const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
-      timeout_(timeout) {}
+      options_(options) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -149,9 +152,10 @@ GoogleAsyncStreamImpl::PendingMessage::PendingMessage(Buffer::InstancePtr reques
 void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   parent_.stats_.streams_total_->inc();
   gpr_timespec abs_deadline =
-      timeout_ ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
-                              gpr_time_from_millis(timeout_.value().count(), GPR_TIMESPAN))
-               : gpr_inf_future(GPR_CLOCK_REALTIME);
+      options_.timeout
+          ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
+                         gpr_time_from_millis(options_.timeout.value().count(), GPR_TIMESPAN))
+          : gpr_inf_future(GPR_CLOCK_REALTIME);
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
@@ -173,7 +177,7 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   rw_ = parent_.stub_->PrepareCall(&ctxt_, "/" + service_full_name_ + "/" + method_name_,
                                    &parent_.tls_.completionQueue());
   if (rw_ == nullptr) {
-    notifyRemoteClose(Status::GrpcStatus::Unavailable, nullptr, EMPTY_STRING);
+    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, nullptr, EMPTY_STRING);
     call_failed_ = true;
     return;
   }
@@ -185,12 +189,12 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
-  if (grpc_status > Status::GrpcStatus::MaximumValid || grpc_status < 0) {
+  if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown || grpc_status < 0) {
     ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
     // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
     // crash..
-    grpc_status = Status::GrpcStatus::InvalidCode;
-    parent_.stats_.streams_closed_[Status::GrpcStatus::Unknown]->inc();
+    grpc_status = Status::WellKnownGrpcStatus::InvalidCode;
+    parent_.stats_.streams_closed_[Status::WellKnownGrpcStatus::Unknown]->inc();
   } else {
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
@@ -268,7 +272,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     // Early fails can be just treated as Internal.
     if (op == GoogleAsyncTag::Operation::Init ||
         op == GoogleAsyncTag::Operation::ReadInitialMetadata) {
-      notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
+      notifyRemoteClose(Status::WellKnownGrpcStatus::Internal, nullptr, EMPTY_STRING);
       resetStream();
       return;
     }
@@ -320,7 +324,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     auto buffer = GoogleGrpcUtils::makeBufferInstance(read_buf_);
     if (!buffer || !callbacks_.onReceiveMessageRaw(std::move(buffer))) {
       // This is basically streamError in Grpc::AsyncClientImpl.
-      notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
+      notifyRemoteClose(Status::WellKnownGrpcStatus::Internal, nullptr, EMPTY_STRING);
       resetStream();
       break;
     }
@@ -349,8 +353,13 @@ void GoogleAsyncStreamImpl::metadataTranslate(
   // More painful copying, this time due to the mismatch in header
   // representation data structures in Envoy and Google gRPC.
   for (const auto& it : grpc_metadata) {
-    header_map.addCopy(Http::LowerCaseString(std::string(it.first.data(), it.first.size())),
-                       std::string(it.second.data(), it.second.size()));
+    auto key = Http::LowerCaseString(std::string(it.first.data(), it.first.size()));
+    if (absl::EndsWith(key.get(), "-bin")) {
+      auto value = Base64::encode(it.second.data(), it.second.size());
+      header_map.addCopy(key, value);
+      continue;
+    }
+    header_map.addCopy(key, std::string(it.second.data(), it.second.size()));
   }
 }
 
@@ -387,8 +396,8 @@ void GoogleAsyncStreamImpl::cleanup() {
 GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
     GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
     absl::string_view method_name, Buffer::InstancePtr request, RawAsyncRequestCallbacks& callbacks,
-    Tracing::Span& parent_span, const absl::optional<std::chrono::milliseconds>& timeout)
-    : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, timeout),
+    Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options)
+    : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.stat_prefix_ + " egress",
@@ -429,7 +438,7 @@ void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                            const std::string& message) {
   current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
 
-  if (status != Grpc::Status::GrpcStatus::Ok) {
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(status, message, *current_span_);
   } else if (response_ == nullptr) {

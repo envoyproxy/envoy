@@ -10,7 +10,6 @@
 #include "absl/strings/match.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtHeader;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using Envoy::Http::LowerCaseString;
 

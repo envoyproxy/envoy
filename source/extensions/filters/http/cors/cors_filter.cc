@@ -67,23 +67,23 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
   Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
       {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}}};
 
-  response_headers->insertAccessControlAllowOrigin().value(*origin_);
+  response_headers->setAccessControlAllowOrigin(origin_->value().getStringView());
 
   if (allowCredentials()) {
-    response_headers->insertAccessControlAllowCredentials().value(
+    response_headers->setReferenceAccessControlAllowCredentials(
         Http::Headers::get().CORSValues.True);
   }
 
   if (!allowMethods().empty()) {
-    response_headers->insertAccessControlAllowMethods().value(allowMethods());
+    response_headers->setAccessControlAllowMethods(allowMethods());
   }
 
   if (!allowHeaders().empty()) {
-    response_headers->insertAccessControlAllowHeaders().value(allowHeaders());
+    response_headers->setAccessControlAllowHeaders(allowHeaders());
   }
 
   if (!maxAge().empty()) {
-    response_headers->insertAccessControlMaxAge().value(maxAge());
+    response_headers->setAccessControlMaxAge(maxAge());
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -98,13 +98,13 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.insertAccessControlAllowOrigin().value(*origin_);
+  headers.setAccessControlAllowOrigin(origin_->value().getStringView());
   if (allowCredentials()) {
-    headers.insertAccessControlAllowCredentials().value(Http::Headers::get().CORSValues.True);
+    headers.setReferenceAccessControlAllowCredentials(Http::Headers::get().CORSValues.True);
   }
 
   if (!exposeHeaders().empty()) {
-    headers.insertAccessControlExposeHeaders().value(exposeHeaders());
+    headers.setAccessControlExposeHeaders(exposeHeaders());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -115,47 +115,22 @@ void CorsFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& c
 }
 
 bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
-  return isOriginAllowedString(origin) || isOriginAllowedRegex(origin);
-}
-
-bool CorsFilter::isOriginAllowedString(const Http::HeaderString& origin) {
-  if (allowOrigins() == nullptr) {
+  const auto allow_origins = allowOrigins();
+  if (allow_origins == nullptr) {
     return false;
   }
-  for (const auto& o : *allowOrigins()) {
-    if (o == "*" || origin == o.c_str()) {
+  for (const auto& allow_origin : *allow_origins) {
+    if (allow_origin->match("*") || allow_origin->match(origin.getStringView())) {
       return true;
     }
   }
   return false;
 }
 
-bool CorsFilter::isOriginAllowedRegex(const Http::HeaderString& origin) {
-  if (allowOriginRegexes() == nullptr) {
-    return false;
-  }
-  for (const auto& regex : *allowOriginRegexes()) {
-    const absl::string_view origin_view = origin.getStringView();
-    if (std::regex_match(origin_view.begin(), origin_view.end(), regex)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-const std::list<std::string>* CorsFilter::allowOrigins() {
+const std::vector<Matchers::StringMatcherPtr>* CorsFilter::allowOrigins() {
   for (const auto policy : policies_) {
     if (policy && !policy->allowOrigins().empty()) {
       return &policy->allowOrigins();
-    }
-  }
-  return nullptr;
-}
-
-const std::list<std::regex>* CorsFilter::allowOriginRegexes() {
-  for (const auto policy : policies_) {
-    if (policy && !policy->allowOriginRegexes().empty()) {
-      return &policy->allowOriginRegexes();
     }
   }
   return nullptr;

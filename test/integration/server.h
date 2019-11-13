@@ -32,7 +32,10 @@ namespace Server {
 
 // Create OptionsImpl structures suitable for tests.
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                                  Network::Address::IpVersion ip_version);
+                                  Network::Address::IpVersion ip_version,
+                                  bool allow_unknown_static_fields = false,
+                                  bool reject_unknown_dynamic_fields = false,
+                                  uint32_t concurrency = 1);
 
 class TestDrainManager : public DrainManager {
 public:
@@ -88,9 +91,9 @@ public:
     return wrapped_scope_->gaugeFromStatName(name, import_mode);
   }
 
-  Histogram& histogramFromStatName(StatName name) override {
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatName(name);
+    return wrapped_scope_->histogramFromStatName(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
@@ -104,21 +107,20 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName());
+    return histogramFromStatName(storage.statName(), unit);
   }
 
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+  OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findCounter(name);
   }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+  OptionalGauge findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findGauge(name);
   }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
+  OptionalHistogram findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findHistogram(name);
   }
@@ -161,25 +163,24 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name) override {
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatName(name);
+    return store_.histogramFromStatName(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogram(name);
+    return store_.histogram(name, unit);
   }
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+  OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);
   }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+  OptionalGauge findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findGauge(name);
   }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
+  OptionalHistogram findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
   }
@@ -232,13 +233,16 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
 public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
          std::function<void()> on_server_init_function, bool deterministic,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
-         absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt);
+         absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt,
+         bool allow_unknown_static_fields = false, bool reject_unknown_dynamic_fields = false,
+         uint32_t concurrency = 1);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
-  ~IntegrationTestServer();
+  ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
 
@@ -249,12 +253,17 @@ public:
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
     on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
   }
+  void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
+    on_server_ready_cb_ = std::move(on_server_ready);
+  }
   void onRuntimeCreated() override;
 
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization,
-             absl::optional<std::reference_wrapper<ProcessObject>> process_object);
+             absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+             bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+             uint32_t concurrency);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
     TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
@@ -333,7 +342,9 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
-                     absl::optional<std::reference_wrapper<ProcessObject>> process_object);
+                     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+                     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                     uint32_t concurrency);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -347,6 +358,7 @@ private:
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
+  std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
 };
 
 // Default implementation of IntegrationTestServer

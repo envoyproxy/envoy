@@ -1,0 +1,31 @@
+commit e2ba3aa07009292617c3cabe734e8e44099b22ac
+Author: Lukacs T. Berki <lberki@google.com>
+Date:   Tue Aug 6 14:00:11 2019 +0200
+
+    Update C++ code generation to work with Bazel 0.29 .
+    
+    The above Bazel version changes proto compilation slightly: some proto
+    files are put into a `_virtual_imports` directory and thus
+    `_get_include_directory` needs to be updated accordingly.
+    
+    Ideally, it would use instead the `ProtoInfo` provider to tease out the
+    proto import directories, but that's a bit more intrusive change.
+
+diff --git a/bazel/protobuf.bzl b/bazel/protobuf.bzl
+index f2df7bd87b..3066e1d550 100644
+--- a/bazel/protobuf.bzl
++++ b/bazel/protobuf.bzl
+@@ -59,6 +59,13 @@ def proto_path_to_generated_filename(proto_path, fmt_str):
+ def _get_include_directory(include):
+     directory = include.path
+     prefix_len = 0
++
++    virtual_imports = "/_virtual_imports/"
++    if not include.is_source and virtual_imports in include.path:
++        root, relative = include.path.split(virtual_imports, 2)
++        result = root + virtual_imports + relative.split("/", 1)[0]
++        return result
++
+     if not include.is_source and directory.startswith(include.root.path):
+         prefix_len = len(include.root.path) + 1
+ 

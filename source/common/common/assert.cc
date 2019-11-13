@@ -10,7 +10,7 @@ public:
     debug_assertion_failure_record_action_ = action;
   }
 
-  ~ActionRegistrationImpl() {
+  ~ActionRegistrationImpl() override {
     ASSERT(debug_assertion_failure_record_action_ != nullptr);
     debug_assertion_failure_record_action_ = nullptr;
   }

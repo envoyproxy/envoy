@@ -27,7 +27,8 @@ namespace ExtAuthz {
 
 void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
                                            const Network::Connection& connection,
-                                           const std::string& service, const bool local) {
+                                           const std::string& service, const bool local,
+                                           bool include_certificate) {
 
   // Set the address
   auto addr = peer.mutable_address();
@@ -37,24 +38,36 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
     Envoy::Network::Utility::addressToProtobufAddress(*connection.remoteAddress(), *addr);
   }
 
-  // Set the principal
-  // Preferably the SAN from the peer's cert or
-  // Subject from the peer's cert.
-  Ssl::ConnectionInfo* ssl = const_cast<Ssl::ConnectionInfo*>(connection.ssl());
+  // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
+  // cert. Include the X.509 certificate of the source peer, if configured to do so.
+  auto ssl = connection.ssl();
   if (ssl != nullptr) {
     if (local) {
-      const auto uriSans = ssl->uriSanLocalCertificate();
-      if (uriSans.empty()) {
-        peer.set_principal(ssl->subjectLocalCertificate());
+      const auto uri_sans = ssl->uriSanLocalCertificate();
+      if (uri_sans.empty()) {
+        const auto dns_sans = ssl->dnsSansLocalCertificate();
+        if (dns_sans.empty()) {
+          peer.set_principal(ssl->subjectLocalCertificate());
+        } else {
+          peer.set_principal(dns_sans[0]);
+        }
       } else {
-        peer.set_principal(uriSans[0]);
+        peer.set_principal(uri_sans[0]);
       }
     } else {
-      const auto uriSans = ssl->uriSanPeerCertificate();
-      if (uriSans.empty()) {
-        peer.set_principal(ssl->subjectPeerCertificate());
+      const auto uri_sans = ssl->uriSanPeerCertificate();
+      if (uri_sans.empty()) {
+        const auto dns_sans = ssl->dnsSansPeerCertificate();
+        if (dns_sans.empty()) {
+          peer.set_principal(ssl->subjectPeerCertificate());
+        } else {
+          peer.set_principal(dns_sans[0]);
+        }
       } else {
-        peer.set_principal(uriSans[0]);
+        peer.set_principal(uri_sans[0]);
+      }
+      if (include_certificate) {
+        peer.set_certificate(ssl->urlEncodedPemEncodedPeerCertificate());
       }
     }
   }
@@ -143,7 +156,9 @@ void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
-    envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes) {
+    envoy::api::v2::core::Metadata&& metadata_context,
+    envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes,
+    bool include_peer_certificate) {
 
   auto attrs = request.mutable_attributes();
 
@@ -152,22 +167,28 @@ void CheckRequestUtils::createHttpCheck(
 
   const std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
 
-  setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false);
-  setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true);
+  setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
+                     include_peer_certificate);
+  setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true,
+                     include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), callbacks, headers, max_request_bytes);
 
   // Fill in the context extensions:
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
+  (*attrs->mutable_metadata_context()) = std::move(metadata_context);
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                       envoy::service::auth::v2::CheckRequest& request) {
+                                       envoy::service::auth::v2::CheckRequest& request,
+                                       bool include_peer_certificate) {
 
   auto attrs = request.mutable_attributes();
 
   Network::ReadFilterCallbacks* cb = const_cast<Network::ReadFilterCallbacks*>(callbacks);
-  setAttrContextPeer(*attrs->mutable_source(), cb->connection(), "", false);
-  setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), "", true);
+  setAttrContextPeer(*attrs->mutable_source(), cb->connection(), "", false,
+                     include_peer_certificate);
+  setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), "", true,
+                     include_peer_certificate);
 }
 
 } // namespace ExtAuthz

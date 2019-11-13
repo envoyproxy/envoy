@@ -80,20 +80,21 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Replace listener addressses in json file.')
-  parser.add_argument(
-      '-o',
-      '--original_json',
-      type=str,
-      required=True,
-      help='Path of the original config json file')
-  parser.add_argument(
-      '-a', '--admin_address_path', type=str, required=True, help='Path of the admin address file')
-  parser.add_argument(
-      '-u',
-      '--updated_json',
-      type=str,
-      required=True,
-      help='Path to output updated json config file')
+  parser.add_argument('-o',
+                      '--original_json',
+                      type=str,
+                      required=True,
+                      help='Path of the original config json file')
+  parser.add_argument('-a',
+                      '--admin_address_path',
+                      type=str,
+                      required=True,
+                      help='Path of the admin address file')
+  parser.add_argument('-u',
+                      '--updated_json',
+                      type=str,
+                      required=True,
+                      help='Path to output updated json config file')
   args = parser.parse_args()
   admin_address_path = args.admin_address_path
 

@@ -10,12 +10,11 @@
 #include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
 
-class StatDataAllocator;
+class Allocator;
 struct Tag;
 
 /**
@@ -23,7 +22,7 @@ struct Tag;
  */
 class Metric : public RefcountInterface {
 public:
-  virtual ~Metric() = default;
+  ~Metric() override = default;
   /**
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing
@@ -80,15 +79,6 @@ public:
 
   // Function to be called from iterateTags passing name and value as const Tag&.
   using TagIterFn = std::function<bool(const Tag&)>;
-
-  /**
-   * Iterates over all tags, calling a functor for each one. The
-   * functor can return 'true' to continue or 'false' to stop the
-   * iteration.
-   *
-   * @param fn The functor to call for each Tag.
-   */
-  virtual void iterateTags(const TagIterFn& fn) const PURE;
 
   /**
    * Indicates whether this metric has been updated since the server was started.

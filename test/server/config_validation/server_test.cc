@@ -42,8 +42,8 @@ public:
     auto files = TestUtility::listFiles(ValidationServerTest::directory_, false);
 
     // Strip directory part. options_ adds it for each test.
-    for (std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++) {
-      (*it) = it->substr(directory_.length() + 1);
+    for (auto& file : files) {
+      file = file.substr(directory_.length() + 1);
     }
     return files;
   }

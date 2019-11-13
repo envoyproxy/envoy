@@ -33,7 +33,7 @@ public:
   DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
   DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                  Event::TimeSystem& time_system);
-  ~DispatcherImpl();
+  ~DispatcherImpl() override;
 
   /**
    * @return event_base& the libevent base.
@@ -58,10 +58,9 @@ public:
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                                      bool bind_to_port,
-                                      bool hand_off_restored_destination_connections) override;
-  Network::ListenerPtr createUdpListener(Network::Socket& socket,
-                                         Network::UdpListenerCallbacks& cb) override;
+                                      bool bind_to_port) override;
+  Network::UdpListenerPtr createUdpListener(Network::Socket& socket,
+                                            Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
@@ -74,6 +73,8 @@ public:
     current_object_ = object;
     return return_object;
   }
+  MonotonicTime approximateMonotonicTime() const override;
+  void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
   void onFatalError() const override {
@@ -91,9 +92,9 @@ private:
   void runPostCallbacks();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
-  // dispatcher run loop is executing on. We allow run_tid_ == nullptr for tests where we don't
+  // dispatcher run loop is executing on. We allow run_tid_ to be empty for tests where we don't
   // invoke run().
-  bool isThreadSafe() const {
+  bool isThreadSafe() const override {
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
   }
 
@@ -110,9 +111,10 @@ private:
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
   Thread::MutexBasicLockable post_lock_;
-  std::list<std::function<void()>> post_callbacks_ GUARDED_BY(post_lock_);
+  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
+  MonotonicTime approximate_monotonic_time_;
 };
 
 } // namespace Event

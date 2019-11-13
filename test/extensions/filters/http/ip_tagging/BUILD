@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.ip_tagging",
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

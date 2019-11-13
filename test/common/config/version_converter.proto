@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package test.common.config;
+
+import "google/protobuf/any.proto";
+
+enum PreviousEnum {
+  PREV_DEFAULT = 0;
+  PREV_DEPRECATED_VALUE = 1;
+  PREV_OTHER_VALUE = 2;
+}
+
+enum NextEnum {
+  NEXT_DEFAULT = 0;
+  reserved 1;
+  NEXT_OTHER_VALUE = 2;
+}
+
+message PreviousVersion {
+  // Singleton scalars.
+  string string_field = 1;
+  bytes bytes_field = 2;
+  int32 int32_field = 3;
+  int64 int64_field = 4;
+  uint32 uint32_field = 5;
+  uint64 uint64_field = 6;
+  double double_field = 7;
+  float float_field = 8;
+  bool bool_field = 9;
+  PreviousEnum enum_field = 10;
+
+  // Singleton nested message.
+  message PreviousVersionNested {
+    google.protobuf.Any any_field = 1;
+  }
+  PreviousVersionNested nested_field = 11;
+
+  // Repeated entities.
+  repeated string repeated_scalar_field = 12;
+  repeated PreviousVersionNested repeated_nested_field = 13;
+
+  // Deprecations.
+  uint32 deprecated_field = 14 [deprecated = true];
+  PreviousEnum enum_field_with_deprecated_value = 15;
+}
+
+message NextVersion {
+  // Singleton scalars.
+  string string_field = 1;
+  bytes bytes_field = 2;
+  int32 int32_field = 3;
+  int64 int64_field = 4;
+  uint32 uint32_field = 5;
+  uint64 uint64_field = 6;
+  double double_field = 7;
+  float float_field = 8;
+  bool bool_field = 9;
+  PreviousEnum enum_field = 10;
+
+  // Singleton nested message.
+  message NextVersionNested {
+    google.protobuf.Any any_field = 1;
+  }
+  NextVersionNested nested_field = 11;
+
+  // Repeated entities.
+  repeated string repeated_scalar_field = 12;
+  repeated NextVersionNested repeated_nested_field = 13;
+
+  // Deprecations.
+  reserved 14;
+  NextEnum enum_field_with_deprecated_value = 15;
+}

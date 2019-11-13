@@ -43,6 +43,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//test/extensions/clusters/redis:redis_cluster_mocks",
+        "//test/extensions/common/redis:mocks_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/mocks/api:api_mocks",
@@ -58,7 +59,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         ":redis_mocks",
-        "//source/common/config:json_utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
@@ -76,6 +76,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/extensions/common/redis:redirection_mgr_interface",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
@@ -92,6 +93,7 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
 )
 
@@ -127,11 +129,28 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
-    size = "small",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/integration:integration_lib",
+    ],
+)
+
+envoy_extension_cc_test_binary(
+    name = "command_split_speed_test",
+    srcs = ["command_split_speed_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        ":redis_mocks",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
+        "//source/extensions/filters/network/redis_proxy:router_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

@@ -1,6 +1,7 @@
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/common/fmt.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 
@@ -50,18 +51,28 @@ struct SuccessResponse {
   const MatcherSharedPtr& matchers_;
   ResponsePtr response_;
 };
+
+std::vector<Matchers::LowerCaseStringMatcherPtr>
+createLowerCaseMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+  std::vector<Matchers::LowerCaseStringMatcherPtr> matchers;
+  for (const auto& matcher : list.patterns()) {
+    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
+  }
+  return matchers;
+}
+
 } // namespace
 
 // Matchers
-HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list)
+HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list)
     : matchers_(std::move(list)) {}
 
 bool HeaderKeyMatcher::matches(absl::string_view key) const {
   return std::any_of(matchers_.begin(), matchers_.end(),
-                     [&key](auto matcher) { return matcher.match(key); });
+                     [&key](auto& matcher) { return matcher->match(key); });
 }
 
-NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list)
+NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list)
     : matcher_(std::move(list)) {}
 
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
@@ -78,7 +89,8 @@ ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2::Ext
       authorization_headers_to_add_(
           toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
-      path_prefix_(path_prefix) {}
+      path_prefix_(path_prefix),
+      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())) {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& list) {
@@ -86,12 +98,11 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& l
       {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
        Http::Headers::get().Host}};
 
-  std::vector<Matchers::LowerCaseStringMatcher> matchers{list.patterns().begin(),
-                                                         list.patterns().end()};
+  std::vector<Matchers::LowerCaseStringMatcherPtr> matchers(createLowerCaseMatchers(list));
   for (const auto& key : keys) {
     envoy::type::matcher::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(matcher);
+    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
@@ -99,15 +110,14 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& l
 
 MatcherSharedPtr
 ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& list) {
-  std::vector<Matchers::LowerCaseStringMatcher> matchers{list.patterns().begin(),
-                                                         list.patterns().end()};
+  std::vector<Matchers::LowerCaseStringMatcherPtr> matchers(createLowerCaseMatchers(list));
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
   if (matchers.empty()) {
     envoy::type::matcher::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
-    matchers.push_back(matcher);
+    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
@@ -121,7 +131,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& li
   for (const auto& key : keys) {
     envoy::type::matcher::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(matcher);
+    matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
@@ -129,9 +139,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& li
 
 MatcherSharedPtr
 ClientConfig::toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& list) {
-  std::vector<Matchers::LowerCaseStringMatcher> matchers{list.patterns().begin(),
-                                                         list.patterns().end()};
-  return std::make_unique<HeaderKeyMatcher>(std::move(matchers));
+  return std::make_unique<HeaderKeyMatcher>(createLowerCaseMatchers(list));
 }
 
 Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
@@ -144,23 +152,35 @@ Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
   return header_vec;
 }
 
-RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
-    : cm_(cm), config_(config) {}
+RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
+                                     TimeSource& time_source)
+    : cm_(cm), config_(config), time_source_(time_source) {}
 
-RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
+RawHttpClientImpl::~RawHttpClientImpl() {
+  ASSERT(callbacks_ == nullptr);
+  ASSERT(span_ == nullptr);
+}
 
 void RawHttpClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
+  ASSERT(span_ != nullptr);
+  span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  span_->finishSpan();
   request_->cancel();
   callbacks_ = nullptr;
+  span_ = nullptr;
 }
 
 // Client
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v2::CheckRequest& request,
-                              Tracing::Span&) {
+                              Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
+  ASSERT(span_ == nullptr);
   callbacks_ = &callbacks;
+  span_ = parent_span.spawnChild(Tracing::EgressConfig::get(), config_->tracingName(),
+                                 time_source_.systemTime());
+  span_->setTag(Tracing::Tags::get().UpstreamCluster, config_->cluster());
 
   Http::HeaderMapPtr headers;
   const uint64_t request_length = request.attributes().request().http().body().size();
@@ -196,20 +216,40 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
   }
 
-  request_ = cm_.httpAsyncClientForCluster(config_->cluster())
-                 .send(std::move(message), *this,
-                       Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+  const std::string& cluster = config_->cluster();
+
+  // It's possible that the cluster specified in the filter configuration no longer exists due to a
+  // CDS removal.
+  if (cm_.get(cluster) == nullptr) {
+    // TODO(dio): Add stats and tracing related to this.
+    ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
+    callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->finishSpan();
+    callbacks_ = nullptr;
+    span_ = nullptr;
+  } else {
+    span_->injectContext(message->headers());
+    request_ = cm_.httpAsyncClientForCluster(cluster).send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+  }
 }
 
 void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
   callbacks_->onComplete(toResponse(std::move(message)));
+  span_->finishSpan();
   callbacks_ = nullptr;
+  span_ = nullptr;
 }
 
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+  span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  span_->finishSpan();
   callbacks_ = nullptr;
+  span_ = nullptr;
 }
 
 ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
@@ -218,8 +258,12 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   uint64_t status_code{};
   if (!absl::SimpleAtoi(message->headers().Status()->value().getStringView(), &status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     return std::make_unique<Response>(errorResponse());
   }
+
+  span_->setTag(TracingConstants::get().HttpStatus,
+                Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
 
   // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
@@ -233,6 +277,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
                                 EMPTY_STRING, Http::Code::OK}};
+    span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     return std::move(ok.response_);
   }
 
@@ -240,6 +285,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
                          Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{},
                                   message->bodyAsString(), static_cast<Http::Code>(status_code)}};
+  span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
   return std::move(denied.response_);
 }
 

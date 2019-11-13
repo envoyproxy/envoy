@@ -11,7 +11,7 @@ class IoSocketError : public Api::IoError {
 public:
   explicit IoSocketError(int sys_errno) : errno_(sys_errno) {}
 
-  ~IoSocketError() override {}
+  ~IoSocketError() override = default;
 
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;

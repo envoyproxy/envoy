@@ -126,26 +126,25 @@ def main(cfg, reqhandle, resphandle):
       v = client.add(a, b)
       print("client: added {0} + {1} = {2}".format(a, b, v))
     elif cfg.method == "execute":
-      param = Param(
-          return_fields=cfg.params,
-          the_works=TheWorks(
-              field_1=True,
-              field_2=0x7f,
-              field_3=0x7fff,
-              field_4=0x7fffffff,
-              field_5=0x7fffffffffffffff,
-              field_6=-1.5,
-              field_7=u"string is UTF-8: \U0001f60e",
-              field_8=b"binary is bytes: \x80\x7f\x00\x01",
-              field_9={
-                  1: "one",
-                  2: "two",
-                  3: "three"
-              },
-              field_10=[1, 2, 4, 8],
-              field_11=set(["a", "b", "c"]),
-              field_12=False,
-          ))
+      param = Param(return_fields=cfg.params,
+                    the_works=TheWorks(
+                        field_1=True,
+                        field_2=0x7f,
+                        field_3=0x7fff,
+                        field_4=0x7fffffff,
+                        field_5=0x7fffffffffffffff,
+                        field_6=-1.5,
+                        field_7=u"string is UTF-8: \U0001f60e",
+                        field_8=b"binary is bytes: \x80\x7f\x00\x01",
+                        field_9={
+                            1: "one",
+                            2: "two",
+                            3: "three"
+                        },
+                        field_10=[1, 2, 4, 8],
+                        field_11=set(["a", "b", "c"]),
+                        field_12=False,
+                    ))
 
       try:
         result = client.execute(param)
@@ -234,7 +233,7 @@ if __name__ == "__main__":
       "--headers",
       dest="headers",
       metavar="KEY=VALUE[,KEY=VALUE]",
-      help="list of comma-delimited, key value pairs to include as tranport headers.",
+      help="list of comma-delimited, key value pairs to include as transport headers.",
   )
 
   cfg = parser.parse_args()

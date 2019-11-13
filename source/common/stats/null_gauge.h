@@ -20,7 +20,7 @@ public:
     // will not be able to access the SymbolTable& to free the symbols. An RAII
     // alternative would be to store the SymbolTable reference in the
     // MetricImpl, costing 8 bytes per stat.
-    MetricImpl::clear(symbolTable());
+    MetricImpl::clear(symbol_table_);
   }
 
   void add(uint64_t) override {}

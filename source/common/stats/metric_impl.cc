@@ -92,16 +92,10 @@ void MetricHelper::iterateTagStatNames(const Metric::TagStatNameIterFn& fn) cons
   ASSERT(state != TagValue);
 }
 
-void MetricHelper::iterateTags(const SymbolTable& symbol_table, const Metric::TagIterFn& fn) const {
-  iterateTagStatNames([&fn, &symbol_table](StatName name, StatName value) -> bool {
-    return fn(Tag{symbol_table.toString(name), symbol_table.toString(value)});
-  });
-}
-
 std::vector<Tag> MetricHelper::tags(const SymbolTable& symbol_table) const {
   std::vector<Tag> tags;
-  iterateTags(symbol_table, [&tags](const Tag& tag) -> bool {
-    tags.emplace_back(tag);
+  iterateTagStatNames([&tags, &symbol_table](StatName name, StatName value) -> bool {
+    tags.emplace_back(Tag{symbol_table.toString(name), symbol_table.toString(value)});
     return true;
   });
   return tags;

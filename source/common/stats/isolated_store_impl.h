@@ -1,15 +1,14 @@
 #pragma once
 
-#include <string.h>
-
 #include <algorithm>
+#include <cstring>
 #include <string>
 
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
 #include "common/common/utility.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
@@ -26,11 +25,13 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  using Allocator = std::function<RefcountPtr<Base>(StatName name)>;
-  using AllocatorImportMode = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
+  using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
+  using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
+  using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
 
-  IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
-  IsolatedStatsCache(AllocatorImportMode alloc) : alloc_import_(alloc) {}
+  IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
+  IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
+  IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
 
   Base& get(StatName name) {
     auto stat = stats_.find(name);
@@ -38,7 +39,7 @@ public:
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = alloc_(name);
+    RefcountPtr<Base> new_stat = counter_alloc_(name);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -49,7 +50,18 @@ public:
       return *stat->second;
     }
 
-    RefcountPtr<Base> new_stat = alloc_import_(name, import_mode);
+    RefcountPtr<Base> new_stat = gauge_alloc_(name, import_mode);
+    stats_.emplace(new_stat->statName(), new_stat);
+    return *new_stat;
+  }
+
+  Base& get(StatName name, Histogram::Unit unit) {
+    auto stat = stats_.find(name);
+    if (stat != stats_.end()) {
+      return *stat->second;
+    }
+
+    RefcountPtr<Base> new_stat = histogram_alloc_(name, unit);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -76,8 +88,9 @@ private:
   }
 
   StatNameHashMap<RefcountPtr<Base>> stats_;
-  Allocator alloc_;
-  AllocatorImportMode alloc_import_;
+  CounterAllocator counter_alloc_;
+  GaugeAllocator gauge_alloc_;
+  HistogramAllocator histogram_alloc_;
 };
 
 class IsolatedStoreImpl : public StoreImpl {
@@ -96,20 +109,13 @@ public:
   }
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
-  Histogram& histogramFromStatName(StatName name) override {
-    Histogram& histogram = histograms_.get(name);
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+    Histogram& histogram = histograms_.get(name, unit);
     return histogram;
   }
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
-    return counters_.find(name);
-  }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
-    return gauges_.find(name);
-  }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
-    return histograms_.find(name);
-  }
+  OptionalCounter findCounter(StatName name) const override { return counters_.find(name); }
+  OptionalGauge findGauge(StatName name) const override { return gauges_.find(name); }
+  OptionalHistogram findHistogram(StatName name) const override { return histograms_.find(name); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -133,16 +139,16 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName());
+    return histogramFromStatName(storage.statName(), unit);
   }
 
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
-  std::unique_ptr<SymbolTable> symbol_table_storage_;
-  HeapStatDataAllocator alloc_;
+  SymbolTablePtr symbol_table_storage_;
+  AllocatorImpl alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;

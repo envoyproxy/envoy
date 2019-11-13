@@ -27,6 +27,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Prefix routing.
 * Separate downstream client and upstream server authentication.
 * Request mirroring for all requests or write requests only.
+* Control :ref:`read requests routing<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.read_policy>`. This only works with Redis Cluster.
 
 **Planned future enhancements**:
 
@@ -59,6 +60,8 @@ If passive healthchecking is desired, also configure
 For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
 close map to 5xx. All other responses from Redis are counted as a success.
 
+.. _arch_overview_redis_cluster_support:
+
 Redis Cluster Support (Experimental)
 ----------------------------------------
 
@@ -81,6 +84,29 @@ following information:
 For topology configuration details, see the Redis Cluster
 :ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`.
 
+Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.redis_cluster.* with the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  max_upstream_unknown_connections_reached, Counter, Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool's max_upstream_unknown_connections limit
+  upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
+  upstream_commands.upstream_rq_time, Histogram, Histogram of upstream request times for all types of requests
+
+.. _arch_overview_redis_cluster_command_stats:
+
+Per-cluster command statistics can be enabled via the setting :ref:`enable_command_stats <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_command_stats>`:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  upstream_commands.[command].success, Counter, Total number of successful requests for a specific Redis command
+  upstream_commands.[command].error, Counter, Total number of failed or cancelled requests for a specific Redis command
+  upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and error)
+  upstream_commands.[command].latency, Histogram, Latency of requests for a specific Redis command
+  
 Supported commands
 ------------------
 

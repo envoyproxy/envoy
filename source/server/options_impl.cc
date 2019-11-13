@@ -23,8 +23,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
   std::string log_levels_string = "Log levels: ";
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    log_levels_string += fmt::format("[{}]", spdlog::level::level_string_views[i]);
+  for (auto level_string_view : spdlog::level::level_string_views) {
+    log_levels_string += fmt::format("[{}]", level_string_view);
   }
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
@@ -50,7 +50,14 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       false, "", "string", cmd);
 
   TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
-                                        "allow unknown fields in the configuration", cmd, false);
+                                        "allow unknown fields in static configuration (DEPRECATED)",
+                                        cmd, false);
+  TCLAP::SwitchArg allow_unknown_static_fields("", "allow-unknown-static-fields",
+                                               "allow unknown fields in static configuration", cmd,
+                                               false);
+  TCLAP::SwitchArg reject_unknown_dynamic_fields("", "reject-unknown-dynamic-fields",
+                                                 "reject unknown fields in dynamic configuration",
+                                                 cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
@@ -65,6 +72,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       "", "component-log-level", component_log_level_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
                                           Logger::Logger::DEFAULT_LOG_FORMAT, "string", cmd);
+  TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
+                                      "Escape c-style escape sequences in the application logs",
+                                      cmd, false);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
@@ -80,8 +90,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<uint32_t> file_flush_interval_msec("", "file-flush-interval-msec",
                                                      "Interval for log flushing in msec", false,
                                                      10000, "uint32_t", cmd);
-  TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s", "Hot restart drain time in seconds",
-                                         false, 600, "uint32_t", cmd);
+  TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s",
+                                         "Hot restart and LDS removal drain time in seconds", false,
+                                         600, "uint32_t", cmd);
   TCLAP::ValueArg<uint32_t> parent_shutdown_time_s("", "parent-shutdown-time-s",
                                                    "Hot restart parent shutdown time in seconds",
                                                    false, 900, "uint32_t", cmd);
@@ -102,10 +113,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::SwitchArg cpuset_threads(
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
-  TCLAP::ValueArg<bool> use_libevent_buffer("", "use-libevent-buffers",
-                                            "Use the original libevent buffer implementation",
-                                            false, true, "bool", cmd);
-
+  TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
+                                              "Use fake symbol table implementation", false, true,
+                                              "bool", cmd);
   cmd.setExceptionHandling(false);
   try {
     cmd.parse(argc, argv);
@@ -128,7 +138,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
 
-  libevent_buffer_enabled_ = use_libevent_buffer.getValue();
+  fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 
   log_level_ = default_log_level;
@@ -139,6 +149,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 
   log_format_ = log_format.getValue();
+  log_format_escaped_ = log_format_escaped.getValue();
 
   parseComponentLogLevels(component_log_level.getValue());
 
@@ -181,7 +192,13 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  allow_unknown_fields_ = allow_unknown_fields.getValue();
+  if (allow_unknown_fields.getValue()) {
+    ENVOY_LOG(warn,
+              "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
+  }
+  allow_unknown_static_fields_ =
+      allow_unknown_static_fields.getValue() || allow_unknown_fields.getValue();
+  reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
@@ -241,12 +258,14 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
-  command_line_options->set_allow_unknown_fields(allow_unknown_fields_);
+  command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
+  command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),
                                       spdlog::level::to_string_view(logLevel()).size());
   command_line_options->set_log_format(logFormat());
+  command_line_options->set_log_format_escaped(logFormatEscaped());
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
   command_line_options->set_service_node(serviceNodeName());
@@ -282,10 +301,11 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
                          const std::string& service_zone, spdlog::level::level_enum log_level)
     : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""),
       local_address_ip_version_(Network::Address::IpVersion::v4), log_level_(log_level),
-      log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), restart_epoch_(0u),
-      service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),
-      file_flush_interval_msec_(10000), drain_time_(600), parent_shutdown_time_(900),
-      mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
-      mutex_tracing_enabled_(false), cpuset_threads_(false), libevent_buffer_enabled_(false) {}
+      log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), log_format_escaped_(false),
+      restart_epoch_(0u), service_cluster_(service_cluster), service_node_(service_node),
+      service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
+      parent_shutdown_time_(900), mode_(Server::Mode::Serve), hot_restart_disabled_(false),
+      signal_handling_enabled_(true), mutex_tracing_enabled_(false), cpuset_threads_(false),
+      fake_symbol_table_enabled_(false) {}
 
 } // namespace Envoy

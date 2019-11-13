@@ -3,11 +3,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/http/fault/v2/fault.pb.h"
+#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
-#include "common/config/filter_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
@@ -15,6 +16,7 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
@@ -25,13 +27,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::DoAll;
-using testing::Invoke;
+using testing::AnyNumber;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::WithArgs;
 
 namespace Envoy {
 namespace Extensions {
@@ -41,114 +41,103 @@ namespace {
 
 class FaultFilterTest : public testing::Test {
 public:
-  const std::string fixed_delay_and_abort_nodes_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 503
-      },
-      "downstream_nodes": ["canary"]
-    }
-    )EOF";
+  const std::string fixed_delay_and_abort_nodes_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 503
+  downstream_nodes:
+  - canary
+  )EOF";
 
-  const std::string fixed_delay_only_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      }
-    }
-    )EOF";
+  const std::string fixed_delay_only_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  )EOF";
 
-  const std::string abort_only_json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 429
-      }
-    }
-    )EOF";
+  const std::string abort_only_yaml = R"EOF(
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 429
+  )EOF";
 
-  const std::string fixed_delay_and_abort_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 503
-      }
-    }
-    )EOF";
+  const std::string fixed_delay_and_abort_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 503
+  )EOF";
 
-  const std::string fixed_delay_and_abort_match_headers_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 503
-      },
-      "headers" : [
-        {"name" : "X-Foo1", "value" : "Bar"},
-        {"name" : "X-Foo2"}
-      ]
-    }
-    )EOF";
+  const std::string fixed_delay_and_abort_match_headers_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 503
+  headers:
+  - name: X-Foo1
+    exact_match: Bar
+  - name: X-Foo2
+  )EOF";
 
-  const std::string delay_with_upstream_cluster_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "upstream_cluster" : "www1"
-    }
-    )EOF";
+  const std::string delay_with_upstream_cluster_yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  upstream_cluster: www1
+  )EOF";
 
-  const std::string v2_empty_fault_config_json = R"EOF(
-    {
-    }
-    )EOF";
-
-  envoy::config::filter::http::fault::v2::HTTPFault
-  convertJsonStrToProtoConfig(const std::string json) {
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    envoy::config::filter::http::fault::v2::HTTPFault fault;
-    Config::FilterJson::translateFaultFilter(*config, fault);
-    return fault;
-  }
+  const std::string v2_empty_fault_config_yaml = "{}";
 
   void SetUpTest(const envoy::config::filter::http::fault::v2::HTTPFault fault) {
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_, time_system_));
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+    EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
   }
 
-  void SetUpTest(const std::string json) { SetUpTest(convertJsonStrToProtoConfig(json)); }
+  void SetUpTest(const std::string& yaml) { SetUpTest(convertYamlStrToProtoConfig(yaml)); }
 
   void expectDelayTimer(uint64_t duration_ms) {
     timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
-    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms)));
+    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms), _));
     EXPECT_CALL(*timer_, disableTimer());
   }
 
   void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
+  Stats::IsolatedStoreImpl stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
@@ -156,110 +145,77 @@ public:
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* timer_{};
   Event::SimulatedTimeSystem time_system_;
 };
 
-void faultFilterBadConfigHelper(const std::string& json) {
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
+void faultFilterBadConfigHelper(const std::string& yaml) {
   envoy::config::filter::http::fault::v2::HTTPFault fault;
-  EXPECT_THROW(Config::FilterJson::translateFaultFilter(*config, fault), EnvoyException);
-}
-
-TEST(FaultFilterBadConfigTest, BadAbortPercent) {
-  const std::string json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 200,
-        "http_status" : 429
-      }
-    }
-  )EOF";
-
-  faultFilterBadConfigHelper(json);
+  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, fault), EnvoyException);
 }
 
 TEST(FaultFilterBadConfigTest, EmptyDownstreamNodes) {
-  const std::string json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 80,
-        "http_status" : 503
-      },
-      "downstream_nodes": []
-    }
+  const std::string yaml = R"EOF(
+  abort:
+    abort_percent:
+      numerator: 80
+      denominator: HUNDRED
+    http_status: 503
+  downstream_nodes: []
+
   )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, MissingHTTPStatus) {
-  const std::string json = R"EOF(
-    {
-      "abort" : {
-        "abort_percent" : 100
-      }
-    }
+  const std::string yaml = R"EOF(
+  abort:
+    abort_percent:
+      numerator: 100
+      denominator: HUNDRED
   )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, BadDelayType) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "foo",
-        "fixed_delay_percent" : 50,
-        "fixed_duration_ms" : 5000
-      }
-    }
+  const std::string yaml = R"EOF(
+  delay:
+    type: foo
+    percentage:
+      numerator: 50
+      denominator: HUNDRED
+    fixed_delay: 5s
   )EOF";
 
-  faultFilterBadConfigHelper(json);
-}
-
-TEST(FaultFilterBadConfigTest, BadDelayPercent) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 500,
-        "fixed_duration_ms" : 5000
-      }
-    }
-  )EOF";
-
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, BadDelayDuration) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 50,
-        "fixed_duration_ms" : 0
-      }
-    }
+  const std::string yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 50
+      denominator: HUNDRED
+    fixed_delay: 0s
    )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
-  const std::string json = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 50
-      }
-    }
+  const std::string yaml = R"EOF(
+  delay:
+    type: fixed
+    percentage:
+      numerator: 50
+      denominator: HUNDRED
    )EOF";
 
-  faultFilterBadConfigHelper(json);
+  faultFilterBadConfigHelper(yaml);
 }
 
 TEST_F(FaultFilterTest, AbortWithHttpStatus) {
@@ -299,6 +255,8 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -311,7 +269,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
-  SetUpTest(fixed_delay_only_json);
+  SetUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -414,7 +372,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
 }
 
 TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
-  SetUpTest(fixed_delay_only_json);
+  SetUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -463,6 +421,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
 
+  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -474,7 +433,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
-  SetUpTest(fixed_delay_and_abort_json);
+  SetUpTest(fixed_delay_and_abort_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -546,7 +505,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbort) {
-  SetUpTest(fixed_delay_and_abort_json);
+  SetUpTest(fixed_delay_and_abort_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -600,7 +559,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
-  SetUpTest(fixed_delay_and_abort_nodes_json);
+  SetUpTest(fixed_delay_and_abort_nodes_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -652,7 +611,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 }
 
 TEST_F(FaultFilterTest, NoDownstreamMatch) {
-  SetUpTest(fixed_delay_and_abort_nodes_json);
+  SetUpTest(fixed_delay_and_abort_nodes_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -662,7 +621,7 @@ TEST_F(FaultFilterTest, NoDownstreamMatch) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
-  SetUpTest(fixed_delay_and_abort_match_headers_json);
+  SetUpTest(fixed_delay_and_abort_match_headers_yaml);
   request_headers_.addCopy("x-foo1", "Bar");
   request_headers_.addCopy("x-foo2", "RandomValue");
 
@@ -717,7 +676,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
-  SetUpTest(fixed_delay_and_abort_match_headers_json);
+  SetUpTest(fixed_delay_and_abort_match_headers_yaml);
   request_headers_.addCopy("x-foo1", "Bar");
   request_headers_.addCopy("x-foo3", "Baz");
 
@@ -747,7 +706,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
 }
 
 TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
-  SetUpTest(fixed_delay_only_json);
+  SetUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -764,7 +723,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 
   SCOPED_TRACE("FixedDelayWithStreamReset");
   timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL), _));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
@@ -796,7 +755,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
-  SetUpTest(delay_with_upstream_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(decoder_filter_callbacks_.route_->route_entry_, clusterName())
@@ -846,7 +805,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
-  SetUpTest(delay_with_upstream_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("mismatch");
 
   EXPECT_CALL(decoder_filter_callbacks_.route_->route_entry_, clusterName())
@@ -875,7 +834,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
-  SetUpTest(delay_with_upstream_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(*decoder_filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
@@ -957,12 +916,12 @@ void FaultFilterTest::TestPerFilterConfigFault(
 
 TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
 
-  Fault::FaultSettings abort_fault(convertJsonStrToProtoConfig(abort_only_json));
-  Fault::FaultSettings delay_fault(convertJsonStrToProtoConfig(delay_with_upstream_cluster_json));
+  Fault::FaultSettings abort_fault(convertYamlStrToProtoConfig(abort_only_yaml));
+  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
 
   // route-level fault overrides listener-level fault
   {
-    SetUpTest(v2_empty_fault_config_json); // This is a valid listener level fault
+    SetUpTest(v2_empty_fault_config_yaml); // This is a valid listener level fault
     TestPerFilterConfigFault(&delay_fault, nullptr);
   }
 
@@ -970,7 +929,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   {
     config_->stats().aborts_injected_.reset();
     config_->stats().delays_injected_.reset();
-    SetUpTest(v2_empty_fault_config_json);
+    SetUpTest(v2_empty_fault_config_yaml);
     TestPerFilterConfigFault(nullptr, &delay_fault);
   }
 
@@ -978,7 +937,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   {
     config_->stats().aborts_injected_.reset();
     config_->stats().delays_injected_.reset();
-    SetUpTest(v2_empty_fault_config_json);
+    SetUpTest(v2_empty_fault_config_yaml);
     TestPerFilterConfigFault(&delay_fault, &abort_fault);
   }
 }
@@ -1051,7 +1010,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Send a small amount of data which should be within limit.
   Buffer::OwnedImpl data1("hello");
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
@@ -1062,11 +1021,11 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data2(std::string(1152, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
 
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
@@ -1074,7 +1033,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Fire timer, also advance time.
   time_system_.sleep(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
@@ -1085,7 +1044,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Fire timer, also advance time.
   time_system_.sleep(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
@@ -1100,7 +1059,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   time_system_.sleep(std::chrono::seconds(1));
 
   // Now send 1024 in one shot with end_stream true which should go through and end the stream.
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
   EXPECT_CALL(encoder_filter_callbacks_,
@@ -1109,6 +1068,42 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   filter_->onDestroy();
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+}
+
+class FaultFilterSettingsTest : public FaultFilterTest {};
+
+TEST_F(FaultFilterSettingsTest, CheckDefaultRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.http.delay.fixed_delay_percent", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.http.abort.abort_percent", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.http.delay.fixed_duration_ms", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.http.abort.http_status", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.http.max_active_faults", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.http.rate_limit.response_percent", settings.responseRateLimitPercentRuntime());
+}
+
+TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+  fault.set_abort_percent_runtime(std::string("fault.abort_percent_runtime"));
+  fault.set_delay_percent_runtime(std::string("fault.delay_percent_runtime"));
+  fault.set_abort_http_status_runtime(std::string("fault.abort_http_status_runtime"));
+  fault.set_delay_duration_runtime(std::string("fault.delay_duration_runtime"));
+  fault.set_max_active_faults_runtime(std::string("fault.max_active_faults_runtime"));
+  fault.set_response_rate_limit_percent_runtime(
+      std::string("fault.response_rate_limit_percent_runtime"));
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.delay_percent_runtime", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.abort_percent_runtime", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.delay_duration_runtime", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.abort_http_status_runtime", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.max_active_faults_runtime", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.response_rate_limit_percent_runtime",
+            settings.responseRateLimitPercentRuntime());
 }
 
 } // namespace

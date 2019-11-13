@@ -16,7 +16,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 
-#include "test/common/http/codec_impl_fuzz.pb.h"
+#include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -150,10 +150,10 @@ public:
     ON_CALL(response_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
       response_.closeRemote();
     }));
-    request_.encoder_->encodeHeaders(request_headers, end_stream);
     if (!end_stream) {
       request_.encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
+    request_.encoder_->encodeHeaders(request_headers, end_stream);
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
   }
@@ -348,31 +348,37 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
   const Http2Settings client_http2settings{fromHttp2Settings(input.h2_settings().client())};
+  const Http1Settings client_http1settings;
   NiceMock<MockConnectionCallbacks> client_callbacks;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+  uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
 
   if (http2) {
-    client = std::make_unique<Http2::TestClientConnectionImpl>(client_connection, client_callbacks,
-                                                               stats_store, client_http2settings,
-                                                               max_request_headers_kb);
+    client = std::make_unique<Http2::TestClientConnectionImpl>(
+        client_connection, client_callbacks, stats_store, client_http2settings,
+        max_request_headers_kb, max_response_headers_count);
   } else {
-    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
+    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, stats_store,
+                                                           client_callbacks, client_http1settings,
+                                                           max_response_headers_count);
   }
 
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
   if (http2) {
     const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
-    server = std::make_unique<Http2::TestServerConnectionImpl>(server_connection, server_callbacks,
-                                                               stats_store, server_http2settings,
-                                                               max_request_headers_kb);
+    server = std::make_unique<Http2::TestServerConnectionImpl>(
+        server_connection, server_callbacks, stats_store, server_http2settings,
+        max_request_headers_kb, max_request_headers_count);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, server_callbacks, server_http1settings, max_request_headers_kb);
+        server_connection, stats_store, server_callbacks, server_http1settings,
+        max_request_headers_kb, max_request_headers_count);
   }
 
   ReorderBuffer client_write_buf{*server};
@@ -418,8 +424,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     }
   };
 
+  constexpr auto max_actions = 1024;
   try {
-    for (const auto& action : input.actions()) {
+    for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
+      const auto& action = input.actions(i);
       ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
       switch (action.action_selector_case()) {
       case test::common::http::Action::kNewStream: {
@@ -500,8 +508,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
 // Fuzz the H1/H2 codec implementations.
 DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
-  codecFuzz(input, HttpVersion::Http1);
-  codecFuzz(input, HttpVersion::Http2);
+  try {
+    // Validate input early.
+    TestUtility::validate(input);
+    codecFuzz(input, HttpVersion::Http1);
+    codecFuzz(input, HttpVersion::Http2);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+  }
 }
 
 } // namespace Http

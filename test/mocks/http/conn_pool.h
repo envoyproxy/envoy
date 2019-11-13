@@ -14,7 +14,7 @@ class MockCancellable : public Cancellable {
 
 public:
   MockCancellable();
-  ~MockCancellable();
+  ~MockCancellable() override;
 
   // Http::ConnectionPool::Cancellable
   MOCK_METHOD0(cancel, void());
@@ -23,7 +23,7 @@ public:
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   // Http::ConnectionPool::Instance
   MOCK_CONST_METHOD0(protocol, Http::Protocol());

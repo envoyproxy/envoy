@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/histogram.h"
@@ -30,7 +31,7 @@ public:
   Writer(Network::Address::InstanceConstSharedPtr address);
   // For testing.
   Writer() : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()) {}
-  virtual ~Writer();
+  ~Writer() override;
 
   virtual void write(const std::string& message);
   // Called in unit test to validate address.
@@ -98,7 +99,7 @@ public:
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
-    ~TlsSink();
+    ~TlsSink() override;
 
     void beginFlush(bool expect_empty_buffer);
     void checkSize();

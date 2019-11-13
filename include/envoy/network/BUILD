@@ -65,6 +65,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "hash_policy_interface",
+    hdrs = ["hash_policy.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":address_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "io_handle_interface",
     hdrs = ["io_handle.h"],
     deps = [
@@ -79,7 +88,7 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":io_handle_interface",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -94,9 +103,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "connection_balancer_interface",
+    hdrs = ["connection_balancer.h"],
+    deps = [
+        ":listen_socket_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
     deps = [
+        ":connection_balancer_interface",
         ":connection_interface",
         ":listen_socket_interface",
         "//include/envoy/stats:stats_interface",
@@ -108,6 +126,6 @@ envoy_cc_library(
     hdrs = ["resolver.h"],
     deps = [
         ":address_interface",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

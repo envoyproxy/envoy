@@ -1,10 +1,10 @@
 #include "test/integration/tcp_dump.h"
 
-#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <csignal>
 #include <fstream>
 
 #include "common/common/assert.h"

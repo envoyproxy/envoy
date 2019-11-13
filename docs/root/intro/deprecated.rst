@@ -10,8 +10,64 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
-Version 1.11.0 (Pending)
+Version 1.13.0 (pending)
 ========================
+
+
+Version 1.12.0 (October 31, 2019)
+=================================
+* The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is
+  deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination
+  cluster <envoy_api_field_Cluster.type>`.
+* The `regex` field in :ref:`StringMatcher <envoy_api_msg_type.matcher.StringMatcher>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `regex` field in :ref:`RouteMatch <envoy_api_msg_route.RouteMatch>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `allow_origin` and `allow_origin_regex` fields in :ref:`CorsPolicy
+  <envoy_api_msg_route.CorsPolicy>` have been deprecated in favor of the
+  `allow_origin_string_match` field.
+* The `pattern` and `method` fields in :ref:`VirtualCluster <envoy_api_msg_route.VirtualCluster>`
+  have been deprecated in favor of the `headers` field.
+* The `regex_match` field in :ref:`HeaderMatcher <envoy_api_msg_route.HeaderMatcher>` has been
+  deprecated in favor of the `safe_regex_match` field.
+* The `value` and `regex` fields in :ref:`QueryParameterMatcher
+  <envoy_api_msg_route.QueryParameterMatcher>` has been deprecated in favor of the `string_match`
+  and `present_match` fields.
+* The :option:`--allow-unknown-fields` command-line option,
+  use :option:`--allow-unknown-static-fields` instead.
+* The use of HTTP_JSON_V1 :ref:`Zipkin collector endpoint version
+  <envoy_api_field_config.trace.v2.ZipkinConfig.collector_endpoint_version>` or not explicitly
+  specifying it is deprecated, use HTTP_JSON or HTTP_PROTO instead.
+* The `operation_name` field in :ref:`HTTP connection manager
+  <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
+  has been deprecated in favor of the `traffic_direction` field in
+  :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
+  specified.
+* The `tls_context` field in :ref:`Filter chain <envoy_api_field_listener.FilterChain.tls_context>` message
+  and :ref:`Cluster <envoy_api_field_Cluster.tls_context>` message have been deprecated in favor of
+  `transport_socket` with name `envoy.transport_sockets.tls`. The latter takes priority if specified.
+* The `use_http2` field in
+  :ref:`HTTP health checker <envoy_api_msg_core.HealthCheck.HttpHealthCheck>` has been deprecated in
+  favor of the `codec_client_type` field.
+* The use of :ref:`gRPC bridge filter <config_http_filters_grpc_bridge>` for
+  gRPC stats has been deprecated in favor of the dedicated :ref:`gRPC stats
+  filter <config_http_filters_grpc_stats>`
+* Ext_authz filter stats `ok`, `error`, `denied`, `failure_mode_allowed` in
+  *cluster.<route target cluster>.ext_authz.* namespace is deprecated.
+  Use *http.<stat_prefix>.ext_authz.* namespace to access same counters instead.
+* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
+  udpa.type.v1.TypedStruct in google.protobuf.Any.
+
+Version 1.11.2 (October 8, 2019)
+================================
+* Use of :ref:`idle_timeout
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>`
+  is deprecated. Use :ref:`common_http_protocol_options
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+  instead.
+
+Version 1.11.0 (July 11, 2019)
+==============================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.
 * Use of :ref:`cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
 * Use of :ref:`catch_all_cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.

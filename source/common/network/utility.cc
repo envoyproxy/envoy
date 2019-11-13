@@ -1,20 +1,5 @@
 #include "common/network/utility.h"
 
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-
-#if defined(__linux__)
-#include <linux/netfilter_ipv4.h>
-#endif
-
-#ifndef IP6T_SO_ORIGINAL_DST
-// From linux/netfilter_ipv6/ip6_tables.h
-#define IP6T_SO_ORIGINAL_DST 80
-#endif
-
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <cstdint>
 #include <list>
 #include <sstream>
@@ -22,16 +7,19 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
+#include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
-
-#include "common/common/fmt.h"
 
 #include "absl/strings/match.h"
 
@@ -87,6 +75,11 @@ uint32_t portFromUrl(const std::string& url, const std::string& scheme,
   size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
+    throw EnvoyException(fmt::format("malformed url: {}", url));
+  }
+
+  size_t rcolon_index = url.rfind(':');
+  if (colon_index != rcolon_index) {
     throw EnvoyException(fmt::format("malformed url: {}", url));
   }
 
@@ -238,46 +231,21 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
-bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
+bool Utility::isLocalConnection(const ConnectionSocket& socket) {
+  // These are local:
+  // - Pipes
+  // - Sockets to a loopback address
+  // - Sockets where the local and remote address (ignoring port) are the same
   const auto& remote_address = socket.remoteAddress();
-  // Before calling getifaddrs, verify the obvious checks.
-  // Note that there are corner cases, where remote and local address will be the same
-  // while the client is not actually local. Example could be an iptables intercepted
-  // connection. However, this is a rare exception and such assumption results in big
-  // performance optimization.
-  if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
-      remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
+  if (remote_address->type() == Address::Type::Pipe || isLoopbackAddress(*remote_address)) {
     return true;
   }
-
-  struct ifaddrs* ifaddr;
-  const int rc = getifaddrs(&ifaddr);
-  Cleanup ifaddr_cleanup([ifaddr] {
-    if (ifaddr) {
-      freeifaddrs(ifaddr);
-    }
-  });
-  RELEASE_ASSERT(rc == 0, "");
-
-  const auto af_look_up =
-      (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
-
-  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == nullptr) {
-      continue;
-    }
-
-    if (ifa->ifa_addr->sa_family == af_look_up) {
-      const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      const auto local_address = Address::addressFromSockAddr(
-          *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-
-      if (remote_address == local_address) {
-        return true;
-      }
-    }
+  const auto local_ip = socket.localAddress()->ip();
+  const auto remote_ip = remote_address->ip();
+  if (remote_ip != nullptr && local_ip != nullptr &&
+      remote_ip->addressAsString() == local_ip->addressAsString()) {
+    return true;
   }
-
   return false;
 }
 
@@ -361,9 +329,9 @@ const std::string& Utility::getIpv6CidrCatchAllAddress() {
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
                                                             uint32_t port) {
   switch (address.ip()->version()) {
-  case Network::Address::IpVersion::v4:
+  case Address::IpVersion::v4:
     return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
-  case Network::Address::IpVersion::v6:
+  case Address::IpVersion::v6:
     return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -445,7 +413,7 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
     return false;
   }
 
-  for (const Network::PortRange& p : list) {
+  for (const PortRange& p : list) {
     if (p.contains(address.ip()->port())) {
       return true;
     }
@@ -482,9 +450,9 @@ Address::InstanceConstSharedPtr
 Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::api::v2::core::Address::kSocketAddress:
-    return Network::Utility::parseInternetAddress(proto_address.socket_address().address(),
-                                                  proto_address.socket_address().port_value(),
-                                                  !proto_address.socket_address().ipv4_compat());
+    return Utility::parseInternetAddress(proto_address.socket_address().address(),
+                                         proto_address.socket_address().port_value(),
+                                         !proto_address.socket_address().ipv4_compat());
   case envoy::api::v2::core::Address::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
   default:
@@ -523,6 +491,113 @@ Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_ad
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
+
+Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
+                                               const Address::Ip* local_ip,
+                                               const Address::Instance& peer_address) {
+  const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  buffer.getRawSlices(slices.begin(), num_slices);
+  return writeToSocket(handle, slices.begin(), num_slices, local_ip, peer_address);
+}
+
+Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
+                                               uint64_t num_slices, const Address::Ip* local_ip,
+                                               const Address::Instance& peer_address) {
+  Api::IoCallUint64Result send_result(
+      /*rc=*/0, /*err=*/Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  do {
+    send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
+  } while (!send_result.ok() &&
+           // Send again if interrupted.
+           send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
+
+  if (send_result.ok()) {
+    ENVOY_LOG_MISC(trace, "sendmsg sent:{} bytes", send_result.rc_);
+  } else {
+    ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
+                   static_cast<int>(send_result.err_->getErrorCode()),
+                   send_result.err_->getErrorDetails());
+  }
+  return send_result;
+}
+
+Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
+                                                const Address::Instance& local_address,
+                                                UdpPacketProcessor& udp_packet_processor,
+                                                MonotonicTime receive_time,
+                                                uint32_t* packets_dropped) {
+  Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+  Buffer::RawSlice slice;
+  const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
+  ASSERT(num_slices == 1);
+
+  IoHandle::RecvMsgOutput output(packets_dropped);
+  Api::IoCallUint64Result result =
+      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+
+  if (!result.ok()) {
+    return result;
+  }
+
+  // Adjust used memory length.
+  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+  buffer->commit(&slice, 1);
+
+  ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
+
+  RELEASE_ASSERT(output.peer_address_ != nullptr,
+                 fmt::format("Unable to get remote address for fd: {}, local address: {} ",
+                             handle.fd(), local_address.asString()));
+
+  // Unix domain sockets are not supported
+  RELEASE_ASSERT(output.peer_address_->type() == Address::Type::Ip,
+                 fmt::format("Unsupported remote address: {} local address: {}, receive size: "
+                             "{}",
+                             output.peer_address_->asString(), local_address.asString(),
+                             result.rc_));
+  udp_packet_processor.processPacket(std::move(output.local_address_),
+                                     std::move(output.peer_address_), std::move(buffer),
+                                     receive_time);
+  return result;
+}
+
+Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
+                                               const Address::Instance& local_address,
+                                               UdpPacketProcessor& udp_packet_processor,
+                                               TimeSource& time_source, uint32_t& packets_dropped) {
+  do {
+    const uint32_t old_packets_dropped = packets_dropped;
+    const MonotonicTime receive_time = time_source.monotonicTime();
+    Api::IoCallUint64Result result = Utility::readFromSocket(
+        handle, local_address, udp_packet_processor, receive_time, &packets_dropped);
+
+    if (!result.ok()) {
+      // No more to read or encountered a system error.
+      return std::move(result.err_);
+    }
+
+    if (result.rc_ == 0) {
+      // TODO(conqerAtapple): Is zero length packet interesting? If so add stats
+      // for it. Otherwise remove the warning log below.
+      ENVOY_LOG_MISC(trace, "received 0-length packet");
+    }
+
+    if (packets_dropped != old_packets_dropped) {
+      // The kernel tracks SO_RXQ_OVFL as a uint32 which can overflow to a smaller
+      // value. So as long as this count differs from previously recorded value,
+      // more packets are dropped by kernel.
+      const uint32_t delta =
+          (packets_dropped > old_packets_dropped)
+              ? (packets_dropped - old_packets_dropped)
+              : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
+                 1);
+      // TODO(danzh) add stats for this.
+      ENVOY_LOG_MISC(
+          debug, "Kernel dropped {} more packets. Consider increase receive buffer size.", delta);
+    }
+  } while (true);
 }
 
 } // namespace Network

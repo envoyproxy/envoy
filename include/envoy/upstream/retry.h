@@ -79,10 +79,19 @@ class RetryPriorityFactory {
 public:
   virtual ~RetryPriorityFactory() = default;
 
-  virtual RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message& config,
-                                                     uint32_t retry_count) PURE;
+  virtual RetryPrioritySharedPtr
+  createRetryPriority(const Protobuf::Message& config,
+                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                      uint32_t retry_count) PURE;
 
   virtual std::string name() const PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "retry_priorities"; }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };
@@ -101,6 +110,8 @@ public:
    * @return name name of this factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "retry_host_predicates"; }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };

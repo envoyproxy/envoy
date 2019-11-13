@@ -1,0 +1,18 @@
+static_resources {
+  clusters {
+    name: "@"
+    connect_timeout {
+      nanos: 250000000
+    }
+    common_lb_config {
+      zone_aware_lb_config {
+        min_cluster_size {
+          value: 38
+        }
+      }
+    }
+  }
+}
+stats_flush_interval {
+  nanos: 32256
+}

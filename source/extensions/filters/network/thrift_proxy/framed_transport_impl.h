@@ -17,7 +17,7 @@ namespace ThriftProxy {
  */
 class FramedTransportImpl : public Transport {
 public:
-  FramedTransportImpl() {}
+  FramedTransportImpl() = default;
 
   // Transport
   const std::string& name() const override { return TransportNames::get().FRAMED; }

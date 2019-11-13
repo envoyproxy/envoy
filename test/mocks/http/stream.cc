@@ -22,7 +22,7 @@ MockStream::MockStream() {
   }));
 }
 
-MockStream::~MockStream() {}
+MockStream::~MockStream() = default;
 
 } // namespace Http
 } // namespace Envoy

@@ -31,6 +31,8 @@ envoy_cc_library(
     external_deps = ["protobuf"],
     deps = [
         "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:hash_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
     ],
@@ -60,6 +62,6 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/json:json_loader_lib",
-        "@envoy_api//envoy/type:percent_cc",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )

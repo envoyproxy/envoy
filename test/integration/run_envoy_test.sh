@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source "$TEST_RUNDIR/test/integration/test_utility.sh"
+source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
 function expect_fail_with_error() {
   log="${TEST_TMPDIR}/envoy.log"
@@ -21,7 +21,7 @@ expect_fail_with_error "PARSE ERROR: Argument: --bogus-flag" --bogus-flag
 
 start_test Launching envoy without --config-path or --config-yaml fails.
 expect_fail_with_error \
-  "At least one of --config-path and --config-yaml should be non-empty"
+  "At least one of --config-path or --config-yaml or Options::configProto() should be non-empty"
 
 start_test Launching envoy with unknown IP address.
 expect_fail_with_error "error: unknown IP address version" --local-address-ip-version foo

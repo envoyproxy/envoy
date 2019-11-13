@@ -43,6 +43,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   // Make sure inexact matches work also on data already received.
   tcp_client->waitForData("ello", false);
 
+  // Make sure length based wait works for the data already received
+  tcp_client->waitForData(5);
+  tcp_client->waitForData(4);
+
+  // Drain part of the received message
+  tcp_client->clearData(2);
+  tcp_client->waitForData("llo");
+  tcp_client->waitForData(3);
+
   tcp_client->write("hello");
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
@@ -226,10 +235,12 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
+    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            *config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
@@ -238,9 +249,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n");
-    TestUtility::jsonConvert(access_log_config, *access_log->mutable_config());
-
-    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
 
@@ -314,14 +324,16 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
+    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
-    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
+    config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -335,14 +347,16 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
+    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
+    config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -356,6 +370,286 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
   tcp_client->waitForDisconnect(true);
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+}
+
+class TcpProxyMetadataMatchIntegrationTest : public TcpProxyIntegrationTest {
+public:
+  void initialize();
+
+  void expectEndpointToMatchRoute();
+  void expectEndpointNotToMatchRoute();
+
+  envoy::api::v2::core::Metadata lbMetadata(std::map<std::string, std::string> values);
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_;
+  envoy::api::v2::core::Metadata endpoint_metadata_;
+};
+
+envoy::api::v2::core::Metadata
+TcpProxyMetadataMatchIntegrationTest::lbMetadata(std::map<std::string, std::string> values) {
+
+  ProtobufWkt::Struct map;
+  auto* mutable_fields = map.mutable_fields();
+  ProtobufWkt::Value value;
+
+  std::map<std::string, std::string>::iterator it;
+  for (it = values.begin(); it != values.end(); it++) {
+    value.set_string_value(it->second);
+    mutable_fields->insert({it->first, value});
+  }
+
+  envoy::api::v2::core::Metadata metadata;
+  (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] = map;
+  return metadata;
+}
+
+void TcpProxyMetadataMatchIntegrationTest::initialize() {
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+
+    ASSERT(static_resources->listeners_size() == 1);
+    static_resources->mutable_listeners(0)
+        ->mutable_filter_chains(0)
+        ->mutable_filters(0)
+        ->mutable_typed_config()
+        ->PackFrom(tcp_proxy_);
+
+    ASSERT(static_resources->clusters_size() == 1);
+    auto* cluster_0 = static_resources->mutable_clusters(0);
+    cluster_0->Clear();
+    cluster_0->set_name("cluster_0");
+    cluster_0->set_type(envoy::api::v2::Cluster::STATIC);
+    cluster_0->set_lb_policy(envoy::api::v2::Cluster::ROUND_ROBIN);
+    auto* lb_subset_config = cluster_0->mutable_lb_subset_config();
+    lb_subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
+    auto* subset_selector = lb_subset_config->add_subset_selectors();
+    subset_selector->add_keys("role");
+    subset_selector->add_keys("version");
+    subset_selector->add_keys("stage");
+    auto* load_assignment = cluster_0->mutable_load_assignment();
+    load_assignment->set_cluster_name("cluster_0");
+    auto* locality_lb_endpoints = load_assignment->add_endpoints();
+    auto* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(version_));
+    lb_endpoint->mutable_metadata()->MergeFrom(endpoint_metadata_);
+  });
+
+  TcpProxyIntegrationTest::initialize();
+}
+
+// Verifies successful connection.
+void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  tcp_client->waitForData("world");
+  tcp_client->write("hello", true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("cluster.cluster_0.lb_subsets_selected", 1);
+}
+
+// Verifies connection failure.
+void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+
+  // TODO(yskopets): 'tcp_client->waitForDisconnect(true);' gets stuck indefinitely on Linux builds,
+  // e.g. on 'envoy-linux (bazel compile_time_options)' and 'envoy-linux (bazel release)'
+  // tcp_client->waitForDisconnect(true);
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_none_healthy", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.lb_subsets_selected", 0);
+
+  tcp_client->close();
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyMetadataMatchIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test subset load balancing for a regular cluster when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldMatchSingleClusterWithTopLevelMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       DEPRECATED_FEATURE_TEST(EndpointShouldMatchRouteWithTopLevelMetadataMatch)) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("fallback");
+  tcp_proxy_.mutable_deprecated_v1()->add_routes()->set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
+// cluster.
+TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterWithMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined both on a
+// weighted cluster and at the top level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldMatchWeightedClusterWithMetadataMatchAndTopLevelMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(lbMetadata({{"version", "v1"}, {"stage", "dev"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
+      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined at the top
+// level only.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldMatchWeightedClusterWithTopLevelMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointToMatchRoute();
+}
+
+// Test subset load balancing for a regular cluster when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchSingleClusterWithTopLevelMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a deprecated_v1 route when endpoint selector is defined at the top
+// level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       DEPRECATED_FEATURE_TEST(EndpointShouldNotMatchRouteWithTopLevelMetadataMatch)) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.set_cluster("fallback");
+  tcp_proxy_.mutable_deprecated_v1()->add_routes()->set_cluster("cluster_0");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined on a weighted
+// cluster.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchWeightedClusterWithMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined both on a
+// weighted cluster and at the top level.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchWeightedClusterWithMetadataMatchAndTopLevelMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(lbMetadata({{"version", "v1"}, {"stage", "dev"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+  cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
+      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+
+  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "dev"}});
+
+  initialize();
+
+  expectEndpointNotToMatchRoute();
+}
+
+// Test subset load balancing for a weighted cluster when endpoint selector is defined at the top
+// level only.
+TEST_P(TcpProxyMetadataMatchIntegrationTest,
+       EndpointShouldNotMatchWeightedClusterWithTopLevelMetadataMatch) {
+  tcp_proxy_.set_stat_prefix("tcp_stats");
+  tcp_proxy_.mutable_metadata_match()->MergeFrom(
+      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+  auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
+  cluster_0->set_name("cluster_0");
+  cluster_0->set_weight(1);
+
+  endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
+
+  initialize();
+
+  expectEndpointNotToMatchRoute();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxySslIntegrationTest,

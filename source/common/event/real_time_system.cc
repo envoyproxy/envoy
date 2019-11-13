@@ -12,7 +12,9 @@ namespace {
 class RealScheduler : public Scheduler {
 public:
   RealScheduler(Scheduler& base_scheduler) : base_scheduler_(base_scheduler) {}
-  TimerPtr createTimer(const TimerCb& cb) override { return base_scheduler_.createTimer(cb); };
+  TimerPtr createTimer(const TimerCb& cb, Dispatcher& d) override {
+    return base_scheduler_.createTimer(cb, d);
+  };
 
 private:
   Scheduler& base_scheduler_;

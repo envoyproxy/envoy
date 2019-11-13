@@ -85,7 +85,7 @@ protected:
     GetLogger().set_level(ERROR);
   }
 
-  ~QuicPlatformTest() {
+  ~QuicPlatformTest() override {
     SetVerbosityLogThreshold(verbosity_log_threshold_);
     GetLogger().set_level(log_level_);
   }
@@ -310,10 +310,7 @@ TEST_F(QuicPlatformTest, QuicUint128) {
 }
 
 TEST_F(QuicPlatformTest, QuicPtrUtil) {
-  auto p = QuicMakeUnique<std::string>("abc");
-  EXPECT_EQ("abc", *p);
-
-  p = QuicWrapUnique(new std::string("aaa"));
+  auto p = QuicWrapUnique(new std::string("aaa"));
   EXPECT_EQ("aaa", *p);
 }
 
@@ -360,6 +357,18 @@ TEST_F(QuicPlatformTest, QuicLog) {
 #else
 #define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) debug_mode_value
 #endif
+
+TEST_F(QuicPlatformTest, LogIoManipulators) {
+  GetLogger().set_level(ERROR);
+  QUIC_DLOG(ERROR) << "aaaa" << std::endl;
+  EXPECT_LOG_CONTAINS("error", "aaaa\n\n", QUIC_LOG(ERROR) << "aaaa" << std::endl << std::endl);
+  EXPECT_LOG_NOT_CONTAINS("error", "aaaa\n\n\n",
+                          QUIC_LOG(ERROR) << "aaaa" << std::endl
+                                          << std::endl);
+
+  EXPECT_LOG_CONTAINS("error", "42 in octal is 52",
+                      QUIC_LOG(ERROR) << 42 << " in octal is " << std::oct << 42);
+}
 
 TEST_F(QuicPlatformTest, QuicDLog) {
   int i = 0;
@@ -724,16 +733,7 @@ TEST_F(QuicPlatformTest, TestQuicOptional) {
   EXPECT_EQ(1, *maybe_a);
 }
 
-class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
-public:
-  ~QuicMemSliceTest() override {}
-};
-
-INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
-                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
-                                            Envoy::Buffer::BufferImplementation::New}));
-
-TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
+TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
@@ -744,7 +744,6 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   // str2 is copied.
@@ -755,7 +754,7 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
   EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
-  std::string str2_old = str2;
+  std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
   // slice1 is released, but str2 should not be affected.
   slice1.Reset();
   EXPECT_TRUE(slice1.empty());
@@ -772,9 +771,8 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(fragment_releaser_called);
 }
 
-TEST_P(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
+TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   std::string str(1024, 'a');
   buffer.add(str);
   quic::QuicMemSlice slice{quic::QuicMemSliceImpl(buffer, str.length())};
@@ -784,7 +782,7 @@ TEST_P(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
   EXPECT_EQ(str, span.GetData(0));
 }
 
-TEST_P(QuicMemSliceTest, QuicMemSliceStorage) {
+TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
   std::string str(512, 'a');
   struct iovec iov = {const_cast<char*>(str.data()), str.length()};
   SimpleBufferAllocator allocator;

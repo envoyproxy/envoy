@@ -1,7 +1,5 @@
 #include "common/grpc/common.h"
 
-#include <arpa/inet.h>
-
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -10,6 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -49,16 +48,17 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers,
+                                                         bool allow_user_defined) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
-
   uint64_t grpc_status_code;
+
   if (!grpc_status_header || grpc_status_header->value().empty()) {
-    return absl::optional<Status::GrpcStatus>();
+    return absl::nullopt;
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
-      grpc_status_code > Status::GrpcStatus::MaximumValid) {
-    return {Status::GrpcStatus::InvalidCode};
+      (grpc_status_code > Status::WellKnownGrpcStatus::MaximumKnown && !allow_user_defined)) {
+    return {Status::WellKnownGrpcStatus::InvalidCode};
   }
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
@@ -66,6 +66,27 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
   const auto entry = trailers.GrpcMessage();
   return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
+}
+
+absl::optional<google::rpc::Status>
+Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
+  const Http::HeaderEntry* details_header = trailers.get(Http::Headers::get().GrpcStatusDetailsBin);
+  if (!details_header) {
+    return absl::nullopt;
+  }
+
+  // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
+  auto decoded_value = Base64::decodeWithoutPadding(details_header->value().getStringView());
+  if (decoded_value.empty()) {
+    return absl::nullopt;
+  }
+
+  google::rpc::Status status;
+  if (!status.ParseFromString(decoded_value)) {
+    return absl::nullopt;
+  }
+
+  return {std::move(status)};
 }
 
 Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
@@ -107,9 +128,9 @@ Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   return body;
 }
 
-std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_headers) {
+std::chrono::milliseconds Common::getGrpcTimeout(const Http::HeaderMap& request_headers) {
   std::chrono::milliseconds timeout(0);
-  Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
+  const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
     // TODO(dnoe): Migrate to pure string_view (#6580)
@@ -175,21 +196,16 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& method_name,
                                         const absl::optional<std::chrono::milliseconds>& timeout) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(service_full_name.c_str(),
-                                                 service_full_name.size());
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
-  message->headers().insertHost().value(upstream_cluster);
+  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  message->headers().setPath(absl::StrCat("/", service_full_name, "/", method_name));
+  message->headers().setHost(upstream_cluster);
   // According to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md TE should appear
   // before Timeout and ContentType.
-  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+  message->headers().setReferenceTE(Http::Headers::get().TEValues.Trailers);
   if (timeout) {
     toGrpcTimeout(timeout.value(), message->headers().insertGrpcTimeout().value());
   }
-  message->headers().insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Grpc);
+  message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
   return message;
 }
@@ -202,7 +218,7 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
     return;
   }
 
-  if (grpc_status_code.value() == Status::GrpcStatus::InvalidCode) {
+  if (grpc_status_code.value() == Status::WellKnownGrpcStatus::InvalidCode) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 

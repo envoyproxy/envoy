@@ -22,11 +22,10 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()), rate_limit_policy_(route.route().rate_limits()) {
-  for (const auto& header_map : route.match().headers()) {
-    config_headers_.push_back(header_map);
-  }
-
+    : cluster_name_(route.route().cluster()),
+      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
+      rate_limit_policy_(route.route().rate_limits()),
+      strip_service_name_(route.route().strip_service_name()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -248,7 +247,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   ASSERT(protocol != ProtocolType::Auto);
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this, nullptr);
+      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
@@ -258,6 +257,14 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
+
+  if (route_entry_->stripServiceName()) {
+    const auto& method = metadata->methodName();
+    const auto pos = method.find(':');
+    if (pos != std::string::npos) {
+      metadata->setMethodName(method.substr(pos + 1));
+    }
+  }
 
   upstream_request_ =
       std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata, transport, protocol);
@@ -368,7 +375,7 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
 
-Router::UpstreamRequest::~UpstreamRequest() {}
+Router::UpstreamRequest::~UpstreamRequest() = default;
 
 FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);

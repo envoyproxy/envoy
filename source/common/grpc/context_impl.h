@@ -30,6 +30,10 @@ public:
                   const RequestNames& request_names, bool success) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
                   bool success) override;
+  void chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
+                                const RequestNames& request_names, uint64_t amount) override;
+  void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
+                                 const RequestNames& request_names, uint64_t amount) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
@@ -56,14 +60,16 @@ private:
 
   Stats::SymbolTable& symbol_table_;
   mutable Thread::MutexBasicLockable mutex_;
-  Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
-  StringMap<Stats::StatName> stat_name_map_ GUARDED_BY(mutex_);
+  Stats::StatNamePool stat_name_pool_ ABSL_GUARDED_BY(mutex_);
+  StringMap<Stats::StatName> stat_name_map_ ABSL_GUARDED_BY(mutex_);
   const Stats::StatName grpc_;
   const Stats::StatName grpc_web_;
   const Stats::StatName success_;
   const Stats::StatName failure_;
   const Stats::StatName total_;
   const Stats::StatName zero_;
+  const Stats::StatName request_message_count_;
+  const Stats::StatName response_message_count_;
 };
 
 } // namespace Grpc

@@ -26,6 +26,9 @@ unhealthy, successes required before marking a host healthy, etc.):
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
   :ref:`redis_key <envoy_api_msg_config.health_checker.redis.v2.Redis>`.
 
+Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
+using a TLS-enabled transport socket, the health check will also occur over TLS.
+
 .. _arch_overview_per_cluster_health_check_config:
 
 Per cluster member health check config

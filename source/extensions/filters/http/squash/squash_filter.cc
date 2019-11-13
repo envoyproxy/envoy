@@ -30,7 +30,7 @@ const std::string SquashFilter::ERROR_STATE = "error";
 
 SquashFilterConfig::SquashFilterConfig(
     const envoy::config::filter::http::squash::v2::Squash& proto_config,
-    Upstream::ClusterManager& clusterManager)
+    Upstream::ClusterManager& cluster_manager)
     : cluster_name_(proto_config.cluster()),
       attachment_json_(getAttachment(proto_config.attachment_template())),
       attachment_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_timeout, 60000)),
@@ -38,7 +38,7 @@ SquashFilterConfig::SquashFilterConfig(
           PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_poll_period, 1000)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, request_timeout, 1000)) {
 
-  if (!clusterManager.get(cluster_name_)) {
+  if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(
         fmt::format("squash filter: unknown cluster '{}' in squash config", cluster_name_));
   }
@@ -129,7 +129,7 @@ SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::Cluster
                                  std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
       cm_(cm), decoder_callbacks_(nullptr) {}
 
-SquashFilter::~SquashFilter() {}
+SquashFilter::~SquashFilter() = default;
 
 void SquashFilter::onDestroy() { cleanup(); }
 
@@ -142,11 +142,10 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, 
   ENVOY_LOG(debug, "Squash: Holding request and requesting debug attachment");
 
   Http::MessagePtr request(new Http::RequestMessageImpl());
-  request->headers().insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
-  request->headers().insertPath().value().setReference(POST_ATTACHMENT_PATH);
-  request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
-  request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
+  request->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  request->headers().setReferencePath(POST_ATTACHMENT_PATH);
+  request->headers().setReferenceHost(SERVER_AUTHORITY);
+  request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request->body() = std::make_unique<Buffer::OwnedImpl>(config_->attachmentJson());
 
   is_squashing_ = true;
@@ -163,7 +162,8 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, 
 
   attachment_timeout_timer_ =
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
-  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
+  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout(),
+                                         &decoder_callbacks_->scope());
   // Check if the timer expired inline.
   if (!is_squashing_) {
     return Http::FilterHeadersStatus::Continue;
@@ -261,14 +261,15 @@ void SquashFilter::scheduleRetry() {
     attachment_poll_period_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
   }
-  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod());
+  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod(),
+                                             &decoder_callbacks_->scope());
 }
 
 void SquashFilter::pollForAttachment() {
   Http::MessagePtr request(new Http::RequestMessageImpl());
-  request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  request->headers().insertPath().value().setReference(debug_attachment_path_);
-  request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
+  request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
+  request->headers().setReferencePath(debug_attachment_path_);
+  request->headers().setReferenceHost(SERVER_AUTHORITY);
 
   in_flight_request_ =
       cm_.httpAsyncClientForCluster(config_->clusterName())

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Call addr2line as needed to resolve addresses in a stack trace. The addresses
 # will be replaced if they can be resolved into file and line numbers. The
@@ -11,7 +11,6 @@
 # In each case this script will add file and line information to any backtrace log
 # lines found and echo back all non-Backtrace lines untouched.
 
-from __future__ import print_function
 import collections
 import re
 import subprocess
@@ -24,10 +23,14 @@ import sys
 # any nonmatching lines unmodified. End when EOF received.
 def decode_stacktrace_log(object_file, input_source):
   traces = {}
-  # Match something like [backtrace]
-  # bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
+  # Match something like:
+  #     [backtrace] [bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
   backtrace_marker = "\[backtrace\] [^\s]+"
-  stackaddr_re = re.compile("%s #\d+: .* \[(0x[0-9a-fA-F]+)\]$" % backtrace_marker)
+  # Match something like:
+  #     ${backtrace_marker} #10: SYMBOL [0xADDR]
+  # or:
+  #     ${backtrace_marker} #10: [0xADDR]
+  stackaddr_re = re.compile("%s #\d+:(?: .*)? \[(0x[0-9a-fA-F]+)\]$" % backtrace_marker)
 
   try:
     while True:
@@ -53,7 +56,7 @@ def decode_stacktrace_log(object_file, input_source):
 #
 # Returns list of result lines
 def run_addr2line(obj_file, addr_to_resolve):
-  return subprocess.check_output(["addr2line", "-Cpie", obj_file, addr_to_resolve])
+  return subprocess.check_output(["addr2line", "-Cpie", obj_file, addr_to_resolve]).decode('utf-8')
 
 
 # Because of how bazel compiles, addr2line reports file names that begin with
@@ -69,7 +72,10 @@ if __name__ == "__main__":
     decode_stacktrace_log(sys.argv[2], sys.stdin)
     sys.exit(0)
   elif len(sys.argv) > 1:
-    rununder = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    rununder = subprocess.Popen(sys.argv[1:],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True)
     decode_stacktrace_log(sys.argv[1], rununder.stdout)
     rununder.wait()
     sys.exit(rununder.returncode)  # Pass back test pass/fail result

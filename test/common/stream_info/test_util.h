@@ -49,6 +49,7 @@ public:
   void setResponseFlag(Envoy::StreamInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }
+  uint64_t responseFlags() const override { return response_flags_; }
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -85,12 +86,21 @@ public:
     return downstream_remote_address_;
   }
 
-  void setDownstreamSslConnection(const Ssl::ConnectionInfo* connection_info) override {
+  void
+  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     downstream_connection_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfo* downstreamSslConnection() const override {
+  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
     return downstream_connection_info_;
+  }
+
+  void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
+    upstream_connection_info_ = connection_info;
+  }
+
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+    return upstream_connection_info_;
   }
   void setRouteName(absl::string_view route_name) override {
     route_name_ = std::string(route_name);
@@ -182,6 +192,10 @@ public:
     return upstream_transport_failure_reason_;
   }
 
+  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
+
+  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
   SystemTime start_time_;
@@ -207,13 +221,15 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  const Ssl::ConnectionInfo* downstream_connection_info_{};
+  Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
+  Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateImpl filter_state_{};
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
+  const Http::HeaderMap* request_headers_{};
   DangerousDeprecatedTestTime test_time_;
 };
 

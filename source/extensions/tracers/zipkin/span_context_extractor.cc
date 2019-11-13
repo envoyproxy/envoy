@@ -32,7 +32,7 @@ bool getSamplingFlags(char c, const Tracing::Decision tracing_decision) {
 SpanContextExtractor::SpanContextExtractor(Http::HeaderMap& request_headers)
     : request_headers_(request_headers) {}
 
-SpanContextExtractor::~SpanContextExtractor() {}
+SpanContextExtractor::~SpanContextExtractor() = default;
 
 bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decision) {
   bool sampled(false);

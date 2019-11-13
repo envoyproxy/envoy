@@ -1,13 +1,11 @@
 #include "test/test_common/environment.h"
 
-#include <sys/un.h>
-#include <unistd.h>
-
-#ifdef __has_include
-#if __has_include(<filesystem>)
+// TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
+// Clang >= 9.
+#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
 #include <filesystem>
-// TODO(asraa): Remove this when Envoy requires Clang >= 9.
-#elif __has_include(<experimental/filesystem>)
+#elif defined __has_include
+#if __has_include(<experimental/filesystem>) && !defined(__APPLE__)
 #include <experimental/filesystem>
 #endif
 #endif
@@ -24,6 +22,7 @@
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "envoy/common/platform.h"
 
 #include "server/options_impl.h"
 
@@ -33,6 +32,8 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using bazel::tools::cpp::runfiles::Runfiles;
+
 namespace Envoy {
 namespace {
 
@@ -41,9 +42,9 @@ std::string makeTempDir(char* name_template) {
   char* dirname = ::_mktemp(name_template);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, strerror(errno)));
-#ifdef __cpp_lib_filesystem
-  std::filesystem::create_directories(dirname);
-#elif defined __cpp_lib_experimental_filesystem
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
+  std::__fs::filesystem::create_directories(dirname);
+#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
   std::experimental::filesystem::create_directories(dirname);
 #endif
 #else
@@ -84,10 +85,10 @@ char** argv_;
 } // namespace
 
 void TestEnvironment::createPath(const std::string& path) {
-#ifdef __cpp_lib_filesystem
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
-  std::filesystem::create_directories(std::filesystem::path(path));
+  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path));
 #elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
 #else
@@ -97,11 +98,11 @@ void TestEnvironment::createPath(const std::string& path) {
 }
 
 void TestEnvironment::createParentPath(const std::string& path) {
-#ifdef __cpp_lib_filesystem
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
-  std::filesystem::create_directories(std::filesystem::path(path).parent_path());
-#elif defined __cpp_lib_experimental_filesystem
+  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
+#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
   std::experimental::filesystem::create_directories(
       std::experimental::filesystem::path(path).parent_path());
 #else
@@ -112,14 +113,14 @@ void TestEnvironment::createParentPath(const std::string& path) {
 
 void TestEnvironment::removePath(const std::string& path) {
   RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()), "");
-#ifdef __cpp_lib_filesystem
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
-  if (!std::filesystem::exists(path)) {
+  if (!std::__fs::filesystem::exists(path)) {
     return;
   }
-  std::filesystem::remove_all(std::filesystem::path(path));
-#elif defined __cpp_lib_experimental_filesystem
+  std::__fs::filesystem::remove_all(std::__fs::filesystem::path(path));
+#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
   if (!std::experimental::filesystem::exists(path)) {
     return;
   }
@@ -188,8 +189,14 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
-const std::string& TestEnvironment::runfilesDirectory() {
-  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_RUNDIR"));
+std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
+  RELEASE_ASSERT(runfiles_ != nullptr, "");
+  return runfiles_->Rlocation(workspace);
+}
+
+std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
+  RELEASE_ASSERT(runfiles_ != nullptr, "");
+  return runfiles_->Rlocation(absl::StrCat(workspace, "/", path));
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {
@@ -232,6 +239,14 @@ std::string TestEnvironment::substitute(const std::string& str,
     out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
     break;
   }
+
+  // Substitute socket options arguments.
+  const std::regex sol_socket_regex(R"(\{\{ sol_socket \}\})");
+  out_json_string =
+      std::regex_replace(out_json_string, sol_socket_regex, std::to_string(SOL_SOCKET));
+  const std::regex so_reuseport_regex(R"(\{\{ so_reuseport \}\})");
+  out_json_string =
+      std::regex_replace(out_json_string, so_reuseport_regex, std::to_string(SO_REUSEPORT));
 
   return out_json_string;
 }
@@ -343,7 +358,6 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   ASSERT_EQ(0, rc);
 #endif
 }
-
 void TestEnvironment::unsetEnvVar(const std::string& name) {
 #ifdef WIN32
   const int rc = ::_putenv_s(name.c_str(), "");
@@ -353,5 +367,9 @@ void TestEnvironment::unsetEnvVar(const std::string& name) {
   ASSERT_EQ(0, rc);
 #endif
 }
+
+void TestEnvironment::setRunfiles(Runfiles* runfiles) { runfiles_ = runfiles; }
+
+Runfiles* TestEnvironment::runfiles_{};
 
 } // namespace Envoy

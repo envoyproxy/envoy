@@ -7,7 +7,6 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
-    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 load(
@@ -15,7 +14,7 @@ load(
     "envoy_all_extensions",
     "envoy_windows_extensions",
 )
-load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -44,7 +43,6 @@ envoy_cc_library(
     ] + select({
         "//bazel:windows_x86_64": envoy_windows_extensions(),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//bazel:boringssl_disabled": envoy_all_extensions(NOBORINGSSL_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -56,9 +54,10 @@ envoy_cc_library(
         "abseil_symbolize",
     ],
     deps = [
-               ":envoy_main_common_lib",
-           ] + envoy_cc_platform_dep("platform_impl_lib") +
-           envoy_cc_platform_dep("platform_checks_lib"),
+        ":envoy_main_common_lib",
+        ":platform_impl_lib",
+	":platform_checks_lib"
+    ],
 )
 
 envoy_cc_library(
@@ -66,23 +65,25 @@ envoy_cc_library(
     srcs = ["main_common.cc"],
     hdrs = ["main_common.h"],
     deps = [
-               ":envoy_common_lib",
-               ":process_wide_lib",
-               "//source/common/api:os_sys_calls_lib",
-               "//source/common/common:compiler_requirements_lib",
-               "//source/common/common:perf_annotation_lib",
-               "//source/common/stats:fake_symbol_table_lib",
-               "//source/server:hot_restart_lib",
-               "//source/server:hot_restart_nop_lib",
-               "//source/server/config_validation:server_lib",
-           ] + select({
-               "//bazel:disable_signal_trace": [],
-               "//conditions:default": [
-                   "//source/common/signal:sigaction_lib",
-                   ":terminate_handler_lib",
-               ],
-           }) + envoy_cc_platform_dep("platform_checks_lib") +
-           envoy_cc_platform_dep("platform_impl_lib"),
+        ":envoy_common_lib",
+        ":platform_impl_lib",
+	":platform_checks_lib",
+        ":process_wide_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
+        "//source/common/stats:symbol_table_creator_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
+        "//source/server/config_validation:server_lib",
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [
+            "//source/common/signal:sigaction_lib",
+            ":terminate_handler_lib",
+        ],
+    }),
 )
 
 envoy_cc_library(
@@ -95,7 +96,22 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",
         "//source/server:proto_descriptors_lib",
-    ] + envoy_google_grpc_external_deps(),
+    ],
+)
+
+envoy_cc_library(
+    name = "platform_impl_lib",
+    deps = [":platform_header_lib"] +
+           envoy_cc_platform_dep("platform_impl_lib"),
+)
+
+envoy_cc_library(
+    name = "platform_header_lib",
+    hdrs = ["platform_impl.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/thread:thread_interface",
+    ],
 )
 
 envoy_cc_posix_library(
@@ -113,9 +129,9 @@ envoy_cc_posix_library(
 
 envoy_cc_posix_library(
     name = "platform_impl_lib",
-    hdrs = ["posix/platform_impl.h"],
-    strip_include_prefix = "posix",
+    srcs = ["posix/platform_impl.cc"],
     deps = [
+        ":platform_header_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
@@ -123,9 +139,9 @@ envoy_cc_posix_library(
 
 envoy_cc_win32_library(
     name = "platform_impl_lib",
-    hdrs = ["win32/platform_impl.h"],
-    strip_include_prefix = "win32",
+    srcs = ["win32/platform_impl.cc"],
     deps = [
+        ":platform_header_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",

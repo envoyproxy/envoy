@@ -85,12 +85,12 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   encoder.getStream().addCallbacks(*response);
 
   Http::HeaderMapImpl headers;
-  headers.insertMethod().value(method);
-  headers.insertPath().value(url);
-  headers.insertHost().value(host);
-  headers.insertScheme().value(Http::Headers::get().SchemeValues.Http);
+  headers.setMethod(method);
+  headers.setPath(url);
+  headers.setHost(host);
+  headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
   if (!content_type.empty()) {
-    headers.insertContentType().value(content_type);
+    headers.setContentType(content_type);
   }
   encoder.encodeHeaders(headers, body.empty());
   if (!body.empty()) {
@@ -129,7 +129,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
   client_->connect();
 }
 
-RawConnectionDriver::~RawConnectionDriver() {}
+RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
 
@@ -145,6 +145,11 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   if ((!data_to_wait_for_.empty() && absl::StartsWith(data_, data_to_wait_for_)) ||
       (exact_match_ == false && data_.find(data_to_wait_for_) != std::string::npos) || end_stream) {
     data_to_wait_for_.clear();
+    dispatcher_.exit();
+  }
+
+  if (wait_for_length_ && data_.size() >= length_to_wait_for_) {
+    wait_for_length_ = false;
     dispatcher_.exit();
   }
 

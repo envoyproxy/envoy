@@ -3,7 +3,6 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -94,6 +93,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_export_impl_lib",
     hdrs = ["quic_export_impl.h"],
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
 )
 
@@ -104,6 +104,7 @@ envoy_cc_library(
         "quic_bug_tracker_impl.h",
         "quic_logging_impl.h",
     ],
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         "//source/common/common:assert_lib",
@@ -153,10 +154,12 @@ envoy_cc_library(
         "abseil_optional",
         "googletest",
     ],
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":flags_impl_lib",
         ":string_utils_lib",
+        "//include/envoy/api:io_error_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
@@ -190,6 +193,7 @@ envoy_cc_library(
         "abseil_time",
         "ssl",
     ],
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         "//source/common/common:assert_lib",
@@ -203,7 +207,11 @@ envoy_cc_library(
     name = "quic_platform_mem_slice_span_impl_lib",
     srcs = ["quic_mem_slice_span_impl.cc"],
     hdrs = ["quic_mem_slice_span_impl.h"],
-    copts = ["-Wno-unused-parameter"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": ["-Wno-unused-parameter"],
+    }),
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
@@ -217,10 +225,14 @@ envoy_cc_library(
     name = "quic_platform_mem_slice_storage_impl_lib",
     srcs = ["quic_mem_slice_storage_impl.cc"],
     hdrs = ["quic_mem_slice_storage_impl.h"],
-    copts = [
-        "-Wno-error=invalid-offsetof",
-        "-Wno-unused-parameter",
-    ],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-Wno-error=invalid-offsetof",
+            "-Wno-unused-parameter",
+        ],
+    }),
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
@@ -232,6 +244,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_bbr2_sender_impl_lib",
     hdrs = ["quic_bbr2_sender_impl.h"],
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = ["@com_googlesource_quiche//:quic_core_congestion_control_bbr_lib"],
 )
@@ -240,9 +253,10 @@ envoy_cc_library(
     name = "envoy_quic_clock_lib",
     srcs = ["envoy_quic_clock.cc"],
     hdrs = ["envoy_quic_clock.h"],
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/event:timer_interface",
+        "//include/envoy/event:dispatcher_interface",
         "@com_googlesource_quiche//:quic_platform",
     ],
 )
@@ -276,6 +290,7 @@ envoy_cc_library(
         "spdy_flags_impl.h",
         "spdy_logging_impl.h",
         "spdy_macros_impl.h",
+        "spdy_map_util_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
         "spdy_string_impl.h",

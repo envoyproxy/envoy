@@ -51,9 +51,9 @@ public:
   /**
    * Type of HTTP codec to use.
    */
-  enum class Type { HTTP1, HTTP2 };
+  enum class Type { HTTP1, HTTP2, HTTP3 };
 
-  ~CodecClient();
+  ~CodecClient() override;
 
   /**
    * Add a connection callback to the underlying network connection.
@@ -117,6 +117,8 @@ public:
   bool remoteClosed() const { return remote_closed_; }
 
   Type type() const { return type_; }
+
+  const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
 protected:
   /**

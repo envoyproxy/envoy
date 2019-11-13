@@ -1,25 +1,59 @@
 #include "common/router/config_utility.h"
 
-#include <regex>
 #include <string>
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/common/regex.h"
 
 namespace Envoy {
 namespace Router {
+namespace {
+
+absl::optional<Matchers::StringMatcherImpl>
+maybeCreateStringMatcher(const envoy::api::v2::route::QueryParameterMatcher& config) {
+  switch (config.query_parameter_match_specifier_case()) {
+  case envoy::api::v2::route::QueryParameterMatcher::kStringMatch: {
+    return Matchers::StringMatcherImpl(config.string_match());
+  }
+  case envoy::api::v2::route::QueryParameterMatcher::kPresentMatch: {
+    return absl::nullopt;
+  }
+  case envoy::api::v2::route::QueryParameterMatcher::QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET: {
+    if (config.value().empty()) {
+      // Present match.
+      return absl::nullopt;
+    }
+
+    envoy::type::matcher::StringMatcher matcher_config;
+    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
+      matcher_config.set_regex(config.value());
+    } else {
+      matcher_config.set_exact(config.value());
+    }
+    return Matchers::StringMatcherImpl(matcher_config);
+  }
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE; // Needed for gcc
+}
+
+} // namespace
+
+ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
+    const envoy::api::v2::route::QueryParameterMatcher& config)
+    : name_(config.name()), matcher_(maybeCreateStringMatcher(config)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
     const Http::Utility::QueryParams& request_query_params) const {
   auto query_param = request_query_params.find(name_);
   if (query_param == request_query_params.end()) {
     return false;
-  } else if (is_regex_) {
-    return std::regex_match(query_param->second, regex_pattern_);
-  } else if (value_.length() == 0) {
+  } else if (!matcher_.has_value()) {
+    // Present match.
     return true;
   } else {
-    return (value_ == query_param->second);
+    return matcher_.value().match(query_param->second);
   }
 }
 
@@ -37,9 +71,9 @@ ConfigUtility::parsePriority(const envoy::api::v2::core::RoutingPriority& priori
 
 bool ConfigUtility::matchQueryParams(
     const Http::Utility::QueryParams& query_params,
-    const std::vector<QueryParameterMatcher>& config_query_params) {
+    const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
-    if (!config_query_param.matches(query_params)) {
+    if (!config_query_param->matches(query_params)) {
       return false;
     }
   }

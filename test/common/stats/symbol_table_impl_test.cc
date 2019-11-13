@@ -10,6 +10,8 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/hash/hash_testing.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
@@ -80,7 +82,7 @@ INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
 TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
-  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
+  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", ".x"};
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -100,8 +102,8 @@ TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
 }
 
 TEST_P(StatNameTest, TestUnusualDelimitersRoundtrip) {
-  const std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
-                                               ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
+  const std::vector<std::string> stat_names = {".x",   "..x",    "...x",    "foo",     "foo.x",
+                                               ".foo", ".foo.x", ".foo..x", "..foo.x", "..foo..x"};
   for (auto& stat_name : stat_names) {
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
@@ -163,6 +165,13 @@ TEST_P(StatNameTest, TestSymbolConsistency) {
   SymbolVec vec_2 = getSymbols(stat_name_2);
   EXPECT_EQ(vec_1[0], vec_2[1]);
   EXPECT_EQ(vec_2[0], vec_1[1]);
+}
+
+TEST_P(StatNameTest, TestIgnoreTrailingDots) {
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar."));
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar..."));
+  EXPECT_EQ("", encodeDecode("."));
+  EXPECT_EQ("", encodeDecode(".."));
 }
 
 TEST_P(StatNameTest, TestSameValueOnPartialFree) {
@@ -319,10 +328,10 @@ TEST_P(StatNameTest, HashTable) {
 }
 
 TEST_P(StatNameTest, Sort) {
-  std::vector<StatName> names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
-                              makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
-  const std::vector<StatName> sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
-                                           makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
+  StatNameVec names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
+                    makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
+  const StatNameVec sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
+                                 makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
   EXPECT_NE(names, sorted_names);
   std::sort(names.begin(), names.end(), StatNameLessThan(*table_));
   EXPECT_EQ(names, sorted_names);
@@ -535,6 +544,106 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
   EXPECT_EQ(0, set1.size());
   EXPECT_EQ(1, set2.size());
   set2.free(*table_);
+}
+
+TEST_P(StatNameTest, StatNameSet) {
+  StatNameSetPtr set(table_->makeSet("set"));
+
+  // Test that we get a consistent StatName object from a remembered name.
+  set->rememberBuiltin("remembered");
+  const StatName fallback = set->add("fallback");
+  const Stats::StatName remembered = set->getBuiltin("remembered", fallback);
+  EXPECT_EQ("remembered", table_->toString(remembered));
+  EXPECT_EQ(remembered.data(), set->getBuiltin("remembered", fallback).data());
+  EXPECT_EQ(fallback.data(), set->getBuiltin("not_remembered", fallback).data());
+
+  // Same test for a dynamically allocated name. The only difference between
+  // the behavior with a remembered vs dynamic name is that when looking
+  // up a remembered name, a mutex is not taken. But we have no easy way
+  // to test for that. So we'll at least cover the code.
+  const Stats::StatName dynamic = set->getDynamic("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic));
+  EXPECT_EQ(dynamic.data(), set->getDynamic("dynamic").data());
+
+  // Make sure blanks are always the same.
+  const Stats::StatName blank = set->getDynamic("");
+  EXPECT_EQ("", table_->toString(blank));
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic("").data());
+  EXPECT_EQ(blank.data(), set->getDynamic(absl::string_view()).data());
+
+  // There's another corner case for the same "dynamic" name from a
+  // different set. Here we will get a different StatName object
+  // out of the second set, though it will share the same underlying
+  // symbol-table symbol.
+  StatNameSetPtr set2(table_->makeSet("set2"));
+  const Stats::StatName dynamic2 = set2->getDynamic("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic2));
+  EXPECT_EQ(dynamic2.data(), set2->getDynamic("dynamic").data());
+  EXPECT_NE(dynamic2.data(), dynamic.data());
+}
+
+TEST_P(StatNameTest, StorageCopy) {
+  StatName a = pool_->add("stat.name");
+  StatNameStorage b_storage(a, *table_);
+  StatName b = b_storage.statName();
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a.data(), b.data());
+  b_storage.free(*table_);
+}
+
+TEST_P(StatNameTest, RecentLookups) {
+  if (GetParam() == SymbolTableType::Fake) {
+    // touch these cover coverage for fake symbol tables, but they'll have no effect.
+    table_->clearRecentLookups();
+    table_->setRecentLookupCapacity(0);
+    return;
+  }
+
+  StatNameSetPtr set1(table_->makeSet("set1"));
+  table_->setRecentLookupCapacity(10);
+  StatNameSetPtr set2(table_->makeSet("set2"));
+  set1->getDynamic("dynamic.stat1");
+  set2->getDynamic("dynamic.stat2");
+  encodeDecode("direct.stat");
+
+  std::vector<std::string> accum;
+  uint64_t total = table_->getRecentLookups([&accum](absl::string_view name, uint64_t count) {
+    accum.emplace_back(absl::StrCat(count, ": ", name));
+  });
+  EXPECT_EQ(5, total);
+  std::string recent_lookups_str = absl::StrJoin(accum, " ");
+
+  EXPECT_EQ("1: direct.stat "
+            "2: dynamic.stat1 " // Combines entries from set and symbol-table.
+            "2: dynamic.stat2",
+            recent_lookups_str);
+
+  table_->clearRecentLookups();
+  uint32_t num_calls = 0;
+  EXPECT_EQ(0,
+            table_->getRecentLookups([&num_calls](absl::string_view, uint64_t) { ++num_calls; }));
+  EXPECT_EQ(0, num_calls);
+}
+
+TEST_P(StatNameTest, StatNameEmptyEquivalent) {
+  StatName empty1;
+  StatName empty2 = makeStat("");
+  StatName non_empty = makeStat("a");
+  EXPECT_EQ(empty1, empty2);
+  EXPECT_EQ(empty1.hash(), empty2.hash());
+  EXPECT_NE(empty1, non_empty);
+  EXPECT_NE(empty2, non_empty);
+  EXPECT_NE(empty1.hash(), non_empty.hash());
+  EXPECT_NE(empty2.hash(), non_empty.hash());
+}
+
+TEST_P(StatNameTest, SupportsAbslHash) {
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      StatName(),
+      makeStat(""),
+      makeStat("hello.world"),
+  }));
 }
 
 // Tests the memory savings realized from using symbol tables with 1k

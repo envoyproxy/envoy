@@ -5,7 +5,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -23,7 +22,7 @@ MockLocalInfo::MockLocalInfo() : address_(new Network::Address::Ipv4Instance("12
   ON_CALL(*this, node()).WillByDefault(ReturnRef(node_));
 }
 
-MockLocalInfo::~MockLocalInfo() {}
+MockLocalInfo::~MockLocalInfo() = default;
 
 } // namespace LocalInfo
 } // namespace Envoy

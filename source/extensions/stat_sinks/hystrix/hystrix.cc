@@ -39,9 +39,8 @@ void ClusterStatsCache::printToStream(std::stringstream& out_str) {
 void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow rolling_window,
                                            std::stringstream& out_str) {
   out_str << name << " | ";
-  for (auto specific_stat_vec_itr = rolling_window.begin();
-       specific_stat_vec_itr != rolling_window.end(); ++specific_stat_vec_itr) {
-    out_str << *specific_stat_vec_itr << " | ";
+  for (uint64_t& specific_stat_vec_itr : rolling_window) {
+    out_str << specific_stat_vec_itr << " | ";
   }
   out_str << std::endl;
 }
@@ -288,17 +287,14 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Buffer::Instance&,
                                                   Server::AdminStream& admin_stream) {
 
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.TextEventStream);
-  response_headers.insertCacheControl().value().setReference(
-      Http::Headers::get().CacheControlValues.NoCache);
-  response_headers.insertConnection().value().setReference(
-      Http::Headers::get().ConnectionValues.Close);
-  response_headers.insertAccessControlAllowHeaders().value().setReference(
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+  response_headers.setReferenceCacheControl(Http::Headers::get().CacheControlValues.NoCache);
+  response_headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Close);
+  response_headers.setReferenceAccessControlAllowHeaders(
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
-  response_headers.insertAccessControlAllowOrigin().value().setReference(
+  response_headers.setReferenceAccessControlAllowOrigin(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.insertNoChunks().value().setInteger(0);
+  response_headers.setNoChunks(0);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();

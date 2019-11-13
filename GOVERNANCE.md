@@ -52,10 +52,10 @@
     can be promoted to other issue types once it's clear they are actionable (at which point the
     question label should be removed).
 * Make sure that ongoing PRs are moving forward at the right pace or closing them.
-* Participate when called upon in the [security release process](SECURITY_RELEASE_PROCESS.md). Note
-  that although this should be a rare occurrence, if a serious vulnerability is found, the process
-  may take up to several full days of work to implement. This reality should be taken into account
-  when discussing time commitment obligations with employers.
+* Participate when called upon in the [security release process](SECURITY.md). Note that although
+  this should be a rare occurrence, if a serious vulnerability is found, the process may take up to
+  several full days of work to implement. This reality should be taken into account when discussing
+  time commitment obligations with employers.
 * In general continue to be willing to spend at least 25% of ones time working on Envoy (~1.25
   business days per week).
 * We currently maintain an "on-call" rotation within the maintainers. Each on-call is 1 week.
@@ -83,7 +83,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
   corrections.
 * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-  "1.6.0". Also remove the "Pending" tag from the top of the [release notes](docs/root/intro/version_history.rst)
+  "1.6.0". Also remove the "Pending" tags and add dates to the top of the [release notes](docs/root/intro/version_history.rst)
   and [deprecated log](docs/root/intro/deprecated.rst). Get a review and merge.
 * **Wait for tests to pass on
   [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
@@ -101,9 +101,9 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   the same time, also add a new empty "pending" section to the [release
   notes](docs/root/intro/version_history.rst) and to [deprecated log](docs/root/intro/deprecated.rst) for the
   following version. E.g., "1.7.0 (pending)".
-* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh 1.8.0 1.10.0`)
+* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
   to file tracking issues for code which can be removed.
-* Run the deprecate_features.py script (e.g. `sh tools/deprecate_version/deprecate_features.sh`)
+* Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
   to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
   an email to envoy-announce.
 

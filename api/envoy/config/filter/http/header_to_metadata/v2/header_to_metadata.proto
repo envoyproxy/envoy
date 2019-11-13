@@ -5,7 +5,6 @@ package envoy.config.filter.http.header_to_metadata.v2;
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.http.header_to_metadata.v2";
-option go_package = "v2";
 
 import "validate/validate.proto";
 
@@ -15,19 +14,37 @@ import "validate/validate.proto";
 // for matching load balancer subsets, logging, etc.
 //
 // Header to Metadata :ref:`configuration overview <config_http_filters_header_to_metadata>`.
+// [#extension: envoy.filters.http.header_to_metadata]
 
 message Config {
   enum ValueType {
     STRING = 0;
+
     NUMBER = 1;
+
+    // The value is a serialized `protobuf.Value
+    // <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/struct.proto#L62>`_.
+    PROTOBUF_VALUE = 2;
   }
 
+  // ValueEncode defines the encoding algorithm.
+  enum ValueEncode {
+    // The value is not encoded.
+    NONE = 0;
+
+    // The value is encoded in `Base64 <https://tools.ietf.org/html/rfc4648#section-4>`_.
+    // Note: this is mostly used for STRING and PROTOBUF_VALUE to escape the
+    // non-ASCII characters in the header.
+    BASE64 = 1;
+  }
+
+  // [#next-free-field: 6]
   message KeyValuePair {
     // The namespace — if this is empty, the filter's namespace will be used.
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string.min_bytes = 1];
+    string key = 2 [(validate.rules).string = {min_bytes: 1}];
 
     // The value to pair with the given key.
     //
@@ -40,12 +57,16 @@ message Config {
 
     // The value's type — defaults to string.
     ValueType type = 4;
+
+    // How is the value encoded, default is NONE (not encoded).
+    // The value will be decoded accordingly before storing to metadata.
+    ValueEncode encode = 5;
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
   message Rule {
     // The header that triggers this rule — required.
-    string header = 1 [(validate.rules).string.min_bytes = 1];
+    string header = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // If the header is present, apply this metadata KeyValuePair.
     //

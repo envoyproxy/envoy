@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
+#include "common/http/header_utility.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -27,7 +28,7 @@ public:
                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                               Upstream::ResourcePriority priority);
-  ~RetryStateImpl();
+  ~RetryStateImpl() override;
 
   /**
    * Returns the RetryPolicy extracted from the x-envoy-retry-on header.
@@ -108,6 +109,8 @@ private:
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
 };
 
 } // namespace Router

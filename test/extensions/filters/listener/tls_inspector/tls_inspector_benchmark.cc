@@ -15,14 +15,7 @@
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
-using testing::_;
-using testing::AtLeast;
-using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
-using testing::ReturnNew;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -109,7 +102,7 @@ BENCHMARK(BM_TlsInspector)->Unit(benchmark::kMicrosecond);
 int main(int argc, char** argv) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_context(spdlog::level::warn,
-                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
+                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

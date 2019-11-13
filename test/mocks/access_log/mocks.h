@@ -13,7 +13,7 @@ namespace AccessLog {
 class MockAccessLogFile : public AccessLogFile {
 public:
   MockAccessLogFile();
-  ~MockAccessLogFile();
+  ~MockAccessLogFile() override;
 
   // AccessLog::AccessLogFile
   MOCK_METHOD1(write, void(absl::string_view data));
@@ -24,7 +24,7 @@ public:
 class MockFilter : public Filter {
 public:
   MockFilter();
-  ~MockFilter();
+  ~MockFilter() override;
 
   // AccessLog::Filter
   MOCK_METHOD4(evaluate,
@@ -36,7 +36,7 @@ public:
 class MockAccessLogManager : public AccessLogManager {
 public:
   MockAccessLogManager();
-  ~MockAccessLogManager();
+  ~MockAccessLogManager() override;
 
   // AccessLog::AccessLogManager
   MOCK_METHOD0(reopen, void());
@@ -48,7 +48,7 @@ public:
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   // AccessLog::Instance
   MOCK_METHOD4(log,

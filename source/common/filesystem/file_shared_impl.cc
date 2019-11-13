@@ -9,12 +9,12 @@ Api::IoError::IoErrorCode IoFileError::getErrorCode() const { return IoErrorCode
 
 std::string IoFileError::getErrorDetails() const { return ::strerror(errno_); }
 
-Api::IoCallBoolResult FileSharedImpl::open() {
+Api::IoCallBoolResult FileSharedImpl::open(FlagSet in) {
   if (isOpen()) {
     return resultSuccess<bool>(true);
   }
 
-  openFile();
+  openFile(in);
   return fd_ != -1 ? resultSuccess<bool>(true) : resultFailure<bool>(false, errno);
 }
 

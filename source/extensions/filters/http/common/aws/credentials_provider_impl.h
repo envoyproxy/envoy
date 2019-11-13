@@ -98,7 +98,7 @@ private:
 class CredentialsProviderChain : public CredentialsProvider,
                                  public Logger::Loggable<Logger::Id::aws> {
 public:
-  virtual ~CredentialsProviderChain() = default;
+  ~CredentialsProviderChain() override = default;
 
   void add(const CredentialsProviderSharedPtr& credentials_provider) {
     providers_.emplace_back(credentials_provider);

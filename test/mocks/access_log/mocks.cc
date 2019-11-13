@@ -5,25 +5,24 @@
 
 using testing::_;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace AccessLog {
 
-MockAccessLogFile::MockAccessLogFile() {}
-MockAccessLogFile::~MockAccessLogFile() {}
+MockAccessLogFile::MockAccessLogFile() = default;
+MockAccessLogFile::~MockAccessLogFile() = default;
 
-MockFilter::MockFilter() {}
-MockFilter::~MockFilter() {}
+MockFilter::MockFilter() = default;
+MockFilter::~MockFilter() = default;
 
 MockAccessLogManager::MockAccessLogManager() {
   ON_CALL(*this, createAccessLog(_)).WillByDefault(Return(file_));
 }
 
-MockAccessLogManager::~MockAccessLogManager() {}
+MockAccessLogManager::~MockAccessLogManager() = default;
 
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
+MockInstance::MockInstance() = default;
+MockInstance::~MockInstance() = default;
 
 } // namespace AccessLog
 } // namespace Envoy

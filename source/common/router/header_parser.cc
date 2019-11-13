@@ -1,7 +1,6 @@
 #include "common/router/header_parser.h"
 
-#include <ctype.h>
-
+#include <cctype>
 #include <memory>
 #include <string>
 

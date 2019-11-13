@@ -21,11 +21,11 @@ MockSecretManager::MockSecretManager() {
       }));
 }
 
-MockSecretManager::~MockSecretManager() {}
+MockSecretManager::~MockSecretManager() = default;
 
-MockSecretCallbacks::MockSecretCallbacks() {}
+MockSecretCallbacks::MockSecretCallbacks() = default;
 
-MockSecretCallbacks::~MockSecretCallbacks() {}
+MockSecretCallbacks::~MockSecretCallbacks() = default;
 
 } // namespace Secret
 } // namespace Envoy

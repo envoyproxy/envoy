@@ -127,7 +127,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   Buffer::InstancePtr body;
   if (raw_body != nullptr) {
     body = std::make_unique<Buffer::OwnedImpl>(raw_body, body_size);
-    headers->insertContentLength().value(body_size);
+    headers->setContentLength(body_size);
   }
 
   // Once we respond we treat that as the end of the script even if there is more code. Thus we
@@ -146,9 +146,19 @@ Http::HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, 
   while (lua_next(state, table_index) != 0) {
     // Uses 'key' (at index -2) and 'value' (at index -1).
     const char* key = luaL_checkstring(state, -2);
-    const char* value = luaL_checkstring(state, -1);
-    headers->addCopy(Http::LowerCaseString(key), value);
-
+    // Check if the current value is a table, we iterate through the table and add each element of
+    // it as a header entry value for the current key.
+    if (lua_istable(state, -1)) {
+      lua_pushnil(state);
+      while (lua_next(state, -2) != 0) {
+        const char* value = luaL_checkstring(state, -1);
+        headers->addCopy(Http::LowerCaseString(key), value);
+        lua_pop(state, 1);
+      }
+    } else {
+      const char* value = luaL_checkstring(state, -1);
+      headers->addCopy(Http::LowerCaseString(key), value);
+    }
     // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
     // it can push the next key/value pair onto the stack.
     lua_pop(state, 1);
@@ -183,7 +193,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 
   if (body != nullptr) {
     message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
-    message->headers().insertContentLength().value(body_size);
+    message->headers().setContentLength(body_size);
   }
 
   absl::optional<std::chrono::milliseconds> timeout;
@@ -445,11 +455,10 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   const char* clear_text = luaL_checkstring(state, 6);
   int text_len = luaL_checknumber(state, 7);
   const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
-
   // Step 5: verify signature
-  auto output = Common::Crypto::Utility::verifySignature(hash, reinterpret_cast<EVP_PKEY*>(ptr),
-                                                         sig_vec, text_vec);
-
+  auto crypto = reinterpret_cast<Common::Crypto::CryptoObject*>(ptr);
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  auto output = crypto_util.verifySignature(hash, *crypto, sig_vec, text_vec);
   lua_pushboolean(state, output.result_);
   if (output.result_) {
     lua_pushnil(state);
@@ -464,12 +473,12 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   const char* str = luaL_checkstring(state, 2);
   int n = luaL_checknumber(state, 3);
   std::vector<uint8_t> key(str, str + n);
-
   if (public_key_wrapper_.get() != nullptr) {
     public_key_wrapper_.pushStack();
   } else {
-    public_key_wrapper_.reset(
-        PublicKeyWrapper::create(state, Common::Crypto::Utility::importPublicKey(key)), true);
+    auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+    Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
+    public_key_wrapper_.reset(PublicKeyWrapper::create(state, std::move(crypto_ptr)), true);
   }
 
   return 1;

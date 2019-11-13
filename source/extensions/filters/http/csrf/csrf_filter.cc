@@ -28,7 +28,7 @@ bool isModifyMethod(const Http::HeaderMap& headers) {
   const absl::string_view method_type = method->value().getStringView();
   const auto& method_values = Http::Headers::get().MethodValues;
   return (method_type == method_values.Post || method_type == method_values.Put ||
-          method_type == method_values.Delete);
+          method_type == method_values.Delete || method_type == method_values.Patch);
 }
 
 absl::string_view hostAndPort(const Http::HeaderEntry* header) {
@@ -59,10 +59,9 @@ static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-static const CsrfPolicy
-generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-               Runtime::Loader& runtime) {
-  return CsrfPolicy(policy, runtime);
+static CsrfPolicyPtr generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
+                                    Runtime::Loader& runtime) {
+  return std::make_unique<CsrfPolicy>(policy, runtime);
 }
 } // namespace
 
@@ -127,8 +126,8 @@ bool CsrfFilter::isValid(const absl::string_view source_origin, Http::HeaderMap&
     return true;
   }
 
-  for (const auto& additional_origin : policy_->additional_origins()) {
-    if (additional_origin.match(source_origin)) {
+  for (const auto& additional_origin : policy_->additionalOrigins()) {
+    if (additional_origin->match(source_origin)) {
       return true;
     }
   }

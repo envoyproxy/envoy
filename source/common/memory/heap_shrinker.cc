@@ -1,6 +1,7 @@
 #include "common/memory/heap_shrinker.h"
 
 #include "common/memory/utils.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -18,7 +19,9 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
                                          [this](Server::OverloadActionState state) {
                                            active_ = (state == Server::OverloadActionState::Active);
                                          })) {
-    shrink_counter_ = &stats.counter(absl::StrCat("overload.", action_name, ".shrink_count"));
+    Envoy::Stats::StatNameManagedStorage stat_name(
+        absl::StrCat("overload.", action_name, ".shrink_count"), stats.symbolTable());
+    shrink_counter_ = &stats.counterFromStatName(stat_name.statName());
     timer_ = dispatcher.createTimer([this] {
       shrinkHeap();
       timer_->enableTimer(kTimerInterval);

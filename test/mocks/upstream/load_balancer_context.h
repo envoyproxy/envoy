@@ -8,7 +8,7 @@ namespace Upstream {
 class MockLoadBalancerContext : public LoadBalancerContext {
 public:
   MockLoadBalancerContext();
-  ~MockLoadBalancerContext();
+  ~MockLoadBalancerContext() override;
 
   MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
   MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
@@ -19,6 +19,7 @@ public:
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
   MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
   MOCK_CONST_METHOD0(upstreamSocketOptions, Network::Socket::OptionsSharedPtr());
+  MOCK_CONST_METHOD0(upstreamTransportSocketOptions, Network::TransportSocketOptionsSharedPtr());
 
 private:
   HealthyAndDegradedLoad priority_load_;

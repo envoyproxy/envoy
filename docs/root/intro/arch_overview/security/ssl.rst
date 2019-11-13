@@ -3,8 +3,8 @@
 TLS
 ===
 
-Envoy supports both :ref:`TLS termination <envoy_api_field_listener.FilterChain.tls_context>` in listeners as well as
-:ref:`TLS origination <envoy_api_field_Cluster.tls_context>` when making connections to upstream
+Envoy supports both :ref:`TLS termination <envoy_api_field_listener.FilterChain.transport_socket>` in listeners as well as
+:ref:`TLS origination <envoy_api_field_Cluster.transport_socket>` when making connections to upstream
 clusters. Support is sufficient for Envoy to perform standard edge proxy duties for modern web
 services as well as to initiate connections with external services that have advanced TLS
 requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
@@ -23,6 +23,10 @@ requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
   tickets (see `RFC 5077 <https://www.ietf.org/rfc/rfc5077.txt>`_). Resumption can be performed
   across hot restarts and between parallel Envoy instances (typically useful in a front proxy
   configuration).
+* **BoringSSL private key methods**: TLS private key operations (signing and decrypting) can be
+  performed asynchronously from an extension. This allows extending Envoy to support various key
+  management schemes (such as TPM) and TLS acceleration. This mechanism uses
+  `BoringSSL private key method interface <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
 
 Underlying implementation
 -------------------------
@@ -76,11 +80,14 @@ Example configuration
       - filters:
         - name: envoy.http_connection_manager
           # ...
-        tls_context:
-          common_tls_context:
-            validation_context:
-              trusted_ca:
-                filename: /usr/local/my-client-ca.crt
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+            common_tls_context:
+              validation_context:
+                trusted_ca:
+                  filename: /usr/local/my-client-ca.crt
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -95,18 +102,24 @@ Example configuration
                 socket_address:
                   address: 127.0.0.2
                   port_value: 1234
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            certificate_chain: { "filename": "/cert.crt" }
-            private_key: { "filename": "/cert.key" }
-          validation_context:
-            trusted_ca:
-              filename: /etc/ssl/certs/ca-certificates.crt
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              certificate_chain: { "filename": "/cert.crt" }
+              private_key: { "filename": "/cert.key" }
+            validation_context:
+              verify_subject_alt_name: [ foo ]
+              trusted_ca:
+                filename: /etc/ssl/certs/ca-certificates.crt
 
 */etc/ssl/certs/ca-certificates.crt* is the default path for the system CA bundle on Debian systems.
-This makes Envoy verify the server identity of *127.0.0.2:1234* in the same way as e.g. cURL does on
-standard Debian installations. Common paths for system CA bundles on Linux and BSD are
+:ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>` along with
+:ref:`verify_subject_alt_name <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`
+makes Envoy verify the server identity of *127.0.0.2:1234* as "foo" in the same way as e.g. cURL
+does on standard Debian installations. Common paths for system CA bundles on Linux and BSD are:
 
 * /etc/ssl/certs/ca-certificates.crt (Debian/Ubuntu/Gentoo etc.)
 * /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem (CentOS/RHEL 7)
@@ -117,6 +130,13 @@ standard Debian installations. Common paths for system CA bundles on Linux and B
 
 See the reference for :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` and
 :ref:`DownstreamTlsContexts <envoy_api_msg_auth.DownstreamTlsContext>` for other TLS options.
+
+.. attention::
+
+  If only :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>` is
+  specified, Envoy will verify the certificate chain of the presented certificate, but not its
+  subject name, hash, etc. Other validation context configuration is typically required depending
+  on the deployment.
 
 .. _arch_overview_ssl_cert_select:
 

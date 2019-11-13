@@ -36,7 +36,7 @@ Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTranspo
     Server::Configuration::TransportSocketFactoryContext& context) {
   const auto& outer_config =
       MessageUtil::downcastAndValidate<const envoy::config::transport_socket::tap::v2alpha::Tap&>(
-          message);
+          message, context.messageValidationVisitor());
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(
       outer_config.transport_socket().name());
@@ -55,7 +55,7 @@ Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTrans
     const std::vector<std::string>& server_names) {
   const auto& outer_config =
       MessageUtil::downcastAndValidate<const envoy::config::transport_socket::tap::v2alpha::Tap&>(
-          message);
+          message, context.messageValidationVisitor());
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       outer_config.transport_socket().name());

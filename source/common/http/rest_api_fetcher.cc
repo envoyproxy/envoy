@@ -41,21 +41,23 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   try {
     parseResponse(*response);
   } catch (EnvoyException& e) {
-    onFetchFailure(&e);
+    onFetchFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 
   requestComplete();
 }
 
-void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason) {
-  onFetchFailure(nullptr);
+void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
+  // Currently Http::AsyncClient::FailureReason only has one value: "Reset".
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  onFetchFailure(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
   requestComplete();
 }
 
 void RestApiFetcher::refresh() {
   MessagePtr message(new RequestMessageImpl());
   createRequest(*message);
-  message->headers().insertHost().value(remote_cluster_name_);
+  message->headers().setHost(remote_cluster_name_);
   active_request_ = cm_.httpAsyncClientForCluster(remote_cluster_name_)
                         .send(std::move(message), *this,
                               AsyncClient::RequestOptions().setTimeout(request_timeout_));

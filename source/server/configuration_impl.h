@@ -54,6 +54,13 @@ public:
    * factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "stats_sinks"; }
 };
 
 /**
@@ -81,7 +88,7 @@ public:
    * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
    */
-  static bool
+  static void
   buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
                       Network::UdpReadFilterCallbacks& callbacks,
                       const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
@@ -159,10 +166,12 @@ private:
     const std::string& accessLogPath() override { return access_log_path_; }
     const std::string& profilePath() override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
+    Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
 
     std::string access_log_path_;
     std::string profile_path_;
     Network::Address::InstanceConstSharedPtr address_;
+    Network::Socket::OptionsSharedPtr socket_options_;
   };
 
   AdminImpl admin_;

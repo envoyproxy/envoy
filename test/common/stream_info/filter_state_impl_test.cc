@@ -14,7 +14,7 @@ class TestStoredTypeTracking : public FilterState::Object {
 public:
   TestStoredTypeTracking(int value, size_t* access_count, size_t* destruction_count)
       : value_(value), access_count_(access_count), destruction_count_(destruction_count) {}
-  ~TestStoredTypeTracking() {
+  ~TestStoredTypeTracking() override {
     if (destruction_count_) {
       ++*destruction_count_;
     }

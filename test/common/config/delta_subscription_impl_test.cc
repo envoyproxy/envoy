@@ -8,21 +8,26 @@ namespace {
 
 class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
 protected:
-  DeltaSubscriptionImplTest() {}
+  DeltaSubscriptionImplTest() = default;
+
+  // We need to destroy the subscription before the test's destruction, because the subscription's
+  // destructor removes its watch from the GrpcMuxDelta, and that removal process involves
+  // some things held by the test fixture.
+  void TearDown() override { doSubscriptionTearDown(); }
 };
 
 TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
-  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
-  subscription_->updateResources({"name3", "name4"});
-  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
-  subscription_->updateResources({"name1", "name2", "name3", "name4"});
-  expectSendMessage({}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
-  subscription_->updateResources({"name3", "name4"});
-  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
-  subscription_->updateResources({"name1", "name2", "name3", "name4"});
-  expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::GrpcStatus::Ok, "", {});
-  subscription_->updateResources({"name4"});
+  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->updateResourceInterest({"name3", "name4"});
+  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
+  expectSendMessage({}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->updateResourceInterest({"name3", "name4"});
+  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
+  expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->updateResourceInterest({"name4"});
 }
 
 // Checks that after a pause(), no requests are sent until resume().
@@ -33,14 +38,14 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   startSubscription({"name1", "name2", "name3"});
   subscription_->pause();
 
-  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   // If not for the pause, these updates would make the expectSendMessage fail due to too many
   // messages being sent.
-  subscription_->updateResources({"name3", "name4"});
-  subscription_->updateResources({"name1", "name2", "name3", "name4"});
-  subscription_->updateResources({"name3", "name4"});
-  subscription_->updateResources({"name1", "name2", "name3", "name4"});
-  subscription_->updateResources({"name3", "name4"});
+  subscription_->updateResourceInterest({"name3", "name4"});
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
+  subscription_->updateResourceInterest({"name3", "name4"});
+  subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
+  subscription_->updateResourceInterest({"name3", "name4"});
 
   subscription_->resume();
 }
@@ -64,8 +69,10 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1A"));
     message->set_nonce(nonce);
+    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    subscription_->onDiscoveryResponse(std::move(message));
+    auto shared_mux = subscription_->getGrpcMuxForTest();
+    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
   }
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
@@ -76,8 +83,10 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version2A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version2A"));
     message->set_nonce(nonce);
+    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    subscription_->onDiscoveryResponse(std::move(message));
+    auto shared_mux = subscription_->getGrpcMuxForTest();
+    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
   }
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
@@ -88,8 +97,10 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1B");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1B"));
     message->set_nonce(nonce);
+    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    subscription_->onDiscoveryResponse(std::move(message));
+    auto shared_mux = subscription_->getGrpcMuxForTest();
+    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
@@ -106,13 +117,36 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // in the correct order.
 }
 
-TEST_F(DeltaSubscriptionImplTest, NoGrpcStream) {
-  // Have to call start() to get state_ populated (which this test needs to not segfault), but
-  // start() also tries to start the GrpcStream. So, have that attempt return nullptr.
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(0);
-  subscription_->start({"name1"});
-  subscription_->updateResources({"name1", "name2"});
+TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
+  Stats::IsolatedStoreImpl stats_store;
+  SubscriptionStats stats(Utility::generateStats(stats_store));
+
+  envoy::api::v2::core::Node node;
+  node.set_id("fo0");
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  EXPECT_CALL(local_info, node()).WillRepeatedly(testing::ReturnRef(node));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Envoy::Config::RateLimitSettings rate_limit_settings;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  auto* async_client = new Grpc::MockAsyncClient();
+
+  const Protobuf::MethodDescriptor* method_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
+  std::shared_ptr<GrpcMuxDelta> xds_context = std::make_shared<GrpcMuxDelta>(
+      std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor, random,
+      stats_store, rate_limit_settings, local_info, true);
+
+  auto subscription = std::make_unique<GrpcSubscriptionImpl>(
+      xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, stats,
+      std::chrono::milliseconds(12345), false);
+
+  EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+
+  subscription->start({"name1"});
+  subscription->updateResourceInterest({"name1", "name2"});
 }
 
 } // namespace

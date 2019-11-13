@@ -169,7 +169,7 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  void setReference(const std::string& ref_value);
+  void setReference(absl::string_view ref_value);
 
   /**
    * @return the size of the string, not including the null terminator.
@@ -300,6 +300,7 @@ private:
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
+  HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
@@ -346,11 +347,16 @@ private:
  * ContentLength() -> returns the header entry if it exists or nullptr.
  * insertContentLength() -> inserts the header if it does not exist, and returns a reference to it.
  * removeContentLength() -> removes the header if it exists.
+ *
+ * TODO(asraa): Remove functions with a non-const HeaderEntry return value.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
   virtual HeaderEntry* name() PURE;                                                                \
   virtual HeaderEntry& insert##name() PURE;                                                        \
+  virtual void setReference##name(absl::string_view value) PURE;                                   \
+  virtual void set##name(absl::string_view value) PURE;                                            \
+  virtual void set##name(uint64_t value) PURE;                                                     \
   virtual void remove##name() PURE;
 
 /**
@@ -371,6 +377,7 @@ public:
    * Calling addReference multiple times for the same header will result in:
    * - Comma concatenation for predefined inline headers.
    * - Multiple headers being present in the HeaderMap for other headers.
+   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL NOT be copied.
@@ -436,6 +443,7 @@ public:
    *
    * Calling setReference multiple times for the same header will result in only the last header
    * being present in the HeaderMap.
+   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to set; it WILL NOT be copied.
    * @param value specifies the value of the header to set; it WILL NOT be copied.
@@ -456,9 +464,41 @@ public:
   virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
+   * HeaderMap contains an internal byte size count, updated as entries are added, removed, or
+   * modified through the HeaderMap interface. However, HeaderEntries can be accessed and modified
+   * by reference so that the HeaderMap can no longer accurately update the internal byte size
+   * count.
+   *
+   * Calling byteSize before a HeaderEntry is accessed will return the internal byte size count. The
+   * value is cleared when a HeaderEntry is accessed, and the value is updated and set again when
+   * refreshByteSize is called.
+   *
+   * To guarantee an accurate byte size count, call refreshByteSize.
+   *
+   * @return uint64_t the approximate size of the header map in bytes if valid.
+   */
+  virtual absl::optional<uint64_t> byteSize() const PURE;
+
+  /**
+   * This returns the sum of the byte sizes of the keys and values in the HeaderMap. This also
+   * updates and sets the byte size count.
+   *
+   * To guarantee an accurate byte size count, use this. If it is known HeaderEntries have not been
+   * manipulated since a call to refreshByteSize, it is safe to use byteSize.
+   *
    * @return uint64_t the approximate size of the header map in bytes.
    */
-  virtual uint64_t byteSize() const PURE;
+  virtual uint64_t refreshByteSize() PURE;
+
+  /**
+   * This returns the sum of the byte sizes of the keys and values in the HeaderMap.
+   *
+   * This iterates over the HeaderMap to calculate size and should only be called directly when the
+   * user wants an explicit recalculation of the byte size.
+   *
+   * @return uint64_t the approximate size of the header map in bytes.
+   */
+  virtual uint64_t byteSizeInternal() const PURE;
 
   /**
    * Get a header by key.
@@ -554,6 +594,21 @@ using HeaderMapPtr = std::unique_ptr<HeaderMap>;
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
  */
 using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;
+
+/**
+ * An interface to be implemented by header matchers.
+ */
+class HeaderMatcher {
+public:
+  virtual ~HeaderMatcher() = default;
+
+  /*
+   * Check whether header matcher matches any headers in a given HeaderMap.
+   */
+  virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
+};
+
+using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
 
 } // namespace Http
 } // namespace Envoy

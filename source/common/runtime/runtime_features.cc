@@ -25,6 +25,9 @@ namespace Runtime {
 constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
+    "envoy.reloadable_features.buffer_filter_populate_content_length",
+    "envoy.reloadable_features.trusted_forwarded_proto",
+    "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
 };
 
 // This is a list of configuration fields which are disallowed by default in Envoy
@@ -38,20 +41,23 @@ constexpr const char* runtime_features[] = {
 //
 // The release cycle after a feature has been marked disallowed, it is officially removable, and
 // the maintainer team will run a script creating a tracking issue for proto and code clean up.
-//
-// TODO(alyssawilk) handle deprecation of reloadable_features and update the above comment. Ideally
-// runtime override of a deprecated feature will log(warn) on runtime-load if not deprecated
-// and hard-fail once it has been deprecated.
-
 constexpr const char* disallowed_features[] = {
     // Acts as both a test entry for deprecated.proto and a marker for the Envoy
     // deprecation scripts.
     "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
+    // 1.10.0
     "envoy.deprecated_features.config_source.proto:UNSUPPORTED_REST_LEGACY",
     "envoy.deprecated_features.ext_authz.proto:use_alpha",
-    "envoy.deprecated_features.route.proto:enabled",
     "envoy.deprecated_features.fault.proto:type",
+    "envoy.deprecated_features.route.proto:enabled",
     "envoy.deprecated_features.route.proto:runtime_key",
+    // 1.11.0
+    "envoy.deprecated_features.bootstrap.proto:runtime",
+    "envoy.deprecated_features.redis_proxy.proto:catch_all_cluster",
+    "envoy.deprecated_features.redis_proxy.proto:cluster",
+    "envoy.deprecated_features.server_info.proto:max_obj_name_len",
+    "envoy.deprecated_features.server_info.proto:max_stats",
+    "envoy.deprecated_features.v1_filter_json_config",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

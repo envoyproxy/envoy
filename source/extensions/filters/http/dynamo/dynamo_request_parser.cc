@@ -61,10 +61,10 @@ const std::vector<std::string> RequestParser::TRANSACT_OPERATIONS{"TransactGetIt
 const std::vector<std::string> RequestParser::TRANSACT_ITEM_OPERATIONS{"ConditionCheck", "Delete",
                                                                        "Get", "Put", "Update"};
 
-std::string RequestParser::parseOperation(const Http::HeaderMap& headerMap) {
+std::string RequestParser::parseOperation(const Http::HeaderMap& header_map) {
   std::string operation;
 
-  const Http::HeaderEntry* x_amz_target = headerMap.get(X_AMZ_TARGET);
+  const Http::HeaderEntry* x_amz_target = header_map.get(X_AMZ_TARGET);
   if (x_amz_target) {
     // Normally x-amz-target contains Version.Operation, e.g., DynamoDB_20160101.GetItem
     auto version_and_operation = StringUtil::splitToken(x_amz_target->value().getStringView(), ".");
@@ -184,6 +184,24 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
   });
 
   return partition_descriptors;
+}
+
+void RequestParser::forEachStatString(const StringFn& fn) {
+  for (const std::string& str : SINGLE_TABLE_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : SUPPORTED_ERROR_TYPES) {
+    fn(str);
+  }
+  for (const std::string& str : BATCH_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : TRANSACT_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : TRANSACT_ITEM_OPERATIONS) {
+    fn(str);
+  }
 }
 
 } // namespace Dynamo

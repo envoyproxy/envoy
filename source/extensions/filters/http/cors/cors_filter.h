@@ -82,8 +82,7 @@ public:
 private:
   friend class CorsFilterTest;
 
-  const std::list<std::string>* allowOrigins();
-  const std::list<std::regex>* allowOriginRegexes();
+  const std::vector<Matchers::StringMatcherPtr>* allowOrigins();
   const std::string& allowMethods();
   const std::string& allowHeaders();
   const std::string& exposeHeaders();
@@ -92,8 +91,6 @@ private:
   bool shadowEnabled();
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);
-  bool isOriginAllowedString(const Http::HeaderString& origin);
-  bool isOriginAllowedRegex(const Http::HeaderString& origin);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

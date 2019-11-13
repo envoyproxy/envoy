@@ -1,21 +1,11 @@
 #include "utility.h"
 
-#ifdef WIN32
-#include <windows.h>
-// <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
-// interfere with our code. DELETE shows up in the base.pb.h header generated from
-// api/envoy/api/core/base.proto. Since it's a generated header, we can't #undef DELETE at
-// the top of that header to avoid the collision. Similarly, GetMessage shows up in generated
-// protobuf code so we can't #undef the symbol there.
-#undef DELETE
-#undef GetMessage
-#endif
-
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <regex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -25,6 +15,7 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
 
@@ -36,18 +27,18 @@
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
+#include "common/filesystem/directory.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/filesystem/directory.h"
-#include "common/filesystem/filesystem_impl.h"
 
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "test/mocks/stats/mocks.h"
 #include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -328,6 +319,20 @@ bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges)
   return true;
 }
 
+// static
+bool TestUtility::gaugesZeroed(
+    const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges) {
+  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+  // gauges which default to the resource max.
+  std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  for (const auto& gauge : gauges) {
+    if (!std::regex_match(std::string(gauge.first), omitted) && gauge.second.get().value() != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -385,6 +390,11 @@ const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
 const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
+const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
+const uint32_t Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
 TestHeaderMapImpl::TestHeaderMapImpl() = default;
 
@@ -417,9 +427,11 @@ void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value
 
 void TestHeaderMapImpl::remove(const std::string& key) { remove(LowerCaseString(key)); }
 
-std::string TestHeaderMapImpl::get_(const std::string& key) { return get_(LowerCaseString(key)); }
+std::string TestHeaderMapImpl::get_(const std::string& key) const {
+  return get_(LowerCaseString(key));
+}
 
-std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
+std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
   const HeaderEntry* header = get(key);
   if (!header) {
     return EMPTY_STRING;
@@ -428,9 +440,11 @@ std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
   }
 }
 
-bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString(key)) != nullptr; }
+bool TestHeaderMapImpl::has(const std::string& key) const {
+  return get(LowerCaseString(key)) != nullptr;
+}
 
-bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
+bool TestHeaderMapImpl::has(const LowerCaseString& key) const { return get(key) != nullptr; }
 
 } // namespace Http
 

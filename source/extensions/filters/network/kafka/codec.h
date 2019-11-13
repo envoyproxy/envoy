@@ -48,7 +48,7 @@ public:
 template <typename ParserType, typename CallbackType>
 class AbstractMessageDecoder : public MessageDecoder {
 public:
-  virtual ~AbstractMessageDecoder() = default;
+  ~AbstractMessageDecoder() override = default;
 
   /**
    * Creates a decoder that will invoke given callbacks when a message has been parsed.

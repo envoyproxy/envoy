@@ -113,6 +113,7 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
 TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl accumulation_buffer;
+  Buffer::OwnedImpl empty_buffer;
 
   Envoy::Compressor::ZlibCompressorImpl compressor;
   compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
@@ -143,6 +144,12 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
 
   decompressor.decompress(accumulation_buffer, buffer);
   std::string decompressed_text{buffer.toString()};
+
+  // Check decompressor's internal state isn't broken.
+  drainBuffer(buffer);
+  ASSERT_EQ(0, buffer.length());
+  decompressor.decompress(empty_buffer, buffer);
+  ASSERT_EQ(0, buffer.length());
 
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());

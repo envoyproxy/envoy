@@ -9,13 +9,12 @@ option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
-import "gogoproto/gogo.proto";
-import "validate/validate.proto";
 
-option (gogoproto.stable_marshaler_all) = true;
+import "validate/validate.proto";
 
 // [#protodoc-title: gRPC access logs]
 // Envoy access logs describe incoming interaction with Envoy over a fixed
@@ -28,23 +27,27 @@ option (gogoproto.stable_marshaler_all) = true;
 // Fields describing *upstream* interaction will explicitly include ``upstream``
 // in their name.
 
-// [#not-implemented-hide:]
 message TCPAccessLogEntry {
   // Common properties shared by all Envoy access logs.
   AccessLogCommon common_properties = 1;
+
+  // Properties of the TCP connection.
+  ConnectionProperties connection_properties = 2;
 }
 
 message HTTPAccessLogEntry {
-  // Common properties shared by all Envoy access logs.
-  AccessLogCommon common_properties = 1;
-
   // HTTP version
   enum HTTPVersion {
     PROTOCOL_UNSPECIFIED = 0;
     HTTP10 = 1;
     HTTP11 = 2;
     HTTP2 = 3;
+    HTTP3 = 4;
   }
+
+  // Common properties shared by all Envoy access logs.
+  AccessLogCommon common_properties = 1;
+
   HTTPVersion protocol_version = 2;
 
   // Description of the incoming HTTP request.
@@ -54,57 +57,67 @@ message HTTPAccessLogEntry {
   HTTPResponseProperties response = 4;
 }
 
+// Defines fields for a connection
+message ConnectionProperties {
+  // Number of bytes received from downstream.
+  uint64 received_bytes = 1;
+
+  // Number of bytes sent to downstream.
+  uint64 sent_bytes = 2;
+}
+
 // Defines fields that are shared by all Envoy access logs.
+// [#next-free-field: 22]
 message AccessLogCommon {
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.
   // Valid range is (0.0, 1.0].
-  double sample_rate = 1 [(validate.rules).double.gt = 0.0, (validate.rules).double.lte = 1.0];
+  double sample_rate = 1 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
 
   // This field is the remote/origin address on which the request from the user was received.
   // Note: This may not be the physical peer. E.g, if the remote address is inferred from for
   // example the x-forwarder-for header, proxy protocol, etc.
-  envoy.api.v2.core.Address downstream_remote_address = 2;
+  api.v2.core.Address downstream_remote_address = 2;
 
   // This field is the local/destination address on which the request from the user was received.
-  envoy.api.v2.core.Address downstream_local_address = 3;
+  api.v2.core.Address downstream_local_address = 3;
 
   // If the connection is secure,S this field will contain TLS properties.
   TLSProperties tls_properties = 4;
 
   // The time that Envoy started servicing this request. This is effectively the time that the first
   // downstream byte is received.
-  google.protobuf.Timestamp start_time = 5 [(gogoproto.stdtime) = true];
+  google.protobuf.Timestamp start_time = 5;
 
   // Interval between the first downstream byte received and the last
   // downstream byte received (i.e. time it takes to receive a request).
-  google.protobuf.Duration time_to_last_rx_byte = 6 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_rx_byte = 6;
 
   // Interval between the first downstream byte received and the first upstream byte sent. There may
   // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
   // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
   // not accounting for kernel socket buffer time, etc.
-  google.protobuf.Duration time_to_first_upstream_tx_byte = 7 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_first_upstream_tx_byte = 7;
 
   // Interval between the first downstream byte received and the last upstream byte sent. There may
   // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
   // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
   // not accounting for kernel socket buffer time, etc.
-  google.protobuf.Duration time_to_last_upstream_tx_byte = 8 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_upstream_tx_byte = 8;
 
   // Interval between the first downstream byte received and the first upstream
   // byte received (i.e. time it takes to start receiving a response).
-  google.protobuf.Duration time_to_first_upstream_rx_byte = 9 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_first_upstream_rx_byte = 9;
 
   // Interval between the first downstream byte received and the last upstream
   // byte received (i.e. time it takes to receive a complete response).
-  google.protobuf.Duration time_to_last_upstream_rx_byte = 10 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_upstream_rx_byte = 10;
 
   // Interval between the first downstream byte received and the first downstream byte sent.
   // There may be a considerable delta between the *time_to_first_upstream_rx_byte* and this field
   // due to filters. Additionally, the same caveats apply as documented in
   // *time_to_last_downstream_tx_byte* about not accounting for kernel socket buffer time, etc.
-  google.protobuf.Duration time_to_first_downstream_tx_byte = 11 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_first_downstream_tx_byte = 11;
 
   // Interval between the first downstream byte received and the last downstream byte sent.
   // Depending on protocol, buffering, windowing, filters, etc. there may be a considerable delta
@@ -112,14 +125,14 @@ message AccessLogCommon {
   // time. In the current implementation it does not include kernel socket buffer time. In the
   // current implementation it also does not include send window buffering inside the HTTP/2 codec.
   // In the future it is likely that work will be done to make this duration more accurate.
-  google.protobuf.Duration time_to_last_downstream_tx_byte = 12 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_downstream_tx_byte = 12;
 
   // The upstream remote/destination address that handles this exchange. This does not include
   // retries.
-  envoy.api.v2.core.Address upstream_remote_address = 13;
+  api.v2.core.Address upstream_remote_address = 13;
 
   // The upstream local/origin address that handles this exchange. This does not include retries.
-  envoy.api.v2.core.Address upstream_local_address = 14;
+  api.v2.core.Address upstream_local_address = 14;
 
   // The upstream cluster that *upstream_remote_address* belongs to.
   string upstream_cluster = 15;
@@ -135,7 +148,7 @@ message AccessLogCommon {
   // route created from a higher level forwarding rule with some ID can place
   // that ID in this field and cross reference later. It can also be used to
   // determine if a canary endpoint was used or not.
-  envoy.api.v2.core.Metadata metadata = 17;
+  api.v2.core.Metadata metadata = 17;
 
   // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured
@@ -145,10 +158,33 @@ message AccessLogCommon {
 
   // The name of the route
   string route_name = 19;
+
+  // This field is the downstream direct remote address on which the request from the user was
+  // received. Note: This is always the physical peer, even if the remote address is inferred from
+  // for example the x-forwarder-for header, proxy protocol, etc.
+  api.v2.core.Address downstream_direct_remote_address = 20;
+
+  // Map of filter state in stream info that have been configured to be logged. If the filter
+  // state serialized to any message other than `google.protobuf.Any` it will be packed into
+  // `google.protobuf.Any`.
+  map<string, google.protobuf.Any> filter_state_objects = 21;
 }
 
 // Flags indicating occurrences during request/response processing.
+// [#next-free-field: 20]
 message ResponseFlags {
+  message Unauthorized {
+    // Reasons why the request was unauthorized
+    enum Reason {
+      REASON_UNSPECIFIED = 0;
+
+      // The request was denied by the external authorization service.
+      EXTERNAL_SERVICE = 1;
+    }
+
+    Reason reason = 1;
+  }
+
   // Indicates local server healthcheck failed.
   bool failed_local_healthcheck = 1;
 
@@ -185,17 +221,6 @@ message ResponseFlags {
   // Indicates that the request was rate-limited locally.
   bool rate_limited = 12;
 
-  message Unauthorized {
-    // Reasons why the request was unauthorized
-    enum Reason {
-      REASON_UNSPECIFIED = 0;
-      // The request was denied by the external authorization service.
-      EXTERNAL_SERVICE = 1;
-    }
-
-    Reason reason = 1;
-  }
-
   // Indicates if the request was deemed unauthorized and the reason for it.
   Unauthorized unauthorized_details = 13;
 
@@ -214,9 +239,13 @@ message ResponseFlags {
   // Indicates that the request was rejected because an envoy request header failed strict
   // validation.
   bool invalid_envoy_request_headers = 18;
+
+  // Indicates there was an HTTP protocol error on the downstream request.
+  bool downstream_protocol_error = 19;
 }
 
 // Properties of a negotiated TLS connection.
+// [#next-free-field: 7]
 message TLSProperties {
   enum TLSVersion {
     VERSION_UNSPECIFIED = 0;
@@ -225,6 +254,24 @@ message TLSProperties {
     TLSv1_2 = 3;
     TLSv1_3 = 4;
   }
+
+  message CertificateProperties {
+    message SubjectAltName {
+      oneof san {
+        string uri = 1;
+
+        // [#not-implemented-hide:]
+        string dns = 2;
+      }
+    }
+
+    // SANs present in the certificate.
+    repeated SubjectAltName subject_alt_name = 1;
+
+    // The subject field of the certificate.
+    string subject = 2;
+  }
+
   // Version of TLS that was negotiated.
   TLSVersion tls_version = 1;
 
@@ -238,22 +285,6 @@ message TLSProperties {
   // SNI hostname from handshake.
   string tls_sni_hostname = 3;
 
-  message CertificateProperties {
-    message SubjectAltName {
-      oneof san {
-        string uri = 1;
-        // [#not-implemented-hide:]
-        string dns = 2;
-      }
-    }
-
-    // SANs present in the certificate.
-    repeated SubjectAltName subject_alt_name = 1;
-
-    // The subject field of the certificate.
-    string subject = 2;
-  }
-
   // Properties of the local certificate used to negotiate TLS.
   CertificateProperties local_certificate_properties = 4;
 
@@ -264,11 +295,10 @@ message TLSProperties {
   string tls_session_id = 6;
 }
 
+// [#next-free-field: 14]
 message HTTPRequestProperties {
   // The request method (RFC 7231/2616).
-  // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
-  // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-  envoy.api.v2.core.RequestMethod request_method = 1;
+  api.v2.core.RequestMethod request_method = 1 [(validate.rules).enum = {defined_only: true}];
 
   // The scheme portion of the incoming request URI.
   string scheme = 2;
@@ -318,6 +348,7 @@ message HTTPRequestProperties {
   map<string, string> request_headers = 13;
 }
 
+// [#next-free-field: 7]
 message HTTPResponseProperties {
   // The HTTP response code returned by Envoy.
   google.protobuf.UInt32Value response_code = 1;

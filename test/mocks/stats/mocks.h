@@ -18,6 +18,8 @@
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/store_impl.h"
+#include "common/stats/symbol_table_creator.h"
+#include "common/stats/timespan_impl.h"
 
 #include "test/test_common/global.h"
 
@@ -25,6 +27,25 @@
 
 namespace Envoy {
 namespace Stats {
+
+class TestSymbolTableHelper {
+public:
+  TestSymbolTableHelper() : symbol_table_(SymbolTableCreator::makeSymbolTable()) {}
+  SymbolTable& symbolTable() { return *symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return *symbol_table_; }
+
+private:
+  SymbolTablePtr symbol_table_;
+};
+
+class TestSymbolTable {
+public:
+  SymbolTable& operator*() { return global_.get().symbolTable(); }
+  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
+  SymbolTable* operator->() { return &global_.get().symbolTable(); }
+  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
+  Envoy::Test::Global<TestSymbolTableHelper> global_;
+};
 
 template <class BaseClass> class MockMetric : public BaseClass {
 public:
@@ -39,7 +60,7 @@ public:
     explicit MetricName(MockMetric& mock_metric) : mock_metric_(mock_metric) {}
     ~MetricName() {
       if (stat_name_storage_ != nullptr) {
-        stat_name_storage_->free(*mock_metric_.symbol_table_);
+        stat_name_storage_->free(mock_metric_.symbolTable());
       }
     }
 
@@ -57,8 +78,8 @@ public:
     std::unique_ptr<StatNameStorage> stat_name_storage_;
   };
 
-  SymbolTable& symbolTable() override { return symbol_table_.get(); }
-  const SymbolTable& constSymbolTable() const override { return symbol_table_.get(); }
+  SymbolTable& symbolTable() override { return *symbol_table_; }
+  const SymbolTable& constSymbolTable() const override { return *symbol_table_; }
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
@@ -82,15 +103,8 @@ public:
       }
     }
   }
-  void iterateTags(const Metric::TagIterFn& fn) const override {
-    for (const Tag& tag : tags_) {
-      if (!fn(tag)) {
-        return;
-      }
-    }
-  }
 
-  Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
+  TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
 
   void setTags(const std::vector<Tag>& tags) {
@@ -184,14 +198,16 @@ public:
   MockHistogram();
   ~MockHistogram() override;
 
-  MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(unit, Histogram::Unit());
+  MOCK_METHOD1(recordValue, void(uint64_t value));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
+  Unit unit_{Histogram::Unit::Unspecified};
   Store* store_;
 
 private:
@@ -208,6 +224,7 @@ public:
   const std::string bucketSummary() const override { return ""; };
 
   MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(unit, Histogram::Unit());
   MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
@@ -218,6 +235,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
   bool used_;
+  Unit unit_{Histogram::Unit::Unspecified};
   Store* store_;
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
@@ -251,7 +269,7 @@ public:
 
 class SymbolTableProvider {
 public:
-  Test::Global<FakeSymbolTableImpl> fake_symbol_table_;
+  TestSymbolTable global_symbol_table_;
 };
 
 class MockStore : public SymbolTableProvider, public StoreImpl {
@@ -268,13 +286,12 @@ public:
   MOCK_METHOD2(gauge, Gauge&(const std::string&, Gauge::ImportMode));
   MOCK_METHOD1(nullGauge, NullGaugeImpl&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
-  MOCK_METHOD1(histogram, Histogram&(const std::string& name));
+  MOCK_METHOD2(histogram, Histogram&(const std::string&, Histogram::Unit));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
 
-  MOCK_CONST_METHOD1(findCounter, absl::optional<std::reference_wrapper<const Counter>>(StatName));
-  MOCK_CONST_METHOD1(findGauge, absl::optional<std::reference_wrapper<const Gauge>>(StatName));
-  MOCK_CONST_METHOD1(findHistogram,
-                     absl::optional<std::reference_wrapper<const Histogram>>(StatName));
+  MOCK_CONST_METHOD1(findCounter, OptionalCounter(StatName));
+  MOCK_CONST_METHOD1(findGauge, OptionalGauge(StatName));
+  MOCK_CONST_METHOD1(findHistogram, OptionalHistogram(StatName));
 
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));
@@ -282,11 +299,11 @@ public:
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     return gauge(symbol_table_->toString(name), import_mode);
   }
-  Histogram& histogramFromStatName(StatName name) override {
-    return histogram(symbol_table_->toString(name));
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+    return histogram(symbol_table_->toString(name), unit);
   }
 
-  Test::Global<FakeSymbolTableImpl> symbol_table_;
+  TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };
@@ -295,8 +312,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : private Test::Global<Stats::FakeSymbolTableImpl>,
-                               public IsolatedStoreImpl {
+class MockIsolatedStatsStore : public SymbolTableProvider, public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;

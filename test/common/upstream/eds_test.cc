@@ -22,9 +22,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -48,7 +45,8 @@ protected:
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+                 Cluster::InitializePhase::Secondary);
   }
 
   void resetClusterDrainOnHostRemoval() {
@@ -66,10 +64,24 @@ protected:
               cluster_names:
               - eds
               refresh_delay: 1s
-    )EOF");
+    )EOF",
+                 Cluster::InitializePhase::Secondary);
   }
 
-  void resetCluster(const std::string& yaml_config) {
+  void resetClusterLoadedFromFile() {
+    resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        eds_config:
+          path: "eds path"
+    )EOF",
+                 Cluster::InitializePhase::Primary);
+  }
+
+  void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV2Yaml(yaml_config);
     Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
@@ -80,7 +92,7 @@ protected:
         singleton_manager_, tls_, validation_visitor_, *api_);
     cluster_.reset(
         new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
-    EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
+    EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 
@@ -116,7 +128,7 @@ protected:
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
 protected:
-  EdsWithHealthCheckUpdateTest() {}
+  EdsWithHealthCheckUpdateTest() = default;
 
   // Build the initial cluster with some endpoints.
   void initializeCluster(const std::vector<uint32_t> endpoint_ports,
@@ -171,7 +183,8 @@ protected:
             - eds
             refresh_delay: 1s
       )EOF";
-    EdsTest::resetCluster(fmt::format(config, drain_connections_on_host_removal));
+    EdsTest::resetCluster(fmt::format(config, drain_connections_on_host_removal),
+                          Cluster::InitializePhase::Secondary);
   }
 
   void addEndpoint(const uint32_t port) {
@@ -217,8 +230,12 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   initialize();
-  EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), EnvoyException);
-  eds_callbacks_->onConfigUpdateFailed(nullptr);
+  try {
+    eds_callbacks_->onConfigUpdate(resources, "");
+  } catch (const EnvoyException& e) {
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
+  }
   EXPECT_TRUE(initialized_);
 }
 
@@ -241,8 +258,12 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   resources.Add()->PackFrom(cluster_load_assignment);
-  EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), EnvoyException);
-  eds_callbacks_->onConfigUpdateFailed(nullptr);
+  try {
+    eds_callbacks_->onConfigUpdate(resources, "");
+  } catch (const EnvoyException& e) {
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
+  }
   EXPECT_TRUE(initialized_);
 }
 
@@ -286,7 +307,18 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+               Cluster::InitializePhase::Secondary);
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("name");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+}
+
+// Validate that EDS cluster loaded from file as primary cluster
+TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
+  resetClusterLoadedFromFile();
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("name");
   initialize();
@@ -1010,7 +1042,8 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+               Cluster::InitializePhase::Secondary);
 
   {
     auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -1483,7 +1516,8 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+               Cluster::InitializePhase::Secondary);
 
   uint32_t port = 1000;
   auto add_hosts_to_locality_and_priority =
@@ -1658,7 +1692,7 @@ TEST_F(EdsTest, MalformedIP) {
 
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
-  EdsAssignmentTimeoutTest() : interval_timer_(nullptr) {
+  EdsAssignmentTimeoutTest() {
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;
@@ -1671,7 +1705,7 @@ public:
     resetCluster();
   }
 
-  Event::MockTimer* interval_timer_;
+  Event::MockTimer* interval_timer_{nullptr};
   Event::TimerCb timer_cb_;
 };
 
@@ -1697,9 +1731,9 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
   cluster_load_assignment_lease.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(1));
 
-  EXPECT_CALL(*interval_timer_, enableTimer(_)).Times(2); // Timer enabled twice.
-  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1); // Timer disabled once.
-  EXPECT_CALL(*interval_timer_, enabled()).Times(6);      // Includes calls by test.
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _)).Times(2); // Timer enabled twice.
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1);    // Timer disabled once.
+  EXPECT_CALL(*interval_timer_, enabled()).Times(6);         // Includes calls by test.
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_lease);
   // Check that the timer is enabled.
   EXPECT_EQ(interval_timer_->enabled(), true);
@@ -1739,7 +1773,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
   add_endpoint(81);
 
   // Expect the timer to be enabled once.
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   // Expect the timer to be disabled when stale assignments are removed.
   EXPECT_CALL(*interval_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enabled()).Times(2);

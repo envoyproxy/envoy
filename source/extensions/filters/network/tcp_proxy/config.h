@@ -16,12 +16,7 @@ namespace TcpProxy {
 class ConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::tcp_proxy::v2::TcpProxy> {
 public:
-  ConfigFactory() : FactoryBase(NetworkFilterNames::get().TcpProxy) {}
-
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config,
-                      Server::Configuration::FactoryContext& context) override;
+  ConfigFactory() : FactoryBase(NetworkFilterNames::get().TcpProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

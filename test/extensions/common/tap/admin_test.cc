@@ -30,7 +30,9 @@ public:
     handler_ = std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_);
   }
 
-  ~AdminHandlerTest() { EXPECT_CALL(admin_, removeHandler("/tap")).WillOnce(Return(true)); }
+  ~AdminHandlerTest() override {
+    EXPECT_CALL(admin_, removeHandler("/tap")).WillOnce(Return(true));
+  }
 
   Server::MockAdmin admin_;
   Event::MockDispatcher main_thread_dispatcher_;

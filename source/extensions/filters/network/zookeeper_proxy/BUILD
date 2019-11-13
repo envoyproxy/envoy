@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -31,18 +32,22 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
         "//source/common/network:filter_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/filters/network:well_known_names",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "alpha",
     deps = [
         ":proxy_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/zookeeper_proxy/v1alpha1:zookeeper_proxy_cc",
+        "@envoy_api//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg_cc_proto",
     ],
 )

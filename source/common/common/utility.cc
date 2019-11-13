@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <regex>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -167,7 +168,7 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
                                                   const std::string& seconds_str) const {
   std::string formatted_time;
 
-  size_t previous = 0;
+  int32_t previous = 0;
   specifier_offsets.reserve(specifiers_.size());
   for (const auto& specifier : specifiers_) {
     std::string current_format =
@@ -262,6 +263,16 @@ absl::string_view StringUtil::rtrim(absl::string_view source) {
 
 absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
 
+absl::string_view StringUtil::removeTrailingCharacters(absl::string_view source, char ch) {
+  const absl::string_view::size_type pos = source.find_last_not_of(ch);
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - pos - 1);
+  } else {
+    source.remove_suffix(source.size());
+  }
+  return source;
+}
+
 bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
                            absl::string_view key_token, bool trim_whitespace) {
   const auto tokens = splitToken(source, delimiters, trim_whitespace);
@@ -323,6 +334,16 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
   return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
 }
 
+std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
+                                     const CaseUnorderedSet& tokens_to_remove,
+                                     absl::string_view joiner) {
+  auto values = Envoy::StringUtil::splitToken(source, delimiters);
+  std::for_each(values.begin(), values.end(), [](auto& v) { v = StringUtil::trim(v); });
+  auto end = std::remove_if(values.begin(), values.end(),
+                            [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
+  return absl::StrJoin(values.begin(), end, joiner);
+}
+
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   // The maximum size required for an unsigned 64-bit integer is 21 chars (including null).
   if (buffer_size < 21) {
@@ -342,22 +363,13 @@ uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   }
 
   *current = 0;
-  return current - out;
+  return static_cast<uint32_t>(current - out);
 }
 
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
   strncpy(dst, src, size - 1);
   dst[size - 1] = '\0';
   return strlen(src);
-}
-
-std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
-  std::ostringstream buf;
-  std::copy(source.begin(), source.end(),
-            std::ostream_iterator<std::string>(buf, delimiter.c_str()));
-  std::string ret = buf.str();
-  // copy will always end with an extra delimiter, we remove it here.
-  return ret.substr(0, ret.length() - delimiter.length());
 }
 
 std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {
@@ -499,22 +511,12 @@ uint32_t Primes::findPrimeLargerThan(uint32_t x) {
   return x;
 }
 
-std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type flags) {
-  // TODO(zuercher): In the future, PGV (https://github.com/lyft/protoc-gen-validate) annotations
-  // may allow us to remove this in favor of direct validation of regular expressions.
-  try {
-    return std::regex(regex, flags);
-  } catch (const std::regex_error& e) {
-    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
-  }
-}
-
 // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
-void WelfordStandardDeviation::update(double newValue) {
+void WelfordStandardDeviation::update(double new_value) {
   ++count_;
-  const double delta = newValue - mean_;
+  const double delta = new_value - mean_;
   mean_ += delta / count_;
-  const double delta2 = newValue - mean_;
+  const double delta2 = new_value - mean_;
   m2_ += delta * delta2;
 }
 

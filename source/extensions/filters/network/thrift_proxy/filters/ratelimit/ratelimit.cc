@@ -58,20 +58,23 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Http::HeaderMapPtr&& headers) {
+                      Http::HeaderMapPtr&& response_headers_to_add,
+                      Http::HeaderMapPtr&& request_headers_to_add) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
-  UNREFERENCED_PARAMETER(headers);
+  UNREFERENCED_PARAMETER(response_headers_to_add);
+  UNREFERENCED_PARAMETER(request_headers_to_add);
 
   state_ = State::Complete;
+  Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    cluster_->statsScope().counter("ratelimit.ok").inc();
+    cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
-    cluster_->statsScope().counter("ratelimit.error").inc();
+    cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     if (!config_->failureModeAllow()) {
       state_ = State::Responded;
       callbacks_->sendLocalReply(
@@ -80,10 +83,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
       return;
     }
-    cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
+    cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counter("ratelimit.over_limit").inc();
+    cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
     if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
       state_ = State::Responded;
       callbacks_->sendLocalReply(

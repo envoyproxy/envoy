@@ -36,7 +36,6 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
   // headers.
   envoy::api::v2::RouteConfiguration clean_config =
       replaceInvalidHeaders<envoy::api::v2::RouteConfiguration>(route_config);
-  // Replace invalid characters from
   auto internal_only_headers = clean_config.mutable_internal_only_headers();
   std::for_each(internal_only_headers->begin(), internal_only_headers->end(),
                 [](std::string& n) { n = Fuzz::replaceInvalidCharacters(n); });
@@ -52,16 +51,25 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
         // cluster_header from the request header. Because these cluster_headers are destined to be
         // added to a Header Map, we iterate through each route in and remove invalid characters
         // from their cluster headers.
-        std::for_each(virtual_host.mutable_routes()->begin(), virtual_host.mutable_routes()->end(),
-                      [](envoy::api::v2::route::Route& route) {
-                        if (route.has_route()) {
-                          route.mutable_route()->set_cluster_header(
-                              Fuzz::replaceInvalidCharacters(route.route().cluster_header()));
-                          if (route.route().cluster_header().empty()) {
-                            route.mutable_route()->set_cluster_header("not-empty");
-                          }
-                        }
-                      });
+        auto routes = virtual_host.mutable_routes();
+        for (int i = 0; i < routes->size();) {
+          // Erase routes that use a regex matcher. This is deprecated and may cause crashes when
+          // wildcards are matched against very long headers.
+          // See https://github.com/envoyproxy/envoy/issues/7728.
+          if (routes->Get(i).match().path_specifier_case() ==
+              envoy::api::v2::route::RouteMatch::kRegex) {
+            routes->erase(routes->begin() + i);
+          } else {
+            if (routes->Get(i).has_route()) {
+              routes->Mutable(i)->mutable_route()->set_cluster_header(
+                  Fuzz::replaceInvalidCharacters(routes->Mutable(i)->route().cluster_header()));
+              if (routes->Get(i).route().cluster_header().empty()) {
+                routes->Mutable(i)->mutable_route()->set_cluster_header("not-empty");
+              }
+            }
+            ++i;
+          }
+        }
       });
 
   return clean_config;
@@ -69,24 +77,25 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
 
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
+  static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  static NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   try {
-    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-    MessageUtil::validate(input.config());
-    ConfigImpl config(cleanRouteConfig(input.config()), factory_context, true);
+    TestUtility::validate(input.config());
+    ConfigImpl config(cleanRouteConfig(input.config()), factory_context,
+                      ProtobufMessage::getNullValidationVisitor(), true);
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(input.headers());
     // It's a precondition of routing that {:authority, :path, x-forwarded-proto} headers exists,
     // HCM enforces this.
     if (headers.Host() == nullptr) {
-      headers.insertHost().value(std::string("example.com"));
+      headers.setHost("example.com");
     }
     if (headers.Path() == nullptr) {
-      headers.insertPath().value(std::string("/"));
+      headers.setPath("/");
     }
     if (headers.ForwardedProto() == nullptr) {
-      headers.insertForwardedProto().value(std::string("http"));
+      headers.setForwardedProto("http");
     }
-    auto route = config.route(headers, input.random_value());
+    auto route = config.route(headers, stream_info, input.random_value());
     if (route != nullptr && route->routeEntry() != nullptr) {
       route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);
     }
