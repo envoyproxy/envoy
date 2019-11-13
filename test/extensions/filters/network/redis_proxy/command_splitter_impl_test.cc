@@ -31,6 +31,8 @@ namespace CommandSplitter {
 
 class RedisCommandSplitterImplTest : public testing::Test {
 public:
+  RedisCommandSplitterImplTest() : RedisCommandSplitterImplTest(false) {}
+  RedisCommandSplitterImplTest(bool latency_in_macro) : latency_in_micros_(latency_in_macro) {}
   void makeBulkStringArray(Common::Redis::RespValue& value,
                            const std::vector<std::string>& strings) {
     std::vector<Common::Redis::RespValue> values(strings.size());
@@ -48,6 +50,7 @@ public:
     route_->policies_.push_back(mirror_policy);
   }
 
+  const bool latency_in_micros_;
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   ConnPool::MockInstance* mirror_conn_pool_{new ConnPool::MockInstance()};
   ConnPool::InstanceSharedPtr mirror_conn_pool_shared_ptr_{mirror_conn_pool_};
@@ -56,7 +59,7 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Event::SimulatedTimeSystem time_system_;
   InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_), store_, "redis.foo.",
-                         time_system_, false};
+                         time_system_, latency_in_micros_};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -156,6 +159,9 @@ MATCHER_P(RespVariantEq, rhs, "RespVariant should be equal") {
 class RedisSingleServerRequestTest : public RedisCommandSplitterImplTest,
                                      public testing::WithParamInterface<std::string> {
 public:
+  RedisSingleServerRequestTest() : RedisSingleServerRequestTest(false) {}
+  RedisSingleServerRequestTest(bool latency_in_micros)
+      : RedisCommandSplitterImplTest(latency_in_micros) {}
   void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request,
                    bool mirrored = false) {
     EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
@@ -971,17 +977,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 class RedisSingleServerRequestWithLatencyMicrosTest : public RedisSingleServerRequestTest {
 public:
-  void makeRequest(const std::string& hash_key, Common::Redis::RespValuePtr&& request) {
-    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-    EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
-        .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-    handle_ = splitter_.makeRequest(std::move(request), callbacks_);
-  }
-
-  ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
-  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
-                         store_, "redis.foo.", time_system_, true};
+  RedisSingleServerRequestWithLatencyMicrosTest() : RedisSingleServerRequestTest(true) {}
 };
 
 TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {
