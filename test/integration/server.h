@@ -233,6 +233,7 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
 public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
          std::function<void()> on_server_init_function, bool deterministic,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
@@ -251,6 +252,9 @@ public:
   }
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
     on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
+  }
+  void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
+    on_server_ready_cb_ = std::move(on_server_ready);
   }
   void onRuntimeCreated() override;
 
@@ -354,6 +358,7 @@ private:
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
+  std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
 };
 
 // Default implementation of IntegrationTestServer

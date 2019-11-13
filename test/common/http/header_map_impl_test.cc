@@ -1118,5 +1118,53 @@ TEST(HeaderMapImplTest, TestInlineHeaderAdd) {
   EXPECT_TRUE(foo.Path() != nullptr);
 }
 
+// Validates byte size is properly accounted for in different inline header setting scenarios.
+TEST(HeaderMapImplTest, InlineHeaderByteSize) {
+  uint64_t hostKeySize = Headers::get().Host.get().size();
+  uint64_t statusKeySize = Headers::get().Status.get().size();
+  {
+    HeaderMapImpl headers;
+    std::string foo = "foo";
+    EXPECT_EQ(headers.byteSize().value(), 0);
+    headers.setHost(foo);
+    EXPECT_EQ(headers.byteSize().value(), foo.size() + hostKeySize);
+  }
+  {
+    // Overwrite an inline headers.
+    HeaderMapImpl headers;
+    std::string foo = "foo";
+    EXPECT_EQ(headers.byteSize().value(), 0);
+    headers.setHost(foo);
+    EXPECT_EQ(headers.byteSize().value(), foo.size() + hostKeySize);
+    std::string big_foo = "big_foo";
+    headers.setHost(big_foo);
+    EXPECT_EQ(headers.byteSize().value(), big_foo.size() + hostKeySize);
+  }
+  {
+    // Overwrite an inline headers with reference value and clear.
+    HeaderMapImpl headers;
+    std::string foo = "foo";
+    EXPECT_EQ(headers.byteSize().value(), 0);
+    headers.setHost(foo);
+    EXPECT_EQ(headers.byteSize().value(), foo.size() + hostKeySize);
+    std::string big_foo = "big_foo";
+    headers.setReferenceHost(big_foo);
+    EXPECT_EQ(headers.byteSize().value(), big_foo.size() + hostKeySize);
+    headers.removeHost();
+    EXPECT_EQ(headers.byteSize().value(), 0);
+  }
+  {
+    // Overwrite an inline headers with integer value.
+    HeaderMapImpl headers;
+    uint64_t status = 200;
+    EXPECT_EQ(headers.byteSize().value(), 0);
+    headers.setStatus(status);
+    EXPECT_EQ(headers.byteSize().value(), 3 + statusKeySize);
+    uint64_t newStatus = 500;
+    headers.setStatus(newStatus);
+    EXPECT_EQ(headers.byteSize().value(), 3 + statusKeySize);
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
