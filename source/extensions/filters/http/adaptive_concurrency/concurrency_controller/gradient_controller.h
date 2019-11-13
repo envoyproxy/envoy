@@ -89,6 +89,11 @@ public:
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
+  uint32_t minConcurrency() const {
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey,
+                                          min_concurrency_);
+  }
+
 private:
   class RuntimeKeyValues {
   public:
@@ -104,6 +109,8 @@ private:
     const std::string SampleAggregatePercentileKey =
         "adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
     const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
+    const std::string MinConcurrencyKey =
+      "adaptive_concurrency.gradient_controller.min_concurrency";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
@@ -130,6 +137,9 @@ private:
 
   // The percentile value considered when processing samples.
   const double sample_aggregate_percentile_;
+
+  // The concurrency limit set while measuring the minRTT.
+  const uint32_t min_concurrency_;
 };
 using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 
