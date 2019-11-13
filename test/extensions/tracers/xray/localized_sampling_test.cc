@@ -293,6 +293,31 @@ TEST_F(LocalizedSamplingStrategyTest, CustomRuleMissingRate) {
   ASSERT_TRUE(strategy.usingDefaultManifest());
 }
 
+TEST_F(LocalizedSamplingStrategyTest, CustomRuleArrayElementWithWrongType) {
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  constexpr auto rules_json = R"EOF(
+{
+  "version": 2,
+  "rules": [
+    {
+      "description": "X-Ray rule",
+      "host": "*",
+      "http_method": "*",
+      "url_path": "/api/move/*",
+      "fixed_target": 0
+    },
+    "should be an array, not string"
+  ],
+  "default": {
+    "fixed_target": 1,
+    "rate": 0.1
+  }
+}
+  )EOF";
+  LocalizedSamplingStrategy strategy{rules_json, random_generator, time_system_};
+  ASSERT_TRUE(strategy.usingDefaultManifest());
+}
+
 TEST_F(LocalizedSamplingStrategyTest, CustomRuleNegativeFixedRate) {
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
@@ -523,6 +548,7 @@ TEST_F(LocalizedSamplingStrategyTest, NoMatchingPath) {
     ASSERT_FALSE(strategy.shouldTrace(req));
   }
 }
+
 } // namespace
 } // namespace XRay
 } // namespace Tracers

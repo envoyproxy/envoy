@@ -27,9 +27,7 @@ envoy_cc_library(
         "xray_configuration.h",
         "xray_tracer_impl.h",
     ],
-    external_deps = [
-        "rapidjson",
-    ],
+    external_deps = [],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:instance_interface",
@@ -38,6 +36,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )

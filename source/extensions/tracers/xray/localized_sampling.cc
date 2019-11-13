@@ -1,10 +1,9 @@
 #include "extensions/tracers/xray/localized_sampling.h"
 
 #include "common/http/exception.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/tracers/xray/util.h"
-
-#include "rapidjson/document.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,31 +27,42 @@ static void fail(absl::string_view msg) {
   ENVOY_LOG_TO_LOGGER(logger, error, "Failed to parse sampling rules - {}", msg);
 }
 
-static bool validateRule(const rapidjson::Value& rule) {
+static bool validateRule(const ProtobufWkt::Struct& rule) {
+  using ProtobufWkt::Value;
 
-  if (rule.HasMember(HostJsonKey) && !rule[HostJsonKey].IsString()) {
+  const auto host_it = rule.fields().find(HostJsonKey);
+  if (host_it != rule.fields().end() &&
+      host_it->second.kind_case() != Value::KindCase::kStringValue) {
     fail("host must be a string");
     return false;
   }
 
-  if (rule.HasMember(HttpMethodJsonKey) && !rule[HttpMethodJsonKey].IsString()) {
+  const auto http_method_it = rule.fields().find(HttpMethodJsonKey);
+  if (http_method_it != rule.fields().end() &&
+      http_method_it->second.kind_case() != Value::KindCase::kStringValue) {
     fail("HTTP method must be a string");
     return false;
   }
 
-  if (rule.HasMember(UrlPathJsonKey) && !rule[UrlPathJsonKey].IsString()) {
+  const auto url_path_it = rule.fields().find(UrlPathJsonKey);
+  if (url_path_it != rule.fields().end() &&
+      url_path_it->second.kind_case() != Value::KindCase::kStringValue) {
     fail("URL path must be a string");
     return false;
   }
 
-  if (!rule.HasMember(FixedTargetJsonKey) || !rule[FixedTargetJsonKey].IsNumber() ||
-      rule[FixedTargetJsonKey].GetInt() < 0) {
+  const auto fixed_target_it = rule.fields().find(FixedTargetJsonKey);
+  if (fixed_target_it == rule.fields().end() ||
+      fixed_target_it->second.kind_case() != Value::KindCase::kNumberValue ||
+      fixed_target_it->second.number_value() < 0) {
     fail("fixed target is missing or not a valid positive integer");
     return false;
   }
 
-  if (!rule.HasMember(RateJsonKey) || !rule[RateJsonKey].IsNumber() ||
-      rule[RateJsonKey].GetDouble() < 0) {
+  const auto rate_it = rule.fields().find(RateJsonKey);
+  if (rate_it == rule.fields().end() ||
+      rate_it->second.kind_case() != Value::KindCase::kNumberValue ||
+      rate_it->second.number_value() < 0) {
     fail("rate is missing or not a valid positive floating number");
     return false;
   }
@@ -75,68 +85,83 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     return;
   }
 
-  rapidjson::Document document;
-  document.Parse(rule_json);
-  if (document.HasParseError()) {
-    fail("invalid JSON format.");
+  ProtobufWkt::Struct document;
+  MessageUtil::loadFromJson(rule_json, document);
+  if (document.fields().empty()) {
+    fail("invalid JSON rules.");
     return;
   }
 
-  if (!document.HasMember(VersionJsonKey)) {
+  const auto version_it = document.fields().find(VersionJsonKey);
+  if (version_it == document.fields().end()) {
     fail("missing version number");
     return;
   }
 
-  if (!document[VersionJsonKey].IsNumber() ||
-      document[VersionJsonKey].GetInt() != SamplingFileVersion) {
+  if (version_it->second.kind_case() != ProtobufWkt::Value::KindCase::kNumberValue ||
+      version_it->second.number_value() != SamplingFileVersion) {
     fail("wrong version number");
     return;
   }
 
-  if (!document.HasMember(DefaultRuleJsonKey) || !document[DefaultRuleJsonKey].IsObject()) {
+  const auto default_rule_it = document.fields().find(DefaultRuleJsonKey);
+  if (default_rule_it == document.fields().end() ||
+      default_rule_it->second.kind_case() != ProtobufWkt::Value::KindCase::kStructValue) {
     fail("missing default rule");
     return;
   }
 
   // extract default rule members
-  const auto& default_rule_object = document[DefaultRuleJsonKey];
+  auto& default_rule_object = default_rule_it->second.struct_value();
   if (!validateRule(default_rule_object)) {
     return;
   }
 
-  default_rule_.setRate(default_rule_object[RateJsonKey].GetDouble());
-  default_rule_.setFixedTarget(default_rule_object[FixedTargetJsonKey].GetInt());
+  default_rule_.setRate(default_rule_object.fields().find(RateJsonKey)->second.number_value());
+  default_rule_.setFixedTarget(static_cast<unsigned>(
+      default_rule_object.fields().find(FixedTargetJsonKey)->second.number_value()));
 
-  if (!document.HasMember(CustomRulesJsonKey)) {
+  const auto custom_rules_it = document.fields().find(CustomRulesJsonKey);
+  if (custom_rules_it == document.fields().end()) {
     return;
   }
 
-  if (!document[CustomRulesJsonKey].IsArray()) {
+  if (custom_rules_it->second.kind_case() != ProtobufWkt::Value::KindCase::kListValue) {
     fail("rules must be JSON array");
     return;
   }
 
-  for (auto& rule_json : document[CustomRulesJsonKey].GetArray()) {
+  for (auto& el : custom_rules_it->second.list_value().values()) {
+    if (el.kind_case() != ProtobufWkt::Value::KindCase::kStructValue) {
+      fail("rules array must be objects");
+      return;
+    }
+
+    auto& rule_json = el.struct_value();
     if (!validateRule(rule_json)) {
       return;
     }
 
     LocalizedSamplingRule rule = LocalizedSamplingRule::createDefault();
-    if (rule_json.HasMember(HostJsonKey)) {
-      rule.setHost(rule_json[HostJsonKey].GetString());
+    const auto host_it = rule_json.fields().find(HostJsonKey);
+    if (host_it != rule_json.fields().end()) {
+      rule.setHost(host_it->second.string_value());
     }
 
-    if (rule_json.HasMember(HttpMethodJsonKey)) {
-      rule.setHttpMethod(rule_json[HttpMethodJsonKey].GetString());
+    const auto http_method_it = rule_json.fields().find(HttpMethodJsonKey);
+    if (http_method_it != rule_json.fields().end()) {
+      rule.setHttpMethod(http_method_it->second.string_value());
     }
 
-    if (rule_json.HasMember(UrlPathJsonKey)) {
-      rule.setUrlPath(rule_json[UrlPathJsonKey].GetString());
+    const auto url_path_it = rule_json.fields().find(UrlPathJsonKey);
+    if (url_path_it != rule_json.fields().end()) {
+      rule.setUrlPath(url_path_it->second.string_value());
     }
 
     // rate and fixed_target must exist because we validated this rule
-    rule.setRate(rule_json[RateJsonKey].GetDouble());
-    rule.setFixedTarget(rule_json[FixedTargetJsonKey].GetUint());
+    rule.setRate(rule_json.fields().find(RateJsonKey)->second.number_value());
+    rule.setFixedTarget(
+        static_cast<unsigned>(rule_json.fields().find(FixedTargetJsonKey)->second.number_value()));
 
     custom_rules_.push_back(std::move(rule));
   }
