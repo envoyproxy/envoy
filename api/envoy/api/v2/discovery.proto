@@ -55,6 +55,14 @@ message DiscoveryRequest {
   // internal exception related to the failure. It is only intended for consumption during manual
   // debugging, the string provided is not guaranteed to be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
+
+  // [#not-implemented-hide:]
+  // If true, unsubscribes to all resources. This is intended to be used in LDS/CDS for clients using the resource_names
+  // field that want to unsubscribe from the last resource. For RDS/EDS, this can be done by sending a request with an
+  // empty resource_names field, but for LDS/CDS, an empty resource_names field triggers wildcard behavior, so we need an
+  // alternative mechanism to unsubscribe from the last resource. This may be useful if (e.g.) a client is using ADS but is
+  // being reconfigured from a full LDS/RDS/CDS/EDS flow to a simple EDS-only flow.
+  bool unsubscribe_to_all = 7;
 }
 
 // [#next-free-field: 7]
