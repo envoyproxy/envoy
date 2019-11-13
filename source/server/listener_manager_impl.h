@@ -77,10 +77,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createUdpListenerFilterFactoryList_(filters, context);
   }
+
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               Network::Address::SocketType socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
+
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
@@ -162,8 +164,9 @@ private:
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
                                      const Network::Address::Instance& address);
-  static bool hasListenerWithSocket(const ListenerList& list,
-                                    const Network::SocketSharedPtr& socket);
+  static bool
+  shareSocketWithOtherListener(const ListenerList& list,
+                               const Network::ListenSocketFactorySharedPtr& socket_factory);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
     // restart.
@@ -202,6 +205,10 @@ private:
    * @param name supplies the name to search for.
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
+
+  Network::ListenSocketFactorySharedPtr
+  createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
+                            ListenerImpl& listener);
 
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;

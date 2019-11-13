@@ -24,9 +24,14 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Network {
 
-MockListenerConfig::MockListenerConfig() {
+MockListenerConfig::MockListenerConfig()
+    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()) {
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
-  ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
+  ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
+  ON_CALL(socket_factory_, localAddress()).WillByDefault(ReturnRef(socket_->localAddress()));
+  ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(socket_));
+  ON_CALL(socket_factory_, sharedSocket())
+      .WillByDefault(Return(std::reference_wrapper<Socket>(*socket_)));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
 }
@@ -150,7 +155,8 @@ MockConnectionSocket::MockConnectionSocket()
 
 MockConnectionSocket::~MockConnectionSocket() = default;
 
-MockListener::MockListener() = default;
+MockListener::MockListener() {}
+
 MockListener::~MockListener() { onDestroy(); }
 
 MockConnectionHandler::MockConnectionHandler() = default;

@@ -13,9 +13,10 @@ import re
 import subprocess
 import sys
 import tempfile
+import paths
 
 # Where does Buildozer live?
-BUILDOZER_PATH = os.getenv('BUILDOZER_BIN', '$GOPATH/bin/buildozer')
+BUILDOZER_PATH = paths.getBuildozer()
 
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
