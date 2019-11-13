@@ -128,9 +128,9 @@ Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   return body;
 }
 
-std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_headers) {
+std::chrono::milliseconds Common::getGrpcTimeout(const Http::HeaderMap& request_headers) {
   std::chrono::milliseconds timeout(0);
-  Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
+  const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
     // TODO(dnoe): Migrate to pure string_view (#6580)
