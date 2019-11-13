@@ -15,6 +15,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Client TLS authentication]
 // Client TLS authentication
 // :ref:`configuration overview <config_network_filters_client_ssl_auth>`.
+// [#extension: envoy.filters.network.client_ssl_auth]
 
 message ClientSSLAuth {
   // The :ref:`cluster manager <arch_overview_cluster_manager>` cluster that runs

@@ -1,6 +1,14 @@
 licenses(["notice"])  # Apache 2
 
 py_binary(
+    name = "generate_empty",
+    srcs = ["generate_empty.py"],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+    deps = [":protodoc"],
+)
+
+py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
     python_version = "PY3",

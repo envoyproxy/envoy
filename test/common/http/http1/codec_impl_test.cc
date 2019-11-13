@@ -433,6 +433,9 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
 // Regression test for http-parser allowing embedded NULs in header values,
 // verify we reject them.
 TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.strict_header_validation", "false"}});
   initialize();
 
   InSequence sequence;

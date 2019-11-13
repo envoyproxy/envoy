@@ -12,6 +12,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: IP tagging]
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
+// [#extension: envoy.filters.http.ip_tagging]
 
 message IPTagging {
   // The type of requests the filter should apply to. The supported types

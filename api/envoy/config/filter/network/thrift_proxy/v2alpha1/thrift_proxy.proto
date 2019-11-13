@@ -15,6 +15,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Thrift Proxy]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
+// [#extension: envoy.filters.network.thrift_proxy]
 
 // Thrift transport types supported by Envoy.
 enum TransportType {

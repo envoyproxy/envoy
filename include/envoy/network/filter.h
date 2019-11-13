@@ -436,9 +436,8 @@ public:
    *
    * @param udp_listener supplies the listener to create the chain on.
    * @param callbacks supplies the callbacks needed to create a filter.
-   * @return true if filter chain was created successfully. Otherwise false.
    */
-  virtual bool createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
+  virtual void createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
                                             UdpReadFilterCallbacks& callbacks) PURE;
 };
 

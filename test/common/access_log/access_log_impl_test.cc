@@ -1050,7 +1050,7 @@ typed_config:
 )EOF";
 
   const auto desc = envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status_descriptor();
-  const int grpcStatuses = static_cast<int>(Grpc::Status::GrpcStatus::MaximumValid) + 1;
+  const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
   if (desc->value_count() != grpcStatuses) {
     FAIL() << "Mismatch in number of gRPC statuses, GrpcStatus has " << grpcStatuses
            << ", GrpcStatusFilter_Status has " << desc->value_count() << ".";
@@ -1172,7 +1172,7 @@ typed_config:
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  for (int i = 0; i <= static_cast<int>(Grpc::Status::GrpcStatus::MaximumValid); i++) {
+  for (int i = 0; i <= static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown); i++) {
     EXPECT_CALL(*file_, write(_)).Times(i == 0 ? 0 : 1);
 
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, std::to_string(i));
