@@ -20,10 +20,10 @@ void QuicHttpConnectionImplBase::runWatermarkCallbacksForEachStream(
     bool high_watermark) {
   for (auto& it : stream_map) {
     if (!it.second->is_static()) {
+      // Only call watermark callbacks on non QUIC static streams which are
+      // crypto stream and Google QUIC headers stream.
       auto stream = quicStreamToEnvoyStream(it.second.get());
       if (high_watermark) {
-        // Only call watermark callbacks on non QUIC static streams which are
-        // crypto stream and Google QUIC headers stream.
         ENVOY_LOG(debug, "runHighWatermarkCallbacks on stream {}", it.first);
         stream->runHighWatermarkCallbacks();
       } else {
