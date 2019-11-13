@@ -41,12 +41,8 @@ rules:
     path: "/"
 )";
 
-// const char kExampleHeader[] = "x-example";
 const std::string kExampleHeader{"x-example"};
-const char kExamplePayloadHeader[] = "x-example-payload";
 const std::string kOtherHeader{"x-other"};
-const char kOtherPayloadHeader[] = "x-other-payload";
-
 
 // Returns true if the jwt_header is empty, and the jwt_header payload exists.
 // Based on the JWT provider setup for this test, this matcher is equivalent to JWT verification
@@ -292,8 +288,7 @@ TEST_F(AllowFailedInAndListTest, OneGoodJwt) {
   verifier_->verify(context_);
   // In AND-mode, the allow-missing-or-failed reset the output payload. This could be an undesired
   // behavior.
-  EXPECT_FALSE(headers.has(kExampleHeader));
-  EXPECT_FALSE(headers.has(kExamplePayloadHeader));
+  EXPECT_THAT(headers, JwtOutputWeird(kExampleHeader));
 }
 
 TEST_F(AllowFailedInAndListTest, GoodAndBadJwts) {
@@ -305,8 +300,7 @@ TEST_F(AllowFailedInAndListTest, GoodAndBadJwts) {
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   // Same as above, output payload is reset.
-  EXPECT_FALSE(headers.has(kExampleHeader));
-  EXPECT_FALSE(headers.has(kExamplePayloadHeader));
+  EXPECT_THAT(headers, JwtOutputWeird(kExampleHeader));
   // The bad, non-required token won't affect the verification status though.
   EXPECT_THAT(headers, JwtOutputFailed(kOtherHeader));
 }
@@ -320,8 +314,7 @@ TEST_F(AllowFailedInAndListTest, TwoGoodJwts) {
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   // Same as above, output payload is reset.
-  EXPECT_FALSE(headers.has(kExampleHeader));
-  EXPECT_FALSE(headers.has(kExamplePayloadHeader));
+  EXPECT_THAT(headers, JwtOutputWeird(kExampleHeader));
   // The *other* JWT is processed by allow_missing_or_failed, and actually output payload.
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
