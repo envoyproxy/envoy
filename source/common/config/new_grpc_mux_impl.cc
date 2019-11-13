@@ -225,8 +225,8 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            Runtime::RandomGenerator& random, Stats::Scope& scope,
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-    : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher),
-                  skip_subsequent_node, local_info),
+    : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
+                  local_info),
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings) {}
 
@@ -260,8 +260,8 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-    : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
-                  skip_subsequent_node, local_info),
+    : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
+                  local_info),
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings) {}
 
