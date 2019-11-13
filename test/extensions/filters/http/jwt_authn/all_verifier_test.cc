@@ -56,17 +56,9 @@ MATCHER_P(JwtOutputSuccess, jwt_header, "") {
 // Returns true if the jwt_header exists, and the jwt_header payload is empty.
 // Based on the JWT provider setup for this test, this matcher is equivalent to JWT verification
 // was failed.
-MATCHER_P(JwtOutputFailed, jwt_header, "") {
+MATCHER_P(JwtOutputFailedOrIgnore, jwt_header, "") {
   auto payload_header = absl::StrCat(jwt_header, "-payload");
   return arg.has(std::string(jwt_header)) && !arg.has(payload_header);
-}
-
-// Returns true if both jwt_header and jwt_header payload are empty.
-// This is probably an undesirable outcome of JWT validation and should be fixed in the future.
-// We will address this as part of https://github.com/envoyproxy/envoy/issues/8909
-MATCHER_P(JwtOutputWeird, jwt_header, "") {
-  auto payload_header = absl::StrCat(jwt_header, "-payload");
-  return !arg.has(std::string(jwt_header)) && !arg.has(payload_header);
 }
 
 class AllVerifierTest : public testing::Test {
@@ -82,19 +74,6 @@ public:
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
                                  *filter_config_);
-  }
-
-  void addTokenLocation(const std::vector<std::string>& headers) {
-    for (const auto& it : headers) {
-      auto header =
-        (*proto_config_.mutable_providers())[std::string(ProviderName)].add_from_headers();
-      header->set_name(it);
-      header->set_value_prefix("Prefix ");
-    }
-  }
-
-  void modifyRequirement(const std::string& yaml) {
-    TestUtility::loadFromYaml(yaml, *proto_config_.mutable_rules(0)->mutable_requires());
   }
 
   void modifyRequirement(const std::string& yaml) {
@@ -123,7 +102,6 @@ TEST_F(AllVerifierTest, TestAllAllow) {
   verifier_->verify(context_);
 }
 
-<<<<<<< HEAD
 // tests requires allow missing or failed. The `allow_missing_or_failed` is defined in a single
 // requirement by itself.
 class AllowFailedInSingleRequirementTest : public AllVerifierTest {
@@ -134,20 +112,6 @@ protected:
     createVerifier();
   }
 };
-=======
-// tests requires allow missing or failed
-TEST_F(AllVerifierTest, TestAllowFailed) {
-  addTokenLocation({"a", "b", "c"});
-  const char allow_failed_yaml[] = R"(
-requires_any:
-  requirements:
-  - provider_name: "example_provider"
-  - allow_missing_or_failed: {}
-)";
-  modifyRequirement(allow_failed_yaml);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
->>>>>>> Fix tests
 
 TEST_F(AllowFailedInSingleRequirementTest, NoJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
@@ -161,7 +125,7 @@ TEST_F(AllowFailedInSingleRequirementTest, BadJwt) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailed(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, OneGoodJwt) {
@@ -169,7 +133,9 @@ TEST_F(AllowFailedInSingleRequirementTest, OneGoodJwt) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  // As requirment has nothing except allow_missing_or_failed, it will
+  // not try to check any token.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, TwoGoodJwts) {
@@ -178,8 +144,8 @@ TEST_F(AllowFailedInSingleRequirementTest, TwoGoodJwts) {
       Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
-  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, GoodAndBadJwts) {
@@ -187,8 +153,8 @@ TEST_F(AllowFailedInSingleRequirementTest, GoodAndBadJwts) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
-  EXPECT_THAT(headers, JwtOutputFailed(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 // The `allow_missing_or_failed` is defined in an OR-list of requirements.
@@ -219,7 +185,7 @@ TEST_F(AllowFailedInOrListTest, BadJwt) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailed(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
 TEST_F(AllowFailedInOrListTest, GoodAndBadJwt) {
@@ -229,7 +195,7 @@ TEST_F(AllowFailedInOrListTest, GoodAndBadJwt) {
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
-  EXPECT_THAT(headers, JwtOutputFailed(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 TEST_F(AllowFailedInOrListTest, TwoGoodJwts) {
@@ -241,7 +207,7 @@ TEST_F(AllowFailedInOrListTest, TwoGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
   // Note: the first (provider) requirement is satisfied, so the allow_missing_or_failed has not
   // kicked in yet.
-  EXPECT_THAT(headers, JwtOutputFailed(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 TEST_F(AllowFailedInOrListTest, BadAndGoodJwts) {
@@ -250,10 +216,9 @@ TEST_F(AllowFailedInOrListTest, BadAndGoodJwts) {
       Http::TestHeaderMapImpl{{kExampleHeader, ExpiredToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailed(kExampleHeader));
-  // Note: the first (provider) requirement is failed, so the allow_missing_or_failed run and
-  // validate token by x-other (even though not require).
-  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  // Token in x-other is not required, so it will be ignore.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 // The `allow_missing_or_failed` is defined in an AND-list of requirements.
@@ -284,7 +249,7 @@ TEST_F(AllowFailedInAndListTest, BadJwt) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailed(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
 TEST_F(AllowFailedInAndListTest, OneGoodJwt) {
@@ -294,9 +259,7 @@ TEST_F(AllowFailedInAndListTest, OneGoodJwt) {
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // In AND-mode, the allow-missing-or-failed reset the output payload. This could be an undesired
-  // behavior.
-  EXPECT_THAT(headers, JwtOutputWeird(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
 }
 
 TEST_F(AllowFailedInAndListTest, GoodAndBadJwts) {
@@ -305,10 +268,9 @@ TEST_F(AllowFailedInAndListTest, GoodAndBadJwts) {
       Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // Same as above, output payload is reset.
-  EXPECT_THAT(headers, JwtOutputWeird(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
   // The bad, non-required token won't affect the verification status though.
-  EXPECT_THAT(headers, JwtOutputFailed(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 TEST_F(AllowFailedInAndListTest, TwoGoodJwts) {
@@ -317,10 +279,9 @@ TEST_F(AllowFailedInAndListTest, TwoGoodJwts) {
       Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // Same as above, output payload is reset.
-  EXPECT_THAT(headers, JwtOutputWeird(kExampleHeader));
-  // The *other* JWT is processed by allow_missing_or_failed, and actually output payload.
-  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  // The JWT in x-other is ignored.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
 class AllowFailedInAndOfOrListTest : public AllVerifierTest {
@@ -356,7 +317,7 @@ TEST_F(AllowFailedInAndOfOrListTest, BadJwt) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailed(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, OneGoodJwt) {
@@ -364,9 +325,7 @@ TEST_F(AllowFailedInAndOfOrListTest, OneGoodJwt) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // Output payload is reset due to the second allow_missing_or_failed. Again, this is not
-  // a desirable state.
-  EXPECT_THAT(headers, JwtOutputWeird(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, OtherGoodJwt) {
@@ -374,8 +333,7 @@ TEST_F(AllowFailedInAndOfOrListTest, OtherGoodJwt) {
   auto headers = Http::TestHeaderMapImpl{{kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // Same here, payload for other token is reset.
-  EXPECT_THAT(headers, JwtOutputWeird(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, BadAndGoodJwt) {
@@ -384,8 +342,8 @@ TEST_F(AllowFailedInAndOfOrListTest, BadAndGoodJwt) {
       Http::TestHeaderMapImpl{{kExampleHeader, ExpiredToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailed(kExampleHeader));
-  EXPECT_THAT(headers, JwtOutputWeird(kOtherHeader));
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, TwoGoodJwts) {
@@ -398,121 +356,33 @@ TEST_F(AllowFailedInAndOfOrListTest, TwoGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
-TEST_F(AllVerifierTest, TestAllowFailed_InOrListMissing) {
-  addTokenLocation({"a", "b", "c"});
-  const char allow_failed_yaml[] = R"(
+// The `allow_missing` is defined in an OR-list of requirements.
+class AllowMissingInOrListTest : public AllVerifierTest {
+protected:
+  void SetUp() override {
+    AllVerifierTest::SetUp();
+    const char allow_failed_yaml[] = R"(
 requires_any:
   requirements:
   - provider_name: "example_provider"
-  - allow_missing_or_failed: {}
+  - allow_missing: {}
 )";
-  modifyRequirement(allow_failed_yaml);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+    modifyRequirement(allow_failed_yaml);
+    createVerifier();
+  }
+};
 
+TEST_F(AllowMissingInOrListTest, NoJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
 
-TEST_F(AllVerifierTest, TestAllowFailed_InOrListFailed) {
-  addTokenLocation({"a", "b", "c"});
-  const char allow_failed_yaml[] = R"(
-requires_any:
-  requirements:
-  - provider_name: "example_provider"
-  - allow_missing_or_failed: {}
-)";
-  modifyRequirement(allow_failed_yaml);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
-      {"b", "Prefix " + std::string(NonExistKidToken)}
-  };
-  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
-  verifier_->verify(context_);
-}
-
-TEST_F(AllVerifierTest, TestAllowFailed_InAndList) {
-  addTokenLocation({"a", "b", "c"});
-  const char allow_failed_yaml[] = R"(
-requires_all:
-  requirements:
-  - provider_name: "example_provider"
-  - allow_missing_or_failed: {}
-)";
-  modifyRequirement(allow_failed_yaml);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
-
-  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
-  verifier_->verify(context_);
-}
-
-TEST_F(AllVerifierTest, TestAllowMissing) {
-  addTokenLocation({"a", "b", "c"});
-  const char allow_missing_yaml[] = R"(
-requires_any:
-  requirements:
-  - provider_name: "example_provider"
-  - allow_missing: {}
-)";
-  modifyRequirement(allow_missing_yaml);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
-      {"a", "Prefix " + std::string(GoodToken)},
-      {"b", "Prefix " + std::string(NonExistKidToken)},
-      {"c", "Prefix "},
-  };
-  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
-  verifier_->verify(context_);
-  EXPECT_FALSE(headers.has("a"));
-  EXPECT_TRUE(headers.has("b"));
-  EXPECT_TRUE(headers.has("c"));
-}
-
-TEST_F(AllVerifierTest, TestAllowMissing_InOrListMissing) {
-  addTokenLocation({"a", "b", "c"});
-  const char allow_failed_yaml[] = R"(
-requires_any:
-  requirements:
-  - provider_name: "example_provider"
-  - allow_missing: {}
-)";
-  modifyRequirement(allow_failed_yaml);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
-  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
-  verifier_->verify(context_);
-}
-
-TEST_F(AllVerifierTest, TestAllowMissing_InOrListFailed) {
-  addTokenLocation({"a", "b", "c"});
-  const char allow_failed_yaml[] = R"(
-requires_any:
-  requirements:
-  - provider_name: "example_provider"
-  - allow_missing: {}
-)";
-  modifyRequirement(allow_failed_yaml);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
+TEST_F(AllowMissingInOrListTest, BadJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
-      {"b", "Prefix " + std::string(NonExistKidToken)}
+      {kExampleHeader, NonExistKidToken}
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
