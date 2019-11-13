@@ -228,7 +228,7 @@ TEST_F(AllowFailedInOrListTest, BadAndGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
-// The `allow_missing_or_failed` is defined in an AND-list of requirments.
+// The `allow_missing_or_failed` is defined in an AND-list of requirements.
 class AllowFailedInAndListTest : public AllVerifierTest {
 protected:
   void SetUp() override {
