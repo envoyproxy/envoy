@@ -41,9 +41,8 @@ GradientControllerConfig::GradientControllerConfig(
                                                     max_gradient, 2.0)),
       sample_aggregate_percentile_(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)),
-      min_concurrency_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), min_concurrency, 3))
-  {}
+      min_concurrency_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(),
+                                                       min_concurrency, 3)) {}
 
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
