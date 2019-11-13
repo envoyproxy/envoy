@@ -10,10 +10,6 @@
 namespace Envoy {
 namespace Quic {
 
-namespace {
-const size_t kNumSessionsToCreatePerEpoll = 16;
-}
-
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::ListenerConfig& listener_config,
