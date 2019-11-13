@@ -255,7 +255,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     expectSendMessage(
         "type_url_foo", {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
         absl::Substitute("type URL type_url_bar embedded in an individual Any does not match the "
-                         "message-wide type URL type_url_foo in DiscoveryResponse $1",
+                         "message-wide type URL type_url_foo in DiscoveryResponse $0",
                          invalid_response->DebugString()));
     grpc_mux_->onDiscoveryResponse(std::move(invalid_response));
   }
