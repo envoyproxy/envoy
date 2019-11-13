@@ -32,19 +32,15 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
   stats_.update_attempt_.inc();
 }
 
+void GrpcSubscriptionImpl::requestAliasResolution(const std::set<std::string>& aliases) {
+  grpc_mux_->requestAliasesResolution(type_url_, aliases);
+}
+
 void GrpcSubscriptionImpl::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
   watch_ = grpc_mux_->addOrUpdateWatch(type_url_, watch_, update_to_these_names, *this,
                                        init_fetch_timeout_);
   stats_.update_attempt_.inc();
-}
-
-void DeltaSubscriptionImpl::requestAliasResolution(const std::set<std::string>& aliases) {
-  context_->requestAliasesResolution(type_url_, aliases);
-}
-
-void DeltaSubscriptionImpl::addResourceAliases(const std::set<std::string>& aliases) {
-  context_->requestAliasesResolution(type_url_, aliases);
 }
 
 // Config::SubscriptionCallbacks

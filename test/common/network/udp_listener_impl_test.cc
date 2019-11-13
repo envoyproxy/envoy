@@ -409,14 +409,15 @@ TEST_P(UdpListenerImplTest, SendData) {
   do {
     Api::IoCallUint64Result result = Network::Test::readFromSocket(
         client_socket_->ioHandle(), *client_socket_->localAddress(), data);
-    if (result.rc_ >= 0) {
-      bytes_read = result.rc_;
-      EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
-    } else if (retry == 10 || result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+
+    bytes_read = result.rc_;
+    EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
+
+    if (bytes_read >= bytes_to_read) {
       break;
     }
 
-    if (bytes_read >= bytes_to_read) {
+    if (retry == 10 || result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       break;
     }
 

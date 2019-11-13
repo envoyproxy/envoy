@@ -194,6 +194,7 @@ public:
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   void disableInitFetchTimeoutTimer() override {}
+  void requestAliasesResolution(const std::string&, const std::set<std::string>&) override {}
 };
 
 } // namespace Config
