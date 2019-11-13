@@ -30,7 +30,7 @@ void Filter::onDestroy() {
   }
 }
 
-bool isCorsPreflightRequest(const Http::HeaderMap& headers) {
+bool isCORSPreflightRequest(const Http::HeaderMap& headers) {
   return headers.Method() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
          headers.Origin() && !headers.Origin()->value().empty() &&
@@ -44,10 +44,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   state_ = Calling;
   stopped_ = false;
 
-  if (isCorsPreflightRequest(headers)) {
-    // The CORS preflight doesn't include user credentials, allow regardless of JWT policy.
+  if (config_->bypassCORSPreflightRequest() && isCORSPreflightRequest(headers)) {
+    // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
     // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
-    ENVOY_LOG(debug, "CORS preflight request allowed regardless of JWT policy");
+    ENVOY_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements");
     stats_.cors_preflight_bypassed_.inc();
     onComplete(Status::Ok);
     return Http::FilterHeadersStatus::Continue;

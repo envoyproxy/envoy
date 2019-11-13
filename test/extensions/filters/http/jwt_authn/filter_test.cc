@@ -39,6 +39,7 @@ public:
 class FilterTest : public testing::Test {
 public:
   void SetUp() override {
+    proto_config_.set_bypass_cors_preflight(true);
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
 
     mock_verifier_ = std::make_unique<MockVerifier>();
