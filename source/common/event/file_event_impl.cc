@@ -41,17 +41,13 @@ void FileEventImpl::activate(uint32_t events) {
 }
 
 void FileEventImpl::assignEventBase(event_base* base) {
-  //  ASSERT(-1 !=event_base_set(base, &raw_event_));
+  // we cannot use below
+  // ASSERT(-1 !=event_base_set(base, &raw_event_));
   raw_event_.ev_base = base;
 }
 
 void FileEventImpl::assignEvents(uint32_t events) {
-  {
-    event_base* base_out;
-    event_get_assignment(&raw_event_, &base_out, nullptr, nullptr, nullptr, nullptr);
-    ASSERT(base_ == base_out);
-  }
-
+  ASSERT(base_ == event_get_base(&raw_event_));
   event_assign(
       &raw_event_, base_, fd_,
       EV_PERSIST | (trigger_ == FileTriggerType::Level ? 0 : EV_ET) |
