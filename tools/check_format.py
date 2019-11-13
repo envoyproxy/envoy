@@ -75,7 +75,7 @@ GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN") or (os.path.expandvars("$GOPATH/bin/buildifier") if
-                                                os.getenv("GOPATH") else shutil.which("buildozer"))
+                                                os.getenv("GOPATH") else shutil.which("buildifier"))
 BUILDOZER_PATH = os.getenv("BUILDOZER_BIN") or (os.path.expandvars("$GOPATH/bin/buildozer") if
                                                 os.getenv("GOPATH") else shutil.which("buildozer"))
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
