@@ -1,3 +1,5 @@
+#include "extensions/filters/http/jwt_authn/authenticator.h"
+
 #include "envoy/http/async_client.h"
 
 #include "common/common/assert.h"
@@ -7,8 +9,6 @@
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/http/jwt_authn/authenticator.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"

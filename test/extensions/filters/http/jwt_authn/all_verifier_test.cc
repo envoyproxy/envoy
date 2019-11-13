@@ -133,7 +133,7 @@ TEST_F(AllowFailedInSingleRequirementTest, OneGoodJwt) {
   auto headers = Http::TestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // As requirment has nothing except allow_missing_or_failed, it will
+  // As requirement has nothing except allow_missing_or_failed, it will
   // not try to check any token.
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }

@@ -1,11 +1,11 @@
+#include "extensions/filters/http/jwt_authn/extractor.h"
+
 #include <memory>
 
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
-
-#include "extensions/filters/http/jwt_authn/extractor.h"
 
 #include "absl/strings/match.h"
 
