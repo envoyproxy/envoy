@@ -686,8 +686,8 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedResponseWithTrailers) {
+  codec_settings_.enable_trailers_ = true;
   initialize();
-
   NiceMock<Http::MockStreamDecoder> decoder;
   Http::StreamEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
