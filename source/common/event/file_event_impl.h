@@ -24,13 +24,9 @@ public:
   void setEnabled(uint32_t events) override;
 
 private:
-  // TODO(lambdai): remove it once verification is done.
-  void assignEventBase(event_base* base);
-
-  void assignEvents(uint32_t events);
+  void assignEvents(uint32_t events, event_base* base);
 
   FileReadyCb cb_;
-  event_base* base_;
   int fd_;
   FileTriggerType trigger_;
 };
