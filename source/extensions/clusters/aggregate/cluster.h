@@ -43,7 +43,7 @@ public:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   ThreadLocal::SlotPtr tls_;
-  std::vector<std::string> clusters_;
+  const std::vector<std::string> clusters_;
 
 private:
   // Upstream::ClusterImplBase
