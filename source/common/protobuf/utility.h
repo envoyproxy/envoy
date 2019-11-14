@@ -335,15 +335,6 @@ public:
                                               bool always_print_primitive_fields = false);
 
   /**
-   * Extract JSON object from a google.protobuf.Message.
-   * @param message message of type type.googleapis.com/google.protobuf.Message.
-   * @return Json::ObjectSharedPtr of JSON object or nullptr if unable to extract.
-   */
-  static Json::ObjectSharedPtr getJsonObjectFromMessage(const Protobuf::Message& message) {
-    return Json::Factory::loadFromString(MessageUtil::getJsonStringFromMessage(message));
-  }
-
-  /**
    * Utility method to create a Struct containing the passed in key/value strings.
    *
    * @param key the key to use to set the value
