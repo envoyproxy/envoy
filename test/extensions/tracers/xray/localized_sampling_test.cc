@@ -522,7 +522,7 @@ TEST_F(LocalizedSamplingStrategyTest, NoMatchingHost) {
   ASSERT_FALSE(strategy.usingDefaultManifest());
 
   SamplingRequest req;
-  req.host = "amazon.com"; // host does not match, so default rules apply.
+  req.host_ = "amazon.com"; // host does not match, so default rules apply.
   int i = 10;
   while (i-- > 0) {
     ASSERT_FALSE(strategy.shouldTrace(req));
@@ -560,7 +560,7 @@ TEST_F(LocalizedSamplingStrategyTest, NoMatchingHttpMethod) {
   ASSERT_FALSE(strategy.usingDefaultManifest());
 
   SamplingRequest req;
-  req.http_method = "GET"; // method does not match, so default rules apply.
+  req.http_method_ = "GET"; // method does not match, so default rules apply.
   int i = 10;
   while (i-- > 0) {
     ASSERT_FALSE(strategy.shouldTrace(req));
@@ -598,7 +598,7 @@ TEST_F(LocalizedSamplingStrategyTest, NoMatchingPath) {
   ASSERT_FALSE(strategy.usingDefaultManifest());
 
   SamplingRequest req;
-  req.http_url = "/"; // method does not match, so default rules apply.
+  req.http_url_ = "/"; // method does not match, so default rules apply.
   int i = 10;
   while (i-- > 0) {
     ASSERT_FALSE(strategy.shouldTrace(req));

@@ -15,9 +15,9 @@ namespace Tracers {
 namespace XRay {
 
 struct SamplingRequest {
-  std::string host;
-  std::string http_method;
-  std::string http_url;
+  std::string host_;
+  std::string http_method_;
+  std::string http_url_;
 };
 
 /**

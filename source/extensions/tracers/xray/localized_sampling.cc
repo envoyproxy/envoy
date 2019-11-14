@@ -77,9 +77,9 @@ LocalizedSamplingRule LocalizedSamplingRule::createDefault() {
 }
 
 bool LocalizedSamplingRule::appliesTo(const SamplingRequest& request) const {
-  return (request.host.empty() || wildcardMatch(host_, request.host)) &&
-         (request.http_method.empty() || wildcardMatch(http_method_, request.http_method)) &&
-         (request.http_url.empty() || wildcardMatch(url_path_, request.http_url));
+  return (request.host_.empty() || wildcardMatch(host_, request.host_)) &&
+         (request.http_method_.empty() || wildcardMatch(http_method_, request.http_method_)) &&
+         (request.http_url_.empty() || wildcardMatch(url_path_, request.http_url_));
 }
 
 LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_json)
