@@ -1,5 +1,6 @@
 #include "common/protobuf/utility.h"
 
+#include <limits>
 #include <numeric>
 
 #include "envoy/protobuf/message_validator.h"
@@ -56,7 +57,10 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
     }
     int64_t int_value;
     if (YAML::convert<int64_t>::decode(node, int_value)) {
-      if (static_cast<int64_t>(static_cast<double>(int_value)) == int_value) {
+      if (std::numeric_limits<int32_t>::min() <= int_value &&
+          std::numeric_limits<int32_t>::max() >= int_value) {
+        // We could convert all integer values to string but it will break some stuff relying on
+        // ProtobufWkt::Struct itself, only convert small numbers into number_value here.
         value.set_number_value(int_value);
       } else {
         // Proto3 JSON mapping allows use string for integer, this still has to be converted from
@@ -384,7 +388,20 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
                                                   const bool block_print,
                                                   const bool always_print_primitive_fields) {
   std::string json = getJsonStringFromMessage(message, false, always_print_primitive_fields);
-  auto node = YAML::Load(json);
+  YAML::Node node;
+  try {
+    node = YAML::Load(json);
+  } catch (YAML::ParserException& e) {
+    throw EnvoyException(e.what());
+  } catch (YAML::BadConversion& e) {
+    throw EnvoyException(e.what());
+  } catch (std::exception& e) {
+    // There is a potentially wide space of exceptions thrown by the YAML parser,
+    // and enumerating them all may be difficult. Envoy doesn't work well with
+    // unhandled exceptions, so we capture them and record the exception name in
+    // the Envoy Exception text.
+    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
+  }
   if (block_print) {
     blockFormat(node);
   }
