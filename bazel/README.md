@@ -46,6 +46,7 @@ for how to update or override dependencies.
        cmake \
        automake \
        autoconf \
+       libc++1 \
        make \
        ninja-build \
        curl \
