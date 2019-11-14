@@ -72,8 +72,6 @@ public:
   // again.
   IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn) override {
     IntegrationCodecClientPtr codec = HttpIntegrationTest::makeRawHttpConnection(std::move(conn));
-    ASSERT(!codec->connected());
-    dynamic_cast<EnvoyQuicClientSession*>(codec->connection())->cryptoConnect();
     if (codec->disconnected()) {
       // Connection may get closed during version negotiation or handshake.
       ENVOY_LOG(error, "Fail to connect to server with error: {}",

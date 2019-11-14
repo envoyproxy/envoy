@@ -63,12 +63,7 @@ IntegrationCodecClient::IntegrationCodecClient(
       callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
-  if (type != CodecClient::Type::HTTP3) {
-    // Only expect to have IO event if it's not QUIC. Because call to connect() in CodecClientProd
-    // for QUIC doesn't send anything to server, but just register file event. QUIC connection won't
-    // have any IO event till cryptoConnect() is called later.
-    dispatcher.run(Event::Dispatcher::RunType::Block);
-  }
+  dispatcher.run(Event::Dispatcher::RunType::Block);
 }
 
 void IntegrationCodecClient::flushWrite() {
@@ -188,6 +183,13 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   } else {
+    if (parent_.type() == CodecClient::Type::HTTP3 && !parent_.connected_) {
+      // A QUIC connection may fail of INVALID_VERSION if both this client
+      // doesn't support any of the versions the server advertised before
+      // handshake established. In this case the connection is closed locally
+      // and this is in a blocking event loop.
+      parent_.connection_->dispatcher().exit();
+    }
     parent_.disconnected_ = true;
   }
 }

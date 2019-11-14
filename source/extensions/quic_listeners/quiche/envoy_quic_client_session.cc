@@ -24,6 +24,10 @@ absl::string_view EnvoyQuicClientSession::requestedServerName() const {
 
 void EnvoyQuicClientSession::connect() {
   dynamic_cast<EnvoyQuicClientConnection*>(quic_connection_)->setUpConnectionSocket();
+  // Start version negotiation and crypto handshake during which the connection may fail if server
+  // doesn't support the one and only supported version.
+  CryptoConnect();
+  set_max_allowed_push_id(0u);
 }
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
@@ -51,13 +55,6 @@ void EnvoyQuicClientSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) 
   if (event == HANDSHAKE_CONFIRMED) {
     raiseEvent(Network::ConnectionEvent::Connected);
   }
-}
-
-void EnvoyQuicClientSession::cryptoConnect() {
-  CryptoConnect();
-  set_max_allowed_push_id(0u);
-  // Wait for finishing handshake with server.
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
