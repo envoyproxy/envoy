@@ -4,6 +4,7 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/extensions/transport_sockets/tls/test_data/long_validity_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -103,6 +104,14 @@ TEST(UtilityTest, TestExpirationTime) {
   const std::string formatted =
       TestUtility::formatTime(Utility::getExpirationTime(*cert), "%b %e %H:%M:%S %Y GMT");
   EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_AFTER, formatted);
+}
+
+TEST(UtilityTest, TestLongExpirationTime) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/long_validity_cert.pem"));
+  const std::string formatted =
+      TestUtility::formatTime(Utility::getExpirationTime(*cert), "%b %e %H:%M:%S %Y GMT");
+  EXPECT_EQ(TEST_LONG_VALIDITY_CERT_NOT_AFTER, formatted);
 }
 
 } // namespace

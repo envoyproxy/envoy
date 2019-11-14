@@ -1,12 +1,12 @@
 #pragma once
 
-#include <arpa/inet.h>
-
 #include <algorithm>
 #include <climits>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 
 #include "common/common/assert.h"

@@ -115,7 +115,6 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildRxQueueOverFlowOption
   return options;
 }
 
-
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::SocketOptionImpl>(

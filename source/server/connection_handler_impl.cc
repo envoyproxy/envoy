@@ -29,7 +29,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   ActiveListenerDetails details;
-  if (config.socket().socketType() == Network::Address::SocketType::Stream) {
+  if (config.listenSocketFactory().socketType() == Network::Address::SocketType::Stream) {
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
     details.tcp_listener_ = *tcp_listener;
     details.listener_ = std::move(tcp_listener);
@@ -38,12 +38,10 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
     details.listener_ =
         config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, config);
   }
-
   if (disable_listeners_) {
     details.listener_->listener()->disable();
   }
-
-  listeners_.emplace_back(config.socket().localAddress(), std::move(details));
+  listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
@@ -100,22 +98,20 @@ ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
           POOL_GAUGE_PREFIX(config.listenerScope(), parent.statPrefix()))}),
       config_(config) {}
 
-
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
                                                             Network::ListenerConfig& config)
+    : ActiveTcpListener(
+          parent,
+          parent.dispatcher_.createListener(config.listenSocketFactory().getListenSocket(), *this,
+                                            config.bindToPort()),
+          config) {}
+
+ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
+                                                            Network::ListenerPtr&& listener,
+                                                            Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), parent_(parent),
-      listener_filters_timeout_(config.listenerFiltersTimeout()),
+      listener_(std::move(listener)), listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {
-
-  if (config.reusePort()) {
-    socket_ = config.createReusePortSocket();
-    ENVOY_LOG(trace, "create network listener on fd {}", socket_->ioHandle().fd());
-    listener_ = parent.dispatcher_.createListener(*socket_, *this, config.bindToPort());
-  } else {
-    ENVOY_LOG(trace, "create network listener on fd {}", config.socket().ioHandle().fd());
-    listener_ = parent.dispatcher_.createListener(config.socket(), *this, config.bindToPort());
-  }
-
   config.connectionBalancer().registerHandler(*this);
 }
 
@@ -268,6 +264,11 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
       socket_->setDetectedTransportProtocol(
           Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
     }
+    // TODO(lambdai): add integration test
+    // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
+    // Erase accept filter states because accept filters may not get the opportunity to clean up.
+    // Particularly the assigned events need to reset before assigning new events in the follow up.
+    accept_filters_.clear();
     // Create a new connection on this listener.
     listener_.newConnection(std::move(socket_));
   }
@@ -408,7 +409,10 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
                                      Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
-    : ActiveUdpListener(parent, dispatcher.createUdpListener(config.socket(), *this), config) {}
+    : ActiveUdpListener(
+          parent,
+          dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
+          config) {}
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
                                      Network::UdpListenerPtr&& listener,

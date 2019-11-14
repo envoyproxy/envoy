@@ -129,7 +129,10 @@ public:
                void(SSL* ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
   MOCK_METHOD1(unregisterPrivateKeyMethod, void(SSL* ssl));
   MOCK_METHOD0(checkFips, bool());
+
+#ifdef OPENSSL_IS_BORINGSSL
   MOCK_METHOD0(getBoringSslPrivateKeyMethod, BoringSslPrivateKeyMethodSharedPtr());
+#endif
 };
 
 } // namespace Ssl

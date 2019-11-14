@@ -1,10 +1,7 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"

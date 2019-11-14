@@ -1050,7 +1050,7 @@ typed_config:
 )EOF";
 
   const auto desc = envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status_descriptor();
-  const int grpcStatuses = static_cast<int>(Grpc::Status::GrpcStatus::MaximumValid) + 1;
+  const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
   if (desc->value_count() != grpcStatuses) {
     FAIL() << "Mismatch in number of gRPC statuses, GrpcStatus has " << grpcStatuses
            << ", GrpcStatusFilter_Status has " << desc->value_count() << ".";
@@ -1172,7 +1172,7 @@ typed_config:
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  for (int i = 0; i <= static_cast<int>(Grpc::Status::GrpcStatus::MaximumValid); i++) {
+  for (int i = 0; i <= static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown); i++) {
     EXPECT_CALL(*file_, write(_)).Times(i == 0 ? 0 : 1);
 
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, std::to_string(i));
@@ -1253,7 +1253,8 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: test_header_filter
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.filter.accesslog.v2.HeaderFilter
       header:
         name: test-header
 typed_config:
@@ -1308,7 +1309,8 @@ public:
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(*factory_config);
-    return std::make_unique<SampleExtensionFilter>(filter_config->getInteger("rate"));
+    return std::make_unique<SampleExtensionFilter>(
+        static_cast<uint32_t>(filter_config->getInteger("rate")));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -1326,8 +1328,10 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: sample_extension_filter
-    config:
-      rate: 5
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        rate: 5
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
@@ -1352,8 +1356,10 @@ name: envoy.file_access_log
 filter:
   extension_filter:
     name: unregistered_extension_filter
-    config:
-      foo: bar
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        foo: bar
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null

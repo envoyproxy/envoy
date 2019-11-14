@@ -234,6 +234,22 @@ public:
 };
 
 /**
+ * Formatter based on the FilterState from StreamInfo.
+ */
+class FilterStateFormatter : public FormatterProvider {
+public:
+  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length);
+
+  // FormatterProvider::format
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
+                     const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  std::string key_;
+  absl::optional<size_t> max_length_;
+};
+
+/**
  * Formatter
  */
 class StartTimeFormatter : public FormatterProvider {

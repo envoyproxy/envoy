@@ -1,4 +1,4 @@
-#include <unistd.h>
+#include "envoy/common/platform.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"

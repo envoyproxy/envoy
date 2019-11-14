@@ -5,15 +5,19 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/stats/symbol_table_impl.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -97,7 +101,7 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   for (const Stats::Tag& tag : tags) {
     tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
   }
-  return "|#" + StringUtil::join(tag_strings, ",");
+  return "|#" + absl::StrJoin(tag_strings, ",");
 }
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,

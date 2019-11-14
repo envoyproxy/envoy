@@ -1,9 +1,7 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include "envoy/api/v2/core/address.pb.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/logger.h"

@@ -15,7 +15,7 @@ absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   if (header == nullptr) {
     return {};
   }
-  return CelValue::CreateString(header->value().getStringView());
+  return CelValue::CreateStringView(header->value().getStringView());
 }
 
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
@@ -91,9 +91,9 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
       absl::string_view path = headers_.value_->Path()->value().getStringView();
       size_t query_offset = path.find('?');
       if (query_offset == absl::string_view::npos) {
-        return CelValue::CreateString(path);
+        return CelValue::CreateStringView(path);
       }
-      return CelValue::CreateString(path.substr(0, query_offset));
+      return CelValue::CreateStringView(path.substr(0, query_offset));
     } else if (value == Host) {
       return convertHeaderEntry(headers_.value_->Host());
     } else if (value == Scheme) {
@@ -129,6 +129,8 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateMap(&headers_);
   } else if (value == Trailers) {
     return CelValue::CreateMap(&trailers_);
+  } else if (value == Flags) {
+    return CelValue::CreateInt64(info_.responseFlags());
   }
   return {};
 }
@@ -161,7 +163,7 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
   if (value == Address) {
     auto upstream_host = info_.upstreamHost();
     if (upstream_host != nullptr && upstream_host->address() != nullptr) {
-      return CelValue::CreateString(upstream_host->address()->asStringView());
+      return CelValue::CreateStringView(upstream_host->address()->asStringView());
     }
   } else if (value == Port) {
     auto upstream_host = info_.upstreamHost();
@@ -186,9 +188,9 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (value == Address) {
     if (local_) {
-      return CelValue::CreateString(info_.downstreamLocalAddress()->asStringView());
+      return CelValue::CreateStringView(info_.downstreamLocalAddress()->asStringView());
     } else {
-      return CelValue::CreateString(info_.downstreamRemoteAddress()->asStringView());
+      return CelValue::CreateStringView(info_.downstreamRemoteAddress()->asStringView());
     }
   } else if (value == Port) {
     if (local_) {

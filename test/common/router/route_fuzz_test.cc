@@ -87,13 +87,13 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     // It's a precondition of routing that {:authority, :path, x-forwarded-proto} headers exists,
     // HCM enforces this.
     if (headers.Host() == nullptr) {
-      headers.insertHost().value(std::string("example.com"));
+      headers.setHost("example.com");
     }
     if (headers.Path() == nullptr) {
-      headers.insertPath().value(std::string("/"));
+      headers.setPath("/");
     }
     if (headers.ForwardedProto() == nullptr) {
-      headers.insertForwardedProto().value(std::string("http"));
+      headers.setForwardedProto("http");
     }
     auto route = config.route(headers, stream_info, input.random_value());
     if (route != nullptr && route->routeEntry() != nullptr) {

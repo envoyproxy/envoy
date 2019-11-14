@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -27,13 +28,15 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":datadog_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
+        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
