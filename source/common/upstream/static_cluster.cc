@@ -1,4 +1,5 @@
 #include "common/upstream/static_cluster.h"
+#include "envoy/common/exception.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -6,7 +7,7 @@ namespace Upstream {
 StaticClusterImpl::StaticClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api, bool zone_aware)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
@@ -19,6 +20,10 @@ StaticClusterImpl::StaticClusterImpl(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    if (zone_aware && locality_lb_endpoint.priority() != 0) {
+      throw EnvoyException(
+          "Cannot use endpoints with non-zero priority when using zone aware routing.");
+    }
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
@@ -57,7 +62,8 @@ StaticClusterFactory::createClusterImpl(
     Stats::ScopePtr&& stats_scope) {
   return std::make_pair(
       std::make_shared<StaticClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                          std::move(stats_scope), context.addedViaApi()),
+                                          std::move(stats_scope), context.addedViaApi(),
+                                          !context.clusterManager().localClusterName().empty()),
       nullptr);
 }
 

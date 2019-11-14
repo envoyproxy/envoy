@@ -264,10 +264,10 @@ public:
                                         const Network::ConnectionSocket::OptionsSharedPtr& options,
                                         Network::TransportSocketOptionsSharedPtr));
 
-  MOCK_METHOD4(clusterFromProto,
-               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>(
-                   const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
+  MOCK_METHOD5(clusterFromProto, std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>(
+                                     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                     bool added_via_api, bool zone_aware));
 
   MOCK_METHOD2(createCds,
                CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));

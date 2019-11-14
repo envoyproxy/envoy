@@ -15,7 +15,7 @@ public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                        Network::DnsResolverSharedPtr dns_resolver,
                        Server::Configuration::TransportSocketFactoryContext& factory_context,
-                       Stats::ScopePtr&& stats_scope, bool added_via_api);
+                       Stats::ScopePtr&& stats_scope, bool added_via_api, bool zone_aware);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

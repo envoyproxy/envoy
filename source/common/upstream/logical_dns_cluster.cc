@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -37,6 +38,11 @@ LogicalDnsCluster::LogicalDnsCluster(
       cluster, dns_refresh_rate_ms_.count(), factory_context.random());
 
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
+  if (!locality_lb_endpoints.empty() && locality_lb_endpoints[0].priority() != 0) {
+    throw EnvoyException(
+        "Cannot use endpoints with non-zero priority when using zone aware routing.");
+  }
+
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
     if (cluster.has_load_assignment()) {
       throw EnvoyException(

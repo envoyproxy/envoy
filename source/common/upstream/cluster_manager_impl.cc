@@ -220,6 +220,14 @@ ClusterManagerImpl::ClusterManagerImpl(
     }
   }
 
+  // We need to know whether we're zone aware  early on, so make sure we do this lookup
+  // before we load any clusters.
+  absl::optional<std::string> local_cluster_name;
+  if (!cm_config.local_cluster_name().empty()) {
+    local_cluster_name_ = cm_config.local_cluster_name();
+    local_cluster_name = cm_config.local_cluster_name();
+  }
+
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
@@ -288,14 +296,10 @@ ClusterManagerImpl::ClusterManagerImpl(
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateClusterCounts();
 
-  absl::optional<std::string> local_cluster_name;
-  if (!cm_config.local_cluster_name().empty()) {
-    local_cluster_name_ = cm_config.local_cluster_name();
-    local_cluster_name = cm_config.local_cluster_name();
-    if (active_clusters_.find(local_cluster_name.value()) == active_clusters_.end()) {
-      throw EnvoyException(
-          fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
-    }
+  if (local_cluster_name &&
+      (active_clusters_.find(local_cluster_name.value()) == active_clusters_.end())) {
+    throw EnvoyException(
+        fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
   }
 
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
@@ -646,7 +650,8 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
                                      const std::string& version_info, bool added_via_api,
                                      ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api,
+                                !local_cluster_name_.empty());
   auto& new_cluster = new_cluster_pair.first;
   Cluster& cluster_reference = *new_cluster;
 
@@ -1340,14 +1345,14 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, bool zone_aware) {
   return ClusterFactoryImplBase::create(
       cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
       outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
-      api_);
+      api_, zone_aware);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,

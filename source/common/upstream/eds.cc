@@ -10,10 +10,10 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api, bool zone_aware)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
-      cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
+      zone_aware_(zone_aware), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
@@ -43,8 +43,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
 
-    if (priority > 0 && !parent_.cluster_name_.empty() &&
-        parent_.cluster_name_ == parent_.cm_.localClusterName()) {
+    if (priority > 0 && !parent_.cluster_name_.empty() && parent_.zone_aware_) {
       throw EnvoyException(fmt::format("Unexpected non-zero priority for local cluster '{}'.",
                                        parent_.cluster_name_));
     }
@@ -273,10 +272,10 @@ EdsClusterFactory::createClusterImpl(
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(
-      std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                       std::move(stats_scope), context.addedViaApi()),
-      nullptr);
+  return std::make_pair(std::make_unique<EdsClusterImpl>(
+                            cluster, context.runtime(), socket_factory_context,
+                            std::move(stats_scope), context.addedViaApi(), context.zoneAware()),
+                        nullptr);
 }
 
 /**
