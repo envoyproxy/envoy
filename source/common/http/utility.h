@@ -395,6 +395,13 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
   return merged;
 }
 
+/**
+ * Read available packets from a given UDP socket and pass the packet to a given	   * Check
+ * whether that is valid FQDN or IPv4/IPv6 address, if host is IPv4 or IPv6, that returns true
+ * @param host is hostname
+ * @return if true, passed host is not FQDN
+ */
+bool isIpAddress(const std::string& host);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

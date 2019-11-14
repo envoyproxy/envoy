@@ -754,6 +754,22 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   EXPECT_EQ(2, merged_cfg.value().state_);
 }
 
+TEST(HttpUtility, CheckIsIpAddress) {
+  EXPECT_TRUE(Utility::isIpAddress("1.2.3.4"));
+  EXPECT_TRUE(Utility::isIpAddress("1.2.3.4:0"));
+  EXPECT_TRUE(Utility::isIpAddress("0.0.0.0:0"));
+  EXPECT_TRUE(Utility::isIpAddress("127.0.0.1:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[::1]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[::]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[1::2:3]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("fd12:3456:7890:1234:5678:9012:3456:7890"));
+  EXPECT_TRUE(Utility::isIpAddress("[a::1]:0"));
+  EXPECT_TRUE(Utility::isIpAddress("[a:b:c:d::]:0"));
+  EXPECT_FALSE(Utility::isIpAddress("hoge.hoge.com"));
+  EXPECT_FALSE(Utility::isIpAddress("hoge.hoge.com:8000"));
+  EXPECT_FALSE(Utility::isIpAddress("hoge"));
+}
+
 TEST(Url, ParsingFails) {
   Utility::Url url;
   EXPECT_FALSE(url.initialize(""));
