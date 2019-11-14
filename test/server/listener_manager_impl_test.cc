@@ -3207,6 +3207,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
     name: "TestListener"
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
+    transparent: false
+    freebind: false
     filter_chains:
     - filters:
   )EOF",
