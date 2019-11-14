@@ -26,19 +26,19 @@
 namespace Envoy {
 namespace Network {
 
-UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket,
+UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
-    : BaseListenerImpl(dispatcher, socket), cb_(cb), time_source_(time_source) {
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
   file_event_ = dispatcher_.createFileEvent(
-      socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
+      socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   ASSERT(file_event_);
 
-  if (!Network::Socket::applyOptions(socket.options(), socket,
+  if (!Network::Socket::applyOptions(socket_->options(), *socket_,
                                      envoy::api::v2::core::SocketOption::STATE_BOUND)) {
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
-                                              socket.localAddress()->asString()));
+                                              socket_->localAddress()->asString()));
   }
 }
 
@@ -69,7 +69,7 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
-      socket_.ioHandle(), *socket_.localAddress(), *this, time_source_, packets_dropped_);
+      socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result->getErrorCode()),
@@ -91,20 +91,20 @@ void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_addres
 
 void UdpListenerImpl::handleWriteCallback() {
   ENVOY_UDP_LOG(trace, "handleWriteCallback");
-  cb_.onWriteReady(socket_);
+  cb_.onWriteReady(*socket_);
 }
 
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 
 const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
-  return socket_.localAddress();
+  return socket_->localAddress();
 }
 
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   ENVOY_UDP_LOG(trace, "send");
   Buffer::Instance& buffer = send_data.buffer_;
   Api::IoCallUint64Result send_result = Utility::writeToSocket(
-      socket_.ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
+      socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.

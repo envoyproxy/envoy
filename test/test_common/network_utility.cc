@@ -189,6 +189,31 @@ const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets()
   return createEmptyFilterChain(createRawBufferSocketFactory());
 }
 
+namespace {
+struct SyncPacketProcessor : public Network::UdpPacketProcessor {
+  SyncPacketProcessor(Network::UdpRecvData& data) : data_(data) {}
+
+  void processPacket(Network::Address::InstanceConstSharedPtr local_address,
+                     Network::Address::InstanceConstSharedPtr peer_address,
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time) override {
+    data_.addresses_.local_ = std::move(local_address);
+    data_.addresses_.peer_ = std::move(peer_address);
+    data_.buffer_ = std::move(buffer);
+    data_.receive_time_ = receive_time;
+  }
+  uint64_t maxPacketSize() const override { return Network::MAX_UDP_PACKET_SIZE; }
+
+  Network::UdpRecvData& data_;
+};
+} // namespace
+
+Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
+                                       UdpRecvData& data) {
+  SyncPacketProcessor processor(data);
+  return Network::Utility::readFromSocket(handle, local_address, processor,
+                                          MonotonicTime(std::chrono::seconds(0)), nullptr);
+}
+
 } // namespace Test
 } // namespace Network
 } // namespace Envoy
