@@ -334,19 +334,16 @@ private:
     }
 
     Network::SocketSharedPtr getListenSocket() override {
-      // This is only supposed to be called once.
-      RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");
-      socket_create_ = true;
+      // AdminListener only has one socket
       return socket_;
     }
 
     absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-      return absl::nullopt;
+      return *socket_;
     }
 
   private:
     Network::SocketSharedPtr socket_;
-    bool socket_create_{false};
   };
 
   class AdminListener : public Network::ListenerConfig {
@@ -362,6 +359,7 @@ private:
       return *parent_.socket_factory_;
     }
     bool bindToPort() override { return true; }
+    bool reusePort() override { return false; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override {

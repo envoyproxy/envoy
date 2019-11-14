@@ -34,7 +34,13 @@ public:
     return local_address_;
   }
   Network::SocketSharedPtr getListenSocket() override;
+  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+    if (socket_) {
+      return *socket_;
+    }
 
+    return absl::nullopt;
+  }
 protected:
   Network::SocketSharedPtr createListenSocketAndApplyOptions();
 
@@ -113,6 +119,7 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
   bool bindToPort() override { return bind_to_port_; }
+  bool reusePort() override { return reuse_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
@@ -197,6 +204,7 @@ private:
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   const bool bind_to_port_;
+  const Network::Address::SocketType socket_type_;
   const bool reuse_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;

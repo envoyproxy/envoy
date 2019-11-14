@@ -27,15 +27,16 @@ namespace Envoy {
 namespace Server {
 
 ListenSocketFactoryImpl::ListenSocketFactoryImpl(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
     Network::Address::SocketType socket_type, const Network::Socket::OptionsSharedPtr& options,
     bool bind_to_port, const std::string& listener_name, bool reuse_port)
     : factory_(factory), local_address_(address), socket_type_(socket_type),
       options_(options), bind_to_port_(bind_to_port), listener_name_(listener_name),
       reuse_port_(reuse_port) {
 
-  // If port is 0, still need to create a socket here, considering a random port
-  // will be assigned, all worker threads should use same port
+  // If reuse_port_ is false, create a socket here which will be used by all worker
+  // threads; otherwise, if port is 0, still need to create a socket here, because
+  // a random port will be assigned, then all worker threads should use same port.
   if (!reuse_port_ || local_address_->ip()->port() == 0) {
     socket_ = createListenSocketAndApplyOptions();
     if (socket_ && local_address_->ip() != nullptr && local_address_->ip()->port() == 0) {
@@ -49,7 +50,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions() {
   // socket might be nullptr depending on factory_ implementation.
-  Network::SocketSharedPtr socket = factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
+  Network::SocketSharedPtr socket = factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_, reuse_port_);
 
   // Binding is done by now.
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
@@ -75,7 +76,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 
-  if (rreuse_port_) {
+  if (reuse_port_) {
     auto socket = createListenSocketAndApplyOptions();
     return socket;
   }
@@ -92,7 +93,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
-      reuse_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_port, false)),
+      socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
+      reuse_port_((socket_type_ == Network::Address::SocketType::Datagram) ? true : PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_port, false)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -107,6 +109,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
+
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -121,9 +124,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
-  Network::Address::SocketType socket_type =
-      Network::Utility::protobufAddressSocketType(config.address());
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type_ == Network::Address::SocketType::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
@@ -140,7 +141,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   if (!config.listener_filters().empty()) {
-    switch (socket_type) {
+    switch (socket_type_) {
     case Network::Address::SocketType::Datagram:
       if (config.listener_filters().size() > 1) {
         // Currently supports only 1 UDP listener
@@ -160,7 +161,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  if (config.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
+  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream ||
                                          !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
@@ -187,7 +188,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type_ == Network::Address::SocketType::Datagram) {
     return;
   }
 

@@ -150,7 +150,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, bool reuse_port) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Address::SocketType::Stream ||
@@ -181,7 +181,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
                                  : Network::Utility::UDP_SCHEME;
   const std::string addr = absl::StrCat(scheme, address->asString());
 
-  if (bind_to_port) {
+  if (bind_to_port && !reuse_port) {
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -570,6 +570,15 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
       }
       if (success) {
         stats_.listener_create_success_.inc();
+
+        if (listener.reusePort()) {
+          // The shared socket created for acquiring port number when port is configured as 0
+          // can be closed here.
+          auto sharedSocket = listener.getSocketFactory()->sharedSocket();
+          if (sharedSocket.has_value()) {
+            sharedSocket->get().close();
+          }
+        }
       }
     });
   });
@@ -764,6 +773,7 @@ ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Addre
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(proto_address);
   return std::make_shared<ListenSocketFactoryImpl>(factory_, listener.address(),
+						   socket_type,
                                                   listener.listenSocketOptions(),
                                                   listener.bindToPort(), listener.name(),
                                                   listener.reusePort());

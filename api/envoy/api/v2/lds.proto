@@ -243,5 +243,6 @@ message Listener {
   // create one socket for each worker thread, this makes inbound connections
   // distributed among worker threads evenly. When this flag is set to false,
   // all worker threads shares one socket.
+  // For UDP this flag is set to true forcibly.
   google.protobuf.BoolValue reuse_port = 21;
 }

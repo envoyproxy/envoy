@@ -104,7 +104,7 @@ private:
   public:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
-                       Network::ListenerConfig& config);
+                      Network::ListenerConfig& config);
     ~ActiveTcpListener() override;
     void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections, bool rebalanced);
@@ -119,10 +119,6 @@ private:
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
     void destroy() override { listener_.reset(); }
-    void destroy() override {
-      listener_.reset();
-      socket_.reset();
-    }
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }

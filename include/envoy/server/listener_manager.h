@@ -55,7 +55,8 @@ public:
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
                      Network::Address::SocketType socket_type,
-                     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) PURE;
+                     const Network::Socket::OptionsSharedPtr& options,
+                     bool bind_to_port, bool reuse_port) PURE;
 
   /**
    * Creates a list of filter factories.

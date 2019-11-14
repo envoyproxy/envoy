@@ -44,8 +44,11 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the socket if getListenSocket() returns a shared socket among each call,
-   * nullopt otherwise.
+   * @return the socket shared by worker threads; if work threads doesn't share a socket,
+   * return null.
+   * Worker threads share socket in two cases:
+   * - listener's 'reuse_port' is set to 'false'
+   * - listener's 'reuse_port' is set to 'true' but port is 0
    */
   virtual absl::optional<std::reference_wrapper<Socket>> sharedSocket() const PURE;
 };
@@ -82,6 +85,12 @@ public:
    *         redirected from other listeners.
    */
   virtual bool bindToPort() PURE;
+
+  /**
+   * @return bool if 'true', the listener creates one socket with SO_REUSEPORT for each
+   * worker thread; otherwise, all worker threads share one socket.
+   */
+  virtual bool reusePort() PURE;
 
   /**
    * @return bool if a connection should be handed off to another Listener after the original

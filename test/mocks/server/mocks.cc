@@ -90,10 +90,10 @@ MockOverloadManager::~MockOverloadManager() = default;
 
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
-  ON_CALL(*this, createListenSocket(_, _, _, _))
+  ON_CALL(*this, createListenSocket(_, _, _, _, _))
       .WillByDefault(Invoke(
           [&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-              const Network::Socket::OptionsSharedPtr& options, bool) -> Network::SocketSharedPtr {
+              const Network::Socket::OptionsSharedPtr& options, bool, bool) -> Network::SocketSharedPtr {
             if (!Network::Socket::applyOptions(options, *socket_,
                                                envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
               throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
