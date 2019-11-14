@@ -22,13 +22,15 @@ constexpr static char HostJsonKey[] = "host";
 constexpr static char HttpMethodJsonKey[] = "http_method";
 constexpr static char UrlPathJsonKey[] = "url_path";
 
-static void fail(absl::string_view msg) {
+namespace {
+void fail(absl::string_view msg) {
   auto& logger = Logger::Registry::getLog(Logger::Id::tracing);
   ENVOY_LOG_TO_LOGGER(logger, error, "Failed to parse sampling rules - {}", msg);
 }
 
-static bool is_valid_rate(double n) { return n >= 0 && n <= 1.0; }
-static bool is_valid_fixed_target(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
+bool is_valid_rate(double n) { return n >= 0 && n <= 1.0; }
+bool is_valid_fixed_target(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
+} // namespace
 
 static bool validateRule(const ProtobufWkt::Struct& rule) {
   using ProtobufWkt::Value;
@@ -185,7 +187,7 @@ bool LocalizedSamplingStrategy::shouldTrace(const SamplingRequest& sampling_requ
 }
 
 bool LocalizedSamplingStrategy::shouldTrace(LocalizedSamplingRule& rule) {
-  const auto now = time_source_.get().monotonicTime();
+  const auto now = time_source_.monotonicTime();
   if (rule.reservoir().take(now)) {
     return true;
   }

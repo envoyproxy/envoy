@@ -61,8 +61,8 @@ public:
   }
 
 private:
-  unsigned traces_per_second_;
-  unsigned used_;
+  uint32_t traces_per_second_;
+  uint32_t used_;
   Envoy::MonotonicTime time_point_;
   Envoy::Thread::MutexBasicLockable sync_;
 };

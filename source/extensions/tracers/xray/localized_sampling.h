@@ -31,6 +31,11 @@ namespace XRay {
  */
 class LocalizedSamplingRule {
 public:
+  /**
+   * Creates a default sampling rule that has the default |fixed_target| and default |rate| set.
+   */
+  static LocalizedSamplingRule createDefault();
+
   LocalizedSamplingRule(uint32_t fixed_target, double rate)
       : fixed_target_(fixed_target), rate_(rate), reservoir_(fixed_target_) {}
 
@@ -38,11 +43,6 @@ public:
    * Determines whether Hostname, HTTP method and URL path match the given request.
    */
   bool appliesTo(const SamplingRequest& request) const;
-
-  /**
-   * Creates a default sampling rule that has the default |fixed_target| and default |rate| set.
-   */
-  static LocalizedSamplingRule createDefault();
 
   /**
    * Set the hostname to match against.
@@ -99,6 +99,14 @@ private:
 class LocalizedSamplingManifest {
 public:
   /**
+   * Create a default manifest. The default manifest is used when a custom manifest does not exist
+   * or failed to parse. The default manifest, will have an empty set of custom rules.
+   */
+  static LocalizedSamplingManifest createDefault() {
+    return LocalizedSamplingManifest{LocalizedSamplingRule::createDefault()};
+  }
+
+  /**
    * Create a manifest by de-serializing the input string as JSON representation of the sampling
    * rules.
    * @param sampling_rules_json JSON representation of X-Ray localized sampling rules.
@@ -122,14 +130,6 @@ public:
    * @return the user-defined sampling rules
    */
   std::vector<LocalizedSamplingRule>& customRules() { return custom_rules_; }
-
-  /**
-   * Create a default manifest. The default manifest is used when a custom manifest does not exist
-   * or failed to parse. The default manifest, will have an empty set of custom rules.
-   */
-  static LocalizedSamplingManifest createDefault() {
-    return LocalizedSamplingManifest{LocalizedSamplingRule::createDefault()};
-  }
 
   /**
    * @return true if the this manifest has a set of custom rules; otherwise false.
@@ -165,7 +165,7 @@ private:
   bool shouldTrace(LocalizedSamplingRule& rule);
   LocalizedSamplingManifest default_manifest_;
   LocalizedSamplingManifest custom_manifest_;
-  std::reference_wrapper<TimeSource> time_source_;
+  TimeSource& time_source_;
   bool use_default_;
 };
 
