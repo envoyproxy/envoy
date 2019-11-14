@@ -21,10 +21,10 @@ namespace Config {
 // This class owns the GrpcStream used to talk to the server, maintains queuing
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
-class NewGrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
+class GrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
 public:
-  NewGrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
-                 bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info);
+  GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
+              bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info);
 
   Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                           const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
@@ -120,7 +120,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 };
 
-class GrpcMuxDelta : public NewGrpcMuxImpl,
+class GrpcMuxDelta : public GrpcMuxImpl,
                      public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
@@ -147,7 +147,7 @@ private:
       grpc_stream_;
 };
 
-class GrpcMuxSotw : public NewGrpcMuxImpl,
+class GrpcMuxSotw : public GrpcMuxImpl,
                     public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
