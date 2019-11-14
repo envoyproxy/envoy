@@ -135,8 +135,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "grpc_mux_lib",
-    srcs = ["new_grpc_mux_impl.cc"],
-    hdrs = ["new_grpc_mux_impl.h"],
+    srcs = ["grpc_mux_impl.cc"],
+    hdrs = ["grpc_mux_impl.h"],
     deps = [
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",

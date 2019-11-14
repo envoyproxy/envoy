@@ -2,7 +2,7 @@
 
 #include "envoy/config/subscription.h"
 
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
