@@ -64,15 +64,15 @@ Load Balancing Example
 ----------------------
 
 Aggregate cluster uses tiered load balancing algorithm and the top tier is distributing traffic to different clusters according to the health score across 
-all priorities in each cluster.
+all `priorities <arch_overview_load_balancing_priority_levels>` in each cluster.
  
 +-----------------------------------------------------------------------------------------------------------------------+--------------------+----------------------+
 | Cluster                                                                                                               | Traffic to Primary | Traffic to Secondary |                                                
-+=======================================================================+===============================================+===========================================+
-| Primary                                                               | Secondary                                     |                                           |
-+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+                                           |
-| P=0 Healthy Endpoints | P=1 Healthy Endpoints | P=2 Healthy Endpoints | P=0 Healthy Endpoints | P=1 Healthy Endpoints |                                           |
-+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
++=======================================================================+===============================================+                    |                      |
+| Primary                                                               | Secondary                                     |                    |                      |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+                    |                      |
+| P=0 Healthy Endpoints | P=1 Healthy Endpoints | P=2 Healthy Endpoints | P=0 Healthy Endpoints | P=1 Healthy Endpoints |                    |                      |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+====================+======================+
 | 100%                  | 100%                  | 100%                  | 100%                  | 100%                  | 100%               | 0%                   |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 | 72%                   | 100%                  | 100%                  | 100%                  | 100%                  | 100%               | 0%                   |
@@ -92,8 +92,17 @@ all priorities in each cluster.
 | 20%                   | 0%                    | 0%                    | 20%                   | 0%                    | 50%                | 50%                  |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 
-
 Note: The above load balancing uses default :ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>` which is 1.4.
+
+To sum this up in pseudo algorithms:
+
+::
+
+  health(P_X) = min(100, 1.4 * 100 * healthy_P_X_backends / total_P_X_backends)
+  normalized_total_health = min(100, Σ(health(P_0)...health(P_X)))
+  priority_load(C_0) = min(100, Σ(health(P_0)...health(P_k)) * 100 / normalized_total_health), where P_0...P_k belongs to C_0
+  priority_load(C_X) = min(100 - Σ(priority_load(C_0)..priority_load(C_X-1)),
+                           Σ(health(P_x)...health(P_X)) * 100 / normalized_total_health)
 
 The example shows how the aggregate cluster level load balancer selects the cluster. E.g.,
 healths of {{20, 20, 10}, {25, 25}} would result in a priority load of {70%, 30%} of traffic. When normalized total health drops below 100, traffic is distributed after normalizing
