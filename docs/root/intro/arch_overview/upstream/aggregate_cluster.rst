@@ -64,7 +64,7 @@ Load Balancing Example
 ----------------------
 
 Aggregate cluster uses tiered load balancing algorithm and the top tier is distributing traffic to different clusters according to the health score across 
-all `priorities <arch_overview_load_balancing_priority_levels>` in each cluster.
+all :ref:`priorities <arch_overview_load_balancing_priority_levels>` in each cluster.
  
 +-----------------------------------------------------------------------------------------------------------------------+--------------------+----------------------+
 | Cluster                                                                                                               | Traffic to Primary | Traffic to Secondary |                                                
