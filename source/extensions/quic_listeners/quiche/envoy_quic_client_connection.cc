@@ -42,7 +42,11 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
           std::move(connection_socket)),
       dispatcher_(dispatcher) {}
 
-EnvoyQuicClientConnection::~EnvoyQuicClientConnection() { file_event_->setEnabled(0); }
+EnvoyQuicClientConnection::~EnvoyQuicClientConnection() {
+  if (file_event_ != nullptr) {
+    file_event_->setEnabled(0);
+  }
+}
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
@@ -61,7 +65,7 @@ void EnvoyQuicClientConnection::processPacket(
   Buffer::RawSlice slice;
   buffer->getRawSlices(&slice, 1);
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/true,
+                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   ProcessUdpPacket(envoyAddressInstanceToQuicSocketAddress(local_address),

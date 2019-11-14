@@ -60,7 +60,8 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSessio
 
 Http::StreamEncoder&
 QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
-  auto stream = quicStreamToEnvoyStream(quic_client_session_.CreateOutgoingBidirectionalStream());
+  EnvoyQuicStream* stream =
+      quicStreamToEnvoyStream(quic_client_session_.CreateOutgoingBidirectionalStream());
   // TODO(danzh) handle stream creation failure gracefully. This can happen when
   // there are already 100 open streams. In such case, caller should hold back
   // the stream creation till an existing stream is closed.

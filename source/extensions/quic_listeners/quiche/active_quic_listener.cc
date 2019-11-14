@@ -77,7 +77,7 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
   data.buffer_->getRawSlices(&slice, 1);
   // TODO(danzh): pass in TTL and UDP header.
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/true,
+                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);

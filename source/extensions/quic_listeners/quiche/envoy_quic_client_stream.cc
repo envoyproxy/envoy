@@ -83,7 +83,7 @@ void EnvoyQuicClientStream::encodeTrailers(const Http::HeaderMap& trailers) {
 
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // TODO(danzh): add stats for metadata not supported error.
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {

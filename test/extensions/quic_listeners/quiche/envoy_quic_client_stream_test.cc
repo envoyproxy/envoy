@@ -1,18 +1,7 @@
-#pragma GCC diagnostic push
-// QUICHE allows unused parameters.
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-
-#include "quiche/quic/core/http/quic_spdy_client_session.h"
-#include "quiche/quic/test_tools/crypto_test_utils.h"
-
-#pragma GCC diagnostic pop
-
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_client_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
@@ -30,42 +19,6 @@ namespace Quic {
 using testing::_;
 using testing::Invoke;
 using testing::Return;
-
-class MockEnvoyQuicClientSession : public quic::QuicSpdyClientSession,
-                                   public QuicFilterManagerConnectionImpl {
-public:
-  MockEnvoyQuicClientSession(const quic::QuicConfig& config,
-                             const quic::ParsedQuicVersionVector& supported_versions,
-                             EnvoyQuicConnection* connection, Event::Dispatcher& dispatcher,
-                             uint32_t send_buffer_limit)
-      : quic::QuicSpdyClientSession(config, supported_versions, connection,
-                                    quic::QuicServerId("example.com", 443, false), &crypto_config_,
-                                    nullptr),
-        QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
-        crypto_config_(quic::test::crypto_test_utils::ProofVerifierForTesting()) {}
-
-  // From QuicSession.
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyClientStream*(quic::QuicStreamId id));
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyClientStream*(quic::PendingStream* pending));
-  MOCK_METHOD0(CreateOutgoingBidirectionalStream, quic::QuicSpdyClientStream*());
-  MOCK_METHOD0(CreateOutgoingUnidirectionalStream, quic::QuicSpdyClientStream*());
-  MOCK_METHOD1(ShouldCreateIncomingStream, bool(quic::QuicStreamId id));
-  MOCK_METHOD0(ShouldCreateOutgoingBidirectionalStream, bool());
-  MOCK_METHOD0(ShouldCreateOutgoingUnidirectionalStream, bool());
-  MOCK_METHOD5(WritevData,
-               quic::QuicConsumedData(quic::QuicStream* stream, quic::QuicStreamId id,
-                                      size_t write_length, quic::QuicStreamOffset offset,
-                                      quic::StreamSendingState state));
-
-  absl::string_view requestedServerName() const override {
-    return {GetCryptoStream()->crypto_negotiated_params().sni};
-  }
-
-  using quic::QuicSpdySession::ActivateStream;
-
-private:
-  quic::QuicCryptoClientConfig crypto_config_;
-};
 
 class EnvoyQuicClientStreamTest : public testing::TestWithParam<bool> {
 public:

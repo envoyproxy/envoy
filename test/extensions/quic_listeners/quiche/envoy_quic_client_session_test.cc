@@ -128,7 +128,6 @@ public:
     envoy_quic_session_.setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
     EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
-    envoy_quic_session_.connect();
   }
 
   void TearDown() override {
