@@ -312,6 +312,66 @@ TEST_F(RedisConnPoolImplTest, Basic) {
   tls_.shutdownThread();
 };
 
+TEST_F(RedisConnPoolImplTest, BasicRespVariant) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockPoolRequest active_request;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest_(Eq(value), _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", ConnPool::RespVariant(value), callbacks);
+  EXPECT_NE(nullptr, request);
+
+  EXPECT_CALL(active_request, cancel());
+  EXPECT_CALL(callbacks, onFailure_());
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue value;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest_(Eq(value), _)).WillOnce(Return(nullptr));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequest("hash_key", ConnPool::RespVariant(value), callbacks);
+
+  // the request should be null and the callback is not called
+  EXPECT_EQ(nullptr, request);
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
+
 TEST_F(RedisConnPoolImplTest, BasicWithReadPolicy) {
   testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
                      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER,
