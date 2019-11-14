@@ -70,9 +70,9 @@ as it will use the `python` CLI.
 $ docker-compose ps
              Name                            Command               State                             Ports
 ------------------------------------------------------------------------------------------------------------------------------------
-grpc-bridge_grpc-client-proxy_1   /docker-entrypoint.sh /usr ...   Up      10000/tcp, 0.0.0.0:9911->9911/tcp, 0.0.0.0:9991->9991/tcp
+grpc-bridge_grpc-client-proxy_1   /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:9911->9911/tcp, 0.0.0.0:9991->9991/tcp
 grpc-bridge_grpc-client_1         /bin/sh -c tail -f /dev/null     Up
-grpc-bridge_grpc-server-proxy_1   /docker-entrypoint.sh /usr ...   Up      10000/tcp, 0.0.0.0:8811->8811/tcp, 0.0.0.0:8881->8881/tcp
+grpc-bridge_grpc-server-proxy_1   /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8811->8811/tcp, 0.0.0.0:8881->8881/tcp
 grpc-bridge_grpc-server_1         /bin/sh -c /bin/server           Up      0.0.0.0:8081->8081/tcp
 ```
 
