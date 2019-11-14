@@ -86,9 +86,10 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
   }
 
   ProtobufWkt::Struct document;
-  MessageUtil::loadFromJson(rule_json, document);
-  if (document.fields().empty()) {
-    fail("invalid JSON rules.");
+  try {
+    MessageUtil::loadFromJson(rule_json, document);
+  } catch (EnvoyException& e) {
+    fail("invalid JSON format");
     return;
   }
 

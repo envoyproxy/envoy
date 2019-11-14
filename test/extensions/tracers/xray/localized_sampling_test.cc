@@ -27,6 +27,12 @@ TEST_F(LocalizedSamplingStrategyTest, EmptyRules) {
   ASSERT_TRUE(strategy.usingDefaultManifest());
 }
 
+TEST_F(LocalizedSamplingStrategyTest, BadJson) {
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  LocalizedSamplingStrategy strategy{"{{}", random_generator, time_system_};
+  ASSERT_TRUE(strategy.usingDefaultManifest());
+}
+
 TEST_F(LocalizedSamplingStrategyTest, ValidCustomRules) {
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(
