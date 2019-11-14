@@ -145,7 +145,7 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan --build_tests_only"
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
@@ -174,7 +174,7 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan ${TEST_TARGETS}
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only ${TEST_TARGETS}
   echo "Building and testing envoy-filter-example tests..."
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \
@@ -204,7 +204,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
   "
-  setup_clang_libcxx_toolchain
+  ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
+  setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
 
@@ -271,21 +272,13 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
-elif [[ "$CI_TARGET" == "bazel.fuzzit_regression" ]]; then
+elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
   setup_clang_toolchain
   FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
-  echo "Building fuzzers and run a regression with corpus from Fuzzit"
-  bazel_with_collection build ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
-  ./ci/run_fuzzit.sh local-regression
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.fuzzit_fuzzing" ]]; then
-  setup_clang_toolchain
-  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
-  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
-  echo "Build fuzzers and push them to Fuzzit servers for continuous fuzzing"
-  bazel_with_collection build ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
-  ./ci/run_fuzzit.sh fuzzing
+  echo "Building fuzzers and run under Fuzzit"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} \
+    --test_env=FUZZIT_API_KEY --test_env=ENVOY_BUILD_IMAGE --test_timeout=1200 --run_under=//bazel:fuzzit_wrapper
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.

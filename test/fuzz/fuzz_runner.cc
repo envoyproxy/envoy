@@ -43,7 +43,7 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   // https://github.com/llvm-mirror/compiler-rt/blob/master/lib/fuzzer/FuzzerInterface.h).
   static auto* lock = new Thread::MutexBasicLockable();
   static auto* logging_context =
-      new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock);
+      new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock, false);
   UNREFERENCED_PARAMETER(logging_context);
 }
 

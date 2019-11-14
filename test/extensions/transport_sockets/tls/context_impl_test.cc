@@ -672,14 +672,17 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(
-      manager.createSslClientContext(store, client_context_config), EnvoyException,
+
+  std::string error_msg(
       "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
 #ifdef BORINGSSL_FIPS
-      "with 2048-bit or 3072-bit keys are supported in FIPS mode");
+      "with 2048-bit or 3072-bit keys are supported in FIPS mode"
 #else
-      "with 2048-bit or larger keys are supported");
+      "with 2048-bit or larger keys are supported"
 #endif
+  );
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException, error_msg);
 }
 
 // Validate that 3072-bit RSA certificates load successfully.

@@ -13,6 +13,8 @@
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 
+#include "absl/strings/str_join.h"
+
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
 using Envoy::Config::ConfigProvider;
@@ -255,7 +257,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   stats_.config_reload_.inc();
   if (!exception_msgs.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+                                     absl::StrJoin(exception_msgs, ", ")));
   }
 }
 

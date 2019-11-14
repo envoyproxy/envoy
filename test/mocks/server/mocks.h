@@ -77,6 +77,7 @@ public:
   MOCK_CONST_METHOD0(componentLogLevels,
                      const std::vector<std::pair<std::string, spdlog::level::level_enum>>&());
   MOCK_CONST_METHOD0(logFormat, const std::string&());
+  MOCK_CONST_METHOD0(logFormatEscaped, bool());
   MOCK_CONST_METHOD0(logPath, const std::string&());
   MOCK_CONST_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_CONST_METHOD0(restartEpoch, uint64_t());
@@ -88,7 +89,6 @@ public:
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
-  MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
   MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
@@ -280,6 +280,8 @@ public:
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD1(stopListeners, void(StopListenersType listeners_type));
   MOCK_METHOD0(stopWorkers, void());
+  MOCK_METHOD0(beginListenerUpdate, void());
+  MOCK_METHOD1(endListenerUpdate, void(ListenerManager::FailureStates&&));
 };
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
@@ -331,8 +333,8 @@ public:
   MOCK_METHOD1(start, void(GuardDog& guard_dog));
   MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
   MOCK_METHOD0(stop, void());
-  MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
-  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD2(stopListener,
+               void(Network::ListenerConfig& listener, std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

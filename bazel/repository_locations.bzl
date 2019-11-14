@@ -257,15 +257,21 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "c95ab57835182b8b4b17cf5bbfc2406805bc78c5022c17399f3e5c643f22826a",
-        strip_prefix = "opencensus-cpp-98970f78091ae65b4a029bcf512696ba6d665cf4",
-        # 2019-09-24
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/98970f78091ae65b4a029bcf512696ba6d665cf4.tar.gz"],
+        sha256 = "8078195ce90925c142f5c030b9681771db7b7554ebe2156b08848adeb006c40e",
+        strip_prefix = "opencensus-cpp-d8ec569c6a9157e9cbc2c25021d1c61812891f91",
+        # 2019-11-04
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/d8ec569c6a9157e9cbc2c25021d1c61812891f91.tar.gz"],
     ),
     com_github_curl = dict(
         sha256 = "d0393da38ac74ffac67313072d7fe75b1fa1010eb5987f63f349b024a36b7ffb",
         strip_prefix = "curl-7.66.0",
         urls = ["https://github.com/curl/curl/releases/download/curl-7_66_0/curl-7.66.0.tar.gz"],
+    ),
+    com_googlesource_chromium_v8 = dict(
+        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
+        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
+        sha256 = "7c897863d31569b4a4e16277d94415f1c42f3e130c1ff3573b048b76b15b635f",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-7.9.317.14.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz
@@ -273,10 +279,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz"],
     ),
     com_google_cel_cpp = dict(
-        sha256 = "e21d11be5eca677fe79839d310ceffb2f950d9d03f7682af8c0d311e573a1302",
-        strip_prefix = "cel-cpp-d85f82972c2def6db9c90f3d9a23f56a0ac3caff",
-        # 2019-10-23
-        urls = ["https://github.com/google/cel-cpp/archive/d85f82972c2def6db9c90f3d9a23f56a0ac3caff.tar.gz"],
+        sha256 = "6b056207f6a069ee6e28f31010262585cf6090e6c889cb98da29715cf544ac7d",
+        strip_prefix = "cel-cpp-750fd9a3cbf4470ee46c8deef0a4701b4cc8b1ce",
+        # 2019-11-12
+        urls = ["https://github.com/google/cel-cpp/archive/750fd9a3cbf4470ee46c8deef0a4701b4cc8b1ce.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
         sha256 = "b0382aa7369f373a0148218f2df5a6afd6bfa884ce4da2dfb576b979989e615e",
@@ -291,5 +297,9 @@ REPOSITORY_LOCATIONS = dict(
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
         urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
+    ),
+    fuzzit_linux = dict(
+        sha256 = "9ca76ac1c22d9360936006efddf992977ebf8e4788ded8e5f9d511285c9ac774",
+        urls = ["https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.76/fuzzit_Linux_x86_64.zip"],
     ),
 )

@@ -7,6 +7,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
@@ -358,6 +359,11 @@ public:
   virtual bool hasAnyResponseFlag() const PURE;
 
   /**
+   * @return response flags encoded as an integer.
+   */
+  virtual uint64_t responseFlags() const PURE;
+
+  /**
    * @return upstream host description.
    */
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
@@ -496,6 +502,16 @@ public:
    *         failed.
    */
   virtual const std::string& upstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param headers request headers.
+   */
+  virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
+
+  /**
+   * @return request headers.
+   */
+  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
 };
 
 } // namespace StreamInfo

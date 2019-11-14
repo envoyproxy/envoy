@@ -15,6 +15,8 @@
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/strings/str_join.h"
+
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
@@ -120,7 +122,7 @@ class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<std::string>& source,
                           const std::string& delimiter) {
-    return StringUtil::join(std::vector<std::string>(source.begin(), source.end()), delimiter);
+    return absl::StrJoin(std::vector<std::string>(source.begin(), source.end()), delimiter);
   }
 
   template <class ProtoType>
@@ -331,15 +333,6 @@ public:
   static std::string getJsonStringFromMessage(const Protobuf::Message& message,
                                               bool pretty_print = false,
                                               bool always_print_primitive_fields = false);
-
-  /**
-   * Extract JSON object from a google.protobuf.Message.
-   * @param message message of type type.googleapis.com/google.protobuf.Message.
-   * @return Json::ObjectSharedPtr of JSON object or nullptr if unable to extract.
-   */
-  static Json::ObjectSharedPtr getJsonObjectFromMessage(const Protobuf::Message& message) {
-    return Json::Factory::loadFromString(MessageUtil::getJsonStringFromMessage(message));
-  }
 
   /**
    * Utility method to create a Struct containing the passed in key/value strings.

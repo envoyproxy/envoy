@@ -57,9 +57,9 @@ public:
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
-  Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                                      bool bind_to_port) override;
-  Network::UdpListenerPtr createUdpListener(Network::Socket& socket,
+  Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
+                                      Network::ListenerCallbacks& cb, bool bind_to_port) override;
+  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;

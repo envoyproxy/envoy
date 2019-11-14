@@ -15,35 +15,15 @@ For the meaning of the headers please refer to the pages below.
 
 Runtime
 -------
+The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
+<envoy_api_field_core.runtimefractionalpercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_api_field_route.CorsPolicy.filter_enabled>` field.
 
-The CORS filter supports the following RuntimeFractionalPercent settings:
-
-filter_enabled
-  The % of requests for which the filter is enabled. The default is
-  100/:ref:`HUNDRED <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
-
-  To utilize runtime to enable/disable the CORS filter set the
-  :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>`
-  value of the :ref:`filter_enabled <envoy_api_field_route.CorsPolicy.filter_enabled>`
-  field.
-
-  .. note::
-
-    If present, this will override the :ref:`enabled <envoy_api_field_route.CorsPolicy.enabled>`
-    field of the configuration.
-
-shadow_enabled
-  The % of requests for which the filter is enabled in shadow only mode. Default is 0.
-  If present, this will evaluate a request's *Origin* to determine if it's valid
-  but will not enforce any policies.
-
-  To utilize runtime to enable/disable the CORS filter's shadow mode set the
-  :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>`
-  value of the :ref:`shadow_enabled <envoy_api_field_route.CorsPolicy.shadow_enabled>`
-  field.
-
-To determine if the filter and/or shadow mode are enabled you can check the runtime
-values via the admin panel at :http:get:`/runtime`.
+The fraction of requests for which the filter is enabled in shadow-only mode can be configured via
+the :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` value of the
+:ref:`shadow_enabled <envoy_api_field_route.CorsPolicy.shadow_enabled>` field. When enabled in
+shadow-only node, the filter will evaluate the request's *Origin* to determine if it's valid but
+will not enforce any policies.
 
 .. note::
 

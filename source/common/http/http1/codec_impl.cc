@@ -628,9 +628,9 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   // request-target. A proxy that forwards such a request MUST generate a
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
-  headers.insertHost().value(std::string(absolute_url.host_and_port()));
+  headers.setHost(absolute_url.host_and_port());
 
-  headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
+  headers.setPath(absolute_url.path_and_query_params());
   active_request_->request_url_.clear();
 }
 
@@ -650,7 +650,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     handlePath(*headers, parser_.method);
     ASSERT(active_request_->request_url_.empty());
 
-    headers->insertMethod().value(method_string, strlen(method_string));
+    headers->setMethod(method_string);
 
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
     // presence of content-length or chunked transfer-encoding indicates a body vs. a particular
@@ -787,7 +787,7 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
-  headers->insertStatus().value(parser_.status_code);
+  headers->setStatus(parser_.status_code);
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed

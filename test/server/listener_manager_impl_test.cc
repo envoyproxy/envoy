@@ -8,6 +8,7 @@
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/listener_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
@@ -198,6 +199,9 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
   const std::string proto_text = R"EOF(
     address: {
       socket_address: {
@@ -212,6 +216,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
 
   EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
   EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
@@ -282,11 +287,6 @@ filter_chains:
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Configuration::FactoryContext&) override {
-    return [](Network::FilterManager&) -> void {};
-  }
-
   Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
                                                         Configuration::FactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
@@ -359,11 +359,6 @@ filter_chains:
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Configuration::FactoryContext& context) override {
-    return commonFilterFactory(context);
-  }
-
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Configuration::FactoryContext& context) override {
@@ -592,9 +587,6 @@ static_listeners:
   last_updated:
     seconds: 1001001001
     nanos: 1000000
-dynamic_active_listeners:
-dynamic_warming_listeners:
-dynamic_draining_listeners:
 )EOF");
 
   // Update foo listener. Should be blocked.
@@ -634,9 +626,6 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
   checkConfigDump(R"EOF(
 static_listeners:
-dynamic_active_listeners:
-dynamic_warming_listeners:
-dynamic_draining_listeners:
 )EOF");
 
   // Add foo listener.
@@ -658,20 +647,20 @@ filter_chains: {}
   checkConfigDump(R"EOF(
 version_info: version1
 static_listeners:
-dynamic_active_listeners:
-dynamic_warming_listeners:
-  version_info: "version1"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-  last_updated:
-    seconds: 1001001001
-    nanos: 1000000
-dynamic_draining_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version1
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 1001001001
+        nanos: 1000000
 )EOF");
 
   // Update duplicate should be a NOP.
@@ -700,21 +689,21 @@ per_connection_buffer_limit_bytes: 10
   checkConfigDump(R"EOF(
 version_info: version2
 static_listeners:
-dynamic_active_listeners:
-dynamic_warming_listeners:
-  version_info: "version2"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-    per_connection_buffer_limit_bytes: 10
-  last_updated:
-    seconds: 2002002002
-    nanos: 2000000
-dynamic_draining_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version2
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+        per_connection_buffer_limit_bytes: 10
+      last_updated:
+        seconds: 2002002002
+        nanos: 2000000
 )EOF");
 
   // Start workers.
@@ -734,7 +723,7 @@ dynamic_draining_listeners:
   // removal.
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version3", true));
@@ -744,32 +733,33 @@ dynamic_draining_listeners:
   checkConfigDump(R"EOF(
 version_info: version3
 static_listeners:
-dynamic_active_listeners:
-  version_info: "version3"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-  last_updated:
-    seconds: 3003003003
-    nanos: 3000000
-dynamic_warming_listeners:
-dynamic_draining_listeners:
-  version_info: "version2"
-  listener:
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-    per_connection_buffer_limit_bytes: 10
-  last_updated:
-    seconds: 2002002002
-    nanos: 2000000
+dynamic_listeners:
+  - name: foo
+    active_state:
+      version_info: version3
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 3003003003
+        nanos: 3000000
+    draining_state:
+      version_info: version2
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+        per_connection_buffer_limit_bytes: 10
+      last_updated:
+        seconds: 2002002002
+        nanos: 2000000
 )EOF");
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -822,43 +812,46 @@ filter_chains: {}
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
   checkConfigDump(R"EOF(
 version_info: version5
-static_listeners:
-dynamic_active_listeners:
-  - version_info: "version3"
-    listener:
-      name: "foo"
-      address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 1234
-      filter_chains: {}
-    last_updated:
-      seconds: 3003003003
-      nanos: 3000000
-  - version_info: "version4"
-    listener:
-      name: "bar"
-      address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 1235
-      filter_chains: {}
-    last_updated:
-      seconds: 4004004004
-      nanos: 4000000
-dynamic_warming_listeners:
-  - version_info: "version5"
-    listener:
-      name: "baz"
-      address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 1236
-      filter_chains: {}
-    last_updated:
-      seconds: 5005005005
-      nanos: 5000000
-dynamic_draining_listeners:
+dynamic_listeners:
+  - name: foo
+    active_state:
+      version_info: version3
+      listener:
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 3003003003
+        nanos: 3000000
+  - name: bar
+    active_state:
+      version_info: version4
+      listener:
+        name: bar
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1235
+        filter_chains: {}
+      last_updated:
+        seconds: 4004004004
+        nanos: 4000000
+  - name: baz
+    warming_state:
+      version_info: version5
+      listener:
+        name: baz
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1236
+        filter_chains: {}
+      last_updated:
+        seconds: 5005005005
+        nanos: 5000000
 )EOF");
 
   // Update a duplicate baz that is currently warming.
@@ -901,7 +894,7 @@ filter_chains:
   EXPECT_CALL(*listener_baz_update1, onDestroy());
 }
 
-TEST_F(ListenerManagerImplTest, AddDrainingListener) {
+TEST_F(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -930,7 +923,13 @@ filter_chains:
   checkStats(1, 0, 0, 0, 1, 0);
 
   // Remove foo into draining.
-  EXPECT_CALL(*worker_, stopListener(_));
+  std::function<void()> stop_completion;
+  EXPECT_CALL(*worker_, stopListener(_, _))
+      .WillOnce(Invoke(
+          [&stop_completion](Network::ListenerConfig&, std::function<void()> completion) -> void {
+            ASSERT_TRUE(completion != nullptr);
+            stop_completion = std::move(completion);
+          }));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(1, 0, 1, 0, 0, 1);
@@ -940,6 +939,62 @@ filter_chains:
 
   // Add foo again. We should use the socket from draining.
   ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  worker_->callAddCompletion(true);
+  checkStats(2, 0, 1, 0, 1, 1);
+
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0);
+  stop_completion();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+  checkStats(2, 0, 1, 0, 1, 0);
+
+  EXPECT_CALL(*listener_foo2, onDestroy());
+}
+
+TEST_F(ListenerManagerImplTest, AddClosedDrainingListener) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener directly into active.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  Network::Address::InstanceConstSharedPtr local_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 1234));
+  ON_CALL(*listener_factory_.socket_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(*worker_, addListener(_, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  worker_->callAddCompletion(true);
+  checkStats(1, 0, 0, 0, 1, 0);
+
+  // Remove foo into draining.
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(1, 0, 1, 0, 0, 1);
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(1, 0, 1, 0, 0, 1);
+
+  // Add foo again. We should use the socket from draining.
+  ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
@@ -1003,6 +1058,7 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
 }
 
 TEST_F(ListenerManagerImplTest, CantBindSocket) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_));
@@ -1024,6 +1080,71 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true),
                EnvoyException);
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+  - name: foo
+    error_state:
+      failed_configuration:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains:
+          - {}
+      last_update_attempt:
+        seconds: 1001001001
+        nanos: 1000000
+      details: can't bind
+)EOF");
+
+  ListenerManager::FailureStates empty_failure_state;
+  // Fake a new update, just to sanity check the clearing code.
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(empty_failure_state));
+
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
+}
+
+// Verify that errors tracked on endListenerUpdate show up in the config dump/
+TEST_F(ListenerManagerImplTest, ConfigDumpWithExternalError) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Make sure the config dump is empty by default.
+  ListenerManager::FailureStates empty_failure_state;
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(empty_failure_state));
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
+
+  // Now have an external update with errors and make sure it gets dumped.
+  ListenerManager::FailureStates non_empty_failure_state;
+  non_empty_failure_state.push_back(std::make_unique<envoy::admin::v2alpha::UpdateFailureState>());
+  auto& state = non_empty_failure_state.back();
+  state->set_details("foo");
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(non_empty_failure_state));
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+  error_state:
+    details: "foo"
+)EOF");
+
+  // And clear again.
+  ListenerManager::FailureStates empty_failure_state2;
+  manager_->beginListenerUpdate();
+  manager_->endListenerUpdate(std::move(empty_failure_state2));
+  checkConfigDump(R"EOF(
+dynamic_listeners:
+)EOF");
 }
 
 TEST_F(ListenerManagerImplTest, ListenerDraining) {
@@ -1053,7 +1174,7 @@ filter_chains:
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(1, 0, 1, 0, 0, 1);
@@ -1143,7 +1264,8 @@ filter_chains:
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(2, 1, 2, 0, 0, 1);
@@ -1210,7 +1332,8 @@ filter_chains:
   EXPECT_EQ(2UL, manager_->listeners().size());
 
   // Validate that stop listener is only called once - for inbound listeners.
-  EXPECT_CALL(*worker_, stopListener(_)).Times(1);
+  EXPECT_CALL(*worker_, stopListener(_, _)).Times(1);
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(1);
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 
@@ -1280,7 +1403,8 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(1, 0, 0, 0, 1, 0);
 
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::All);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
@@ -1350,7 +1474,8 @@ filter_chains:
 
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
@@ -1378,7 +1503,7 @@ filter_chains:
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 
-  EXPECT_CALL(*worker_, stopListener(_));
+  EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   worker_->callAddCompletion(false);
 
@@ -3082,6 +3207,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
     name: "TestListener"
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
+    transparent: false
+    freebind: false
     filter_chains:
     - filters:
   )EOF",

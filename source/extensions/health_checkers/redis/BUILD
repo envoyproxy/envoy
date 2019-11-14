@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -19,15 +20,15 @@ envoy_cc_library(
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/health_checker/redis/v2:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":redis",
         ":utility",
