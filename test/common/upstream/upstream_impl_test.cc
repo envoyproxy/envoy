@@ -1188,7 +1188,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
   cluster.initialize([] {});
 
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -1233,7 +1234,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
   cluster.initialize([] {});
 
   auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -1278,7 +1280,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
   cluster.initialize([] {});
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
@@ -1303,7 +1306,8 @@ TEST_F(StaticClusterImplTest, AltStatName) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
   cluster.initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name
   cluster.info()->stats().upstream_rq_total_.inc();
@@ -1326,7 +1330,8 @@ TEST_F(StaticClusterImplTest, RingHash) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true,
+                            false);
   cluster.initialize([] {});
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -1352,7 +1357,8 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
@@ -1400,7 +1406,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
   cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
@@ -1531,7 +1538,8 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
   cluster.initialize([] {});
 
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
@@ -1629,7 +1637,8 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false, false);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false,
+                            false);
   cluster.initialize([] {});
 
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
