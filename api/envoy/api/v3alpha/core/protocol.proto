@@ -44,6 +44,10 @@ message HttpProtocolOptions {
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+
+  // If true, updating SNI automatically by reading host/authority on request header so that
+  // updating upstream cluster name
+  bool auto_sni = 4;
 }
 
 message Http1ProtocolOptions {

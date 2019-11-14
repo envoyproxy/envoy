@@ -244,9 +244,6 @@ message TransportSocket {
 
     google.protobuf.Any typed_config = 3;
   }
-
-  // set sni value automatically, dynamic updating sni field
-  bool auto_sni = 4;
 }
 
 // Generic socket option message. This would be used to set socket options that

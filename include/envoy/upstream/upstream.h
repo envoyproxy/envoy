@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
