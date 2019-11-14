@@ -578,7 +578,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool(bool update_sni, absl::strin
   if (update_sni) {
     callbacks_->streamInfo().filterState().setData(
         Network::UpstreamServerName::key(), std::make_unique<Network::UpstreamServerName>(url),
-        StreamInfo::FilterState::StateType::ReadOnly);
+        StreamInfo::FilterState::StateType::Mutable);
   }
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       callbacks_->streamInfo().filterState());

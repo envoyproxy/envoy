@@ -11,6 +11,7 @@
 #include "common/http/context_impl.h"
 #include "common/network/application_protocol.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/upstream_server_name.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
@@ -276,6 +277,29 @@ public:
   RouterTestSuppressEnvoyHeaders()
       : RouterTestBase(false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
+
+TEST_F(RouterTest, UpdateFilterState) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, auto_sni()).WillByDefault(Return(true));
+  ON_CALL(callbacks_.stream_info_, filterState())
+      .WillByDefault(ReturnRef(stream_info.filterState()));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  stream_info.filterState().setData(Network::UpstreamServerName::key(),
+                                    std::make_unique<Network::UpstreamServerName>("dummy"),
+                                    StreamInfo::FilterState::StateType::Mutable);
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ("host", stream_info.filterState()
+                        .template getDataReadOnly<Network::UpstreamServerName>(
+                            Network::UpstreamServerName::key())
+                        .value());
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
 
 TEST_F(RouterTest, RouteNotFound) {
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
