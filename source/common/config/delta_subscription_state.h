@@ -1,55 +1,56 @@
 #pragma once
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/config/subscription.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
-#include "envoy/local_info/local_info.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/config/pausable_ack_queue.h"
+#include "common/config/subscription_state.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
 
-// Tracks the xDS protocol state of an individual ongoing delta xDS session, i.e. a single type_url.
-// There can be multiple DeltaSubscriptionStates active. They will always all be
-// blissfully unaware of each other's existence, even when their messages are
-// being multiplexed together by ADS.
-class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
+// Tracks the state of a delta xDS-over-gRPC protocol session.
+class DeltaSubscriptionState : public SubscriptionState {
 public:
+  // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   DeltaSubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
-                         const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
                          Event::Dispatcher& dispatcher);
+  ~DeltaSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const std::set<std::string>& cur_added,
-                                  const std::set<std::string>& cur_removed);
+                                  const std::set<std::string>& cur_removed) override;
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
-  bool subscriptionUpdatePending() const;
+  bool subscriptionUpdatePending() const override;
 
-  void markStreamFresh() { any_request_sent_yet_in_current_stream_ = false; }
+  void markStreamFresh() override { any_request_sent_yet_in_current_stream_ = false; }
 
-  UpdateAck handleResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
+  // message is expected to be a envoy::api::v2::DeltaDiscoveryResponse.
+  UpdateAck handleResponse(const void* response_proto_ptr) override;
 
-  void handleEstablishmentFailure();
+  void handleEstablishmentFailure() override;
 
   // Returns the next gRPC request proto to be sent off to the server, based on this object's
   // understanding of the current protocol state, and new resources that Envoy wants to request.
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless();
-  // The WithAck version first calls the Ack-less version, then adds in the passed-in ack.
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
+  // Returns a new'd pointer, meant to be owned by the caller.
+  void* getNextRequestAckless() override;
+  // The WithAck version first calls the Ackless version, then adds in the passed-in ack.
+  // Returns a new'd pointer, meant to be owned by the caller.
+  void* getNextRequestWithAck(const UpdateAck& ack) override;
 
   DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
   DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 
 private:
+  // Returns a new'd pointer, meant to be owned by the caller.
+  envoy::api::v2::DeltaDiscoveryRequest* getNextRequestInternal();
   void handleGoodResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
-  void disableInitFetchTimeoutTimer();
 
   class ResourceVersion {
   public:
@@ -84,13 +85,6 @@ private:
   // iterator into just its keys, e.g. for use in std::set_difference.
   std::set<std::string> resource_names_;
 
-  const std::string type_url_;
-  // callbacks_ is expected to be a WatchMap.
-  SubscriptionCallbacks& callbacks_;
-  const LocalInfo::LocalInfo& local_info_;
-  std::chrono::milliseconds init_fetch_timeout_;
-  Event::TimerPtr init_fetch_timeout_timer_;
-
   bool any_request_sent_yet_in_current_stream_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
@@ -98,6 +92,18 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
+};
+
+class DeltaSubscriptionStateFactory : public SubscriptionStateFactory {
+public:
+  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher);
+  ~DeltaSubscriptionStateFactory() override;
+  std::unique_ptr<SubscriptionState>
+  makeSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+                        std::chrono::milliseconds init_fetch_timeout) override;
+
+private:
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace Config

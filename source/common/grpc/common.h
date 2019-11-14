@@ -78,7 +78,7 @@ public:
    * @return std::chrono::milliseconds the duration in milliseconds. A zero value corresponding to
    *         infinity is returned if 'grpc-timeout' is missing or malformed.
    */
-  static std::chrono::milliseconds getGrpcTimeout(Http::HeaderMap& request_headers);
+  static std::chrono::milliseconds getGrpcTimeout(const Http::HeaderMap& request_headers);
 
   /**
    * Encode 'timeout' into 'grpc-timeout' format.
