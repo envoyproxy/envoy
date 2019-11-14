@@ -64,7 +64,7 @@ private:
         Internal::parseMessageUntyped(std::make_unique<Response>(), std::move(response))
             .release()));
     if (!message) {
-      onFailure(Status::GrpcStatus::Internal, "", span);
+      onFailure(Status::WellKnownGrpcStatus::Internal, "", span);
       return;
     }
     onSuccess(std::move(message), span);

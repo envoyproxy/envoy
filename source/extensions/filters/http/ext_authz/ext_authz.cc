@@ -75,7 +75,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
       callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
-      check_request_, config_->maxRequestBytes());
+      check_request_, config_->maxRequestBytes(), config_->includePeerCertificate());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *callbacks_);
   state_ = State::Calling;
@@ -109,12 +109,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
              : Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (buffer_data_) {
     const bool buffer_is_full = isBufferFull();
     if (end_stream || buffer_is_full) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request since {}",
                        *callbacks_, buffer_is_full ? "buffer is full" : "stream is ended");
+      if (!buffer_is_full) {
+        // Make sure data is available in initiateCall.
+        callbacks_->addDecodedData(data, true);
+      }
       initiateCall(*request_headers_);
       return filter_return_ == FilterReturn::StopDecoding
                  ? Http::FilterDataStatus::StopIterationAndWatermark
@@ -215,9 +219,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
+          // First remove all headers requested by the ext_authz filter,
+          // to ensure that they will override existing headers
+          for (const auto& header : headers) {
+            response_headers.remove(header.first);
+          }
+          // Then set all of the requested headers, allowing the
+          // same header to be set multiple times, e.g. `Set-Cookie`
           for (const auto& header : headers) {
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
-            response_headers.remove(header.first);
             response_headers.addCopy(header.first, header.second);
           }
         },

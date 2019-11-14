@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -76,10 +77,12 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createUdpListenerFilterFactoryList_(filters, context);
   }
+
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               Network::Address::SocketType socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
+
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
@@ -135,6 +138,8 @@ public:
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners(StopListenersType stop_listeners_type) override;
   void stopWorkers() override;
+  void beginListenerUpdate() override { error_state_tracker_.clear(); }
+  void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
@@ -143,6 +148,9 @@ public:
 private:
   using ListenerList = std::list<ListenerImplPtr>;
 
+  bool addOrUpdateListenerInternal(const envoy::api::v2::Listener& config,
+                                   const std::string& version_info, bool added_via_api,
+                                   const std::string& name);
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
         : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
@@ -156,8 +164,9 @@ private:
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
                                      const Network::Address::Instance& address);
-  static bool hasListenerWithSocket(const ListenerList& list,
-                                    const Network::SocketSharedPtr& socket);
+  static bool
+  shareSocketWithOtherListener(const ListenerList& list,
+                               const Network::ListenSocketFactorySharedPtr& socket_factory);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
     // restart.
@@ -197,6 +206,10 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  Network::ListenSocketFactorySharedPtr
+  createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
+                            ListenerImpl& listener);
+
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
   // Warming listeners are listeners that may need further initialization via the listener's init
@@ -216,6 +229,9 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
+  using UpdateFailureState = envoy::admin::v2alpha::UpdateFailureState;
+  absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
+  FailureStates overall_error_state_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

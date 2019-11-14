@@ -60,6 +60,7 @@ message Tracing {
 }
 
 // Configuration for the LightStep tracer.
+// [#extension: envoy.tracers.lightstep]
 message LightstepConfig {
   // The cluster manager cluster that hosts the LightStep collectors.
   string collector_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -70,6 +71,7 @@ message LightstepConfig {
 }
 
 // Configuration for the Zipkin tracer.
+// [#extension: envoy.tracers.zipkin]
 // [#next-free-field: 6]
 message ZipkinConfig {
   // Available Zipkin collector endpoint versions.
@@ -119,6 +121,7 @@ message ZipkinConfig {
 // DynamicOtConfig is used to dynamically load a tracer from a shared library
 // that implements the `OpenTracing dynamic loading API
 // <https://github.com/opentracing/opentracing-cpp>`_.
+// [#extension: envoy.tracers.dynamic_ot]
 message DynamicOtConfig {
   // Dynamic library implementing the `OpenTracing API
   // <https://github.com/opentracing/opentracing-cpp>`_.
@@ -130,6 +133,7 @@ message DynamicOtConfig {
 }
 
 // Configuration for the Datadog tracer.
+// [#extension: envoy.tracers.datadog]
 message DatadogConfig {
   // The cluster to use for submitting traces to the Datadog agent.
   string collector_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -140,6 +144,7 @@ message DatadogConfig {
 
 // Configuration for the OpenCensus tracer.
 // [#next-free-field: 13]
+// [#extension: envoy.tracers.opencensus]
 message OpenCensusConfig {
   enum TraceContext {
     // No-op default, no trace context is utilized.

@@ -35,9 +35,11 @@ public:
       const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig& config);
 
   const std::string& hostRewrite() const { return host_rewrite_; }
+  const Http::LowerCaseString& hostRewriteHeader() const { return host_rewrite_header_; }
 
 private:
   const std::string host_rewrite_;
+  const Http::LowerCaseString host_rewrite_header_;
 };
 
 class ProxyFilter

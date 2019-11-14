@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -29,14 +30,14 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":ratelimit_lib",
         "//include/envoy/registry",
-        "//source/common/config:filter_json_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",

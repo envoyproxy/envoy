@@ -442,8 +442,6 @@ private:
 
 class LibEventInstance : public Instance {
 public:
-  // Allows access into the underlying buffer for move() optimizations.
-  virtual Event::Libevent::BufferPtr& buffer() PURE;
   // Called after accessing the memory in buffer() directly to allow any post-processing.
   virtual void postProcess() PURE;
 };
@@ -508,7 +506,6 @@ public:
   std::string toString() const override;
 
   // LibEventInstance
-  Event::Libevent::BufferPtr& buffer() override { return buffer_; }
   void postProcess() override;
 
   /**
@@ -524,23 +521,6 @@ public:
    */
   void appendSliceForTest(absl::string_view data);
 
-  // Support for choosing the buffer implementation at runtime.
-  // TODO(brian-pane) remove this once the new implementation has been
-  // running in production for a while.
-
-  /** @return whether this buffer uses the old evbuffer-based implementation. */
-  bool usesOldImpl() const { return old_impl_; }
-
-  /**
-   * @param use_old_impl whether to use the evbuffer-based implementation for new buffers
-   * @warning Except for testing code, this method should be called at most once per process,
-   *          before any OwnedImpl objects are created. The reason is that it is unsafe to
-   *          mix and match buffers with different implementations. The move() method,
-   *          in particular, only works if the source and destination objects are using
-   *          the same destination.
-   */
-  static void useOldImpl(bool use_old_impl);
-
 private:
   /**
    * @param rhs another buffer
@@ -549,20 +529,11 @@ private:
    */
   bool isSameBufferImpl(const Instance& rhs) const;
 
-  /** Whether to use the old evbuffer implementation when constructing new OwnedImpl objects. */
-  static bool use_old_impl_;
-
-  /** Whether this buffer uses the old evbuffer implementation. */
-  bool old_impl_;
-
   /** Ring buffer of slices. */
   SliceDeque slices_;
 
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
-
-  /** Used when old_impl_==true */
-  Event::Libevent::BufferPtr buffer_;
 };
 
 using BufferFragmentPtr = std::unique_ptr<BufferFragment>;

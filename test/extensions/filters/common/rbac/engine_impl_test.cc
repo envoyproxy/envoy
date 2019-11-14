@@ -1,3 +1,5 @@
+#include "envoy/config/rbac/v2/rbac.pb.validate.h"
+
 #include "common/network/utility.h"
 
 #include "extensions/filters/common/rbac/engine_impl.h"
@@ -37,6 +39,92 @@ TEST(RoleBasedAccessControlEngineImpl, Disabled) {
 
   rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_DENY);
   checkEngine(RBAC::RoleBasedAccessControlEngineImpl(rbac), true);
+}
+
+// Test various invalid policies to validate the fix for
+// https://github.com/envoyproxy/envoy/issues/8715.
+TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
+  {
+    envoy::config::rbac::v2::RBAC rbac;
+    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    envoy::config::rbac::v2::Policy policy;
+    (*rbac.mutable_policies())["foo"] = policy;
+
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
+                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions"
+                            ".*value must contain at least")
+  }
+
+  {
+    envoy::config::rbac::v2::RBAC rbac;
+    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    envoy::config::rbac::v2::Policy policy;
+    policy.add_permissions();
+    (*rbac.mutable_policies())["foo"] = policy;
+
+    EXPECT_THROW_WITH_REGEX(
+        TestUtility::validate(rbac), EnvoyException,
+        "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions.*rule.*is required");
+  }
+
+  {
+    envoy::config::rbac::v2::RBAC rbac;
+    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    envoy::config::rbac::v2::Policy policy;
+    auto* permission = policy.add_permissions();
+    auto* and_rules = permission->mutable_and_rules();
+    and_rules->add_rules();
+    (*rbac.mutable_policies())["foo"] = policy;
+
+    EXPECT_THROW_WITH_REGEX(
+        TestUtility::validate(rbac), EnvoyException,
+        "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions"
+        ".*PermissionValidationError\\.AndRules.*SetValidationError\\.Rules.*rule.*is required");
+  }
+
+  {
+    envoy::config::rbac::v2::RBAC rbac;
+    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    envoy::config::rbac::v2::Policy policy;
+    auto* permission = policy.add_permissions();
+    permission->set_any(true);
+    (*rbac.mutable_policies())["foo"] = policy;
+
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
+                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
+                            ".*value must contain at least")
+  }
+
+  {
+    envoy::config::rbac::v2::RBAC rbac;
+    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    envoy::config::rbac::v2::Policy policy;
+    auto* permission = policy.add_permissions();
+    permission->set_any(true);
+    policy.add_principals();
+    (*rbac.mutable_policies())["foo"] = policy;
+
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
+                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
+                            ".*identifier.*is required");
+  }
+
+  {
+    envoy::config::rbac::v2::RBAC rbac;
+    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    envoy::config::rbac::v2::Policy policy;
+    auto* permission = policy.add_permissions();
+    permission->set_any(true);
+    auto* principal = policy.add_principals();
+    auto* and_ids = principal->mutable_and_ids();
+    and_ids->add_ids();
+    (*rbac.mutable_policies())["foo"] = policy;
+
+    EXPECT_THROW_WITH_REGEX(
+        TestUtility::validate(rbac), EnvoyException,
+        "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
+        ".*PrincipalValidationError\\.AndIds.*SetValidationError\\.Ids.*identifier.*is required");
+  }
 }
 
 TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {

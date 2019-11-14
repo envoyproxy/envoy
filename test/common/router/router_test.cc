@@ -3129,7 +3129,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
 TEST_F(RouterTest, InternalRedirectRejectedOnSecondPass) {
   enableRedirects();
-  default_request_headers_.insertEnvoyOriginalUrl().value(std::string("http://www.foo.com"));
+  default_request_headers_.setEnvoyOriginalUrl("http://www.foo.com");
   sendRequest();
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -3145,7 +3145,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
   enableRedirects();
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string(""));
+  redirect_headers_->setLocation("");
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
   Buffer::OwnedImpl data("1234567890");
@@ -3159,7 +3159,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
   enableRedirects();
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string("h"));
+  redirect_headers_->setLocation("h");
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
   Buffer::OwnedImpl data("1234567890");
@@ -3216,7 +3216,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  redirect_headers_->setLocation("https://www.foo.com");
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
@@ -3225,7 +3225,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects();
-  default_request_headers_.insertForwardedProto().value(std::string("http"));
+  default_request_headers_.setForwardedProto("http");
   sendRequest();
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
@@ -3245,7 +3245,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  redirect_headers_->setLocation("https://www.foo.com");
   EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));

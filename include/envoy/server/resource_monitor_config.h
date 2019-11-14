@@ -66,6 +66,13 @@ public:
    * monitor produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "resource_monitors"; }
 };
 
 } // namespace Configuration

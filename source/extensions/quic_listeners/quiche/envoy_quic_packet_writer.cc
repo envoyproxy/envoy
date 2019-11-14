@@ -26,7 +26,8 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
   Api::IoCallUint64Result result = Network::Utility::writeToSocket(
-      socket_, &slice, 1, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
+      socket_.ioHandle(), &slice, 1, local_addr == nullptr ? nullptr : local_addr->ip(),
+      *remote_addr);
   if (result.ok()) {
     return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
   }

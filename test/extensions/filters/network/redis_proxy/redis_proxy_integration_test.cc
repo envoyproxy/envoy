@@ -378,7 +378,6 @@ public:
                                      const std::string& auth_password = "");
 
 protected:
-  Runtime::MockRandomGenerator* mock_rng_{};
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
   Runtime::MockLoader* runtime_{};
@@ -463,12 +462,6 @@ void RedisProxyIntegrationTest::initialize() {
   setDeterministic();
   config_helper_.renameListener("redis_proxy");
   BaseIntegrationTest::initialize();
-
-  mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&test_server_->server().random());
-  // Abort now if we cannot downcast the server's random number generator pointer.
-  ASSERT_TRUE(mock_rng_ != nullptr);
-  // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
-  ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
 }
 
 void RedisProxyIntegrationTest::roundtripToUpstreamStep(
@@ -1002,8 +995,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   initialize();
 
   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
-  // When random_value is < 50, the percentage:* will be mirrored
-  ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
+  // When random_value is < 50, the percentage:* will be mirrored, random() default is 0
   const std::string& request = makeBulkStringArray({"get", "percentage:toto"});
   const std::string& response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)
