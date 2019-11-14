@@ -18,3 +18,12 @@ message FilterConfig {
   // counts.
   bool emit_filter_state = 1;
 }
+
+// gRPC statistics filter state object in protobuf form.
+message FilterObject {
+  // Count of request messages in the request stream.
+  uint64 request_message_count = 1;
+
+  // Count of response messages in the response stream.
+  uint64 response_message_count = 2;
+}
