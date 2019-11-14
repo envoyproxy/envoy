@@ -21,7 +21,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/cleanup.h"
-#include "common/config/grpc_mux_impl.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
@@ -185,6 +185,8 @@ public:
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context);
 
+  std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
+
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                           const std::string& version_info) override;
@@ -235,8 +237,6 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
-
-  std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,

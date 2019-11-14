@@ -8,5 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/api/v2/core:pkg",
         "//envoy/config/filter/accesslog/v2:pkg",
+        "//envoy/type:pkg",
     ],
 )

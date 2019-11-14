@@ -1,11 +1,10 @@
 #pragma once
 
-#include <unistd.h>
-
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 
@@ -31,6 +30,7 @@ public:
       io_handle_->close();
     }
   }
+  bool isOpen() const override { return io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();

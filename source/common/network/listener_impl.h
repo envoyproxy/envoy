@@ -11,7 +11,7 @@ namespace Network {
  */
 class ListenerImpl : public BaseListenerImpl {
 public:
-  ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
+  ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
                bool bind_to_port);
 
   void disable() override;

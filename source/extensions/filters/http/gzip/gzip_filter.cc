@@ -126,7 +126,7 @@ Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bo
     sanitizeEtagHeader(headers);
     insertVaryHeader(headers);
     headers.removeContentLength();
-    headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
+    headers.setReferenceContentEncoding(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
                      config_->windowBits(), config_->memoryLevel());
     config_->stats().compressed_.inc();
@@ -284,10 +284,10 @@ void GzipFilter::insertVaryHeader(Http::HeaderMap& headers) {
       std::string new_header;
       absl::StrAppend(&new_header, vary->value().getStringView(), ", ",
                       Http::Headers::get().VaryValues.AcceptEncoding);
-      headers.insertVary().value(new_header);
+      headers.setVary(new_header);
     }
   } else {
-    headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);
+    headers.setReferenceVary(Http::Headers::get().VaryValues.AcceptEncoding);
   }
 }
 

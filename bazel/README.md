@@ -98,6 +98,8 @@ for how to update or override dependencies.
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
    in your shell for buildifier to work.
+1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
+   in your shell for buildozer to work.
 1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Envoy with the CI Docker image
@@ -147,20 +149,15 @@ set different options. See below to configure test IP versions.
 
 ## Linking against libc++ on Linux
 
-To link Envoy against libc++, use the following commands:
+To link Envoy against libc++, follow the [quick start](#quick-start-bazel-build-for-developers) to setup Clang+LLVM and run:
 ```
-export CC=clang
-export CXX=clang++
 bazel build --config=libc++ //source/exe:envoy-static
 ```
-Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
-include them in the search path, e.g. `export PATH=/usr/lib/llvm-9/bin:$PATH`.
 
-You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
-might look like `sudo apt-get install libc++abi-9-dev libc++-9-dev`.
+Or use our configuration with Remote Execution or Docker sandbox, pass `--config=remote-clang-libc++` or
+`--config=docker-clang-libc++` respectively.
 
-Note: this configuration currently doesn't work with Remote Execution or Docker sandbox.
+If you want to make libc++ as default, add a line `build --config=libc++` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 
@@ -176,7 +173,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 8.
+known to work. Currently the CI is running with Clang 9.
 
 ## Clang STL debug symbols
 

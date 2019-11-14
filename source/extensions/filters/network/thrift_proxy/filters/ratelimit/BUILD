@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -26,10 +27,12 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "alpha",
     deps = [
         ":ratelimit_lib",
         "//include/envoy/registry",
@@ -38,5 +41,6 @@ envoy_cc_library(
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
+        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg_cc_proto",
     ],
 )

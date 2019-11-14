@@ -31,7 +31,8 @@ public:
 
     const std::string filter = fmt::format(R"EOF(
 name: envoy.filters.http.dynamic_forward_proxy
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}

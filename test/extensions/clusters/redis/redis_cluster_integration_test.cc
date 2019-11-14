@@ -33,7 +33,8 @@ static_resources:
     filter_chains:
       filters:
         name: envoy.redis_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
           prefix_routes:
             catch_all_route:
@@ -80,8 +81,10 @@ const std::string& testConfigWithReadPolicy() {
 
 const std::string& testConfigWithAuth() {
   CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: somepassword }}
+      typed_extension_protocol_options:
+        envoy.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: somepassword }
 )EOF");
 }
 
@@ -133,13 +136,15 @@ public:
       }
     });
 
-    BaseIntegrationTest::initialize();
+    on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
+      mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));
+      // Abort now if we cannot downcast the server's random number generator pointer.
+      ASSERT_TRUE(mock_rng_ != nullptr);
+      // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
+      ON_CALL(*mock_rng_, random()).WillByDefault(Return(random_index_));
+    };
 
-    mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&test_server_->server().random());
-    // Abort now if we cannot downcast the server's random number generator pointer.
-    ASSERT_TRUE(mock_rng_ != nullptr);
-    // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
-    ON_CALL(*mock_rng_, random()).WillByDefault(Return(random_index_));
+    BaseIntegrationTest::initialize();
   }
 
 protected:

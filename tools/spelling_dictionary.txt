@@ -312,6 +312,7 @@ absl
 accesslog
 accessor
 accessors
+ackless
 acks
 acls
 addr
@@ -553,6 +554,7 @@ genrule
 getaddrinfo
 getaffinity
 getifaddrs
+getNextRequestAckless
 getpeername
 getsockname
 getsockopt
@@ -759,6 +761,7 @@ parseable
 parsers
 passphrase
 passthrough
+pathname
 pausable
 pcall
 pcap
@@ -770,6 +773,7 @@ pkey
 plaintext
 pluggable
 pointee
+polymorphism
 popen
 pos
 posix
@@ -913,6 +917,8 @@ sockfd
 sockopt
 sockopts
 somestring
+SotW
+SotwSubscriptionState
 spanid
 spdlog
 splitter
@@ -951,6 +957,7 @@ submessages
 subnet
 subnets
 suboptimal
+SubscriptionStateFactory
 subsecond
 subseconds
 subsequence

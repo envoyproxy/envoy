@@ -56,7 +56,11 @@ class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::
 public:
   EnvoyQuicDispatcherTest()
       : version_(GetParam()), api_(Api::createApiForTest(time_system_)),
-        dispatcher_(api_->allocateDispatcher()), connection_helper_(*dispatcher_),
+        dispatcher_(api_->allocateDispatcher()),
+        listen_socket_(std::make_unique<Network::NetworkListenSocket<
+                           Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
+            Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
+        connection_helper_(*dispatcher_),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
@@ -70,7 +74,7 @@ public:
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, *dispatcher_) {
+            listener_stats_, *dispatcher_, *listen_socket_) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _))
@@ -78,12 +82,10 @@ public:
   }
 
   void SetUp() override {
-    listen_socket_ = std::make_unique<Network::NetworkListenSocket<
-        Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
-        Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
-    EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
+    EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
+        .WillRepeatedly(Return(1024 * 1024));
   }
 
   void TearDown() override {
@@ -146,7 +148,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EnvoyQuicDispatcherTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
-  quic::SetVerbosityLogThreshold(2);
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
@@ -164,10 +165,17 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
       }));
   std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
   Network::MockConnectionCallbacks network_connection_callbacks;
+  testing::StrictMock<Stats::MockCounter> read_total;
+  testing::StrictMock<Stats::MockGauge> read_current;
+  testing::StrictMock<Stats::MockCounter> write_total;
+  testing::StrictMock<Stats::MockGauge> write_current;
+
   std::vector<Network::FilterFactoryCb> filter_factory(
       {[&](Network::FilterManager& filter_manager) {
         filter_manager.addReadFilter(read_filter);
         read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
+        read_filter->callbacks_->connection().setConnectionStats(
+            {read_total, read_current, write_total, write_current, nullptr, nullptr});
       }});
   EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());

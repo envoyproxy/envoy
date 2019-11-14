@@ -148,8 +148,8 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
 }
 
 TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
-#ifdef __APPLE__
-  // Skip this test on macOS: we can't detect the early close on macOS, and we
+#if defined(__APPLE__) || defined(WIN32)
+  // Skip this test on OS X + Windows: we can't detect the early close on non-Linux, and we
   // won't clean up the upstream connection until it times out. See #4294.
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     return;
@@ -363,7 +363,7 @@ public:
     envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
-    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
+    transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   void setupDownstreamTap(envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -378,7 +378,7 @@ public:
     envoy::config::transport_socket::tap::v2alpha::Tap tap_config =
         createTapConfig(ssl_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-    TestUtility::jsonConvert(tap_config, *transport_socket->mutable_config());
+    transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
   envoy::config::transport_socket::tap::v2alpha::Tap

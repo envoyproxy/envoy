@@ -10,8 +10,12 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
-Version 1.12.0 (pending)
+Version 1.13.0 (pending)
 ========================
+
+
+Version 1.12.0 (October 31, 2019)
+=================================
 * The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is
   deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination
   cluster <envoy_api_field_Cluster.type>`.
@@ -51,6 +55,8 @@ Version 1.12.0 (pending)
 * Ext_authz filter stats `ok`, `error`, `denied`, `failure_mode_allowed` in
   *cluster.<route target cluster>.ext_authz.* namespace is deprecated.
   Use *http.<stat_prefix>.ext_authz.* namespace to access same counters instead.
+* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
+  udpa.type.v1.TypedStruct in google.protobuf.Any.
 
 Version 1.11.2 (October 8, 2019)
 ================================

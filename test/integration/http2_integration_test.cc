@@ -68,7 +68,8 @@ TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTra
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 // Verifies metadata can be sent at different locations of the responses.
@@ -483,7 +484,8 @@ TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
 
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
@@ -592,7 +594,8 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
 
 static std::string decode_headers_only = R"EOF(
 name: decode-headers-only
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 void Http2MetadataIntegrationTest::runHeaderOnlyTest(bool send_request_body, size_t body_size) {
@@ -699,7 +702,8 @@ void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
 
 static std::string metadata_stop_all_filter = R"EOF(
 name: metadata-stop-all-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
@@ -1141,7 +1145,8 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
 TEST_P(Http2IntegrationTest, PauseAndResume) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -1170,7 +1175,8 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
 TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -1488,7 +1494,7 @@ void Http2FloodMitigationTest::startHttp2Session() {
   readFrame();
 
   // Send an SETTINGS ACK.
-  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::ACK);
+  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
   tcp_client_->write(std::string(settings), false, false);
 
   // read pending SETTINGS and WINDOW_UPDATE frames
@@ -1530,7 +1536,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
   auto request = Http2Frame::makeRequest(request_idx, host, path);
   sendFame(request);
   auto frame = readFrame();
-  EXPECT_EQ(Http2Frame::Type::HEADERS, frame.type());
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
   tcp_client_->readDisable(true);
   uint64_t total_bytes_sent = 0;
@@ -1570,7 +1576,7 @@ TEST_P(Http2FloodMitigationTest, 404) {
   beginSession();
 
   // Send requests to a non existent path to generate 404s
-  floodServer("host", "/notfound", Http2Frame::ResponseStatus::_404, "http2.outbound_flood");
+  floodServer("host", "/notfound", Http2Frame::ResponseStatus::NotFound, "http2.outbound_flood");
 }
 
 // Verify that the server can detect flood of DATA frames
@@ -1581,7 +1587,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::_200, "http2.outbound_flood");
+  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "http2.outbound_flood");
 }
 
 // Verify that the server can detect flood of RST_STREAM frames.
@@ -1599,7 +1605,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   sendFame(request);
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
-  EXPECT_EQ(Http2Frame::Type::RST_STREAM, response.type());
+  EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
   uint64_t total_bytes_sent = 0;
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
     request = Http::Http2::Http2Frame::makeMalformedRequest(++i);
@@ -1625,7 +1631,7 @@ TEST_P(Http2FloodMitigationTest, TooManyStreams) {
 
   // Exceed the number of streams allowed by the server. The server should stop reading from the
   // client. Verify that the client was unable to stuff a lot of data into the server.
-  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::_200, "");
+  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "");
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
@@ -1718,7 +1724,7 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   sendFame(request);
   // Reading response marks this stream as closed in nghttp2.
   auto frame = readFrame();
-  EXPECT_EQ(Http2Frame::Type::HEADERS, frame.type());
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
 
   floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
               "http2.inbound_priority_frames_flood");
@@ -1770,15 +1776,15 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   sendFame(request);
   // Make sure we've got RST_STREAM from the server.
   auto response = readFrame();
-  EXPECT_EQ(Http2Frame::Type::RST_STREAM, response.type());
+  EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
 
   // Send valid request using the same connection.
   request_idx++;
   request = Http2Frame::makeRequest(request_idx, "host", "/");
   sendFame(request);
   response = readFrame();
-  EXPECT_EQ(Http2Frame::Type::HEADERS, response.type());
-  EXPECT_EQ(Http2Frame::ResponseStatus::_200, response.responseStatus());
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
 
   tcp_client_->close();
 
