@@ -404,7 +404,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
-    const auto listen_addr = listener_it->get().socket().localAddress();
+    const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
     if (listen_addr->type() == Network::Address::Type::Ip) {
       ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
       registerPort(*port_it, listen_addr->ip()->port());

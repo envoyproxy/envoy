@@ -41,7 +41,7 @@ public:
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
 
     listener_ = std::make_unique<UdpListenerImpl>(
-        dispatcherImpl(), *server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
+        dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
   }
 
 protected:
@@ -54,16 +54,15 @@ protected:
                                      server_socket_->localAddress()->ip()->port());
   }
 
-  SocketPtr createServerSocket(bool bind) {
+  SocketSharedPtr createServerSocket(bool bind) {
     // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
-    return std::make_unique<NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>>(
-        Network::Test::getAnyAddress(version_),
+    return std::make_shared<UdpListenSocket>(Network::Test::getAnyAddress(version_),
 #ifdef IP_FREEBIND
-        SocketOptionFactory::buildIpFreebindOptions(),
+                                             SocketOptionFactory::buildIpFreebindOptions(),
 #else
-        nullptr,
+                                             nullptr,
 #endif
-        bind);
+                                             bind);
   }
 
   SocketPtr createClientSocket(bool bind) {
@@ -89,7 +88,7 @@ protected:
     time_system_.sleep(std::chrono::milliseconds(100));
   }
 
-  SocketPtr server_socket_;
+  SocketSharedPtr server_socket_;
   SocketPtr client_socket_;
   Address::InstanceConstSharedPtr send_to_addr_;
   MockUdpListenerCallbacks listener_callbacks_;
@@ -103,9 +102,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
 // Test that socket options are set after the listener is setup.
 TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   MockUdpListenerCallbacks listener_callbacks;
-  UdpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
+  auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getAnyAddress(version_),
+                                                           nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket.addOption(option);
+  socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
