@@ -353,10 +353,13 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestNoStream) {
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
+  Buffer::OwnedImpl buffer("bad");
+#ifndef ENVOY_ENABLE_LEGACY_HTTP_PARSER
+  // TODO(dereka) fixme
   Http::MockStreamDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+#endif
 
-  Buffer::OwnedImpl buffer("bad");
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException, "http/1.1 protocol error: HPE_INVALID_METHOD");
 
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
@@ -395,19 +398,12 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-
-// We can no longer enable this feature because llhttp rejects this, http-parser didn't.
-// llhttp returns INVALID_HEADER_TOKEN from llhttp_get_errno(&parser_) in dispatchSlice
-//
-// hmm, http-parser has INVALID_HEADER_TOKEN, why didn't that work?
-//
-// If we want to keep this feature, we'd need to manually parse to the next valid token.
-//
+#ifdef ENVOY_ENABLE_LEGACY_HTTP_PARSER
 // Ensures that requests with invalid HTTP header values are not rejected
 // when the runtime guard is not enabled for the feature.
-TEST_F(Http1ServerConnectionImplTest, DISABLED_ HeaderInvalidCharsRuntimeGuard) {
+TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRuntimeGuard) {
   TestScopedRuntime scoped_runtime;
-  // When the runtime-guarded   feature is NOT enabled, invalid header values
+  // When the runtime-guarded feature is NOT enabled, invalid header values
   // should be accepted by the codec.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.strict_header_validation", "false"}});
@@ -419,8 +415,9 @@ TEST_F(Http1ServerConnectionImplTest, DISABLED_ HeaderInvalidCharsRuntimeGuard) 
 
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
-  EXPECT_NO_THROW(codec_->dispatch(buffer));
+  codec_->dispatch(buffer);
 }
+#endif
 
 // Ensures that requests with invalid HTTP header values are properly rejected
 // when the runtime guard is enabled for the feature.
@@ -438,8 +435,14 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
 
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
+
+#ifndef ENVOY_ENABLE_LEGACY_HTTP_PARSER
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
                             "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+#else
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: header value contains invalid chars");
+#endif
 }
 
 // Regression test for http-parser allowing embedded NULs in header values,
@@ -457,8 +460,13 @@ TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
 
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
+#ifndef ENVOY_ENABLE_LEGACY_HTTP_PARSER
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
                             "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+#else
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: header value contains NUL");
+#endif
 }
 
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some

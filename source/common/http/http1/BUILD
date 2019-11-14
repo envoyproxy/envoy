@@ -19,11 +19,8 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = [
-        "http_parser",
-        "llhttp"
-    ],
     deps = [
+        ":parser_adapter",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
@@ -76,12 +73,12 @@ envoy_cc_library(
     ],
 )
 
-
-envoy_cc_binary(
-    name = "comparison",
-    srcs = ["comparison.cc"],
+envoy_cc_library(
+    name = "parser_adapter",
+    hdrs = ["parser_adapter.h"],
     external_deps = [
         "http_parser",
         "llhttp"
     ],
 )
+

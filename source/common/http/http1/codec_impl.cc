@@ -16,6 +16,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/http1/parser_adapter.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -312,32 +313,32 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
-llhttp_settings_s ConnectionImpl::settings_{
-    [](llhttp_t* parser) -> int {
+parser_settings_t ConnectionImpl::settings_{
+    [](parser_t* parser) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onMessageBeginBase();
       return 0;
     },
-    [](llhttp_t* parser, const char* at, size_t length) -> int {
+    [](parser_t* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onUrl(at, length);
       return 0;
     },
     nullptr, // on_status
-    [](llhttp_t* parser, const char* at, size_t length) -> int {
+    [](parser_t* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onHeaderField(at, length);
       return 0;
     },
-    [](llhttp_t* parser, const char* at, size_t length) -> int {
+    [](parser_t* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onHeaderValue(at, length);
       return 0;
     },
-    [](llhttp_t* parser) -> int {
+    [](parser_t* parser) -> int {
       return static_cast<ConnectionImpl*>(parser->data)->onHeadersCompleteBase();
     },
-    [](llhttp_t* parser, const char* at, size_t length) -> int {
+    [](parser_t* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->onBody(at, length);
       return 0;
     },
-    [](llhttp_t* parser) -> int {
+    [](parser_t* parser) -> int {
       return static_cast<ConnectionImpl*>(parser->data)->onMessageCompleteBase();
     },
     nullptr, // on_chunk_header
@@ -350,7 +351,7 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               llhttp_type type, uint32_t max_headers_kb,
+                               parser_type_t type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
@@ -361,7 +362,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       strict_header_validation_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
-  llhttp_init(&parser_, type, &settings_);
+  parser_init(&parser_, type, &settings_);
   parser_.data = this;
 }
 
@@ -412,7 +413,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   }
 
   // Always unpause before dispatch.
-  llhttp_resume(&parser_);
+  parser_resume(&parser_);
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
@@ -435,32 +436,15 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
-  llhttp_errno_t err;
-  if (slice == nullptr || len == 0) {
-    err = llhttp_finish(&parser_);
-  } else {
-    err = llhttp_execute(&parser_, slice, len);
-  }
+  const size_t bytes_read = parser_execute(&parser_, &settings_, slice, len);
 
-  size_t nread = len;
-  if (err != HPE_OK) {
-    // If llhttp ran into an error, llhttp_get_error_pos will return a char* to where it
-    // left off, allowing us to calculate how many bytes were read. Otherwise, we assume
-    // the entire message was parsed.
-    nread = llhttp_get_error_pos(&parser_) - slice;
-    if (err == HPE_PAUSED_UPGRADE) {
-      err = HPE_OK;
-      llhttp_resume_after_upgrade(&parser_);
-    }
-  }
-
-  if (llhttp_get_errno(&parser_) != HPE_OK && llhttp_get_errno(&parser_) != HPE_PAUSED) {
+  if (parser_get_errno(&parser_) != HPE_OK && parser_get_errno(&parser_) != HPE_PAUSED) {
     sendProtocolError();
     throw CodecProtocolException("http/1.1 protocol error: " +
-                                 std::string(llhttp_errno_name(llhttp_get_errno(&parser_))));
+                                 std::string(parser_errno_name(parser_get_errno(&parser_))));
   }
 
-  return nread;
+  return bytes_read;
 }
 
 void ConnectionImpl::onHeaderField(const char* data, size_t length) {
@@ -482,8 +466,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
+#ifdef ENVOY_ENABLE_LEGACY_HTTP_PARSER
   const absl::string_view header_value = absl::string_view(data, length);
-
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
@@ -491,7 +475,14 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
       sendProtocolError();
       throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
     }
+  } else if (header_value.find('\0') != absl::string_view::npos) {
+    // http-parser should filter for this
+    // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+    // have an invariant that they must not contain embedded zero characters
+    // (NUL, ASCII 0x0).
+    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
+#endif
 
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
@@ -562,7 +553,12 @@ int ConnectionImpl::onMessageCompleteBase() {
     // upgrade payload will be treated as stream body.
     ASSERT(!deferred_end_stream_headers_);
     ENVOY_CONN_LOG(trace, "Pausing parser due to upgrade.", connection_);
+#ifdef ENVOY_ENABLE_LEGACY_HTTP_PARSER
+    http_parser_pause(&parser_, 1);
+    return HPE_OK;
+#else
     return HPE_PAUSED;
+#endif
   }
   return onMessageComplete();
 }
@@ -651,7 +647,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    const char* method_string = llhttp_method_name(static_cast<llhttp_method>(parser_.method));
+    const char* method_string = parser_method_name(static_cast<parser_method>(parser_.method));
 
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
@@ -677,7 +673,12 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
       // so we return control to the caller.
       if (connection_.state() != Network::Connection::State::Open) {
+#ifdef ENVOY_ENABLE_LEGACY_HTTP_PARSER
+        http_parser_pause(&parser_, 1);
+        return HPE_OK;
+#else
         return HPE_PAUSED;
+#endif
       }
 
     } else {
@@ -728,7 +729,12 @@ int ServerConnectionImpl::onMessageComplete() {
   // Always pause the parser so that the calling code can process 1 request at a time and apply
   // back pressure. However this means that the calling code needs to detect if there is more data
   // in the buffer and dispatch it again.
+#ifndef ENVOY_ENABLE_LEGACY_HTTP_PARSER
   return HPE_PAUSED;
+#else
+  http_parser_pause(&parser_, 1);
+  return 0;
+#endif
 }
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {

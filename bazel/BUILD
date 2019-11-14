@@ -247,6 +247,11 @@ alias(
 )
 
 config_setting(
+    name = "enable_legacy_http_parser",
+    values = {"define": "legacy_http_parser=enabled"},
+)
+
+config_setting(
     name = "linux_x86_64",
     values = {"cpu": "k8"},
 )

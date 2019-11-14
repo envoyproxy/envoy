@@ -1,7 +1,5 @@
 #pragma once
 
-#include <llhttp.h>
-
 #include <array>
 #include <cstdint>
 #include <list>
@@ -19,6 +17,7 @@
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/http1/parser_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -193,7 +192,7 @@ public:
   CodecStats& stats() { return stats_; }
 
 protected:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, llhttp_type type,
+  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, parser_type_t type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
                  HeaderKeyFormatterPtr&& header_key_formatter);
 
@@ -201,7 +200,7 @@ protected:
 
   Network::Connection& connection_;
   CodecStats stats_;
-  llhttp_t parser_;
+  parser_t parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   bool handling_upgrade_{};
@@ -294,7 +293,7 @@ private:
    */
   virtual void onBelowLowWatermark() PURE;
 
-  static llhttp_settings_s settings_;
+  static parser_settings_t settings_;
   static const ToLowerTable& toLowerTable();
 
   HeaderMapImplPtr current_header_map_;
