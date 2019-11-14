@@ -70,7 +70,6 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
 
 void FileEventImpl::setEnabled(uint32_t events) {
   auto* base = event_get_base(&raw_event_);
-  ASSERT(base != nullptr);
   event_del(&raw_event_);
   assignEvents(events, base);
   event_add(&raw_event_, nullptr);
