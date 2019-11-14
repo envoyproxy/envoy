@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -31,8 +32,16 @@ void checkSysctlLong(const std::string& path, int64_t expected, Filesystem::Inst
         }
 
         return;
+      } else {
+        ENVOY_LOG_MISC(error, "Could not read contents of {0} as a number",
+                       "Envoy will log this message if the value could not be read as an int or is "
+                       "less than {1}",
+                       path,    // 0
+                       expected // 1
+        );
       }
     } catch (const EnvoyException& e) {
+      ENVOY_LOG_MISC(error, "Exception when trying to check value of {} - {}", path, e.what());
     }
 
     ENVOY_LOG_MISC(
@@ -46,8 +55,8 @@ void checkSysctlLong(const std::string& path, int64_t expected, Filesystem::Inst
 void checkPlatformSettings(Filesystem::Instance& file_system) {
   struct rlimit current_limits;
 
-  int64_t min_open_files = 102400;
-  int64_t min_inotify_watches = 500000;
+  const int64_t min_open_files = 102400;
+  const int64_t min_inotify_watches = 500000;
 
   if (getrlimit(RLIMIT_NOFILE, &current_limits) == 0) {
     if (current_limits.rlim_max < 102400) {
@@ -57,6 +66,8 @@ void checkPlatformSettings(Filesystem::Instance& file_system) {
                      current_limits.rlim_max, // 0
                      min_open_files);         // 1
     }
+  } else {
+    ENVOY_LOG_MISC(error, "getrlimit failed with error: {}", strerror(errno));
   }
 
   checkSysctlLong("/proc/sys/fs/inotify/max_user_watches", min_inotify_watches, file_system);
