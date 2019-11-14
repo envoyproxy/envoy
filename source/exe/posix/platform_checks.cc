@@ -16,6 +16,8 @@
 
 namespace Envoy {
 
+namespace Platform {
+
 void checkSysctlLong(const std::string& path, int64_t expected, Filesystem::Instance& file_system) {
   if (file_system.fileExists(path)) {
     int64_t current;
@@ -33,15 +35,13 @@ void checkSysctlLong(const std::string& path, int64_t expected, Filesystem::Inst
 
         return;
       } else {
-        ENVOY_LOG_MISC(error, "Could not read contents of {0} as a number",
+        ENVOY_LOG_MISC(error, "Could not read contents of {} as a number",
                        "Envoy will log this message if the value could not be read as an int or is "
-                       "less than {1}",
-                       path,    // 0
-                       expected // 1
-        );
+                       "less than {}",
+                       path, expected);
       }
     } catch (const EnvoyException& e) {
-      ENVOY_LOG_MISC(error, "Exception when trying to check value of {} - {}", path, e.what());
+      ENVOY_LOG_MISC(error, "Exception when trying to check contents of {} - {}", path, e.what());
     }
 
     ENVOY_LOG_MISC(
@@ -61,10 +61,9 @@ void checkPlatformSettings(Filesystem::Instance& file_system) {
   if (getrlimit(RLIMIT_NOFILE, &current_limits) == 0) {
     if (current_limits.rlim_max < 102400) {
       ENVOY_LOG_MISC(error,
-                     "Hard limit for number of open files is {0}. Consider increasing it using "
-                     "`ulimit`. Envoy will log this error if the value is less than {1}",
-                     current_limits.rlim_max, // 0
-                     min_open_files);         // 1
+                     "Hard limit for number of open files is {}. Consider increasing it using "
+                     "`ulimit`. Envoy will log this error if the value is less than {}",
+                     current_limits.rlim_max, min_open_files);
     }
   } else {
     ENVOY_LOG_MISC(error, "getrlimit failed with error: {}", strerror(errno));
@@ -72,5 +71,7 @@ void checkPlatformSettings(Filesystem::Instance& file_system) {
 
   checkSysctlLong("/proc/sys/fs/inotify/max_user_watches", min_inotify_watches, file_system);
 }
+
+} // namespace Platform
 
 } // namespace Envoy
