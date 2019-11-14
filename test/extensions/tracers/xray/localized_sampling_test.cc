@@ -58,6 +58,56 @@ TEST_F(LocalizedSamplingStrategyTest, ValidCustomRules) {
   ASSERT_FALSE(strategy.usingDefaultManifest());
 }
 
+TEST_F(LocalizedSamplingStrategyTest, InvalidRate) {
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  constexpr auto rules_json = R"EOF(
+{
+  "version": 2,
+  "rules": [
+    {
+      "description": "X-Ray rule",
+      "host": "*",
+      "http_method": "*",
+      "url_path": "/api/move/*",
+      "fixed_target": 0,
+      "rate": 1.5
+    }
+  ],
+  "default": {
+    "fixed_target": 1,
+    "rate": 0
+  }
+}
+  )EOF";
+  LocalizedSamplingStrategy strategy{rules_json, random_generator, time_system_};
+  ASSERT_TRUE(strategy.usingDefaultManifest());
+}
+
+TEST_F(LocalizedSamplingStrategyTest, InvalidFixedTarget) {
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  constexpr auto rules_json = R"EOF(
+{
+  "version": 2,
+  "rules": [
+    {
+      "description": "X-Ray rule",
+      "host": "*",
+      "http_method": "*",
+      "url_path": "/api/move/*",
+      "fixed_target": 4.2,
+      "rate": 0.1
+    }
+  ],
+  "default": {
+    "fixed_target": 1,
+    "rate": 0.1
+  }
+}
+  )EOF";
+  LocalizedSamplingStrategy strategy{rules_json, random_generator, time_system_};
+  ASSERT_TRUE(strategy.usingDefaultManifest());
+}
+
 TEST_F(LocalizedSamplingStrategyTest, DefaultRuleMissingRate) {
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   constexpr auto rules_json = R"EOF(

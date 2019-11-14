@@ -27,6 +27,9 @@ static void fail(absl::string_view msg) {
   ENVOY_LOG_TO_LOGGER(logger, error, "Failed to parse sampling rules - {}", msg);
 }
 
+static bool is_valid_rate(double n) { return n >= 0 && n <= 1.0; }
+static bool is_valid_fixed_target(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
+
 static bool validateRule(const ProtobufWkt::Struct& rule) {
   using ProtobufWkt::Value;
 
@@ -54,7 +57,7 @@ static bool validateRule(const ProtobufWkt::Struct& rule) {
   const auto fixed_target_it = rule.fields().find(FixedTargetJsonKey);
   if (fixed_target_it == rule.fields().end() ||
       fixed_target_it->second.kind_case() != Value::KindCase::kNumberValue ||
-      fixed_target_it->second.number_value() < 0) {
+      !is_valid_fixed_target(fixed_target_it->second.number_value())) {
     fail("fixed target is missing or not a valid positive integer");
     return false;
   }
@@ -62,7 +65,7 @@ static bool validateRule(const ProtobufWkt::Struct& rule) {
   const auto rate_it = rule.fields().find(RateJsonKey);
   if (rate_it == rule.fields().end() ||
       rate_it->second.kind_case() != Value::KindCase::kNumberValue ||
-      rate_it->second.number_value() < 0) {
+      !is_valid_rate(rate_it->second.number_value())) {
     fail("rate is missing or not a valid positive floating number");
     return false;
   }
@@ -119,7 +122,7 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
   }
 
   default_rule_.setRate(default_rule_object.fields().find(RateJsonKey)->second.number_value());
-  default_rule_.setFixedTarget(static_cast<unsigned>(
+  default_rule_.setFixedTarget(static_cast<uint32_t>(
       default_rule_object.fields().find(FixedTargetJsonKey)->second.number_value()));
 
   const auto custom_rules_it = document.fields().find(CustomRulesJsonKey);
@@ -162,7 +165,7 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     // rate and fixed_target must exist because we validated this rule
     rule.setRate(rule_json.fields().find(RateJsonKey)->second.number_value());
     rule.setFixedTarget(
-        static_cast<unsigned>(rule_json.fields().find(FixedTargetJsonKey)->second.number_value()));
+        static_cast<uint32_t>(rule_json.fields().find(FixedTargetJsonKey)->second.number_value()));
 
     custom_rules_.push_back(std::move(rule));
   }

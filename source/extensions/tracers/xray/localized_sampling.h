@@ -31,7 +31,7 @@ namespace XRay {
  */
 class LocalizedSamplingRule {
 public:
-  LocalizedSamplingRule(unsigned fixed_target, unsigned rate)
+  LocalizedSamplingRule(uint32_t fixed_target, double rate)
       : fixed_target_(fixed_target), rate_(rate), reservoir_(fixed_target_) {}
 
   /**
@@ -65,7 +65,7 @@ public:
   /**
    * Set the minimum number of requests to sample per second.
    */
-  void setFixedTarget(unsigned fixed_target) {
+  void setFixedTarget(uint32_t fixed_target) {
     fixed_target_ = fixed_target;
     reservoir_ = Reservoir(fixed_target);
   }
@@ -78,7 +78,7 @@ public:
   const std::string& host() const { return host_; }
   const std::string& httpMethod() const { return http_method_; }
   const std::string& urlPath() const { return url_path_; }
-  unsigned fixedTarget() const { return fixed_target_; }
+  uint32_t fixedTarget() const { return fixed_target_; }
   double rate() const { return rate_; }
   const Reservoir& reservoir() const { return reservoir_; }
   Reservoir& reservoir() { return reservoir_; }
@@ -87,7 +87,7 @@ private:
   std::string host_;
   std::string http_method_;
   std::string url_path_;
-  unsigned fixed_target_;
+  uint32_t fixed_target_;
   double rate_;
   Reservoir reservoir_;
 };

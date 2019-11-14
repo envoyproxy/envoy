@@ -16,7 +16,7 @@ namespace XRay {
 
 void Span::finishSpan() {
   end_time_ = time_source_.systemTime();
-  // serialize this span and send it to X-Ray Daemon
+  // TODO(marcomagdy): serialize this span and send it to X-Ray Daemon
 }
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
@@ -37,9 +37,9 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& span_name, const std::stri
   span_ptr->setOperation(operation_name);
   span_ptr->setStartTime(start_time);
   if (xray_header) { // there's a previous span that this span should be based-on
-    span_ptr->setParentId(xray_header->parent_id);
-    span_ptr->setTraceId(xray_header->trace_id);
-    switch (xray_header->sample_decision) {
+    span_ptr->setParentId(xray_header->parent_id_);
+    span_ptr->setTraceId(xray_header->trace_id_);
+    switch (xray_header->sample_decision_) {
     case SamplingDecision::Sampled:
       span_ptr->setSampled(true);
       break;

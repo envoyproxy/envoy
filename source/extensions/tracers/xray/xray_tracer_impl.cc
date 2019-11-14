@@ -17,18 +17,18 @@ static XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
   const auto& lowered_header = header.get();
   XRayHeader result;
   for (const auto& token : StringUtil::splitToken(lowered_header, ";")) {
-    if (token.find("root=") == 0) {
-      result.trace_id = std::string(StringUtil::cropLeft(token, "="));
-    } else if (token.find("parent=") == 0) {
-      result.parent_id = std::string(StringUtil::cropLeft(token, "="));
-    } else if (token.find("sampled=") == 0) {
+    if (absl::StartsWith(token, "root=")) {
+      result.trace_id_ = std::string(StringUtil::cropLeft(token, "="));
+    } else if (absl::StartsWith(token, "parent=")) {
+      result.parent_id_ = std::string(StringUtil::cropLeft(token, "="));
+    } else if (absl::StartsWith(token, "sampled=")) {
       const auto s = StringUtil::cropLeft(token, "=");
       if (s == "1") {
-        result.sample_decision = SamplingDecision::Sampled;
+        result.sample_decision_ = SamplingDecision::Sampled;
       } else if (s == "0") {
-        result.sample_decision = SamplingDecision::NotSampled;
+        result.sample_decision_ = SamplingDecision::NotSampled;
       } else {
-        result.sample_decision = SamplingDecision::Unknown;
+        result.sample_decision_ = SamplingDecision::Unknown;
       }
     }
   }
@@ -39,19 +39,19 @@ Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
     : xray_config_(config), tls_slot_ptr_(server.threadLocal().allocateSlot()) {
 
   const std::string daemon_endpoint =
-      config.daemon_endpoint.empty() ? DefaultDaemonEndpoint : config.daemon_endpoint;
+      config.daemon_endpoint_.empty() ? DefaultDaemonEndpoint : config.daemon_endpoint_;
 
   ENVOY_LOG(debug, "send X-Ray generated segments to daemon address on {}", daemon_endpoint);
   sampling_strategy_ = std::make_unique<XRay::LocalizedSamplingStrategy>(
-      xray_config_.sampling_rules, server.random(), server.timeSource());
+      xray_config_.sampling_rules_, server.random(), server.timeSource());
 
-  tls_slot_ptr_->set(
-      [this, &server](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        std::string span_name = xray_config_.segment_name.empty() ? server.localInfo().clusterName()
-                                                                  : xray_config_.segment_name;
-        TracerPtr tracer = std::make_unique<Tracer>(span_name, server.timeSource());
-        return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
-      });
+  tls_slot_ptr_->set([this,
+                      &server](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    std::string span_name = xray_config_.segment_name_.empty() ? server.localInfo().clusterName()
+                                                               : xray_config_.segment_name_;
+    TracerPtr tracer = std::make_unique<Tracer>(span_name, server.timeSource());
+    return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
+  });
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
@@ -70,7 +70,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   UNREFERENCED_PARAMETER(start_time);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
+  const auto* header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
   if (header) {
@@ -78,13 +78,15 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     xray_header = parseXRayHeader(lowered_header_value);
     // if the sample_decision in the x-ray header is unknown then we try to make a decision based
     // on the sampling strategy
-    if (xray_header.sample_decision == SamplingDecision::Sampled) {
+    if (xray_header.sample_decision_ == SamplingDecision::Sampled) {
       should_trace = true;
-    } else if (xray_header.sample_decision == SamplingDecision::NotSampled) {
+    } else if (xray_header.sample_decision_ == SamplingDecision::NotSampled) {
       should_trace = false;
+    } else {
+      ENVOY_LOG(
+          trace,
+          "Unable to determine from the X-Ray trace header whether request is sampled or not");
     }
-    ENVOY_LOG(trace,
-              "Unable to determine from the X-Ray trace header whether request is sampled or not");
   }
 
   if (!should_trace.has_value()) {
@@ -97,7 +99,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 
   if (should_trace.value()) {
     auto tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
-    return tracer->startSpan(xray_config_.segment_name, operation_name, start_time,
+    return tracer->startSpan(xray_config_.segment_name_, operation_name, start_time,
                              header ? absl::optional<XRayHeader>(xray_header) : absl::nullopt);
   }
   return nullptr;
