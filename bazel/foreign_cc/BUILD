@@ -5,6 +5,8 @@ load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 envoy_package()
 
+exports_files(["zlib.BUILD"])
+
 configure_make(
     name = "gperftools_build",
     configure_options = [
@@ -107,8 +109,8 @@ envoy_cmake_external(
     deps = [
         ":ares",
         ":nghttp2",
-        ":zlib",
         "//external:ssl",
+        "@zlib",
     ],
 )
 
@@ -171,18 +173,5 @@ envoy_cmake_external(
     static_libraries = select({
         "//bazel:windows_x86_64": ["libyaml-cpp.lib"],
         "//conditions:default": ["libyaml-cpp.a"],
-    }),
-)
-
-envoy_cmake_external(
-    name = "zlib",
-    cache_entries = {
-        "BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-    },
-    lib_source = "@net_zlib//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["zlibstatic.lib"],
-        "//conditions:default": ["libz.a"],
     }),
 )
