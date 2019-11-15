@@ -131,7 +131,7 @@ public:
                                  cm(), Common::JwksFetcher::create, timeSource());
   }
 
-  bool bypassCORSPreflightRequest() { return proto_config_.bypass_cors_preflight(); }
+  bool bypassCorsPreflightRequest() { return proto_config_.bypass_cors_preflight(); }
 
 private:
   JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {

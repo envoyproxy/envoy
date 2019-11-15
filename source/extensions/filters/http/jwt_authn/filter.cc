@@ -14,6 +14,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
+namespace {
+
+bool isCorsPreflightRequest(const Http::HeaderMap& headers) {
+  return headers.Method() &&
+         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
+         headers.Origin() && !headers.Origin()->value().empty() &&
+         headers.AccessControlRequestMethod() &&
+         !headers.AccessControlRequestMethod()->value().empty();
+}
+
+} // namespace
+
 struct RcDetailsValues {
   // The jwt_authn filter rejected the request
   const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
@@ -30,21 +42,13 @@ void Filter::onDestroy() {
   }
 }
 
-bool isCORSPreflightRequest(const Http::HeaderMap& headers) {
-  return headers.Method() &&
-         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
-         headers.Origin() && !headers.Origin()->value().empty() &&
-         headers.AccessControlRequestMethod() &&
-         !headers.AccessControlRequestMethod()->value().empty();
-}
-
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
   state_ = Calling;
   stopped_ = false;
 
-  if (config_->bypassCORSPreflightRequest() && isCORSPreflightRequest(headers)) {
+  if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
     // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
     // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
     ENVOY_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements");
