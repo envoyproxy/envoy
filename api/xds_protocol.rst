@@ -53,6 +53,23 @@ The concept of `type URLs <https://developers.google.com/protocol-buffers/docs/p
 `type.googleapis.com/<resource type>` -- e.g., `type.googleapis.com/envoy.api.v2.Cluster` for a `Cluster` resource. In various
 requests from Envoy and responses by the management server, the resource type URL is stated.
 
+API flow
+~~~~~~~~
+
+The core resource types for the client's configuration are `Listener`, `RouteConfiguration`, `Cluster`, and
+`ClusterLoadAssignment`.  Each `Listener` resource may point to a `RouteConfiguration` resource, which may point to one or more
+`Cluster` resources, and each `Cluster` resource may point to a `ClusterLoadAssignment` resource.
+
+Envoy fetches all `Listener` and `Cluster` resources at startup. It then fetches whatever `RouteConfiguration` and
+`ClusterLoadAssignment` resources that are required by the `Listener` and `Cluster` resources. In effect, every `Listener`
+or `Cluster` resource is a root to part of Envoy's configuration tree.
+
+A non-proxy client such as gRPC will start by fetching only the one particular `Listener` resource that is the root of its
+configuration tree. It then fetches the `RouteConfiguration` resource required by that `Listener`, followed by whichever
+`Cluster` resources are required by the `RouteConfiguration`, followed by the `ClusterLoadAssignment` resources required by
+the `Cluster` resources. In effect, the original `Listener` resource is the one single root to the gRPC client's
+configuration tree.
+
 Variants of the xDS API
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -70,8 +87,8 @@ even if the 99 that were already subscribed to have not changed (in LDS/CDS). Th
 which is why the incremental API variant was introduced. The incremental approach allows both the client and server to indicate
 only deltas relative to their previous state -- i.e., the client can say that it wants to add or remove its subscription to a
 particular resource name without resending those that have not changed, and the server can send updates only for those
-resources that have changed. For details on the incremental protocol, see :ref:`Incremental xDS <xds_protocol_incremental>`
-below.
+resources that have changed. The incremental API also provides a mechanism for lazy loading of resources. For details on the
+incremental protocol, see :ref:`Incremental xDS <xds_protocol_incremental>` below.
 
 The second dimension is using a separate gRPC stream for each resource type vs. aggregating all resource types onto a
 single gRPC stream. The former approach was the original mechanism used by xDS, and it offers an eventual consistency
@@ -133,16 +150,26 @@ the response type is :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryR
 Configuring Which Variant to Use
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In Envoy, a :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be specified independently for each xDS API,
-pointing at a management server to contact.
+In the xDS API, the :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` message indicates how to obtain resources of a
+particular type. If the *ConfigSource* contains a gRPC :ref:`ApiConfigSource <envoy_api_msg_core.ApiConfigSource>`, it points
+to an upstream cluster for the management server; this will initiate an independent bidirectional gRPC stream for each xDS
+resource type, potentially to distinct management servers. If the *ConfigSource* contains a :ref:`AggregatedConfigSource
+<envoy_api_msg_core.AggregatedConfigSource>`, it tells the client to use :ref:`ADS <xds_protocol_ads>`.
 
-If the ConfigSource contains a gRPC :ref:`ApiConfigSource <envoy_api_msg_core.ApiConfigSource>`, it points to an upstream cluster
-for the management server. This will initiate an independent bidirectional gRPC stream for each xDS resource type, potentially
-to distinct management servers.
+Currently, the client is expected to be given some local configuration that tells it how to obtain the `Listener` and
+`Cluster` resources. `Listener` resources may include a *ConfigSource* that indicates how the `RouteConfiguration` resources
+are obtained, and `Cluster` resources may include a *ConfigSource* that indicates how the `ClusterLoadAssignment` resources
+are obtained.
 
-If the ConfigSource contains a :ref:`AggregatedConfigSource <envoy_api_msg_core.AggregatedConfigSource>`, it tells Envoy to
-use ADS. Envoy's bootstrap config contains a separate ConfigSource indicating how to contact the ADS server. See
-:ref:`Aggregated Discovery Service <xds_protocol_ads>` below for more details on configuring ADS.
+In Envoy, the bootstrap file contains two :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` messages,
+one indicating how `Listener` resources are obtained and another indicating how `Cluster` resources are obtained. It also
+contains a separate *ApiConfigSource* message indicating how to contact the ADS server, which will be used whenever a
+*ConfigSource* message (either in the bootstrap file or in a `Listener` or `Cluster` resource obtained from a management
+server) contains an *AggregatedConfigSource* message.
+
+In a gRPC client that uses xDS, only ADS is supported, and the bootstrap file contains the name of the ADS server, which will
+be used for all resources. The *ConfigSource* messages in the `Listener` and `Cluster` resources must contain
+*AggregateConfigSource* messages.
 
 The xDS Protocol
 ~~~~~~~~~~~~~~~~
@@ -252,9 +279,9 @@ is interested in. In the SotW API variants, this is done via the :ref:`resource_
 
 For `Listener` and `Cluster` resource types, Envoy will always set the resource hints to empty, in which case the server
 should use site-specific business logic to determine the full set of resources that the client is interested in, typically
-based on the client's :ref:`node <envoy_api_msg_Core.Node>` identification. However, other xDS clients (such as gRPC) may
-specify explicit LDS/CDS resources as resource hints, for example if they only have a singleton listener and already know
-its name from some out-of-band configuration.
+based on the client's :ref:`node <envoy_api_msg_Core.Node>` identification. However, other xDS clients (such as gRPC
+clients that use xDS) may specify explicit LDS/CDS resources as resource hints, for example if they only have a singleton
+listener and already know its name from some out-of-band configuration.
 
 For other resource types, the resource hints are required. If the field is empty, that means that the client is not
 interested in any resources of the relevant type.
@@ -304,7 +331,8 @@ However, for other resource types, because each resource can be sent in its own 
 next response whether the newly requested resource exists, because the next response could be an unrelated update for another
 resource that had already been subscribed to previously. As a result, clients are expected to use a timeout (recommended
 duration is 15 seconds) after sending a request for a new resource, after which they will consider the requested resource to
-not exist if they have not received the resource.
+not exist if they have not received the resource. In Envoy, this is done for `RouteConfiguration` and `ClusterLoadAssignment`
+resources during :ref:`resource Warming <xds_protocol_resource_warming>`.
 
 Note that even if a requested resource does not exist at the moment when the client requests it, that resource could be
 created at any time. Management servers must remember the set of resources being requested by the client, and if one of
