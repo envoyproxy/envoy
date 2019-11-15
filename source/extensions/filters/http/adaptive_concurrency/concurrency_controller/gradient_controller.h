@@ -90,8 +90,8 @@ public:
 
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
-    const double val =
-        runtime_.snapshot().getDouble(RuntimeKeys::get().MinRTTBufferPercentKey, min_rtt_buffer_pct_);
+    const double val = runtime_.snapshot().getDouble(RuntimeKeys::get().MinRTTBufferPercentKey,
+                                                     min_rtt_buffer_pct_);
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
