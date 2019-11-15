@@ -4,7 +4,7 @@
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/common/empty_string.h"
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"

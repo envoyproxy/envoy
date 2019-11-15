@@ -42,6 +42,11 @@ public:
    * @return bool should the service name prefix be stripped from the method.
    */
   virtual bool stripServiceName() const PURE;
+
+  /**
+   * @return const Http::LowerCaseString& the header used to determine the cluster.
+   */
+  virtual const Http::LowerCaseString& clusterHeader() const PURE;
 };
 
 /**

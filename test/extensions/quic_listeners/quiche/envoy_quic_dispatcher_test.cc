@@ -56,7 +56,11 @@ class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::
 public:
   EnvoyQuicDispatcherTest()
       : version_(GetParam()), api_(Api::createApiForTest(time_system_)),
-        dispatcher_(api_->allocateDispatcher()), connection_helper_(*dispatcher_),
+        dispatcher_(api_->allocateDispatcher()),
+        listen_socket_(std::make_unique<Network::NetworkListenSocket<
+                           Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
+            Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true)),
+        connection_helper_(*dispatcher_),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
@@ -70,7 +74,7 @@ public:
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, *dispatcher_) {
+            listener_stats_, *dispatcher_, *listen_socket_) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _))
@@ -78,12 +82,8 @@ public:
   }
 
   void SetUp() override {
-    listen_socket_ = std::make_unique<Network::NetworkListenSocket<
-        Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
-        Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
-    EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
     EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
         .WillRepeatedly(Return(1024 * 1024));
   }
