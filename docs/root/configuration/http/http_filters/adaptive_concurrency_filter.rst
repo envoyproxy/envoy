@@ -64,9 +64,11 @@ The gradient is calculated using summarized sampled request latencies (sampleRTT
 
 .. math::
 
-    gradient = \frac{minRTT}{sampleRTT}
+    gradient = \frac{minRTT + buffer}{sampleRTT}
 
 This gradient value has a useful property, such that it decreases as the sampled latencies increase.
+Notice that the buffer value added to the minRTT, allows for normal variance in the sampled latencies.
+
 The gradient value is then used to update the concurrency limit via:
 
 .. math::

@@ -57,8 +57,11 @@ message GradientControllerConfig {
     // The concurrency limit set while measuring the minRTT. Defaults to 3.
     google.protobuf.UInt32Value min_concurrency = 4 [(validate.rules).uint32 = {gt: 0}];
 
-    // Amount added to the measured minRTT as a hedge against natural variability in latency. This
-    // is expressed as a percentage of the measured value. Defaults to 10.
+    // Amount added to the measured minRTT to add stability to the concurrency limit during natural
+    // variability in latency. This is expressed as a percentage of the measured value and can be
+    // adjusted to allow more or less tolerance to the sampled latency values.
+    //
+    //Defaults to 10.
     type.Percent buffer = 5;
   }
 
