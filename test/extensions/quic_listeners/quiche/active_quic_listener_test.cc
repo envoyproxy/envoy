@@ -95,9 +95,8 @@ protected:
                 network_connection_callbacks_);
           })});
       // Stop iteration to avoid calling getRead/WriteBuffer().
-      EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Invoke([]() {
-        return Network::FilterStatus::StopIteration;
-      }));
+      EXPECT_CALL(*read_filter, onNewConnection())
+          .WillOnce(Return(Network::FilterStatus::StopIteration));
       read_filters_.push_back(std::move(read_filter));
 
       filter_chains_.emplace_back();
