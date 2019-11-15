@@ -57,14 +57,20 @@ protected:
         connection_handler_(*dispatcher_, "test_thread") {}
 
   void SetUp() override {
-    listen_socket_ = std::make_unique<Socket>(Network::Test::getCanonicalLoopbackAddress(version_),
-                                              nullptr, /*bind*/ true);
+    listen_socket_ = std::make_shared<Network::UdpListenSocket>(
+        Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
     EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
+    ON_CALL(listener_config_, filterChainManager()).WillByDefault(ReturnRef(filter_chain_manager_));
+    ON_CALL(filter_chain_manager_, findFilterChain(_)).WillByDefault(Return(&filter_chain_));
+    ON_CALL(filter_chain_, networkFilterFactories()).WillByDefault(ReturnRef(filter_factory_));
+    ON_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+        .WillByDefault(Invoke([](Network::Connection& connection,
+                                 const std::vector<Network::FilterFactoryCb>& filter_factories) {
 
-    quic_listener_ = std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
-                                                          listener_config_, quic_config_);
+    quic_listener_ = std::make_unique<ActiveQuicListener>(
+        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_);
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -191,7 +197,9 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   EnvoyQuicClock clock_;
-  Network::SocketPtr listen_socket_;
+  Network::SocketSharedPtr listen_socket_;
+  Network::SocketPtr client_socket_;
+  std::shared_ptr<Network::MockReadFilter> read_filter_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   const quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;

@@ -1,9 +1,9 @@
 #include "common/config/subscription_factory_impl.h"
 
 #include "common/config/filesystem_subscription_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
-#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
