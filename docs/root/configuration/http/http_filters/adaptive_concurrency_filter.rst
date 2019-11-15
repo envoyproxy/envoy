@@ -163,8 +163,8 @@ adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms
 adaptive_concurrency.gradient_controller.max_concurrency_limit
     Overrides the maximum allowed concurrency limit.
 
-adaptive_concurrency.gradient_controller.max_gradient
-    Overrides the maximum allowed gradient value.
+adaptive_concurrency.gradient_controller.min_rtt_buffer
+    Overrides the padding added to the minRTT when calculating the concurrency limit.
 
 adaptive_concurrency.gradient_controller.sample_aggregate_percentile
     Overrides the percentile value used to represent the collection of latency samples in
