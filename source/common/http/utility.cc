@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "envoy/http/header_map.h"
@@ -625,43 +626,47 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-bool Utility::isIpAddress(const std::string& host) {
+const std::tuple<bool, std::string, uint32_t> Utility::ParseAuthority(const std::string& host,
+                                                                      uint32_t default_port) {
   const auto colon_pos_front = host.find(':');
   auto colon_pos = host.rfind(':');
-  std::string pure_host;
-  uint32_t pure_port = 0;
+  std::string pure_host = host;
+  uint32_t pure_port = default_port;
 
   const auto open_bracket_pos = host.find('[');
   const auto close_bracket_pos = host.find(']');
 
-  if (colon_pos != absl::string_view::npos && host.find('.') != absl::string_view::npos) {
+  bool bracket_pair_exist =
+      open_bracket_pos != absl::string_view::npos && close_bracket_pos != absl::string_view::npos;
+
+  if (colon_pos != absl::string_view::npos && pure_host.find('.') != absl::string_view::npos) {
     pure_host = host.substr(0, colon_pos);
     const auto port_str = host.substr(colon_pos + 1);
 
-    if (!absl::SimpleAtoi(port_str, &pure_port)) {
-      return false;
+    if (port_str.empty() || !absl::SimpleAtoi(port_str, &pure_port) || pure_port > 65535) {
+      pure_host = host;
+      pure_port = default_port;
     }
-  } else if (colon_pos_front != colon_pos && open_bracket_pos != absl::string_view::npos &&
-             close_bracket_pos != absl::string_view::npos) {
-    ASSERT(open_bracket_pos < close_bracket_pos);
+  } else if (colon_pos_front != colon_pos && bracket_pair_exist) {
     pure_host = host.substr(open_bracket_pos + 1, close_bracket_pos - 1);
-    const auto port_str = host.substr(close_bracket_pos + 2);
 
-    if (!absl::SimpleAtoi(port_str, &pure_port)) {
-      return false;
+    if (close_bracket_pos != host.size() - 1) {
+      const auto port_str = host.substr(close_bracket_pos + 2);
+
+      if (port_str.empty() || !absl::SimpleAtoi(port_str, &pure_port) || pure_port > 65535) {
+        pure_host = host;
+        pure_port = default_port;
+      }
     }
-  } else {
-    pure_host = host;
-    pure_port = 0;
   }
 
   try {
     Network::Utility::parseInternetAddress(pure_host, pure_port);
-    return true;
+    return std::make_tuple(true, pure_host, pure_port);
   } catch (const EnvoyException&) {
   }
 
-  return false;
+  return std::make_tuple(false, pure_host, pure_port);
 }
 
 } // namespace Http

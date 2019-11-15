@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -755,19 +756,44 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
 }
 
 TEST(HttpUtility, CheckIsIpAddress) {
-  EXPECT_TRUE(Utility::isIpAddress("1.2.3.4"));
-  EXPECT_TRUE(Utility::isIpAddress("1.2.3.4:0"));
-  EXPECT_TRUE(Utility::isIpAddress("0.0.0.0:0"));
-  EXPECT_TRUE(Utility::isIpAddress("127.0.0.1:0"));
-  EXPECT_TRUE(Utility::isIpAddress("[::1]:0"));
-  EXPECT_TRUE(Utility::isIpAddress("[::]:0"));
-  EXPECT_TRUE(Utility::isIpAddress("[1::2:3]:0"));
-  EXPECT_TRUE(Utility::isIpAddress("fd12:3456:7890:1234:5678:9012:3456:7890"));
-  EXPECT_TRUE(Utility::isIpAddress("[a::1]:0"));
-  EXPECT_TRUE(Utility::isIpAddress("[a:b:c:d::]:0"));
-  EXPECT_FALSE(Utility::isIpAddress("hoge.hoge.com"));
-  EXPECT_FALSE(Utility::isIpAddress("hoge.hoge.com:8000"));
-  EXPECT_FALSE(Utility::isIpAddress("hoge"));
+  std::array<std::tuple<bool, std::string, std::string, uint16_t>, 15> patterns{
+      std::make_tuple(true, "1.2.3.4", "1.2.3.4", 0),
+      std::make_tuple(true, "1.2.3.4:0", "1.2.3.4", 0),
+      std::make_tuple(true, "0.0.0.0:0", "0.0.0.0", 0),
+      std::make_tuple(true, "127.0.0.1:0", "127.0.0.1", 0),
+      std::make_tuple(true, "[::1]:0", "::1", 0),
+      std::make_tuple(true, "[::]:0", "::", 0),
+      std::make_tuple(true, "[::1]", "::1", 0),
+      std::make_tuple(true, "[1::2:3]:0", "1::2:3", 0),
+      std::make_tuple(true, "fd12:3456:7890:1234:5678:9012:3456:7890",
+                      "fd12:3456:7890:1234:5678:9012:3456:7890", 0),
+      std::make_tuple(true, "[a::1]:0", "a::1", 0),
+      std::make_tuple(true, "[a:b:c:d::]:0", "a:b:c:d::", 0),
+      std::make_tuple(false, "hoge.hoge.com", "hoge.hoge.com", 0),
+      std::make_tuple(false, "hoge.hoge.com:8000", "hoge.hoge.com", 8000),
+      std::make_tuple(false, "hoge.hoge.com:hoge", "hoge.hoge.com:hoge", 0),
+      std::make_tuple(false, "hoge", "hoge", 0)};
+
+  for (auto&& pattern : patterns) {
+    bool bool_status_pattern = std::get<0>(pattern);
+    std::string& try_host = std::get<1>(pattern);
+    std::string& expect_host = std::get<2>(pattern);
+    uint16_t expect_port = std::get<3>(pattern);
+
+    const auto host_attributes = Utility::isIpAddress(try_host);
+    bool is_ip_address = std::get<0>(host_attributes);
+    std::string retrieved_host = std::get<1>(host_attributes);
+    uint16_t retrieved_port = std::get<2>(host_attributes);
+
+    if (bool_status_pattern) {
+      EXPECT_TRUE(is_ip_address);
+    } else {
+      EXPECT_FALSE(is_ip_address);
+    }
+
+    EXPECT_EQ(expect_host, retrieved_host);
+    EXPECT_EQ(expect_port, retrieved_port);
+  }
 }
 
 TEST(Url, ParsingFails) {

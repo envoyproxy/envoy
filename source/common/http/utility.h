@@ -396,12 +396,13 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
 }
 
 /**
- * Read available packets from a given UDP socket and pass the packet to a given	   * Check
- * whether that is valid FQDN or IPv4/IPv6 address, if host is IPv4 or IPv6, that returns true
- * @param host is hostname
- * @return if true, passed host is not FQDN
+ * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and portname
+ * @param host host/authority
+ * @param default_port If passed authority does not have port, this value is returned
+ * @return hostname parse result. that includes whether host is IP Address, hostname and portname
  */
-bool isIpAddress(const std::string& host);
+const std::tuple<bool, std::string, uint32_t> ParseAuthority(const std::string& host,
+                                                             uint32_t default_port = 0);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
