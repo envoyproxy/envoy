@@ -739,11 +739,13 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
 
-class GrpcJsonTranscoderFilterConvertGrpcStatusTestBase : public GrpcJsonTranscoderFilterTest {
+class GrpcJsonTranscoderFilterConvertGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
 public:
-  GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(
+  GrpcJsonTranscoderFilterConvertGrpcStatusTest(
       const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config)
       : GrpcJsonTranscoderFilterTest(proto_config) {}
+  GrpcJsonTranscoderFilterConvertGrpcStatusTest() : GrpcJsonTranscoderFilterTest(makeProtoConfig())
+  {}
 
   void SetUp() override {
     EXPECT_CALL(decoder_callbacks_, clearRouteCache());
@@ -758,13 +760,19 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue,
               filter_.encode100ContinueHeaders(continue_headers));
   }
+
+private:
+  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    return proto_config;
+  }
 };
 
-class GrpcJsonTranscoderFilterConvertGrpcStatusTest
-    : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
+class GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest
+    : public GrpcJsonTranscoderFilterConvertGrpcStatusTest {
 public:
-  GrpcJsonTranscoderFilterConvertGrpcStatusTest()
-      : GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(makeProtoConfig()) {}
+  GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest()
+      : GrpcJsonTranscoderFilterConvertGrpcStatusTest(makeProtoConfig()) {}
 
 private:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
@@ -774,22 +782,8 @@ private:
   }
 };
 
-class GrpcJsonTranscoderFilterConvertGreaterMaximumKnownGrpcStatusTest
-    : public GrpcJsonTranscoderFilterConvertGrpcStatusTestBase {
-public:
-  GrpcJsonTranscoderFilterConvertGreaterMaximumKnownGrpcStatusTest()
-      : GrpcJsonTranscoderFilterConvertGrpcStatusTestBase(makeProtoConfig()) {}
-
-private:
-  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
-    auto proto_config = bookstoreProtoConfig();
-    proto_config.set_convert_grpc_status(false);
-    return proto_config;
-  }
-};
-
 // Single headers frame with end_stream flag (trailer), no grpc-status-details-bin header.
-TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTrailerOnlyResponse) {
+TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest, TranscodingTextHeadersInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
       .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
@@ -808,7 +802,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTr
 }
 
 // Trailer-only response with grpc-status-details-bin header.
-TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
        TranscodingBinaryHeaderInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
@@ -832,7 +826,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
 
 // Trailer-only response with grpc-status-details-bin header with details.
 // Also tests that a user-defined type from a proto descriptor in config can be used in details.
-TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
        TranscodingBinaryHeaderWithDetailsInTrailerOnlyResponse) {
   const std::string expected_response(
       "{\"code\":5,\"message\":\"Error\",\"details\":"
@@ -854,7 +848,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
 
 // Response with a header frame and a trailer frame.
 // (E.g. a gRPC server sends metadata and then it sends an error.)
-TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrailer) {
+TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest, TranscodingStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
 
@@ -878,7 +872,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrail
   EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
 }
 
-TEST_F(GrpcJsonTranscoderFilterConvertGreaterMaximumKnownGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingInvalidGrpcStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
@@ -894,7 +888,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGreaterMaximumKnownGrpcStatusTest,
 }
 
 // Server sends a response body, don't replace it.
-TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBodyIsPresent) {
+TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest, SkipTranscodingStatusIfBodyIsPresent) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
 
