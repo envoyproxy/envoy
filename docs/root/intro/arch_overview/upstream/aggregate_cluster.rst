@@ -105,8 +105,8 @@ To sum this up in pseudo algorithms:
                            Σ(health(P_x)...health(P_X)) * 100 / normalized_total_health)
 
 The example shows how the aggregate cluster level load balancer selects the cluster. E.g.,
-healths of {{20, 20, 10}, {25, 25}} would result in a priority load of {70%, 30%} of traffic. When normalized total health drops below 100, traffic is distributed after normalizing
+healths of {{20, 20, 10}, {25, 25}} would result in a priority load of {{28%, 28%, 14%}, {30%, 0%}} of traffic. When normalized total health drops below 100, traffic is distributed after normalizing
 the levels' health scores to that sub-100 total. E.g. healths of {{20, 0, 0}, {20, 0}} (yielding a normalized
-total health of 56) would be normalized, and result in a priority load of {50, 50} of traffic.
+total health of 56) would be normalized, and result in a priority load of {{50, 0, 0}, {50, 0, 0}} of traffic.
 
 The second tier is delegating the load balancing to the cluster selected in the first step and the cluster could use any load balancing algorithms specified by :ref:`load balancer type <arch_overview_load_balancing_types>`.
