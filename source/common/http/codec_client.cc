@@ -161,10 +161,10 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
   }
   case Type::HTTP3: {
-    codec_ = std::unique_ptr<ClientConnection>(dynamic_cast<ClientConnection*>(
+    codec_ = std::unique_ptr<ClientConnection>(
         Config::Utility::getAndCheckFactory<Http::QuicHttpClientConnectionFactory>(
             Http::QuicCodecNames::get().Client)
-            .createQuicClientConnection(*connection_, *this)));
+            .createQuicClientConnection(*connection_, *this));
   }
   }
 }
