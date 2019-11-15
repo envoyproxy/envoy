@@ -20,7 +20,7 @@ public:
   /**
    * Creates a new reservoir that allows up to |traces_per_second| samples.
    */
-  explicit Reservoir(unsigned traces_per_second)
+  explicit Reservoir(uint32_t traces_per_second)
       : traces_per_second_(traces_per_second), used_(0) {}
 
   Reservoir(const Reservoir& other)
