@@ -63,26 +63,20 @@ TEST(InitTargetImplTest, ReadyWhenWatcherUnavailable) {
 }
 
 TEST(SharedTargetImplTest, InitializeTwiceBeforeReady) {
-  InSequence s;
   ManagerImpl m1("m1");
   ManagerImpl m2("m2");
   ExpectableWatcherImpl w1;
   ExpectableWatcherImpl w2;
   ExpectableSharedTargetImpl t;
-  //t.expectInitialize();
   m1.add(t);
-  // @mergeconflit: I want to verify Initalize invoked after m2.add(t). 
-  // But if I swap the below lines the test is also passing.
-  // 
-  // t.expectInitialize();
-  // m2.add(t);
+  EXPECT_EQ(0, t.count_);
   m2.add(t);
-  t.expectInitialize();
-  //t.expectInitialize().Times();
+  EXPECT_EQ(0, t.count_);
   EXPECT_EQ(Manager::State::Uninitialized, m1.state());
   EXPECT_EQ(Manager::State::Uninitialized, m2.state());
   m1.initialize(w1);
   m2.initialize(w2);
+  EXPECT_EQ(1, t.count_);
   EXPECT_EQ(Manager::State::Initializing, m1.state());
   EXPECT_EQ(Manager::State::Initializing, m2.state());
   w1.expectReady().Times(1);
@@ -91,7 +85,7 @@ TEST(SharedTargetImplTest, InitializeTwiceBeforeReady) {
   EXPECT_EQ(Manager::State::Initialized, m1.state());
   EXPECT_EQ(Manager::State::Initialized, m2.state());
 }
-/*
+
 // Two managers initialize the same target at their own interests.
 TEST(SharedTargetImplTest, ConcurrentManagerInitialization) {
   ManagerImpl m1("m1");
@@ -187,7 +181,6 @@ TEST(SharedTargetImplTest, DetroyedSharedTargetIsConsideredReadyTarget) {
   m.initialize(w);
   EXPECT_EQ(Manager::State::Initialized, m.state());
 }
-*/
 } // namespace
 } // namespace Init
 } // namespace Envoy
