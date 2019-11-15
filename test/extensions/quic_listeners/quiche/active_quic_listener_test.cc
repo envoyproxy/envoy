@@ -61,13 +61,6 @@ protected:
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-    EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
-    ON_CALL(listener_config_, filterChainManager()).WillByDefault(ReturnRef(filter_chain_manager_));
-    ON_CALL(filter_chain_manager_, findFilterChain(_)).WillByDefault(Return(&filter_chain_));
-    ON_CALL(filter_chain_, networkFilterFactories()).WillByDefault(ReturnRef(filter_factory_));
-    ON_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-        .WillByDefault(Invoke([](Network::Connection& connection,
-                                 const std::vector<Network::FilterFactoryCb>& filter_factories) {
 
     quic_listener_ = std::make_unique<ActiveQuicListener>(
         *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_);
@@ -102,7 +95,7 @@ protected:
                 network_connection_callbacks_);
           })});
       // Stop iteration to avoid calling getRead/WriteBuffer().
-      EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Invoke([this]() {
+      EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Invoke([]() {
         return Network::FilterStatus::StopIteration;
       }));
       read_filters_.push_back(std::move(read_filter));
@@ -201,10 +194,10 @@ protected:
   Network::SocketPtr client_socket_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
-  const quic::QuicConfig quic_config_;
+  NiceMock<Network::MockListenerConfig> listener_config_;
+  quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
-  NiceMock<Network::MockListenerConfig> listener_config_;
 
   std::list<std::unique_ptr<Socket>> client_sockets_;
   std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;

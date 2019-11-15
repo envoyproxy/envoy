@@ -40,8 +40,8 @@ using testing::ReturnRef;
 namespace quic {
 namespace test {
 
-// TODO(bencebeky): Remove this class and move necessary methods
-// to quiche/quic/test_tools/quic_dispatcher_peer.h.
+// TODO(bencebeky): Remove this class, use QuicDispatcherPeer from
+// quiche/quic/test_tools/quic_dispatcher_peer.h instead.
 class QuicDispatcherPeer {
 public:
   static quic::QuicTimeWaitListManager* time_wait_list_manager(QuicDispatcher* dispatcher) {
@@ -210,8 +210,8 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
       }));
-  // Stop iteration to avoid calling getRead/WriteBuffer().
   EXPECT_CALL(*read_filter, onNewConnection())
+      // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
 
