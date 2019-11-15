@@ -85,11 +85,11 @@ all :ref:`priorities <arch_overview_load_balancing_priority_levels>` in each clu
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 | 20%                   | 20%                   | 10%                   | 25%                   | 25%                   | 70%                | 30%                  |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
+| 20%                   | 0%                    | 0%                    | 20%                   | 0%                    | 50%                | 50%                  |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 | 0%                    | 0%                    | 0%                    | 100%                  | 0%                    | 0%                 | 100%                 |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 | 0%                    | 0%                    | 0%                    | 72%                   | 0%                    | 0%                 | 100%                 |
-+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
-| 20%                   | 0%                    | 0%                    | 20%                   | 0%                    | 50%                | 50%                  |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 
 Note: The above load balancing uses default :ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>` which is 1.4.
@@ -98,7 +98,7 @@ To sum this up in pseudo algorithms:
 
 ::
 
-  health(P_X) = min(100, 1.4 * 100 * healthy_P_X_backends / total_P_X_backends)
+  health(P_X) = min(100, 1.4 * 100 * healthy_P_X_backends / total_P_X_backends), where total_P_X_backends is the number of backends for priority P_X after linearization
   normalized_total_health = min(100, Σ(health(P_0)...health(P_X)))
   priority_load(C_0) = min(100, Σ(health(P_0)...health(P_k)) * 100 / normalized_total_health), where P_0...P_k belong to C_0
   priority_load(C_X) = min(100 - Σ(priority_load(C_0)..priority_load(C_X-1)),
@@ -107,6 +107,6 @@ To sum this up in pseudo algorithms:
 The example shows how the aggregate cluster level load balancer selects the cluster. E.g.,
 healths of {{20, 20, 10}, {25, 25}} would result in a priority load of {{28%, 28%, 14%}, {30%, 0%}} of traffic. When normalized total health drops below 100, traffic is distributed after normalizing
 the levels' health scores to that sub-100 total. E.g. healths of {{20, 0, 0}, {20, 0}} (yielding a normalized
-total health of 56) would be normalized, and result in a priority load of {{%50, %0, %0}, {%50, %0, %0}} of traffic.
+total health of 56) would be normalized, and result in a priority load of {{50%, 0%, 0%}, {50%, 0%, 0%}} of traffic.
 
 The second tier is delegating the load balancing to the cluster selected in the first step and the cluster could use any load balancing algorithms specified by :ref:`load balancer type <arch_overview_load_balancing_types>`.
