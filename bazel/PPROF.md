@@ -4,7 +4,7 @@ To use `pprof` to analyze performance and memory consumption in Envoy, you can
 use the built-in statically linked profiler, or dynamically link it in to a
 specific place yourself.
 
-## Collecting CPU or HEAP profile for a full execution of envoy
+## Collecting CPU or heap profile for a full execution of envoy
 
 Static linking is already available (because of a `HeapProfilerDump()` call
 inside
@@ -31,11 +31,11 @@ There are several other environment variables that can be set to tweak the behav
 
 ### Analyzing the profile
 
-[pprof](https://github.com/google/pprof) can be used to symbolize CPU and Heap profiles.  For example:
+[pprof](https://github.com/google/pprof) can be used to symbolize CPU and heap profiles.  For example:
 
     $ pprof -text bazel-bin/source/exe/envoy-static /tmp/mybin.cpuprof
 
-## Collecting CPU or HEAP profile for the full execution of a test target
+## Collecting CPU or heap profile for the full execution of a test target
 
 The profiler library is automatically linked into envoy_cc_test targets.
 
@@ -43,7 +43,7 @@ Run a test with CPU profiling enabled, like so:
 
     $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof <test target>
 
-Run a test with HEAP profiling enabled, like so:
+Run a test with heap profiling enabled, like so:
 
     $ bazel test --test_env=HEAPPROFILE=/tmp/heapprof <test target>
 
