@@ -739,12 +739,12 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
 
-class GrpcJsonTranscoderFilterConvertGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
+class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
 public:
-  GrpcJsonTranscoderFilterConvertGrpcStatusTest(
+  GrpcJsonTranscoderFilterGrpcStatusTest(
       const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config)
       : GrpcJsonTranscoderFilterTest(proto_config) {}
-  GrpcJsonTranscoderFilterConvertGrpcStatusTest()
+  GrpcJsonTranscoderFilterGrpcStatusTest()
       : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
 
   void SetUp() override {
@@ -768,11 +768,11 @@ private:
   }
 };
 
-class GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest
-    : public GrpcJsonTranscoderFilterConvertGrpcStatusTest {
+class GrpcJsonTranscoderFilterConvertGrpcStatusTest
+    : public GrpcJsonTranscoderFilterGrpcStatusTest {
 public:
-  GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest()
-      : GrpcJsonTranscoderFilterConvertGrpcStatusTest(makeProtoConfig()) {}
+  GrpcJsonTranscoderFilterConvertGrpcStatusTest()
+      : GrpcJsonTranscoderFilterGrpcStatusTest(makeProtoConfig()) {}
 
 private:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
@@ -783,7 +783,7 @@ private:
 };
 
 // Single headers frame with end_stream flag (trailer), no grpc-status-details-bin header.
-TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingTextHeadersInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
@@ -803,7 +803,7 @@ TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
 }
 
 // Trailer-only response with grpc-status-details-bin header.
-TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingBinaryHeaderInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
@@ -827,7 +827,7 @@ TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
 
 // Trailer-only response with grpc-status-details-bin header with details.
 // Also tests that a user-defined type from a proto descriptor in config can be used in details.
-TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingBinaryHeaderWithDetailsInTrailerOnlyResponse) {
   const std::string expected_response(
       "{\"code\":5,\"message\":\"Error\",\"details\":"
@@ -849,7 +849,7 @@ TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest,
 
 // Response with a header frame and a trailer frame.
 // (E.g. a gRPC server sends metadata and then it sends an error.)
-TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest, TranscodingStatusFromTrailer) {
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
 
@@ -873,7 +873,7 @@ TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest, TranscodingStatusFrom
   EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
 }
 
-TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingInvalidGrpcStatusFromTrailer) {
+TEST_F(GrpcJsonTranscoderFilterGrpcStatusTest, TranscodingInvalidGrpcStatusFromTrailer) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -888,7 +888,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingInvalidGrpcStat
 }
 
 // Server sends a response body, don't replace it.
-TEST_F(GrpcJsonTranscoderFilterAllowConvertGrpcStatusTest, SkipTranscodingStatusIfBodyIsPresent) {
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBodyIsPresent) {
   Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                            {":status", "200"}};
 
