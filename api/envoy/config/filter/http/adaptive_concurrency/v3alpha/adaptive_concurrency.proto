@@ -59,7 +59,7 @@ message GradientControllerConfig {
 
     // Amount added to the measured minRTT as a hedge against natural variability in latency. This
     // is expressed as a percentage of the measured value. Defaults to 10.
-    type.Percent buffer = 5;
+    type.v3alpha.Percent buffer = 5;
   }
 
   // The percentile to use when summarizing aggregated samples. Defaults to p50.
