@@ -29,7 +29,7 @@ Watch* GrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
   return watch;
 }
 
-Watch* NewGrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
+Watch* GrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
                                   const std::set<std::string>& resources,
                                   SubscriptionCallbacks& callbacks,
                                   std::chrono::milliseconds init_fetch_timeout) {
@@ -108,7 +108,7 @@ void GrpcMuxImpl::handleStreamEstablishmentFailure() {
   } while (all_subscribed.size() != subscriptions_.size());
 }
 
-Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, SubscriptionCallbacks& callbacks,
+Watch* GrpcMuxImpl::addWatch(const std::string& type_url, SubscriptionCallbacks& callbacks,
                                 std::chrono::milliseconds init_fetch_timeout) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
@@ -123,7 +123,7 @@ Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, SubscriptionCallbac
   return watch;
 }
 
-void NewGrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
+void GrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
                                 const std::set<std::string>& resources) {
   ASSERT(watch != nullptr);
   SubscriptionState& sub = subscriptionStateFor(type_url);
