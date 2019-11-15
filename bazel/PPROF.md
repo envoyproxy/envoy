@@ -31,7 +31,7 @@ There are several other environment variables that can be set to tweak the behav
 
 ### Analyzing the profile
 
-[pprof](https://github.com/google/pprof) can be used to symbolize CPU and heap profiles.  For example:
+[pprof](https://github.com/google/pprof) can be used to symbolize CPU and heap profiles. For example:
 
     $ pprof -text bazel-bin/source/exe/envoy-static /tmp/mybin.cpuprof
 
