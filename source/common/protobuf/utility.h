@@ -4,14 +4,12 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
-#include "envoy/json/json_object.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
-#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
 
@@ -216,6 +214,7 @@ public:
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
+  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
@@ -353,6 +352,11 @@ public:
 class ValueUtil {
 public:
   static std::size_t hash(const ProtobufWkt::Value& value) { return MessageUtil::hash(value); }
+
+  /**
+   * Load YAML string into ProtobufWkt::Value.
+   */
+  static ProtobufWkt::Value loadFromYaml(const std::string& yaml);
 
   /**
    * Compare two ProtobufWkt::Values for equality.
