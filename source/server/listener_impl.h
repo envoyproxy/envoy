@@ -225,6 +225,10 @@ private:
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;
+  TagGeneratorBatchImpl filter_chain_tag_generator_;
+  // The pending filter chain managers in the order of insertion.
+  std::list<std::shared_ptr<ThreadLocalFilterChainManagerHelper>> pending_fcms_;
+  ThreadLocal::SlotPtr fcm_tls_;
 
   Network::ListenSocketFactorySharedPtr socket_factory_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.

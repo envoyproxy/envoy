@@ -65,7 +65,6 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
   state.mutable_listener()->MergeFrom(listener.config());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
-
 } // namespace
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
@@ -338,7 +337,13 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }
+  if (existing_active_listener != active_listeners_.end() &&
+      couldTakeOver(**existing_active_listener, config)) {
+    //(*existing_active_listener)->takeOver(config);
 
+    // TODO: after take over
+    // metric, initialize
+  }
   ListenerImplPtr new_listener(new ListenerImpl(
       config, version_info, *this, name, added_via_api, workers_started_, hash,
       added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
@@ -438,6 +443,35 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
 
   new_listener_ref.initialize();
   return true;
+}
+
+// TODO(lambdai): Improve efficiency and false negative.
+bool ListenerManagerImpl::isFilterChainOnlyUpdate(const envoy::api::v2::Listener& existing_config,
+                                                  const envoy::api::v2::Listener& new_config) {
+  auto lhs = existing_config;
+  auto rhs = new_config;
+  lhs.clear_filter_chains();
+  rhs.clear_filter_chains();
+  return lhs.DebugString() == rhs.DebugString();
+
+  /* try below
+  bool IsEmptyDigitalMediaData(
+    const ads_proto::DigitalMediaData& digital_media_data) {
+  // Note that we set the app_id and vendor of the digital media data, so that
+  // the AppSignal is self-describing. Ignore these fields.
+  proto2::util::MessageDifferencer differ;
+  differ.IgnoreField(kAppIdFieldDescriptor);
+  differ.IgnoreField(kVendorFieldDescriptor);
+
+  return differ.Compare(digital_media_data,
+                        ads_proto::DigitalMediaData::default_instance());
+  }
+  */
+}
+
+bool ListenerManagerImpl::couldTakeOver(ListenerImpl& existing_listener,
+                                        const envoy::api::v2::Listener& new_config) {
+  return isFilterChainOnlyUpdate(existing_listener.config(), new_config);
 }
 
 bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
@@ -673,6 +707,27 @@ void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
   }
 }
 
+bool ListenerManagerImpl::updateFilterChainManager(
+    uint64_t listener_tag, ThreadLocalFilterChainManagerHelper& filter_chain_helper,
+    TagGenerator::Tags filter_chain_tags) {
+  UNREFERENCED_PARAMETER(filter_chain_helper);
+  UNREFERENCED_PARAMETER(filter_chain_tags);
+  UNREFERENCED_PARAMETER(listener_tag);
+  // for (const auto& worker : workers_) {
+  //   worker->updateListener(
+  //       listener_tag,
+  //       /* update listener func */
+  //       [&filter_chain_helper,
+  //        filter_chain_tags](Network::ConnectionHandler::ActiveListener&) -> bool {
+  //         UNREFERENCED_PARAMETER(filter_chain_helper);
+  //         return true;
+  //       },
+  //       /* completion */
+  //       [](bool) {});
+  // }
+  return true;
+}
+
 void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
   stop_listeners_type_ = stop_listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
@@ -722,11 +777,28 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : parent_(listener), factory_context_(factory_context) {}
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
+    TagGeneratorBatchImpl& tag_generator)
+    : parent_(listener), factory_context_(factory_context), tag_generator_(tag_generator) {}
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
+  ListenerFilterChainFactoryBuilder::InternalBuilder builder(*this);
+  return builder.buildFilterChainInternal(filter_chain, 0);
+}
+
+TagGenerator::Tags ListenerFilterChainFactoryBuilder::submitFilterChains(
+    FilterChainManagerImpl& fcm,
+    absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span) {
+
+  auto tags = tag_generator_.addFilterChains(filter_chain_span);
+  fcm.addFilterChain(filter_chain_span, *this);
+  return tags;
+}
+
+std::unique_ptr<Network::FilterChain>
+ListenerFilterChainFactoryBuilder::InternalBuilder::buildFilterChainInternal(
+    const ::envoy::api::v2::listener::FilterChain& filter_chain, uint64_t tag) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -744,15 +816,23 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, parent_.messageValidationVisitor(), config_factory);
+      transport_socket, outer_builder_.parent_.messageValidationVisitor(), config_factory);
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
 
   return std::make_unique<FilterChainImpl>(
-      config_factory.createTransportSocketFactory(*message, factory_context_,
+      config_factory.createTransportSocketFactory(*message, outer_builder_.factory_context_,
                                                   std::move(server_names)),
-      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
+      outer_builder_.parent_.parent_.factory_.createNetworkFilterFactoryList(
+          filter_chain.filters(), outer_builder_.parent_),
+      tag);
+}
+
+/* static */
+const ListenerFilterChainFactoryBuilder::TagsIndex&
+ListenerFilterChainFactoryBuilder::InternalBuilder::emptyTags() {
+  CONSTRUCT_ON_FIRST_USE(TagsIndex, {});
 }
 
 Network::ListenSocketFactorySharedPtr

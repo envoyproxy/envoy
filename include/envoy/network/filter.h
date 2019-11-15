@@ -331,6 +331,13 @@ public:
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
+
+  /**
+   * @brief Get the Tag object associated with this filter chain.
+   *
+   * @return int64_t
+   */
+  virtual int64_t getTag() const { return 0; }
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
@@ -350,6 +357,8 @@ public:
    */
   virtual const FilterChain* findFilterChain(const ConnectionSocket& socket) const PURE;
 };
+
+using FilterChainManagerSharedPtr = std::shared_ptr<FilterChainManager>;
 
 /**
  * Callbacks used by individual UDP listener read filter instances to communicate with the filter

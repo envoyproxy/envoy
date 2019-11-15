@@ -4,10 +4,14 @@
 
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/init/manager_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
+
+#include "server/tag_generator_batch_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -21,6 +25,20 @@ public:
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
 };
 
+class FilterChainManagerImpl;
+
+class ThreadLocalFilterChainManagerHelper : public ThreadLocal::ThreadLocalObject {
+public:
+  // The FCM which can be snapped by worker.
+  std::shared_ptr<FilterChainManagerImpl> filter_chain_manager_;
+  // The per worker listener which owns the thread local filter chain manager
+  Network::ListenerCallbacks* listener_;
+
+  // Below could be mutated by main thread. Worker thread should access with causion.
+  std::unique_ptr<Init::ManagerImpl> fcm_init_manager_;
+  std::unique_ptr<Init::WatcherImpl> fcm_init_watcher_;
+  std::unique_ptr<std::unordered_set<uint64_t>> filter_chains_trait_;
+};
 /**
  * Implementation of FilterChainManager.
  */
@@ -137,9 +155,9 @@ private:
 class FilterChainImpl : public Network::FilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb>&& filters_factory)
+                  std::vector<Network::FilterFactoryCb>&& filters_factory, int64_t tag = 0)
       : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)) {}
+        filters_factory_(std::move(filters_factory)), tag_(tag) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -150,9 +168,12 @@ public:
     return filters_factory_;
   }
 
+  int64_t getTag() const override { return tag_; }
+
 private:
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
+  const int64_t tag_{0};
 };
 
 } // namespace Server

@@ -122,8 +122,17 @@ class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id:
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats);
+  static bool isFilterChainOnlyUpdate(const envoy::api::v2::Listener& existing_config,
+                                      const envoy::api::v2::Listener& new_config);
 
   void onListenerWarmed(ListenerImpl& listener);
+
+  /**
+   * @param old_listener
+   * @param new_config
+   * @return true if the new_config is network filter chain only update to the existing listener.
+   */
+  bool couldTakeOver(ListenerImpl& existing_listener, const envoy::api::v2::Listener& new_config);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::api::v2::Listener& config, const std::string& version_info,
@@ -140,6 +149,15 @@ public:
   void stopWorkers() override;
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
+
+  /**
+   * @brief
+   * @return true if the filter chains are updated.
+   */
+  bool updateFilterChainManager(uint64_t listener_tag,
+                                ThreadLocalFilterChainManagerHelper& filter_chain_helper,
+                                TagGenerator::Tags filter_chain_tags);
+
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
@@ -236,14 +254,44 @@ private:
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
+  using TagsIndex = std::unordered_map<const ::envoy::api::v2::listener::FilterChain*, int64_t>;
   ListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
+      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context,
+      TagGeneratorBatchImpl& tag_generator);
+
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
 
+  // consider rewrite ListenerFilterChainFactoryBuilder so that submitFilterChains is the only
+  // interface.
+  TagGenerator::Tags submitFilterChains(
+      FilterChainManagerImpl& fcm,
+      absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span);
+
 private:
+  class InternalBuilder : public FilterChainFactoryBuilder {
+  public:
+    InternalBuilder(const ListenerFilterChainFactoryBuilder& outer_builder,
+                    const TagsIndex& filter_chain_index = emptyTags())
+        : outer_builder_(outer_builder), filter_chain_index_(filter_chain_index) {}
+
+    std::unique_ptr<Network::FilterChain>
+    buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override {
+      auto iter = filter_chain_index_.find(&filter_chain);
+      auto tag = iter != filter_chain_index_.end() ? iter->second : 0;
+      return buildFilterChainInternal(filter_chain, tag);
+    }
+    static const TagsIndex& emptyTags();
+    const ListenerFilterChainFactoryBuilder& outer_builder_;
+    const TagsIndex& filter_chain_index_;
+
+    std::unique_ptr<Network::FilterChain>
+    buildFilterChainInternal(const ::envoy::api::v2::listener::FilterChain& filter_chain,
+                             uint64_t tag) const;
+  };
   ListenerImpl& parent_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;
+  TagGeneratorBatchImpl& tag_generator_;
 };
 
 } // namespace Server

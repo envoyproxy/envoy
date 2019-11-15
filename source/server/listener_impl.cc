@@ -102,7 +102,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                            bool workers_started, uint64_t hash,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_), fcm_tls_(parent_.server_.threadLocal().allocateSlot()),
+      global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
@@ -193,7 +194,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
   factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
+  ListenerFilterChainFactoryBuilder builder(*this, factory_context, filter_chain_tag_generator_);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
   if (socket_type == Network::Address::SocketType::Datagram) {
