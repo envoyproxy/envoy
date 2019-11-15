@@ -184,7 +184,7 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
     parent_.connection_->dispatcher().exit();
   } else {
     if (parent_.type() == CodecClient::Type::HTTP3 && !parent_.connected_) {
-      // Before handshake establision, any connection failure should exit the loop. I.e. a QUIC
+      // Before handshake gets established, any connection failure should exit the loop. I.e. a QUIC
       // connection may fail of INVALID_VERSION if both this client doesn't support any of the
       // versions the server advertised before handshake established. In this case the connection is
       // closed locally and this is in a blocking event loop.
