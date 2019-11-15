@@ -26,10 +26,10 @@ message GradientControllerConfig {
   // latencies.
   message ConcurrencyLimitCalculationParams {
     // The allowed upper-bound on the calculated concurrency limit. Defaults to 1000.
-    google.protobuf.UInt32Value max_concurrency_limit = 1 [(validate.rules).uint32 = {gt: 0}];
+    google.protobuf.UInt32Value max_concurrency_limit = 2 [(validate.rules).uint32 = {gt: 0}];
 
     // The period of time samples are taken to recalculate the concurrency limit.
-    google.protobuf.Duration concurrency_update_interval = 2 [(validate.rules).duration = {
+    google.protobuf.Duration concurrency_update_interval = 3 [(validate.rules).duration = {
       required: true
       gt {}
     }];
