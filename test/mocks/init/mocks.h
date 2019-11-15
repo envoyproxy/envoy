@@ -50,11 +50,16 @@ public:
   ::testing::internal::TypedExpectation<void()>& expectInitializeWillCallReady();
 };
 
+/**
+ * Borrow the idea from ExpectableTargetImpl. ExpectableSharedTargetImpl is a real SharedTargetImpl.
+ */
 class ExpectableSharedTargetImpl : public SharedTargetImpl {
 public:
   ExpectableSharedTargetImpl(absl::string_view name = "test");
   ExpectableSharedTargetImpl(absl::string_view name, InitializeFn fn);
-  int count_{0};
+  MOCK_METHOD0(initialize, void());
+
+  ::testing::internal::TypedExpectation<void()>& expectInitialize();
 };
 
 /**
