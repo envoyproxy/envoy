@@ -313,15 +313,20 @@ def _net_zlib():
     location = REPOSITORY_LOCATIONS["net_zlib"]
 
     http_archive(
-        name = "zlib",
-        build_file = "@envoy//bazel/external:zlib.BUILD",
+        name = "net_zlib",
+        build_file_content = BUILD_ALL_CONTENT,
         **location
+    )
+
+    native.bind(
+        name = "zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
     # Bind for grpc.
     native.bind(
         name = "madler_zlib",
-        actual = "@zlib//:zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
 def _com_google_cel_cpp():

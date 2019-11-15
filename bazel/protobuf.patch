@@ -6,3 +6,17 @@ index 0000000000..b66101a39a
 +++ b/third_party/BUILD
 @@ -0,0 +1 @@
 +exports_files(["six.BUILD", "zlib.BUILD"])
+# patching for zlib binding
+diff --git a/BUILD b/BUILD
+index efc3d8e7f..746ad4851 100644
+--- a/BUILD
++++ b/BUILD
+@@ -24,7 +24,7 @@ config_setting(
+ # ZLIB configuration
+ ################################################################################
+
+-ZLIB_DEPS = ["@zlib//:zlib"]
++ZLIB_DEPS = ["//external:zlib"]
+
+ ################################################################################
+ # Protobuf Runtime Library

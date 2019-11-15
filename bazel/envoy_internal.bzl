@@ -77,8 +77,6 @@ def envoy_copts(repository, test = False):
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
-    if dep in ("zlib",):
-        return "@%s" % dep
     return "//external:%s" % dep
 
 def envoy_linkstatic():
