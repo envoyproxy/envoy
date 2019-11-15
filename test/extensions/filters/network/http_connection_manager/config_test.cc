@@ -166,47 +166,33 @@ tracing:
   - tag: etag
     environment:
       name: E_TAG
-  - tag: etag-n
-    environment:
-      name: E_TAG_N
-      default_value: evalue
   - tag: rtag
     request_header:
       name: X-Tag
-  - tag: rtag-n
-    request_header:
-      name: X-Tag-N
-      default_value: rvalue
   - tag: mtag
     metadata:
       kind: { request: {} }
       metadata_key:
         key: com.bar.foo
         path: [ { key: xx }, { key: yy } ]
-      default_value: mvalue
   max_path_tag_length: 128
 http_filters:
 - name: envoy.router
   config: {}
   )EOF";
-
-  TestEnvironment::setEnvVar("E_TAG", "e_val", 0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
-  const Tracing::CustomTagMap& custom_tags = config.tracingConfig()->custom_tags_;
-  std::vector<std::string> custom_tag_views;
-  for (const auto& it : custom_tags) {
-    custom_tag_views.emplace_back(
-        dynamic_cast<const Tracing::GeneralCustomTag*>(it.second.get())->toString());
+  std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
+  const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
+  for (const std::string& custom_tag : custom_tags) {
+    EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
   }
-  ASSERT_THAT(custom_tag_views,
-              UnorderedElementsAre(
-                  "REQUEST_HEADER|foo|foo|", "LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG||e_val",
-                  "ENVIRONMENT|etag-n|E_TAG_N|evalue|evalue", "REQUEST_HEADER|rtag|x-tag|",
-                  "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
-                  "METADATA|1|mtag|com.bar.foo|xx.yy|mvalue"));
+  EXPECT_NE(dynamic_cast<const Tracing::RequestHeaderCustomTag*>(
+                custom_tag_map.find("foo")->second.get()),
+            nullptr);
+
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());

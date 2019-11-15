@@ -232,10 +232,9 @@ HttpTracerUtility::createCustomTag(const envoy::type::tracing::v2::CustomTag& ta
     return std::make_shared<Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
   case envoy::type::tracing::v2::CustomTag::kMetadata:
     return std::make_shared<Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
-  case envoy::type::tracing::v2::CustomTag::TYPE_NOT_SET:
-    return nullptr;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  return nullptr;
 }
 
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
@@ -263,8 +262,8 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
   return active_span;
 }
 
-void GeneralCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
-  const absl::string_view& tag_value = value(ctx);
+void CustomTagBase::apply(Span& span, const CustomTagContext& ctx) const {
+  absl::string_view tag_value = value(ctx);
   if (!tag_value.empty()) {
     span.setTag(tag(), tag_value);
   }
@@ -272,15 +271,14 @@ void GeneralCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
 
 EnvironmentCustomTag::EnvironmentCustomTag(
     const std::string& tag, const envoy::type::tracing::v2::CustomTag::Environment& environment)
-    : GeneralCustomTag(tag), name_(environment.name()),
-      default_value_(environment.default_value()) {
+    : CustomTagBase(tag), name_(environment.name()), default_value_(environment.default_value()) {
   const char* env = std::getenv(name_.data());
   final_value_ = env ? env : default_value_;
 }
 
 RequestHeaderCustomTag::RequestHeaderCustomTag(
     const std::string& tag, const envoy::type::tracing::v2::CustomTag::Header& request_header)
-    : GeneralCustomTag(tag), name_(Http::LowerCaseString(request_header.name())),
+    : CustomTagBase(tag), name_(Http::LowerCaseString(request_header.name())),
       default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
@@ -293,7 +291,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
                                      const envoy::type::tracing::v2::CustomTag::Metadata& metadata)
-    : GeneralCustomTag(tag), kind_(metadata.kind().kind_case()),
+    : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
@@ -348,7 +346,7 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
     return hostPtr ? hostPtr->metadata().get() : nullptr;
   }
   default:
-    return nullptr;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

@@ -10,7 +10,6 @@
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "test/common/tracing/http_tracer_impl.pb.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -115,19 +114,21 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
 class HttpConnManFinalizerImplTest : public testing::Test {
 protected:
-  void expectSetCustomTags(const std::string& cases) {
-    test::common::tracing::CustomTagCases custom_tag_cases;
-    TestUtility::loadFromYaml(cases, custom_tag_cases);
-    for (const auto& cas : custom_tag_cases.cases()) {
-      const CustomTagConstSharedPtr& ptr = HttpTracerUtility::createCustomTag(cas.custom_tag());
-      config.custom_tags_.emplace(ptr->tag(), ptr);
-      switch (cas.validate_case()) {
-      case test::common::tracing::CustomTagCases::Case::ValidateCase::kValue:
-        EXPECT_CALL(span, setTag(Eq(ptr->tag()), Eq(cas.value())));
-        break;
-      case test::common::tracing::CustomTagCases::Case::ValidateCase::VALIDATE_NOT_SET:
-        EXPECT_CALL(span, setTag(Eq(ptr->tag()), _)).Times(0);
-        break;
+  struct CustomTagCase {
+    std::string custom_tag;
+    bool set;
+    std::string value;
+  };
+
+  void expectSetCustomTags(const std::vector<CustomTagCase>& cases) {
+    for (const CustomTagCase& cas : cases) {
+      envoy::type::tracing::v2::CustomTag custom_tag;
+      TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
+      config.custom_tags_.emplace(custom_tag.tag(), HttpTracerUtility::createCustomTag(custom_tag));
+      if (cas.set) {
+        EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
+      } else {
+        EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), _)).Times(0);
       }
     }
   }
@@ -207,30 +208,26 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
 
-  expectSetCustomTags(R"EOF(
-cases:
-- custom_tag:
-    tag: a
-    request_header:
-      name: X-Ax
-- custom_tag:
-    tag: b
-    metadata:
-      kind: { route: {} }
-      metadata_key: { key: m.rot, path: [ {key: not-found } ] }
-      default_value: _c
-  value: _c
-- custom_tag:
-    tag: c
-    metadata:
-      kind: { cluster: {} }
-      metadata_key: { key: m.cluster, path: [ {key: not-found } ] }
-- custom_tag:
-    tag: d
-    metadata:
-      kind: { host: {} }
-      metadata_key: { key: m.host, path: [ {key: not-found } ] }
-)EOF");
+  expectSetCustomTags({{"{ tag: a, request_header: { name: X-Ax } }", false, ""},
+                       {R"EOF(
+tag: b
+metadata:
+  kind: { route: {} }
+  metadata_key: { key: m.rot, path: [ {key: not-found } ] }
+  default_value: _c)EOF",
+                        true, "_c"},
+                       {R"EOF(
+tag: c
+metadata:
+  kind: { cluster: {} }
+  metadata_key: { key: m.cluster, path: [ {key: not-found } ] })EOF",
+                        false, ""},
+                       {R"EOF(
+tag: d
+metadata:
+  kind: { host: {} }
+  metadata_key: { key: m.host, path: [ {key: not-found } ] })EOF",
+                        false, ""}});
 
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
@@ -368,85 +365,79 @@ ree:
   EXPECT_CALL(config, customTags());
   EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
 
-  expectSetCustomTags(R"EOF(
-cases:
-- custom_tag: { tag: aa, literal: { value: a } }
-  value: a
-- custom_tag: { tag: bb-1, request_header: { name: X-Bb, default_value: _b } }
-  value: b
-- custom_tag: { tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }
-  value: b2
-- custom_tag: { tag: bb-3, request_header: { name: X-Bb-Not-Found } }
-- custom_tag: { tag: cc-1, environment: { name: E_CC } }
-  value: c
-- custom_tag: { tag: cc-1-a, environment: { name: E_CC, default_value: _c } }
-  value: c
-- custom_tag: { tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }
-  value: c2
-- custom_tag: { tag: cc-3, environment: { name: E_CC_NOT_FOUND} }
-- custom_tag:
-    tag: dd-1,
-    metadata:
-      kind: { request: {} }
-      metadata_key: { key: m.req, path: [ { key: ree }, { key: foo } ] }
-  value: bar
-- custom_tag:
-    tag: dd-2,
-    metadata:
-      kind: { request: {} }
-      metadata_key: { key: m.req, path: [ { key: not-found } ] }
-      default_value: d2
-  value: d2
-- custom_tag:
-    tag: dd-3,
-    metadata:
-      kind: { request: {} }
-      metadata_key: { key: m.req, path: [ { key: not-found } ] }
-- custom_tag:
-    tag: dd-4,
-    metadata:
-      kind: { request: {} }
-      metadata_key: { key: m.req, path: [ { key: ree }, { key: nuu } ] }
-      default_value: _d
-  value: "1"
-- custom_tag:
-    tag: dd-5,
-    metadata:
-      kind: { route: {} }
-      metadata_key: { key: m.rot, path: [ { key: ree }, { key: boo } ] }
-  value: "true"
-- custom_tag:
-    tag: dd-6,
-    metadata:
-      kind: { route: {} }
-      metadata_key: { key: m.rot, path: [ { key: ree }, { key: poo } ] }
-  value: "false"
-- custom_tag:
-    tag: dd-7,
-    metadata:
-      kind: { cluster: {} }
-      metadata_key: { key: m.cluster, path: [ { key: ree }, { key: emp } ] }
-      default_value: _d
-  value: ''
-- custom_tag:
-    tag: dd-8,
-    metadata:
-      kind: { cluster: {} }
-      metadata_key: { key: m.cluster, path: [ { key: ree }, { key: lii } ] }
-      default_value: _d
-  value: "[\"something\"]"
-- custom_tag:
-    tag: dd-9,
-    metadata:
-      kind: { host: {} }
-      metadata_key: { key: m.host, path: [ { key: ree }, { key: stt } ] }
-  value: "{\"some\":\"thing\"}"
-- custom_tag:
-    tag: dd-10,
-    metadata:
-      kind: { host: {} }
-      metadata_key: { key: m.host, path: [ { key: not-found } ] }
-)EOF");
+  expectSetCustomTags(
+      {{"{ tag: aa, literal: { value: a } }", true, "a"},
+       {"{ tag: bb-1, request_header: { name: X-Bb, default_value: _b } }", true, "b"},
+       {"{ tag: bb-2, request_header: { name: X-Bb-Not-Found, default_value: b2 } }", true, "b2"},
+       {"{ tag: bb-3, request_header: { name: X-Bb-Not-Found } }", false, ""},
+       {"{ tag: cc-1, environment: { name: E_CC } }", true, "c"},
+       {"{ tag: cc-1-a, environment: { name: E_CC, default_value: _c } }", true, "c"},
+       {"{ tag: cc-2, environment: { name: E_CC_NOT_FOUND, default_value: c2 } }", true, "c2"},
+       {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
+       {R"EOF(
+tag: dd-1,
+metadata:
+  kind: { request: {} }
+  metadata_key: { key: m.req, path: [ { key: ree }, { key: foo } ] })EOF",
+        true, "bar"},
+       {R"EOF(
+tag: dd-2,
+metadata:
+  kind: { request: {} }
+  metadata_key: { key: m.req, path: [ { key: not-found } ] }
+  default_value: d2)EOF",
+        true, "d2"},
+       {R"EOF(
+tag: dd-3,
+metadata:
+  kind: { request: {} }
+  metadata_key: { key: m.req, path: [ { key: not-found } ] })EOF",
+        false, ""},
+       {R"EOF(
+tag: dd-4,
+metadata:
+  kind: { request: {} }
+  metadata_key: { key: m.req, path: [ { key: ree }, { key: nuu } ] }
+  default_value: _d)EOF",
+        true, "1"},
+       {R"EOF(
+tag: dd-5,
+metadata:
+  kind: { route: {} }
+  metadata_key: { key: m.rot, path: [ { key: ree }, { key: boo } ] })EOF",
+        true, "true"},
+       {R"EOF(
+tag: dd-6,
+metadata:
+  kind: { route: {} }
+  metadata_key: { key: m.rot, path: [ { key: ree }, { key: poo } ] })EOF",
+        true, "false"},
+       {R"EOF(
+tag: dd-7,
+metadata:
+  kind: { cluster: {} }
+  metadata_key: { key: m.cluster, path: [ { key: ree }, { key: emp } ] }
+  default_value: _d)EOF",
+        true, ""},
+       {R"EOF(
+tag: dd-8,
+metadata:
+  kind: { cluster: {} }
+  metadata_key: { key: m.cluster, path: [ { key: ree }, { key: lii } ] }
+  default_value: _d)EOF",
+        true, "[\"something\"]"},
+       {R"EOF(
+tag: dd-9,
+metadata:
+  kind: { host: {} }
+  metadata_key: { key: m.host, path: [ { key: ree }, { key: stt } ] })EOF",
+        true, R"({"some":"thing"})"},
+       {R"EOF(
+tag: dd-10,
+metadata:
+  kind: { host: {} }
+  metadata_key: { key: m.host, path: [ { key: not-found } ] })EOF",
+        false, ""}});
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
                                             config);

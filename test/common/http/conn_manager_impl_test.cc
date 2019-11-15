@@ -125,11 +125,9 @@ public:
       envoy::type::FractionalPercent percent2;
       percent2.set_numerator(10000);
       percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-      const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr =
-          requestHeaderCustomTag(":method");
       tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
           TracingConnectionManagerConfig{Tracing::OperationName::Ingress,
-                                         {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                         {{":method", requestHeaderCustomTag(":method")}},
                                          percent1,
                                          percent2,
                                          percent1,
@@ -843,6 +841,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
        }},
       {"m-tag", [](const std::string& t, const std::string& v) {
          envoy::type::tracing::v2::CustomTag::Metadata m;
+         m.mutable_kind()->mutable_host();
          m.set_default_value(v);
          return std::make_shared<Tracing::MetadataCustomTag>(t, m);
        }}};
@@ -861,9 +860,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
     const std::string& rv3 = ms.prefix + "-r3";
     tracing_tag_cases.push_back({false, true, {ms.factory(t3, rv3)}, t3, rv3});
   }
-  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
   Tracing::CustomTagMap conn_tracing_tags = {
-      {method_custom_tag_ptr->tag(), method_custom_tag_ptr}}; // legacy test case
+      {":method", requestHeaderCustomTag(":method")}}; // legacy test case
   Tracing::CustomTagMap route_tracing_tags;
   for (TracingTagSuite& s : tracing_tag_cases) {
     if (s.has_conn) {
@@ -1080,10 +1078,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   envoy::type::FractionalPercent percent2;
   percent2.set_numerator(10000);
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Egress,
-                                     {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                     {{":method", requestHeaderCustomTag(":method")}},
                                      percent1,
                                      percent2,
                                      percent1,
@@ -1160,10 +1157,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   envoy::type::FractionalPercent percent2;
   percent2.set_numerator(10000);
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Egress,
-                                     {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                     {{":method", requestHeaderCustomTag(":method")}},
                                      percent1,
                                      percent2,
                                      percent1,
@@ -1235,10 +1231,9 @@ TEST_F(HttpConnectionManagerImplTest,
   envoy::type::FractionalPercent percent2;
   percent2.set_numerator(10000);
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-  const Tracing::CustomTagConstSharedPtr& method_custom_tag_ptr = requestHeaderCustomTag(":method");
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Egress,
-                                     {{method_custom_tag_ptr->tag(), method_custom_tag_ptr}},
+                                     {{":method", requestHeaderCustomTag(":method")}},
                                      percent1,
                                      percent2,
                                      percent1,

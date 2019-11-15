@@ -14,7 +14,8 @@ Version 1.13.0 (pending)
 ========================
 * The `request_headers_for_tags` field in :ref:`HTTP connection manager
   <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
-  has been deprecated in favor of the `custom_tags` field.
+  has been deprecated in favor of the :ref:`custom_tags
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.custom_tag>` field.
 
 
 Version 1.12.0 (October 31, 2019)

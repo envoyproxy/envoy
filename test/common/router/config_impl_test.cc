@@ -5452,27 +5452,17 @@ virtual_hosts:
           - tag: etag
             environment:
               name: E_TAG
-          - tag: etag-n
-            environment:
-              name: E_TAG_N
-              default_value: evalue
           - tag: rtag
             request_header:
               name: X-Tag
-          - tag: rtag-n
-            request_header:
-              name: X-Tag-N
-              default_value: rvalue
           - tag: mtag
             metadata:
               kind: { route: {} }
               metadata_key:
                 key: com.bar.foo
                 path: [ { key: xx }, { key: yy } ]
-              default_value: mvalue
         route: { cluster: ww2 }
   )EOF";
-  TestEnvironment::setEnvVar("E_TAG", "e_val", 0);
   BazFactory baz_factory;
   Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
@@ -5498,18 +5488,11 @@ virtual_hosts:
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
 
-  const Tracing::CustomTagMap& custom_tags = route3->tracingConfig()->getCustomTags();
-  std::vector<std::string> custom_tag_views;
-  for (const auto& it : custom_tags) {
-    custom_tag_views.emplace_back(
-        dynamic_cast<const Tracing::GeneralCustomTag*>(it.second.get())->toString());
+  std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
+  const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
+  for (const std::string& custom_tag : custom_tags) {
+    EXPECT_NE(map.find(custom_tag), map.end());
   }
-  EXPECT_THAT(custom_tag_views,
-              UnorderedElementsAre("LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG||e_val",
-                                   "ENVIRONMENT|etag-n|E_TAG_N|evalue|evalue",
-                                   "REQUEST_HEADER|rtag|x-tag|",
-                                   "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
-                                   "METADATA|2|mtag|com.bar.foo|xx.yy|mvalue"));
 }
 
 // Test to check Prefix Rewrite for redirects

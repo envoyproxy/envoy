@@ -220,10 +220,7 @@ RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing
     overall_sampling_ = tracing.overall_sampling();
   }
   for (const auto& tag : tracing.custom_tags()) {
-    Tracing::CustomTagConstSharedPtr ptr = Tracing::HttpTracerUtility::createCustomTag(tag);
-    if (ptr) {
-      custom_tags_.emplace(ptr->tag(), ptr);
-    }
+    custom_tags_.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
   }
 }
 
