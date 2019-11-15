@@ -706,7 +706,7 @@ def _com_github_grpc_grpc():
 def _upb():
     _repository_impl(
         name = "upb",
-        patches = ["//bazel:upb.patch"],
+        patches = ["@envoy//bazel:upb.patch"],
         patch_args = ["-p1"],
     )
 
