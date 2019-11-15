@@ -55,7 +55,8 @@ public:
                       uint8_t expected_server_connection_id_length,
                       Network::ConnectionHandler& connection_handler,
                       Network::ListenerConfig& listener_config,
-                      Server::ListenerStats& listener_stats, Event::Dispatcher& dispatcher);
+                      Server::ListenerStats& listener_stats, Event::Dispatcher& dispatcher,
+                      Network::Socket& listen_socket);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -72,6 +73,7 @@ private:
   Network::ListenerConfig& listener_config_;
   Server::ListenerStats& listener_stats_;
   Event::Dispatcher& dispatcher_;
+  Network::Socket& listen_socket_;
 };
 
 } // namespace Quic

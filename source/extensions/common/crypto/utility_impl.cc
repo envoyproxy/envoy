@@ -57,7 +57,6 @@ const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, Cr
   EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
 
   if (pkey == nullptr) {
-    free(pkey_wrapper);
     return {false, "Failed to initialize digest verify."};
   }
 

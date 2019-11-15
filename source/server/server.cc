@@ -20,7 +20,6 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
@@ -188,7 +187,7 @@ void InstanceImpl::flushStats() {
   }
 }
 
-void InstanceImpl::flushStatsInternal() {
+void InstanceImpl::updateServerStats() {
   // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
   HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
 
@@ -205,7 +204,10 @@ void InstanceImpl::flushStatsInternal() {
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
+}
 
+void InstanceImpl::flushStatsInternal() {
+  updateServerStats();
   InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
@@ -253,12 +255,6 @@ void InstanceImpl::initialize(const Options& options,
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
-
-  // Enable the selected buffer implementation (old libevent evbuffer version or new native
-  // version) early in the initialization, before any buffers can be created.
-  Buffer::OwnedImpl::useOldImpl(options.libeventBufferEnabled());
-  ENVOY_LOG(info, "buffer implementation: {}",
-            Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
@@ -429,6 +425,8 @@ void InstanceImpl::initialize(const Options& options,
 void InstanceImpl::startWorkers() {
   listener_manager_->startWorkers(*guard_dog_);
   initialization_timer_->complete();
+  // Update server stats as soon as initialization is done.
+  updateServerStats();
   workers_started_ = true;
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.

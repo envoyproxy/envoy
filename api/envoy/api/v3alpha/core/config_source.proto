@@ -30,15 +30,12 @@ message ApiConfigSource {
     // the v2 protos is used.
     REST = 1;
 
-    // gRPC v2 API.
+    // "State of the world" gRPC v2 API, using Discovery{Request,Response} protos.
     GRPC = 2;
 
-    // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
-    // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
-    // with every update, the xDS server only sends what has changed since the last update.
-    //
-    // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
-    // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
+    // "Delta" gRPC v2 API, using DeltaDiscovery{Request,Response} protos.
+    // Rather than sending Envoy the entire state with every update, the xDS server
+    // only sends what has changed since the last update.
     DELTA_GRPC = 3;
   }
 

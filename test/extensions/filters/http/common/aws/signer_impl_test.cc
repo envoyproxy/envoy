@@ -30,9 +30,9 @@ public:
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   }
 
-  void addMethod(const std::string& method) { message_->headers().insertMethod().value(method); }
+  void addMethod(const std::string& method) { message_->headers().setMethod(method); }
 
-  void addPath(const std::string& path) { message_->headers().insertPath().value(path); }
+  void addPath(const std::string& path) { message_->headers().setPath(path); }
 
   void addHeader(const std::string& key, const std::string& value) {
     message_->headers().addCopy(Http::LowerCaseString(key), value);

@@ -519,6 +519,44 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
+TEST(ThriftRouteMatcherTest, RouteByClusterHeader) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: ""
+    route:
+      cluster_header: "x-cluster"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route;
+
+  // No method nor header.
+  route = matcher.route(metadata, 0);
+  EXPECT_EQ(nullptr, route);
+
+  // Method, but no header.
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata, 0);
+  EXPECT_EQ(nullptr, route);
+
+  // The wrong header is present.
+  metadata.headers().addCopy(Http::LowerCaseString("x-something"), "cluster1");
+  route = matcher.route(metadata, 0);
+  EXPECT_EQ(nullptr, route);
+
+  // Header is present.
+  metadata.headers().addCopy(Http::LowerCaseString("x-cluster"), "cluster1");
+  route = matcher.route(metadata, 0);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+}
+
 TEST(ThriftRouteMatcherTest, WeightedClusters) {
   const std::string yaml = R"EOF(
 name: config

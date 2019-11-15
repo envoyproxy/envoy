@@ -460,10 +460,10 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   Http::TestHeaderMapImpl response_headers;
   Http::TestHeaderMapImpl response_trailers;
 
-  request_headers.insertHost().value(std::string("api"));
-  request_headers.insertUserAgent().value(std::string("agent"));
-  request_headers.insertEnvoyDownstreamServiceCluster().value(std::string("downstream_cluster"));
-  request_headers.insertClientTraceId().value(std::string("client_trace_id"));
+  request_headers.setHost("api");
+  request_headers.setUserAgent("agent");
+  request_headers.setEnvoyDownstreamServiceCluster("downstream_cluster");
+  request_headers.setClientTraceId("client_trace_id");
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));

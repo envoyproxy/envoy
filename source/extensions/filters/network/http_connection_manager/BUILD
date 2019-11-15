@@ -6,16 +6,17 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/filesystem:filesystem_interface",

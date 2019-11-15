@@ -162,8 +162,6 @@ typed_config:
     nanos: 0
 )EOF";
 
-// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
-//               work restores it here.
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
   return fmt::format(
@@ -181,7 +179,7 @@ dynamic_resources:
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      set_node_on_first_message_only: false
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster
@@ -572,8 +570,7 @@ void ConfigHelper::addFilter(const std::string& config) {
   loadHttpConnectionManager(hcm_config);
 
   auto* filter_list_back = hcm_config.add_http_filters();
-  const std::string json = Json::Factory::loadFromYamlString(config)->asJsonString();
-  TestUtility::loadFromJson(json, *filter_list_back);
+  TestUtility::loadFromYaml(config, *filter_list_back);
 
   // Now move it to the front.
   for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
