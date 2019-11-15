@@ -62,108 +62,123 @@ TEST(InitTargetImplTest, ReadyWhenWatcherUnavailable) {
   EXPECT_FALSE(target.ready());
 }
 
-TEST(SharedTargetImplTest, OnSyncManagers) {
+TEST(SharedTargetImplTest, InitializeTwiceBeforeReady) {
   ManagerImpl m1("m1");
   ManagerImpl m2("m2");
-  int counter = 0;
-  SharedTargetImpl t("test", [&counter]() mutable { counter++; });
+  ExpectableWatcherImpl w1;
+  ExpectableWatcherImpl w2;
+  ExpectableSharedTargetImpl t;
   m1.add(t);
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, t.count_);
   m2.add(t);
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, t.count_);
   EXPECT_EQ(Manager::State::Uninitialized, m1.state());
   EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  m1.initialize(WatcherImpl("watcher", []() {}));
-  m2.initialize(WatcherImpl("watcher", []() {}));
-  EXPECT_LE(1, counter);
+  m1.initialize(w1);
+  m2.initialize(w2);
+  EXPECT_EQ(1, t.count_);
   EXPECT_EQ(Manager::State::Initializing, m1.state());
   EXPECT_EQ(Manager::State::Initializing, m2.state());
-
+  w1.expectReady().Times(1);
+  w2.expectReady().Times(1);
   t.ready();
   EXPECT_EQ(Manager::State::Initialized, m1.state());
-  EXPECT_EQ(Manager::State::Initialized, m1.state());
+  EXPECT_EQ(Manager::State::Initialized, m2.state());
 }
 
 // Two managers initialize the same target at their own interests.
 TEST(SharedTargetImplTest, ConcurrentManagerInitialization) {
   ManagerImpl m1("m1");
   ManagerImpl m2("m2");
-  int counter = 0;
-  SharedTargetImpl t("test", [&counter]() mutable { counter++; });
+  ExpectableWatcherImpl w1;
+  ExpectableWatcherImpl w2;
+  ExpectableSharedTargetImpl t;
   m1.add(t);
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, t.count_);
   m2.add(t);
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, t.count_);
   EXPECT_EQ(Manager::State::Uninitialized, m1.state());
   EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  m1.initialize(WatcherImpl("watcher", []() {}));
-  EXPECT_EQ(1, counter);
+  m1.initialize(w1);
+  EXPECT_EQ(1, t.count_);
   EXPECT_EQ(Manager::State::Initializing, m1.state());
   EXPECT_EQ(Manager::State::Uninitialized, m2.state());
+  w1.expectReady().Times(1);
   t.ready();
   EXPECT_EQ(Manager::State::Initialized, m1.state());
   EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  m2.initialize(WatcherImpl("watcher", []() {}));
+  w1.expectReady().Times(0);
+  w2.expectReady().Times(1);
+  m2.initialize(w2);
   EXPECT_EQ(Manager::State::Initialized, m2.state());
-  EXPECT_EQ(1, counter) << "target init function should be invoked only once";
+  EXPECT_EQ(1, t.count_) << "target init function should be invoked only once";
 }
 
 // One manager initialized the target, followed by another manager adding the target.
 TEST(SharedTargetImplTest, OnLateManagers) {
   ManagerImpl m1("m1");
   ManagerImpl m2("m2");
-  int counter = 0;
-  SharedTargetImpl t("test", [&counter]() mutable { counter++; });
+  ExpectableWatcherImpl w1;
+  ExpectableWatcherImpl w2;
+  ExpectableSharedTargetImpl t;
   m1.add(t);
-  EXPECT_EQ(0, counter);
+  EXPECT_EQ(0, t.count_);
   EXPECT_EQ(Manager::State::Uninitialized, m1.state());
-  m1.initialize(WatcherImpl("watcher", []() {}));
-  EXPECT_EQ(1, counter);
+  w1.expectReady().Times(1);
+  m1.initialize(w1);
+  EXPECT_EQ(1, t.count_);
   EXPECT_EQ(Manager::State::Initializing, m1.state());
   t.ready();
   EXPECT_EQ(Manager::State::Initialized, m1.state());
-
   EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  m2.initialize(WatcherImpl("watcher", []() {}));
+  w1.expectReady().Times(0);
+  w2.expectReady().Times(1);
+  m2.initialize(w2);
   EXPECT_EQ(Manager::State::Initialized, m2.state());
 }
 
-TEST(SharedTargetImplTest, GoneTargetIsInitialized) {
+// If the shared target is destroyed, all the linked init manager will be notified.
+TEST(SharedTargetImplTest, DetroyedSharedTargetIsConsideredReadyTarget) {
   ManagerImpl m("test");
-  int counter = 0;
-
-  // add a target and destroy it
+  ExpectableWatcherImpl w;
+  // Adding shared targets in all kinds of states and detryo the target.
   {
-    SharedTargetImpl t("t1", [&counter]() mutable { counter++; });
-    m.add(t);
+    ExpectableSharedTargetImpl t1("t1");
+    m.add(t1);
   }
 
   {
     ManagerImpl m2("");
-    SharedTargetImpl t2("t2", []() mutable {});
+    ExpectableSharedTargetImpl t2("t2");
     m2.add(t2);
-    m2.initialize(WatcherImpl("watcher", []() {}));
+    m2.initialize(ExpectableWatcherImpl());
     m.add(t2);
   }
+
   {
     ManagerImpl m3("");
-    SharedTargetImpl t3("t3", []() mutable {});
+    ExpectableSharedTargetImpl t3("t3");
     m3.add(t3);
-    m3.initialize(WatcherImpl("watcher", []() {}));
+    ExpectableWatcherImpl w3;
+    w3.expectReady().Times(1);
+    m3.initialize(w3);
     m.add(t3);
     t3.ready();
   }
 
   {
     ManagerImpl m4("");
-    SharedTargetImpl t4("t4", []() mutable {});
+    ExpectableSharedTargetImpl t4("t4");
     m4.add(t4);
-    m4.initialize(WatcherImpl("watcher", []() {}));
+    ExpectableWatcherImpl w4;
+    w4.expectReady().Times(1);
+    m4.initialize(w4);
     t4.ready();
     m.add(t4);
   }
   // initialization should complete despite the destroyed target
-  m.initialize(WatcherImpl("watcher", []() {}));
+  w.expectReady().Times(1);
+  m.initialize(w);
   EXPECT_EQ(Manager::State::Initialized, m.state());
 }
 } // namespace

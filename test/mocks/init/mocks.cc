@@ -21,5 +21,10 @@ ExpectableTargetImpl::expectInitializeWillCallReady() {
   return expectInitialize().WillOnce(Invoke([this]() { ready(); }));
 }
 
+ExpectableSharedTargetImpl::ExpectableSharedTargetImpl(absl::string_view name)
+    : SharedTargetImpl(name, [this]() { count_++; }) {}
+ExpectableSharedTargetImpl::ExpectableSharedTargetImpl(absl::string_view name, InitializeFn fn)
+    : SharedTargetImpl(name, fn) {}
+
 } // namespace Init
 } // namespace Envoy
