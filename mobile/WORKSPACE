@@ -100,9 +100,9 @@ android_ndk_repository(name = "androidndk")
 
 http_archive(
     name = "rules_jvm_external",
-    sha256 = "db56dbd8e96ab31d1ee57c168d6343949d95f36a21085b33003d03585c4dba44",
-    strip_prefix = "rules_jvm_external-fc5bd21820581f342a4119a89bfdf36e79c6c549",
-    urls = ["https://github.com/bazelbuild/rules_jvm_external/archive/fc5bd21820581f342a4119a89bfdf36e79c6c549.tar.gz"],
+    strip_prefix = "rules_jvm_external-2.10",
+    sha256 = "1bbf2e48d07686707dd85357e9a94da775e1dbd7c464272b3664283c9c716d26",
+    url = "https://github.com/bazelbuild/rules_jvm_external/archive/2.10.zip",
 )
 
 load("@rules_jvm_external//:defs.bzl", "maven_install")
