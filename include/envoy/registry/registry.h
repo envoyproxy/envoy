@@ -135,7 +135,7 @@ public:
   static std::vector<std::string>& deprecatedFactoryNames() {
     static auto* deprecated_factory_names = new std::vector<std::string>();
     return *deprecated_factory_names;
-  } 
+  }
 
   static void registerFactory(Base& factory, absl::string_view name, bool is_deprecated = false) {
     auto result = factories().emplace(std::make_pair(name, &factory));
