@@ -132,7 +132,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
-    _com_github_nanopb_nanopb()
     _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
@@ -147,6 +146,7 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _upb()
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
@@ -671,19 +671,8 @@ def _fuzzit_linux():
     )
 
 def _com_github_grpc_grpc():
-    _repository_impl(
-        "com_github_grpc_grpc",
-        patches = [
-            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
-            "@envoy//bazel:grpc-protoinfo-1.patch",
-            "@envoy//bazel:grpc-protoinfo-2.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/19860
-            "@envoy//bazel:grpc-protoinfo-3.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/18950
-            "@envoy//bazel:grpc-rename-gettid.patch",
-        ],
-        patch_args = ["-p1"],
-    )
+    _repository_impl("com_github_grpc_grpc")
+    _repository_impl("build_bazel_rules_apple")
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(
@@ -714,15 +703,16 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
-def _com_github_nanopb_nanopb():
+def _upb():
     _repository_impl(
-        name = "com_github_nanopb_nanopb",
-        build_file = "@com_github_grpc_grpc//third_party:nanopb.BUILD",
+        name = "upb",
+        patches = ["@envoy//bazel:upb.patch"],
+        patch_args = ["-p1"],
     )
 
     native.bind(
-        name = "nanopb",
-        actual = "@com_github_nanopb_nanopb//:nanopb",
+        name = "upb_lib",
+        actual = "@upb//:upb",
     )
 
 def _com_github_google_jwt_verify():

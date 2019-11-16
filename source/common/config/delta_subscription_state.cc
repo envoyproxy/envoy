@@ -105,7 +105,7 @@ void DeltaSubscriptionState::handleGoodResponse(
   // initial_resource_versions messages, but will remind us to explicitly tell the server "I'm
   // cancelling my subscription" when we lose interest.
   for (const auto& resource_name : message.removed_resources()) {
-    if (resource_names_.find(resource_name) != resource_names_.end()) {
+    if (resource_versions_.find(resource_name) != resource_versions_.end()) {
       setResourceWaitingForServer(resource_name);
     }
   }
@@ -175,17 +175,14 @@ void* DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
 void DeltaSubscriptionState::setResourceVersion(const std::string& resource_name,
                                                 const std::string& resource_version) {
   resource_versions_[resource_name] = ResourceVersion(resource_version);
-  resource_names_.insert(resource_name);
 }
 
 void DeltaSubscriptionState::setResourceWaitingForServer(const std::string& resource_name) {
   resource_versions_[resource_name] = ResourceVersion();
-  resource_names_.insert(resource_name);
 }
 
 void DeltaSubscriptionState::setLostInterestInResource(const std::string& resource_name) {
   resource_versions_.erase(resource_name);
-  resource_names_.erase(resource_name);
 }
 
 } // namespace Config

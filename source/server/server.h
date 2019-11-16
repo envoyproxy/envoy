@@ -242,6 +242,7 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
   void flushStatsInternal();
+  void updateServerStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory, ListenerHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);

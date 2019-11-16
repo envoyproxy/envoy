@@ -1,4 +1,4 @@
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
@@ -10,17 +10,17 @@
 namespace Envoy {
 namespace Config {
 
-NewGrpcMuxImpl::NewGrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
-                               bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info)
+GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
+                         bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info)
     : subscription_state_factory_(std::move(subscription_state_factory)),
       skip_subsequent_node_(skip_subsequent_node), local_info_(local_info) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
-Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
-                                        const std::set<std::string>& resources,
-                                        SubscriptionCallbacks& callbacks,
-                                        std::chrono::milliseconds init_fetch_timeout) {
+Watch* GrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
+                                     const std::set<std::string>& resources,
+                                     SubscriptionCallbacks& callbacks,
+                                     std::chrono::milliseconds init_fetch_timeout) {
   if (watch == nullptr) {
     return addWatch(type_url, resources, callbacks, init_fetch_timeout);
   } else {
@@ -29,24 +29,24 @@ Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watc
   }
 }
 
-void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
+void GrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   updateWatch(type_url, watch, {});
   watchMapFor(type_url).removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
+void GrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
 
-void NewGrpcMuxImpl::resume(const std::string& type_url) {
+void GrpcMuxImpl::resume(const std::string& type_url) {
   pausable_ack_queue_.resume(type_url);
   trySendDiscoveryRequests();
 }
 
-bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
+bool GrpcMuxImpl::paused(const std::string& type_url) const {
   return pausable_ack_queue_.paused(type_url);
 }
 
-void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
-                                           const void* response_proto_ptr) {
+void GrpcMuxImpl::genericHandleResponse(const std::string& type_url,
+                                        const void* response_proto_ptr) {
   auto sub = subscriptions_.find(type_url);
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -59,9 +59,9 @@ void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
   trySendDiscoveryRequests();
 }
 
-void NewGrpcMuxImpl::start() { establishGrpcStream(); }
+void GrpcMuxImpl::start() { establishGrpcStream(); }
 
-void NewGrpcMuxImpl::handleEstablishedStream() {
+void GrpcMuxImpl::handleEstablishedStream() {
   for (auto& sub : subscriptions_) {
     sub.second->markStreamFresh();
   }
@@ -69,13 +69,13 @@ void NewGrpcMuxImpl::handleEstablishedStream() {
   trySendDiscoveryRequests();
 }
 
-void NewGrpcMuxImpl::disableInitFetchTimeoutTimer() {
+void GrpcMuxImpl::disableInitFetchTimeoutTimer() {
   for (auto& sub : subscriptions_) {
     sub.second->disableInitFetchTimeoutTimer();
   }
 }
 
-void NewGrpcMuxImpl::handleStreamEstablishmentFailure() {
+void GrpcMuxImpl::handleStreamEstablishmentFailure() {
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
@@ -95,9 +95,9 @@ void NewGrpcMuxImpl::handleStreamEstablishmentFailure() {
   } while (all_subscribed.size() != subscriptions_.size());
 }
 
-Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                                SubscriptionCallbacks& callbacks,
-                                std::chrono::milliseconds init_fetch_timeout) {
+Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                             SubscriptionCallbacks& callbacks,
+                             std::chrono::milliseconds init_fetch_timeout) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
@@ -116,8 +116,8 @@ Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std:
 // Updates the list of resource names watched by the given watch. If an added name is new across
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
-void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                                 const std::set<std::string>& resources) {
+void GrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
+                              const std::set<std::string>& resources) {
   ASSERT(watch != nullptr);
   SubscriptionState& sub = subscriptionStateFor(type_url);
   WatchMap& watch_map = watchMapFor(type_url);
@@ -131,7 +131,7 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   }
 }
 
-SubscriptionState& NewGrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
+SubscriptionState& GrpcMuxImpl::subscriptionStateFor(const std::string& type_url) {
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Tried to look up SubscriptionState for non-existent subscription {}.",
@@ -139,7 +139,7 @@ SubscriptionState& NewGrpcMuxImpl::subscriptionStateFor(const std::string& type_
   return *sub->second;
 }
 
-WatchMap& NewGrpcMuxImpl::watchMapFor(const std::string& type_url) {
+WatchMap& GrpcMuxImpl::watchMapFor(const std::string& type_url) {
   auto watch_map = watch_maps_.find(type_url);
   RELEASE_ASSERT(
       watch_map != watch_maps_.end(),
@@ -147,7 +147,7 @@ WatchMap& NewGrpcMuxImpl::watchMapFor(const std::string& type_url) {
   return *watch_map->second;
 }
 
-void NewGrpcMuxImpl::trySendDiscoveryRequests() {
+void GrpcMuxImpl::trySendDiscoveryRequests() {
   while (true) {
     // Do any of our subscriptions even want to send a request?
     absl::optional<std::string> request_type_if_any = whoWantsToSendDiscoveryRequest();
@@ -179,7 +179,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
 
 // Checks whether external conditions allow sending a discovery request. (Does not check
 // whether we *want* to send a discovery request).
-bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
+bool GrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
   RELEASE_ASSERT(
       !pausable_ack_queue_.paused(type_url),
       fmt::format("canSendDiscoveryRequest() called on paused type_url {}. Pausedness is "
@@ -202,7 +202,7 @@ bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
 // First, prioritizes ACKs over non-ACK subscription interest updates.
 // Then, prioritizes non-ACK updates in the order the various types
 // of subscriptions were activated.
-absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
+absl::optional<std::string> GrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
   // type_url from pausable_ack_queue_ if possible, before looking at pending updates.
   if (!pausable_ack_queue_.empty()) {
@@ -225,8 +225,8 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            Runtime::RandomGenerator& random, Stats::Scope& scope,
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-    : NewGrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher),
-                     skip_subsequent_node, local_info),
+    : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
+                  local_info),
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings) {}
 
@@ -260,8 +260,8 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-    : NewGrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
-                     skip_subsequent_node, local_info),
+    : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
+                  local_info),
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings) {}
 

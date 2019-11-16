@@ -196,6 +196,29 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// This test verifies a CORS preflight request without JWT token is allowed.
+TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "OPTIONS"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+      {"origin", "test-origin"},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 // This test verifies JwtRequirement specified from filer state rules
 TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   // A config with metadata rules.
