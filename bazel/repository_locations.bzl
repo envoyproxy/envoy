@@ -16,6 +16,11 @@ REPOSITORY_LOCATIONS = dict(
             "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/1.1.0.tar.gz",
         ],
     ),
+    build_bazel_rules_apple = dict(
+        urls = ["https://github.com/bazelbuild/rules_apple/archive/b869b0d3868d78a1d4ffd866ccb304fb68aa12c3.tar.gz"],
+        strip_prefix = "rules_apple-b869b0d3868d78a1d4ffd866ccb304fb68aa12c3",
+        sha256 = "bdc8e66e70b8a75da23b79f1f8c6207356df07d041d96d2189add7ee0780cf4e",
+    ),
     envoy_build_tools = dict(
         sha256 = "d0f88bef8bd7f76c3684407977f5673f3d06a6c50d4ddaffb8f0e7df6b0ef69e",
         strip_prefix = "envoy-build-tools-a6b28555badcb18d6be924c8fc1bea49971656b8",
@@ -103,19 +108,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "cce1d4585dd017980d4a407d8c5e9f8fc8c1dbb03f249b99e88a387ebb45a035",
-        strip_prefix = "grpc-1.22.1",
-        urls = ["https://github.com/grpc/grpc/archive/v1.22.1.tar.gz"],
+        sha256 = "ffbe61269160ea745e487f79b0fd06b6edd3d50c6d9123f053b5634737cf2f69",
+        strip_prefix = "grpc-1.25.0",
+        urls = ["https://github.com/grpc/grpc/archive/v1.25.0.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
         strip_prefix = "LuaJIT-2.1.0-beta3",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/v2.1.0-beta3.tar.gz"],
-    ),
-    com_github_nanopb_nanopb = dict(
-        sha256 = "cbc8fba028635d959033c9ba8d8186a713165e94a9de02a030a20b3e64866a04",
-        strip_prefix = "nanopb-0.3.9.4",
-        urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.4.tar.gz"],
     ),
     com_github_nghttp2_nghttp2 = dict(
         sha256 = "25b623cd04dc6a863ca3b34ed6247844effe1aa5458229590b3f56a6d53cd692",
@@ -301,5 +301,10 @@ REPOSITORY_LOCATIONS = dict(
     fuzzit_linux = dict(
         sha256 = "9ca76ac1c22d9360936006efddf992977ebf8e4788ded8e5f9d511285c9ac774",
         urls = ["https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.76/fuzzit_Linux_x86_64.zip"],
+    ),
+    upb = dict(
+        sha256 = "61d0417abd60e65ed589c9deee7c124fe76a4106831f6ad39464e1525cef1454",
+        strip_prefix = "upb-9effcbcb27f0a665f9f345030188c0b291e32482",
+        urls = ["https://github.com/protocolbuffers/upb/archive/9effcbcb27f0a665f9f345030188c0b291e32482.tar.gz"],
     ),
 )

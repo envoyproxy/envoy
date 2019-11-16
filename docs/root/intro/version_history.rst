@@ -11,12 +11,15 @@ Version history
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * http: added the ability to sanitize headers nominated by the Connection header. This new behavior is guarded by envoy.reloadable_features.connection_header_sanitization which defaults to true.
 * http: support :ref:`auto_host_rewrite_header<envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig.auto_host_rewrite_header>` in the dynamic forward proxy.
+* jwt_authn: added :ref:`bypass_cors_preflight<envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtAuthentication.bypass_cors_preflight>` to allow bypassing the CORS preflight request.
+* lb_subset_config: new fallback policy for selectors: :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
 * redis: performance improvement for larger split commands by avoiding string copies.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * server: fixed a bug in config validation for configs with runtime layers
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
+* thrift_proxy: added support for cluster header based routing.
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 
