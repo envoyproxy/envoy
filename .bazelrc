@@ -94,8 +94,6 @@ build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 
 # Clang with libc++
-# TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
-# and update stats_integration_test with appropriate m_per_cluster value
 build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=LDFLAGS=-stdlib=libc++
@@ -142,6 +140,12 @@ build:remote --remote_download_toplevel
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
 
+build:remote-clang-libc++ --config=remote
+build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:remote-gcc --config=remote
+build:remote-gcc --config=rbe-toolchain-gcc
+
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
@@ -156,17 +160,23 @@ build:docker-sandbox --experimental_enable_docker_sandbox
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
 
+build:docker-clang-libc++ --config=docker-sandbox
+build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:docker-gcc --config=docker-sandbox
+build:docker-gcc --config=rbe-toolchain-gcc
+
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
-build:asan-fuzzer --config=asan
+build:asan-fuzzer --config=clang-asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
-try-import clang.bazelrc
-try-import user.bazelrc
+try-import %workspace%/clang.bazelrc
+try-import %workspace%/user.bazelrc

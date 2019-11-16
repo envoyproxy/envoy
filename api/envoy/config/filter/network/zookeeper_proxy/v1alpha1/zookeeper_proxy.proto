@@ -6,15 +6,17 @@ option java_outer_classname = "ZookeeperProxyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.zookeeper_proxy.v1alpha1";
 
-import "validate/validate.proto";
 import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
 
 // [#protodoc-title: ZooKeeper proxy]
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
+// [#extension: envoy.filters.network.zookeeper_proxy]
 message ZooKeeperProxy {
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_zookeeper_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // [#not-implemented-hide:] The optional path to use for writing ZooKeeper access logs.
   // If the access log field is empty, access logs will not be written.

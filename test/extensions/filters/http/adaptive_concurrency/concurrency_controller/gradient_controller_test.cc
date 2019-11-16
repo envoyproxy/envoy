@@ -96,6 +96,7 @@ min_rtt_calc_params:
     value: 13.2
   interval: 31s
   request_count: 52
+  min_concurrency: 8
 )EOF";
 
   auto config = makeConfig(yaml, runtime_);
@@ -107,6 +108,7 @@ min_rtt_calc_params:
   EXPECT_EQ(config.maxGradient(), 2.1);
   EXPECT_EQ(config.sampleAggregatePercentile(), .425);
   EXPECT_EQ(config.jitterPercent(), .132);
+  EXPECT_EQ(config.minConcurrency(), 8);
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {
@@ -156,6 +158,7 @@ min_rtt_calc_params:
   interval:
     seconds: 31
   request_count: 52
+  min_concurrency: 7
 )EOF";
 
   auto config = makeConfig(yaml, runtime_);
@@ -180,6 +183,9 @@ min_rtt_calc_params:
 
   EXPECT_CALL(runtime_.snapshot_, getDouble(_, 13.2)).WillOnce(Return(15.5));
   EXPECT_EQ(config.jitterPercent(), .155);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, 7)).WillOnce(Return(9));
+  EXPECT_EQ(config.minConcurrency(), 9);
 }
 
 TEST_F(GradientControllerConfigTest, DefaultValuesTest) {
@@ -199,6 +205,7 @@ min_rtt_calc_params:
   EXPECT_EQ(config.maxGradient(), 2.0);
   EXPECT_EQ(config.sampleAggregatePercentile(), .5);
   EXPECT_EQ(config.jitterPercent(), .15);
+  EXPECT_EQ(config.minConcurrency(), 3);
 }
 
 TEST_F(GradientControllerTest, MinRTTLogicTest) {
@@ -214,12 +221,14 @@ min_rtt_calc_params:
     value: 0.0
   interval: 30s
   request_count: 50
+  min_concurrency: 1
 )EOF";
 
   auto controller = makeController(yaml);
   const auto min_rtt = std::chrono::milliseconds(13);
 
-  // The controller should be measuring minRTT upon creation, so the concurrency window is 1.
+  // The controller should be measuring minRTT upon creation, so the concurrency window is 1 (the
+  // min concurrency).
   EXPECT_EQ(
       1,
       stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
@@ -290,6 +299,8 @@ min_rtt_calc_params:
   auto controller = makeController(yaml);
 
   tryForward(controller, true);
+  tryForward(controller, true);
+  tryForward(controller, true);
   tryForward(controller, false);
   controller->cancelLatencySample();
   tryForward(controller, true);
@@ -312,7 +323,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Force a minRTT of 5ms.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
@@ -322,7 +333,7 @@ min_rtt_calc_params:
   // Ensure that the concurrency window increases on its own due to the headroom calculation.
   time_system_.sleep(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_GT(controller->concurrencyLimit(), 1);
+  EXPECT_GT(controller->concurrencyLimit(), 3);
 
   // Make it seem as if the recorded latencies are consistently lower than the measured minRTT.
   // Ensure that it grows.
@@ -366,7 +377,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Force a minRTT of 5 seconds.
   advancePastMinRTTStage(controller, yaml, std::chrono::seconds(5));
@@ -403,7 +414,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Get initial minRTT measurement out of the way.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
@@ -426,11 +437,11 @@ min_rtt_calc_params:
   // Wait until the minRTT recalculation is triggered again and verify the limit drops.
   time_system_.sleep(std::chrono::seconds(31));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // 49 more requests should cause the minRTT to be done calculating.
   for (int i = 0; i < 5; ++i) {
-    EXPECT_EQ(controller->concurrencyLimit(), 1);
+    EXPECT_EQ(controller->concurrencyLimit(), 3);
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(13));
   }
@@ -455,7 +466,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Get initial minRTT measurement out of the way.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
@@ -476,12 +487,12 @@ min_rtt_calc_params:
   // Wait until the minRTT recalculation is triggered again and verify the limit drops.
   time_system_.sleep(std::chrono::seconds(31));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Verify sample recalculation doesn't occur during the minRTT window.
   time_system_.sleep(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 }
 
 TEST_F(GradientControllerTest, NoSamplesTest) {
@@ -500,7 +511,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Get minRTT measurement out of the way.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));

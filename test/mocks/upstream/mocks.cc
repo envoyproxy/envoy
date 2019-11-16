@@ -139,6 +139,7 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
   ON_CALL(*this, bindConfig()).WillByDefault(ReturnRef(bind_config_));
+  ads_mux_ = std::make_shared<NiceMock<Config::MockGrpcMux>>();
   ON_CALL(*this, adsMux()).WillByDefault(Return(ads_mux_));
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));

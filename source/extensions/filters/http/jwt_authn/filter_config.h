@@ -46,6 +46,7 @@ private:
 // clang-format off
 #define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
   COUNTER(allowed)                                                                                 \
+  COUNTER(cors_preflight_bypassed)                                                                 \
   COUNTER(denied)
 // clang-format on
 
@@ -129,6 +130,8 @@ public:
     return Authenticator::create(check_audience, provider, allow_failed, getCache().getJwksCache(),
                                  cm(), Common::JwksFetcher::create, timeSource());
   }
+
+  bool bypassCorsPreflightRequest() { return proto_config_.bypass_cors_preflight(); }
 
 private:
   JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {

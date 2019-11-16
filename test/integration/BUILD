@@ -561,21 +561,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "udp_echo_integration_test",
-    srcs = [
-        "udp_echo_integration_test.cc",
-    ],
-    deps = [
-        ":integration_lib",
-        "//source/common/network:listen_socket_lib",
-        "//source/server:active_raw_udp_listener_config",
-        "//test/integration/filters:udp_listener_echo_filter_lib",
-        "//test/server:utility_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
     # The symbol table cluster memory tests take a while to run specially under tsan.
@@ -619,7 +604,6 @@ envoy_cc_test(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:resources_lib",
-        "//source/common/json:config_schemas_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:health_checker_lib",

@@ -37,6 +37,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 using testing::Values;
 using testing::WithArgs;
 
@@ -1226,7 +1227,9 @@ TEST_F(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("upstream_rq_403").value());
 }
 
-// Verify that authz denied response headers overrides the existing encoding headers.
+// Verify that authz denied response headers overrides the existing encoding headers,
+// and that it adds repeated header names using the standard method of comma concatenation of values
+// for predefined inline headers while repeating other headers
 TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
   InSequence s;
 
@@ -1234,8 +1237,13 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Forbidden;
   response.body = std::string{"foo"};
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
-                                               {Http::LowerCaseString{"bar"}, "foo"}};
+  response.headers_to_add =
+      Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+                         {Http::LowerCaseString{"bar"}, "foo"},
+                         {Http::LowerCaseString{"set-cookie"}, "cookie1=value"},
+                         {Http::LowerCaseString{"set-cookie"}, "cookie2=value"},
+                         {Http::LowerCaseString{"accept-encoding"}, "gzip"},
+                         {Http::LowerCaseString{"accept-encoding"}, "deflate"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1252,7 +1260,11 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
                                            {"content-length", "3"},
                                            {"content-type", "text/plain"},
                                            {"foo", "bar"},
-                                           {"bar", "foo"}};
+                                           {"bar", "foo"},
+                                           {"set-cookie", "cookie1=value"},
+                                           {"set-cookie", "cookie2=value"},
+                                           {"accept-encoding", "gzip"},
+                                           {"accept-encoding", "deflate"}};
   Http::HeaderMap* saved_headers;
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) {
@@ -1267,7 +1279,12 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
         EXPECT_EQ(test_headers.get_("foo"), "bar");
         EXPECT_EQ(test_headers.get_("bar"), "foo");
         EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");
+        EXPECT_EQ(test_headers.get_("accept-encoding"), "gzip,deflate");
         EXPECT_EQ(data.toString(), "foo");
+
+        std::vector<absl::string_view> setCookieHeaderValues;
+        Http::HeaderUtility::getAllOfHeader(test_headers, "set-cookie", setCookieHeaderValues);
+        EXPECT_THAT(setCookieHeaderValues, UnorderedElementsAre("cookie1=value", "cookie2=value"));
       }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
