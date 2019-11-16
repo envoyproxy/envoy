@@ -120,10 +120,20 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           name);
+
+  if (Registry::FactoryRegistry<
+          Server::Configuration::NamedNetworkFilterConfigFactory>::isDeprecated(name)) {
+    ENVOY_LOG_MISC(warn, "deprecated network filter config name was used {}", name);
+  }
+
   if (factory == nullptr) {
     factory =
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
             name);
+    if (Registry::FactoryRegistry<
+            Server::Configuration::NamedHttpFilterConfigFactory>::isDeprecated(name)) {
+      ENVOY_LOG_MISC(warn, "deprecated http filter config name was used {}", name);
+    }
   }
 
   if (factory == nullptr) {

@@ -140,6 +140,11 @@ getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_se
   } else {
     credentials_factory = Registry::FactoryRegistry<GoogleGrpcCredentialsFactory>::getFactory(
         google_grpc_credentials_factory_name);
+    if (Registry::FactoryRegistry<GoogleGrpcCredentialsFactory>::isDeprecated(
+            google_grpc_credentials_factory_name)) {
+      ENVOY_LOG_MISC(warn, "deprecated config name was used {}",
+                     google_grpc_credentials_factory_name);
+    }
   }
   if (credentials_factory == nullptr) {
     throw EnvoyException(fmt::format("Unknown google grpc credentials factory: {}",
