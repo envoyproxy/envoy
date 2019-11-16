@@ -32,9 +32,9 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
 protected:
-  void setup(bool is_delta = false) {
+  void setup() {
     envoy::api::v2::core::ConfigSource cds_config;
-    cds_ = CdsApiImpl::create(cds_config, is_delta, cm_, store_, validation_visitor_);
+    cds_ = CdsApiImpl::create(cds_config, cm_, store_, validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
@@ -175,54 +175,6 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   expectAdd("cluster_2");
 
   cds_callbacks_->onConfigUpdate(clusters, "");
-}
-
-TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
-  {
-    InSequence s;
-    setup(true);
-  }
-  EXPECT_CALL(initialized_, ready());
-
-  {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
-    {
-      envoy::api::v2::Cluster cluster;
-      cluster.set_name("cluster_1");
-      expectAdd("cluster_1", "v1");
-      auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
-      resource->set_name("cluster_1");
-      resource->set_version("v1");
-    }
-    {
-      envoy::api::v2::Cluster cluster;
-      cluster.set_name("cluster_2");
-      expectAdd("cluster_2", "v1");
-      auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
-      resource->set_name("cluster_2");
-      resource->set_version("v1");
-    }
-    cds_callbacks_->onConfigUpdate(resources, {}, "v1");
-  }
-
-  {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
-    {
-      envoy::api::v2::Cluster cluster;
-      cluster.set_name("cluster_3");
-      expectAdd("cluster_3", "v2");
-      auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
-      resource->set_name("cluster_3");
-      resource->set_version("v2");
-    }
-    Protobuf::RepeatedPtrField<std::string> removed;
-    *removed.Add() = "cluster_1";
-    EXPECT_CALL(cm_, removeCluster(StrEq("cluster_1"))).WillOnce(Return(true));
-    cds_callbacks_->onConfigUpdate(resources, removed, "v2");
-  }
 }
 
 TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {

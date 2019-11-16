@@ -1,5 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/active_message.h"
 
+#include "common/stats/timespan_impl.h"
+
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "extensions/filters/network/dubbo_proxy/conn_manager.h"
 
@@ -182,7 +184,7 @@ void ActiveMessageEncoderFilter::continueEncoding() {
 
 // class ActiveMessage
 ActiveMessage::ActiveMessage(ConnectionManager& parent)
-    : parent_(parent), request_timer_(std::make_unique<Stats::Timespan>(
+    : parent_(parent), request_timer_(std::make_unique<Stats::HistogramCompletableTimespanImpl>(
                            parent_.stats().request_time_ms_, parent.time_system())),
       request_id_(-1), stream_id_(parent.random_generator().random()),
       stream_info_(parent.time_system()), pending_stream_decoded_(false),

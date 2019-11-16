@@ -29,7 +29,7 @@ void RemoteDataFetcher::cancel() {
 
 void RemoteDataFetcher::fetch() {
   Http::MessagePtr message = Http::Utility::prepareHeaders(uri_);
-  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   ENVOY_LOG(debug, "fetch remote data from [uri = {}]: start", uri_.uri());
   request_ = cm_.httpAsyncClientForCluster(uri_.cluster())
                  .send(std::move(message), *this,
@@ -42,8 +42,8 @@ void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());
     if (response->body()) {
-      const auto content_hash =
-          Hex::encode(Envoy::Common::Crypto::Utility::getSha256Digest(*response->body()));
+      auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+      const auto content_hash = Hex::encode(crypto_util.getSha256Digest(*response->body()));
 
       if (content_hash_ != content_hash) {
         ENVOY_LOG(debug, "fetch remote data [uri = {}]: data is invalid", uri_.uri());

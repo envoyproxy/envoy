@@ -1,24 +1,24 @@
-#!/bin/sh
+#!/bin/bash
 
 # Do not ever set -x here, it is a security hazard as it will place the credentials below in the
 # CircleCI logs.
 set -e
 
-if [ -n "$CIRCLE_PULL_REQUEST" ]
-then
+if [[ -n "$CIRCLE_PULL_REQUEST" ]]; then
     echo 'Ignoring PR branch for docker push.'
     exit 0
 fi
 
+DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
+
 # push the envoy image on tags or merge to master
-if [ -n "$CIRCLE_TAG" ] || [ "$CIRCLE_BRANCH" = 'master' ]
-then
+if [[ -n "$CIRCLE_TAG" ]] || [[ "$AZP_BRANCH" = 'refs/heads/master' ]]; then
     docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
-    for BUILD_TYPE in "envoy" "envoy-alpine" "envoy-alpine-debug"; do
-        docker push envoyproxy/"$BUILD_TYPE"-dev:latest
-        docker tag envoyproxy/"$BUILD_TYPE"-dev:latest envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1"
-        docker push envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1"
+    for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do
+        docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:latest"
+        docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:latest" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:${CIRCLE_SHA1}"
+        docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:${CIRCLE_SHA1}"
     done
 
     # This script tests the docker examples.

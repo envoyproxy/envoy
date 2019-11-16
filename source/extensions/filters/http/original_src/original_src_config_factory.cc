@@ -16,7 +16,7 @@ Http::FilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProtoType
     const std::string&, Server::Configuration::FactoryContext&) {
   Config config(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_unique<OriginalSrcFilter>(config));
+    callbacks.addStreamDecoderFilter(std::make_shared<OriginalSrcFilter>(config));
   };
 }
 

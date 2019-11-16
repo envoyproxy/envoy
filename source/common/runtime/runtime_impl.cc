@@ -172,14 +172,11 @@ std::string RandomGeneratorImpl::uuid() {
 }
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
-  bool allowed = false;
+  const bool default_allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
+
   // If the value is not explicitly set as a runtime boolean, the default value is based on
   // disallowedByDefault.
-  if (!getBoolean(key, allowed)) {
-    allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
-  }
-
-  if (!allowed) {
+  if (!getBoolean(key, default_allowed)) {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
@@ -195,14 +192,9 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
 }
 
 bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
-  bool enabled = false;
   // If the value is not explicitly set as a runtime boolean, the default value is based on
-  // disallowedByDefault.
-  if (!getBoolean(key, enabled)) {
-    enabled = RuntimeFeaturesDefaults::get().enabledByDefault(key);
-  }
-
-  return enabled;
+  // enabledByDefault.
+  return getBoolean(key, RuntimeFeaturesDefaults::get().enabledByDefault(key));
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
@@ -286,13 +278,13 @@ double SnapshotImpl::getDouble(const std::string& key, double default_value) con
   }
 }
 
-bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
+bool SnapshotImpl::getBoolean(absl::string_view key, bool default_value) const {
   auto entry = values_.find(key);
-  if (entry != values_.end() && entry->second.bool_value_.has_value()) {
-    value = entry->second.bool_value_.value();
-    return true;
+  if (entry == values_.end() || !entry->second.bool_value_.has_value()) {
+    return default_value;
+  } else {
+    return entry->second.bool_value_.value();
   }
-  return false;
 }
 
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
@@ -385,6 +377,9 @@ DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& 
 
 void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
                               Api::Api& api) {
+  // Maximum recursion depth for walkDirectory().
+  static constexpr uint32_t MaxWalkDepth = 16;
+
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
     throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
@@ -568,7 +563,7 @@ void RtdsSubscription::start() {
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_,
       Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
-      store_, *this, /*is_delta=*/false);
+      store_, *this);
   subscription_->start({resource_name_});
 }
 

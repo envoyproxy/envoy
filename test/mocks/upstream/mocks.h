@@ -251,10 +251,12 @@ public:
   MOCK_METHOD1(clusterManagerFromProto,
                ClusterManagerPtr(const envoy::config::bootstrap::v2::Bootstrap& bootstrap));
 
-  MOCK_METHOD5(allocateConnPool, Http::ConnectionPool::InstancePtr(
-                                     Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                                     ResourcePriority priority, Http::Protocol protocol,
-                                     const Network::ConnectionSocket::OptionsSharedPtr& options));
+  MOCK_METHOD6(allocateConnPool,
+               Http::ConnectionPool::InstancePtr(
+                   Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                   ResourcePriority priority, Http::Protocol protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options));
 
   MOCK_METHOD5(allocateTcpConnPool, Tcp::ConnectionPool::InstancePtr(
                                         Event::Dispatcher& dispatcher, HostConstSharedPtr host,
@@ -267,8 +269,8 @@ public:
                    const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
-  MOCK_METHOD3(createCds, CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
-                                    bool is_delta, ClusterManager& cm));
+  MOCK_METHOD2(createCds,
+               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
@@ -325,8 +327,6 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
                ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
-  MOCK_CONST_METHOD0(warmingClusterCount, std::size_t());
-  MOCK_CONST_METHOD0(xdsIsDelta, bool());
   MOCK_METHOD0(subscriptionFactory, Config::SubscriptionFactory&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;

@@ -13,7 +13,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-MongoStats::MongoStats(Stats::Scope& scope, const std::string& prefix)
+MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Mongo")),
       prefix_(stat_name_set_->add(prefix)), callsite_(stat_name_set_->add("callsite")),
       cmd_(stat_name_set_->add("cmd")), collection_(stat_name_set_->add("collection")),
@@ -44,9 +44,10 @@ void MongoStats::incCounter(const std::vector<Stats::StatName>& names) {
   scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
-void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names, uint64_t sample) {
+void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names,
+                                 Stats::Histogram::Unit unit, uint64_t sample) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get())).recordValue(sample);
+  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(sample);
 }
 
 } // namespace MongoProxy

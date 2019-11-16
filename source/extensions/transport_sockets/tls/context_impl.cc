@@ -1,13 +1,12 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 
-#include <netinet/in.h>
-
 #include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -20,6 +19,7 @@
 
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
@@ -88,7 +88,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
       throw EnvoyException(fmt::format("Failed to initialize cipher suites {}. The following "
                                        "ciphers were rejected when tried individually: {}",
-                                       config.cipherSuites(), StringUtil::join(bad_ciphers, ", ")));
+                                       config.cipherSuites(), absl::StrJoin(bad_ciphers, ", ")));
     }
 
     if (!SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
@@ -800,6 +800,16 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
     SSL_set_app_data(ssl_con.get(), options);
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+  }
+
+  if (options && !options->applicationProtocolListOverride().empty()) {
+    std::vector<uint8_t> parsed_override_alpn =
+        parseAlpnProtocols(absl::StrJoin(options->applicationProtocolListOverride(), ","));
+    if (!parsed_override_alpn.empty()) {
+      int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
+                                   parsed_override_alpn.size());
+      RELEASE_ASSERT(rc == 0, "");
+    }
   }
 
   if (allow_renegotiation_) {

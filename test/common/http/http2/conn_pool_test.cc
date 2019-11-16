@@ -64,7 +64,7 @@ public:
 
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
-        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
+        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr) {}
 
   ~Http2ConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
@@ -84,7 +84,7 @@ public:
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
-        std::move(connection), test_client.codec_,
+        CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
         [this](CodecClient*) -> void { onClientDestroy(); },
         Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
     if (buffer_limits) {

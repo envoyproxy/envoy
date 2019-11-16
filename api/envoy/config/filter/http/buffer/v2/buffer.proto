@@ -12,6 +12,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Buffer]
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.
+// [#extension: envoy.filters.http.buffer]
 
 message Buffer {
   reserved 2;

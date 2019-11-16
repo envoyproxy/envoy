@@ -5,30 +5,30 @@ package envoy.service.discovery.v3alpha;
 option java_outer_classname = "SdsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
+option java_generic_services = true;
 
 import "envoy/api/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
-// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
-// services: https://github.com/google/protobuf/issues/4221
-message SdsDummy {
-}
-
 service SecretDiscoveryService {
-  rpc DeltaSecrets(stream envoy.api.v3alpha.DeltaDiscoveryRequest)
-      returns (stream envoy.api.v3alpha.DeltaDiscoveryResponse) {
+  rpc DeltaSecrets(stream api.v3alpha.DeltaDiscoveryRequest)
+      returns (stream api.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc StreamSecrets(stream envoy.api.v3alpha.DiscoveryRequest)
-      returns (stream envoy.api.v3alpha.DiscoveryResponse) {
+  rpc StreamSecrets(stream api.v3alpha.DiscoveryRequest)
+      returns (stream api.v3alpha.DiscoveryResponse) {
   }
 
-  rpc FetchSecrets(envoy.api.v3alpha.DiscoveryRequest)
-      returns (envoy.api.v3alpha.DiscoveryResponse) {
+  rpc FetchSecrets(api.v3alpha.DiscoveryRequest) returns (api.v3alpha.DiscoveryResponse) {
     option (google.api.http) = {
       post: "/v3alpha/discovery:secrets"
       body: "*"
     };
   }
+}
+
+// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
+// services: https://github.com/google/protobuf/issues/4221
+message SdsDummy {
 }

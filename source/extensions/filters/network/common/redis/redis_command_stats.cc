@@ -1,5 +1,7 @@
 #include "extensions/filters/network/common/redis/redis_command_stats.h"
 
+#include "common/stats/timespan_impl.h"
+
 #include "extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
@@ -38,23 +40,26 @@ Stats::Counter& RedisCommandStats::counter(Stats::Scope& scope,
 }
 
 Stats::Histogram& RedisCommandStats::histogram(Stats::Scope& scope,
-                                               const Stats::StatNameVec& stat_names) {
+                                               const Stats::StatNameVec& stat_names,
+                                               Stats::Histogram::Unit unit) {
   const Stats::SymbolTable::StoragePtr storage_ptr = symbol_table_.join(stat_names);
   Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
-  return scope.histogramFromStatName(full_stat_name);
+  return scope.histogramFromStatName(full_stat_name, unit);
 }
 
-Stats::CompletableTimespanPtr
-RedisCommandStats::createCommandTimer(Stats::Scope& scope, Stats::StatName command,
-                                      Envoy::TimeSource& time_source) {
-  return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
-      histogram(scope, {prefix_, command, latency_}), time_source);
+Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,
+                                                         Stats::StatName command,
+                                                         Envoy::TimeSource& time_source) {
+  return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      histogram(scope, {prefix_, command, latency_}, Stats::Histogram::Unit::Microseconds),
+      time_source);
 }
 
-Stats::CompletableTimespanPtr
-RedisCommandStats::createAggregateTimer(Stats::Scope& scope, Envoy::TimeSource& time_source) {
-  return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
-      histogram(scope, {prefix_, upstream_rq_time_}), time_source);
+Stats::TimespanPtr RedisCommandStats::createAggregateTimer(Stats::Scope& scope,
+                                                           Envoy::TimeSource& time_source) {
+  return std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      histogram(scope, {prefix_, upstream_rq_time_}, Stats::Histogram::Unit::Microseconds),
+      time_source);
 }
 
 Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& request) {

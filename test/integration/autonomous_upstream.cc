@@ -63,7 +63,7 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
                                                    Stats::Store& store, Type type,
                                                    AutonomousUpstream& upstream)
     : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
-                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
       upstream_(upstream) {}
 
 Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
@@ -92,10 +92,8 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
 
 bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
-bool AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
-                                                      Network::UdpReadFilterCallbacks&) {
-  return true;
-}
+void AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                                      Network::UdpReadFilterCallbacks&) {}
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
   Thread::LockGuard lock(headers_lock_);

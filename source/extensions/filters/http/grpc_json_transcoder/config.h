@@ -19,10 +19,6 @@ class GrpcJsonTranscoderFilterConfig
 public:
   GrpcJsonTranscoderFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcJsonTranscoder) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,

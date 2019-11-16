@@ -5,8 +5,8 @@ Overview
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
-<https://developers.google.com/protocol-buffers/>`_ in the `data plane API
-repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They support
+<https://developers.google.com/protocol-buffers/>`_ in the :repo:`api tree <api/>`. They
+support:
 
 * Streaming delivery of :ref:`xDS <xds_protocol>` API updates via gRPC. This reduces
   resource requirements and can lower the update latency.
@@ -334,7 +334,7 @@ The management server could respond to EDS requests with:
 
 .. _config_overview_v2_management_server:
 
-Management server
+xDS API endpoints
 -----------------
 
 A v2 xDS management server will implement the below endpoints as required for
@@ -421,8 +421,69 @@ for the service definition. This is used by Envoy as a client when
             cluster_name: some_xds_cluster
 
 is set in the :ref:`rds
-<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field
+of the :ref:`HttpConnectionManager
 <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
+
+.. http:post:: /envoy.api.v2.ScopedRoutesDiscoveryService/StreamScopedRoutes
+
+See :repo:`srds.proto
+<api/envoy/api/v2/srds.proto>`
+for the service definition. This is used by Envoy as a client when
+
+.. code-block:: yaml
+
+    name: some_scoped_route_name
+    scoped_rds:
+      config_source:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: some_xds_cluster
+
+is set in the :ref:`scoped_routes
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_routes>`
+field of the :ref:`HttpConnectionManager
+<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
+
+.. http:post:: /envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets
+
+See :repo:`sds.proto
+<api/envoy/service/discovery/v2/srds.proto>`
+for the service definition. This is used by Envoy as a client when
+
+.. code-block:: yaml
+
+    name: some_secret_name
+    config_source:
+      api_config_source:
+        api_type: GRPC
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
+
+is set inside a :ref:`SdsSecretConfig <envoy_api_msg_auth.SdsSecretConfig>` message. This message
+is used in various places such as the :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`.
+
+.. http:post:: /envoy.service.discovery.v2.RuntimeDiscoveryService/StreamRuntime
+
+See :repo:`rtds.proto
+<api/envoy/service/discovery/v2/rtds.proto>`
+for the service definition. This is used by Envoy as a client when
+
+.. code-block:: yaml
+
+    name: some_runtime_layer_name
+    config_source:
+      api_config_source:
+        api_type: GRPC
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
+
+is set inside the :ref:`rtds_layer <envoy_api_field_config.bootstrap.v2.RuntimeLayer.rtds_layer>`
+field.
 
 REST endpoints
 ^^^^^^^^^^^^^^
@@ -648,36 +709,3 @@ The following statistics are generated for all subscriptions.
  update_rejected, Counter, Total API fetches that failed because of schema/validation errors
  version, Gauge, Hash of the contents from the last successful API fetch
  control_plane.connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
-
-.. _config_overview_v2_status:
-
-Status
-------
-
-All features described in the :ref:`v2 API reference <envoy_api_reference>` are
-implemented unless otherwise noted. In the v2 API reference and the
-`v2 API repository
-<https://github.com/envoyproxy/data-plane-api/tree/master>`_, all protos are
-*frozen* unless they are tagged as *draft* or *experimental*. Here, *frozen*
-means that we will not break wire format compatibility.
-
-*Frozen* protos may be further extended, e.g. by adding new fields, in a
-manner that does not break `backwards compatibility
-<https://developers.google.com/protocol-buffers/docs/overview#how-do-they-work>`_.
-Fields in the above protos may be later deprecated, subject to the
-:repo:`breaking change policy
-<CONTRIBUTING.md#breaking-change-policy>`,
-when their related functionality is no longer required. While frozen APIs
-have their wire format compatibility preserved, we reserve the right to change
-proto namespaces, file locations and nesting relationships, which may cause
-breaking code changes. We will aim to minimize the churn here.
-
-Protos tagged *draft*, meaning that they are near finalized, are
-likely to be at least partially implemented in Envoy but may have wire format
-breaking changes made prior to freezing.
-
-Protos tagged *experimental*, have the same caveats as draft protos
-and may have major changes made prior to Envoy implementation and freezing.
-
-The current open v2 API issues are tracked `here
-<https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3A%22v2+API%22>`_.

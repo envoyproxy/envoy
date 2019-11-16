@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.metrics.v3alpha";
 
 import "envoy/api/v3alpha/core/address.proto";
-import "envoy/type/matcher/string.proto";
+import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -20,6 +20,10 @@ import "validate/validate.proto";
 
 // Configuration for pluggable stats sinks.
 message StatsSink {
+  reserved 2;
+
+  reserved "config";
+
   // The name of the stats sink to instantiate. The name must match a supported
   // stats sink. The built-in stats sinks are:
   //
@@ -34,8 +38,6 @@ message StatsSink {
   // Stats sink specific configuration which depends on the sink being instantiated. See
   // :ref:`StatsdSink <envoy_api_msg_config.metrics.v3alpha.StatsdSink>` for an example.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 3;
   }
 }
@@ -78,7 +80,7 @@ message StatsMatcher {
   // However, StatsMatcher can be used to limit the creation of families of stats in order to
   // conserve memory. Stats can either be disabled entirely, or they can be
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
-  // <envoy_api_msg_type.matcher.StringMatcher>` protos:
+  // <envoy_api_msg_type.matcher.v3alpha.StringMatcher>` protos:
   //
   // * If `reject_all` is set to `true`, no stats will be instantiated. If `reject_all` is set to
   //   `false`, all stats will be instantiated.
@@ -149,11 +151,11 @@ message StatsMatcher {
 
     // Exclusive match. All stats are enabled except for those matching one of the supplied
     // StringMatcher protos.
-    type.matcher.ListStringMatcher exclusion_list = 2;
+    type.matcher.v3alpha.ListStringMatcher exclusion_list = 2;
 
     // Inclusive match. No stats are enabled except for those matching one of the supplied
     // StringMatcher protos.
-    type.matcher.ListStringMatcher inclusion_list = 3;
+    type.matcher.v3alpha.ListStringMatcher inclusion_list = 3;
   }
 }
 
@@ -241,6 +243,7 @@ message TagSpecifier {
 
 // Stats configuration proto schema for built-in *envoy.statsd* sink. This sink does not support
 // tagged metrics.
+// [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
   oneof statsd_specifier {
     option (validate.required) = true;
@@ -289,7 +292,7 @@ message StatsdSink {
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_api_msg_config.metrics.v3alpha.StatsConfig>`.
-// [#comment:next free field: 3]
+// [#extension: envoy.stat_sinks.dog_statsd]
 message DogStatsdSink {
   reserved 2;
 
@@ -315,6 +318,7 @@ message DogStatsdSink {
 // Note that only a single HystrixSink should be configured.
 //
 // Streaming is started through an admin endpoint :http:get:`/hystrix_event_stream`.
+// [#extension: envoy.stat_sinks.hystrix]
 message HystrixSink {
   // The number of buckets the rolling statistical window is divided into.
   //

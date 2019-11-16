@@ -5,7 +5,6 @@ load(
     "envoy_cc_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -23,7 +22,7 @@ envoy_cc_fuzz_test(
     srcs = ["access_log_formatter_fuzz_test.cc"],
     corpus = "access_log_formatter_corpus",
     deps = [
-        ":access_log_formatter_fuzz_proto_cc",
+        ":access_log_formatter_fuzz_proto_cc_proto",
         "//source/common/access_log:access_log_formatter_lib",
         "//test/fuzz:utility_lib",
     ],
@@ -36,6 +35,7 @@ envoy_cc_test(
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/router:string_accessor_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -49,7 +49,6 @@ envoy_cc_test(
     srcs = ["access_log_impl_test.cc"],
     deps = [
         "//source/common/access_log:access_log_lib",
-        "//source/common/config:filter_json_lib",
         "//source/extensions/access_loggers/file:config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
@@ -60,6 +59,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )
 

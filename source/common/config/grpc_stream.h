@@ -35,8 +35,12 @@ public:
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
       drain_request_timer_ = dispatcher.createTimer([this]() { callbacks_->onWriteable(); });
     }
-    backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
-                                                                  RETRY_MAX_DELAY_MS, random_);
+
+    // TODO(htuch): Make this configurable.
+    static constexpr uint32_t RetryInitialDelayMs = 500;
+    static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
+    backoff_strategy_ =
+        std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
   void establishNewStream() {
@@ -45,7 +49,7 @@ public:
       ENVOY_LOG(warn, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
       return;
     }
-    stream_ = async_client_->start(service_method_, *this);
+    stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
       callbacks_->onEstablishmentFailure();
@@ -92,15 +96,10 @@ public:
   }
 
   void maybeUpdateQueueSizeStat(uint64_t size) {
-    // Although request_queue_.push() happens elsewhere, the only time the queue is non-transiently
-    // non-empty is when it remains non-empty after a drain attempt. (The push() doesn't matter
-    // because we always attempt this drain immediately after the push). Basically, a change in
-    // queue length is not "meaningful" until it has persisted until here. We need the
-    // if(>0 || used) to keep this stat from being wrongly marked interesting by a pointless set(0)
-    // and needlessly taking up space. The first time we set(123), used becomes true, and so we will
-    // subsequently always do the set (including set(0)).
-    if (size > 0 || control_plane_stats_.pending_requests_.used()) {
+    // A change in queue length is not "meaningful" until it has persisted until here.
+    if (size != last_queue_size_) {
       control_plane_stats_.pending_requests_.set(size);
+      last_queue_size_ = size;
     }
   }
 
@@ -128,10 +127,6 @@ private:
 
   GrpcStreamCallbacks<ResponseProto>* const callbacks_;
 
-  // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
-  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
-
   Grpc::AsyncClient<RequestProto, ResponseProto> async_client_;
   Grpc::AsyncStream<RequestProto> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
@@ -147,6 +142,7 @@ private:
   TokenBucketPtr limit_request_;
   const bool rate_limiting_enabled_;
   Event::TimerPtr drain_request_timer_;
+  uint64_t last_queue_size_{};
 };
 
 } // namespace Config

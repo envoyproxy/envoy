@@ -212,6 +212,9 @@ public:
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 
+  /**
+   * Return the factory to use for creating cluster manager related objects.
+   */
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
   /**
@@ -221,10 +224,6 @@ public:
    * @return Config::SubscriptionFactory& the subscription factory.
    */
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
-
-  virtual std::size_t warmingClusterCount() const PURE;
-
-  virtual bool xdsIsDelta() const PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -275,7 +274,8 @@ public:
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
@@ -297,7 +297,7 @@ public:
   /**
    * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                               ClusterManager& cm) PURE;
 
   /**

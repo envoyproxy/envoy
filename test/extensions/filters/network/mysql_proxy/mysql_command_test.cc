@@ -24,7 +24,7 @@ public:
     Command mysql_cmd_decode{};
     uint8_t seq = 0u;
     uint32_t len = 0u;
-    mysql_cmd_encode.setCmd(Command::Cmd::COM_QUERY);
+    mysql_cmd_encode.setCmd(Command::Cmd::Query);
     mysql_cmd_encode.setData(query);
     std::string data = mysql_cmd_encode.encode();
     std::string mysql_msg = BufferHelper::encodeHdr(data, 0);

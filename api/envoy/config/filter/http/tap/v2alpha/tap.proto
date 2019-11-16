@@ -12,6 +12,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Tap]
 // Tap :ref:`configuration overview <config_http_filters_tap>`.
+// [#extension: envoy.filters.http.tap]
 
 // Top level configuration for the tap filter.
 message Tap {

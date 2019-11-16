@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 45]
+// [#next-free-field: 45]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -161,7 +161,7 @@ message Cluster {
     // Optional endpoint metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
     // will use the transport socket configuration specified here.
-    // The endpoint's metadata entry in *envoy.transport_socket* is used to match
+    // The endpoint's metadata entry in *envoy.transport_socket_match* is used to match
     // against the values specified in this field.
     google.protobuf.Struct match = 2;
 
@@ -192,6 +192,7 @@ message Cluster {
 
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
+  // [#next-free-field: 8]
   message LbSubsetConfig {
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
@@ -221,6 +222,13 @@ message Cluster {
         // If DEFAULT_SUBSET is selected, load balancing is performed over the
         // endpoints matching the values from the default_subset field.
         DEFAULT_SUBSET = 3;
+
+        // If KEYS_SUBSET is selected, subset selector matching is performed again with metadata
+        // keys reduced to
+        // :ref:`fallback_keys_subset<envoy_api_field_Cluster.LbSubsetConfig.LbSubsetSelector.fallback_keys_subset>`.
+        // It allows for a fallback to a different, less specific selector if some of the keys of
+        // the selector are considered optional.
+        KEYS_SUBSET = 4;
       }
 
       // List of keys to match with the weighted cluster metadata.
@@ -230,6 +238,17 @@ message Cluster {
       // metadata.
       LbSubsetSelectorFallbackPolicy fallback_policy = 2
           [(validate.rules).enum = {defined_only: true}];
+
+      // Subset of
+      // :ref:`keys<envoy_api_field_Cluster.LbSubsetConfig.LbSubsetSelector.keys>` used by
+      // :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+      // fallback policy.
+      // It has to be a non empty list if KEYS_SUBSET fallback policy is selected.
+      // For any other fallback policy the parameter is not used and should not be set.
+      // Only values also present in
+      // :ref:`keys<envoy_api_field_Cluster.LbSubsetConfig.LbSubsetSelector.keys>` are allowed, but
+      // `fallback_keys_subset` cannot be equal to `keys`.
+      repeated string fallback_keys_subset = 3;
     }
 
     // The behavior used when no endpoint subset matches the selected route's
@@ -277,7 +296,7 @@ message Cluster {
 
     // When used with locality_weight_aware, scales the weight of each locality by the ratio
     // of hosts in the subset vs hosts in the original subset. This aims to even out the load
-    // going to an individual locality if said locality is disproportionally affected by the
+    // going to an individual locality if said locality is disproportionately affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
 
@@ -351,6 +370,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
+  // [#next-free-field: 7]
   message CommonLbConfig {
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
@@ -499,7 +519,6 @@ message Cluster {
   // *transport_socket_match* set, and still send plain text traffic to the same cluster.
   //
   // TODO(incfly): add a detailed architecture doc on intended usage.
-  // [#not-implemented-hide:]
   repeated TransportSocketMatch transport_socket_matches = 43;
 
   // Supplies the name of the cluster which must be unique across all clusters.
@@ -582,18 +601,16 @@ message Cluster {
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   cluster.CircuitBreakers circuit_breakers = 10;
 
-  // The TLS configuration for connections to the upstream cluster. If no TLS
-  // configuration is specified, TLS will not be used for new connections.
+  // The TLS configuration for connections to the upstream cluster.
   //
   // .. attention::
   //
-  //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
-  //   verification.
-  auth.UpstreamTlsContext tls_context = 11;
+  //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
+  //   set, `transport_socket` takes priority.
+  auth.UpstreamTlsContext tls_context = 11 [deprecated = true];
 
-  // Additional options when handling HTTP requests. These options will be applicable to both
-  // HTTP1 and HTTP2 requests.
+  // Additional options when handling HTTP requests upstream. These options will be applicable to
+  // both HTTP1 and HTTP2 requests.
   core.HttpProtocolOptions common_http_protocol_options = 29;
 
   // Additional options when handling HTTP1 requests.
@@ -611,7 +628,7 @@ message Cluster {
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
-  map<string, google.protobuf.Struct> extension_protocol_options = 35;
+  map<string, google.protobuf.Struct> extension_protocol_options = 35 [deprecated = true];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
@@ -623,12 +640,13 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
-  // rate. If this setting is not specified, the value defaults to 5000ms. For
-  // cluster types other than
+  // rate. The value configured must be at least 1ms. If this setting is not specified, the
+  // value defaults to 5000ms. For cluster types other than
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration dns_refresh_rate = 16
+      [(validate.rules).duration = {gt {nanos: 1000000}}];
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
@@ -715,6 +733,10 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
+  // To setup TLS, set a transport socket with name `tls` and
+  // :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsContext>` in the `typed_config`.
+  // If no transport socket configuration is specified, new connections
+  // will be set up with plaintext.
   core.TransportSocket transport_socket = 24;
 
   // The Metadata field can be used to provide additional information about the
@@ -799,8 +821,6 @@ message Cluster {
 //
 // To facilitate this, the config message for the top-level LB policy may include a field of
 // type LoadBalancingPolicy that specifies the child policy.
-//
-// [#proto-status: experimental]
 message LoadBalancingPolicy {
   message Policy {
     // Required. The name of the LB policy.
@@ -808,7 +828,7 @@ message LoadBalancingPolicy {
 
     // Optional config for the LB policy.
     // No more than one of these two fields may be populated.
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
     google.protobuf.Any typed_config = 3;
   }

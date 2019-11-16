@@ -41,6 +41,7 @@ envoy_cc_test(
     name = "tap_config_base_test",
     srcs = ["tap_config_base_test.cc"],
     deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:tap_config_base",
     ],
 )

@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "extensions/common/wasm/null/null.h"
+#include "extensions/common/wasm/v8/v8.h"
 #include "extensions/common/wasm/well_known_names.h"
 
 namespace Envoy {
@@ -13,15 +14,17 @@ namespace Wasm {
 thread_local Envoy::Extensions::Common::Wasm::Context* current_context_ = nullptr;
 thread_local uint32_t effective_context_id_ = 0;
 
-WasmVmPtr createWasmVm(absl::string_view wasm_vm) {
-  if (wasm_vm.empty()) {
-    throw WasmException("Failed to create WASM VM with unspecified runtime.");
-  } else if (wasm_vm == WasmVmNames::get().Null) {
+WasmVmPtr createWasmVm(absl::string_view runtime) {
+  if (runtime.empty()) {
+    throw WasmVmException("Failed to create WASM VM with unspecified runtime.");
+  } else if (runtime == WasmRuntimeNames::get().Null) {
     return Null::createVm();
+  } else if (runtime == WasmRuntimeNames::get().V8) {
+    return V8::createVm();
   } else {
-    throw WasmException(fmt::format(
+    throw WasmVmException(fmt::format(
         "Failed to create WASM VM using {} runtime. Envoy was compiled without support for it.",
-        wasm_vm));
+        runtime));
   }
 }
 

@@ -26,29 +26,24 @@ static void errorCallbackTest(Address::IpVersion version) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher());
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher->createListener(socket, listener_callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher->createListener(socket, listener_callbacks, true);
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
-  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket());
-        listener_callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        Network::ConnectionPtr conn = dispatcher->createServerConnection(
+            std::move(accepted_socket), Network::Test::createRawBufferSocket());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
-        socket.close();
+        socket->close();
       }));
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
@@ -64,10 +59,9 @@ TEST_P(ListenerImplDeathTest, ErrorCallback) {
 
 class TestListenerImpl : public ListenerImpl {
 public:
-  TestListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                   bool bind_to_port, bool hand_off_restored_destination_connections)
-      : ListenerImpl(dispatcher, socket, cb, bind_to_port,
-                     hand_off_restored_destination_connections) {}
+  TestListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
+                   bool bind_to_port)
+      : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port) {}
 
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
@@ -82,13 +76,13 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket.addOption(option);
+  socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
-  TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true, false);
+  TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 }
 
 // Test that an exception is thrown if there is an error setting socket options.
@@ -96,48 +90,42 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket.addOption(option);
+  socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
       .WillOnce(Return(false));
-  EXPECT_THROW_WITH_MESSAGE(
-      TestListenerImpl(dispatcherImpl(), socket, listener_callbacks, true, false),
-      CreateListenerException,
-      fmt::format("cannot set post-listen socket option on socket: {}",
-                  socket.localAddress()->asString()));
+  EXPECT_THROW_WITH_MESSAGE(TestListenerImpl(dispatcherImpl(), socket, listener_callbacks, true),
+                            CreateListenerException,
+                            fmt::format("cannot set post-listen socket option on socket: {}",
+                                        socket->localAddress()->asString()));
 }
 
 TEST_P(ListenerImplTest, UseActualDst) {
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                                  true);
-  Network::TcpListenSocket socketDst(alt_address_, nullptr, false);
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
+  auto socketDst = std::make_shared<TcpListenSocket>(alt_address_, nullptr, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
-  Network::TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks1, true, true);
+  Network::TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks1, true);
   Network::MockListenerCallbacks listener_callbacks2;
-  Network::TestListenerImpl listenerDst(dispatcherImpl(), socketDst, listener_callbacks2, false,
-                                        false);
+  Network::TestListenerImpl listenerDst(dispatcherImpl(), socketDst, listener_callbacks2, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
 
-  EXPECT_CALL(listener_callbacks2, onAccept_(_, _)).Times(0);
-  EXPECT_CALL(listener_callbacks1, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket());
-        listener_callbacks1.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(listener_callbacks1, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        EXPECT_EQ(*conn->localAddress(), *socket.localAddress());
+  EXPECT_CALL(listener_callbacks2, onAccept_(_)).Times(0);
+  EXPECT_CALL(listener_callbacks1, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        Network::ConnectionPtr conn = dispatcher_->createServerConnection(
+            std::move(accepted_socket), Network::Test::createRawBufferSocket());
+        EXPECT_EQ(*conn->localAddress(), *socket->localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher_->exit();
@@ -147,14 +135,15 @@ TEST_P(ListenerImplTest, UseActualDst) {
 }
 
 TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
-  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
+  auto socket =
+      std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
-  Network::TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true, true);
+  Network::TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
-      *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
+      *Network::Test::getCanonicalLoopbackAddress(version_), socket->localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
@@ -162,14 +151,10 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 
   EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));
 
-  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        Network::ConnectionPtr conn = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
-        listener_callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(*conn->localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
@@ -190,19 +175,20 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
       .WillOnce(Return(true));
   options->emplace_back(std::move(option));
 
-  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_, true), options, true);
+  auto socket = std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_, true),
+                                                  options, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 
-  ASSERT_TRUE(socket.localAddress()->ip()->isAnyAddress());
+  ASSERT_TRUE(socket->localAddress()->ip()->isAnyAddress());
 
   // Do not redirect since use_original_dst is false.
-  Network::TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true, true);
+  Network::TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 
   auto listener_address = Network::Utility::getAddressWithPort(
-      *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
+      *Network::Test::getCanonicalLoopbackAddress(version_), socket->localAddress()->ip()->port());
   auto local_dst_address = Network::Utility::getAddressWithPort(
-      *Network::Utility::getCanonicalIpv4LoopbackAddress(), socket.localAddress()->ip()->port());
+      *Network::Utility::getCanonicalIpv4LoopbackAddress(), socket->localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
@@ -212,14 +198,10 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
       .WillOnce(Invoke(
           [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
 
-  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        Network::ConnectionPtr conn = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
-        listener_callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
         EXPECT_EQ(conn->localAddress()->ip()->version(), conn->remoteAddress()->ip()->version());
         EXPECT_EQ(conn->localAddress()->asString(), local_dst_address->asString());
         EXPECT_EQ(*conn->localAddress(), *local_dst_address);
@@ -234,15 +216,16 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
 TEST_P(ListenerImplTest, DisableAndEnableListener) {
   testing::InSequence s1;
 
-  TcpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
+  auto socket =
+      std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
   MockListenerCallbacks listener_callbacks;
-  TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true, true);
+  TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 
   // When listener is disabled, the timer should fire before any connection is accepted.
   listener.disable();
 
   ClientConnectionPtr client_connection =
-      dispatcher_->createClientConnection(socket.localAddress(), Address::InstanceConstSharedPtr(),
+      dispatcher_->createClientConnection(socket->localAddress(), Address::InstanceConstSharedPtr(),
                                           Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
   Event::TimerPtr timer = dispatcher_->createTimer([&] {
@@ -251,7 +234,7 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   });
   timer->enableTimer(std::chrono::milliseconds(2000));
 
-  EXPECT_CALL(listener_callbacks, onAccept_(_, _)).Times(0);
+  EXPECT_CALL(listener_callbacks, onAccept_(_)).Times(0);
   time_system_.sleep(std::chrono::milliseconds(2000));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -261,11 +244,10 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   EXPECT_CALL(listener, getLocalAddress(_))
       .WillOnce(Invoke(
           [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
-  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](ConnectionSocketPtr&, bool) -> void {
-        client_connection->close(ConnectionCloseType::NoFlush);
-        dispatcher_->exit();
-      }));
+  EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
+    client_connection->close(ConnectionCloseType::NoFlush);
+    dispatcher_->exit();
+  }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

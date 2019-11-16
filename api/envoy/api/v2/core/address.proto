@@ -24,11 +24,10 @@ message Pipe {
   uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
 }
 
+// [#next-free-field: 7]
 message SocketAddress {
   enum Protocol {
     TCP = 0;
-
-    // [#not-implemented-hide:]
     UDP = 1;
   }
 

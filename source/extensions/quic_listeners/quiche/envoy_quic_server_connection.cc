@@ -14,15 +14,15 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     quic::QuicSocketAddress initial_peer_address, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions,
-    Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats)
-    : EnvoyQuicConnection(
-          server_connection_id, initial_peer_address, helper, alarm_factory, writer, owns_writer,
-          quic::Perspective::IS_SERVER, supported_versions,
-          std::make_unique<Network::ConnectionSocketImpl>(
-              // Wraps the real IoHandle instance so that if the connection socket gets closed,
-              // the real IoHandle won't be affected.
-              std::make_unique<QuicIoHandleWrapper>(listener_config.socket().ioHandle()), nullptr,
-              quicAddressToEnvoyAddressInstance(initial_peer_address))),
+    Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
+    Network::Socket& listen_socket)
+    : EnvoyQuicConnection(server_connection_id, initial_peer_address, helper, alarm_factory, writer,
+                          owns_writer, quic::Perspective::IS_SERVER, supported_versions,
+                          std::make_unique<Network::ConnectionSocketImpl>(
+                              // Wraps the real IoHandle instance so that if the connection socket
+                              // gets closed, the real IoHandle won't be affected.
+                              std::make_unique<QuicIoHandleWrapper>(listen_socket.ioHandle()),
+                              nullptr, quicAddressToEnvoyAddressInstance(initial_peer_address))),
       listener_config_(listener_config), listener_stats_(listener_stats) {}
 
 bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
@@ -36,7 +36,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   // Self address should be initialized by now. It's time to install filters.
   connectionSocket()->setLocalAddress(quicAddressToEnvoyAddressInstance(self_address()));
   connectionSocket()->setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportSocketNames::get().Quic);
+      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
   ASSERT(filter_chain_ == nullptr);
   filter_chain_ = listener_config_.filterChainManager().findFilterChain(*connectionSocket());
   if (filter_chain_ == nullptr) {
