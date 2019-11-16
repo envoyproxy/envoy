@@ -406,7 +406,7 @@ Api::SysCallIntResult PipeInstance::bind(int fd) const {
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   auto bind_result = os_syscalls.bind(fd, sockAddr(), sockAddrLen());
-  if (mode != 0 and !abstract_namespace_ and bind_result.rc_ == 0) {
+  if (mode != 0 && !abstract_namespace_ && bind_result.rc_ == 0) {
     auto set_permissions = os_syscalls.chmod(address_.sun_path, mode);
     if (set_permissions.rc_ != 0) {
       throw EnvoyException(fmt::format("Failed to create socket with mode {}", mode));
