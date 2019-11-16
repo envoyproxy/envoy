@@ -837,10 +837,10 @@ TEST_P(Http2IntegrationTest, GoAway) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
-TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048, false, true); }
+TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048, false, false); }
 
 TEST_P(Http2IntegrationTest, TrailersGiantBody) {
-  testTrailers(1024 * 1024, 1024 * 1024, false, true);
+  testTrailers(1024 * 1024, 1024 * 1024, false, false);
 }
 
 TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
