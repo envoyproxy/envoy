@@ -27,6 +27,7 @@
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/http/codes.h"
+#include "common/http/http1/parser_factory.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
@@ -252,6 +253,9 @@ void InstanceImpl::initialize(const Options& options,
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
+
+  Http::Http1::ParserFactory::useLegacy(options.legacyHttpParserEnabled());
+  ENVOY_LOG(info, "http implementation: {}", Http::Http1::ParserFactory::usesLegacyParser() ? "old (http-parser" : "new (llhttp)");
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,

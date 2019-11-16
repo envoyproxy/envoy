@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -20,7 +19,8 @@ envoy_cc_library(
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     deps = [
-        ":parser_adapter",
+        ":parser_interface",
+        ":parser_factory_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
@@ -74,11 +74,43 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "parser_adapter",
-    hdrs = ["parser_adapter.h"],
+    name = "parser_interface",
+    hdrs = ["parser.h"],
+)
+
+envoy_cc_library(
+    name = "llhttp_lib",
+    srcs = ["llhttp_parser.cc"],
+    hdrs = ["llhttp_parser.h"],
+    deps = [
+        ":parser_interface",
+        "//source/common/common:assert_lib",
+    ],
     external_deps = [
-        "http_parser",
-        "llhttp"
+        "llhttp",
     ],
 )
 
+envoy_cc_library(
+    name = "legacy_http_parser_lib",
+    srcs = ["legacy_http_parser.cc"],
+    hdrs = ["legacy_http_parser.h"],
+    deps = [
+        ":parser_interface",
+        "//source/common/common:assert_lib",
+    ],
+    external_deps = [
+        "http_parser"
+    ]
+)
+
+envoy_cc_library(
+    name = "parser_factory_lib",
+    srcs = ["parser_factory.cc"],
+    hdrs = ["parser_factory.h"],
+    deps = [
+        ":parser_interface",
+        ":legacy_http_parser_lib",
+        ":llhttp_lib",
+    ]
+)

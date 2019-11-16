@@ -40,6 +40,8 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test
+
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
