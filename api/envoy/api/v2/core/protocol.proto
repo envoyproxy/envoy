@@ -85,7 +85,7 @@ message Http1ProtocolOptions {
   // are lower cased.
   HeaderKeyFormat header_key_format = 4;
 
-  // Enables encoding of trailers for HTTP1.
+  // Enables trailers for HTTP1.
   bool enable_trailers = 5;
 }
 

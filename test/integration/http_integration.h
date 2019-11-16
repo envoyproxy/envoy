@@ -116,8 +116,11 @@ protected:
   // config_helper_.
   void setDownstreamProtocol(Http::CodecClient::Type type);
 
-  // Enable the encoding of Http1 trailers downstream
-  ConfigHelper::HttpModifierFunction setEnableEncodeTrailersHttp1();
+  // Enable the encoding/decoding of Http1 trailers downstream
+  ConfigHelper::HttpModifierFunction setEnableDownstreamTrailersHttp1();
+
+  // Enable the encoding/decoding of Http1 trailers upstream
+  ConfigHelper::ConfigModifierFunction setEnableUpstreamTrailersHttp1();
 
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|

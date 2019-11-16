@@ -480,6 +480,10 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
   // We previously already finished up the headers, these headers are
   // now trailers
   if (header_parsing_state_ == HeaderParsingState::Done) {
+    if (!enable_trailers_) {
+      // Ignore trailers.
+      return;
+    }
     processing_trailers_ = true;
     header_parsing_state_ = HeaderParsingState::Field;
   }
@@ -493,6 +497,12 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   const absl::string_view header_value = absl::string_view(data, length);
   ENVOY_CONN_LOG(trace, "onHeaderValue: data={}", connection_, header_value);
+
+  if (header_parsing_state_ == HeaderParsingState::Done && !enable_trailers_) {
+    // Ignore trailers.
+    return;
+  }
+
   if (!current_header_map_) {
     current_header_map_ = std::make_unique<HeaderMapImpl>();
   }

@@ -61,9 +61,13 @@ protected:
   }
 
   void verifyUpStreamRequestAfterStopAllFilter() {
-    // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
-    // decodeTrailers. 2 decoded data were added.
-    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
+    if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
+      // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
+      // decodeTrailers. 2 decoded data were added.
+      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
+    } else {
+      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
+    }
     EXPECT_EQ(true, upstream_request_->complete());
   }
 
@@ -77,17 +81,9 @@ protected:
 // downstream and H1/H2 upstreams.
 using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
-TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1RequestResponse) {
-  config_helper_.addConfigModifier(HttpIntegrationTest::setEnableEncodeTrailersHttp1());
-
-  // Enable the encoding of trailers upstream
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
-    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
-    }
-  });
+TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
   testTrailers(10, 20, true, true);
 }
@@ -960,6 +956,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   // Default header (and trailer) count limit is 100.
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   Http::TestHeaderMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
     request_trailers.addCopy("trailer", std::string(1, 'a'));
@@ -993,6 +990,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   max_request_headers_count_ = max_count;
   Http::TestHeaderMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
@@ -1019,10 +1017,12 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(60, 96);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(66, 60);
 }
 
@@ -1030,6 +1030,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
 
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
@@ -1249,9 +1250,7 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  // addDecodedData gets called twice in decodeTrailers and decodeData since we
-  // added is_first_trigger
-  EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, response->body().size());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
 }
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
@@ -1291,7 +1290,7 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, response->body().size());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
 }
 
 // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't

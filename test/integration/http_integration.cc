@@ -260,11 +260,21 @@ void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstre
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
-ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableEncodeTrailersHttp1() {
+ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableDownstreamTrailersHttp1() {
   return
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
         hcm.mutable_http_protocol_options()->set_enable_trailers(true);
       };
+}
+
+ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrailersHttp1() {
+  return [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
+    }
+  };
 }
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
