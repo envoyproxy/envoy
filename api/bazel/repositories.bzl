@@ -35,6 +35,16 @@ def api_dependencies():
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
     )
     envoy_http_archive(
+        name = "kafka_server_binary",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = KAFKASERVERBINARY_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "kafka_python_client",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = KAFKAPYTHONCLIENT_BUILD_CONTENT,
+    )
+    envoy_http_archive(
         name = "com_github_openzipkin_zipkinapi",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
@@ -95,6 +105,26 @@ filegroup(
     srcs = glob([
         "*Response.json",
     ]),
+    visibility = ["//visibility:public"],
+)
+
+"""
+
+KAFKASERVERBINARY_BUILD_CONTENT = """
+
+filegroup(
+    name = "all",
+    srcs = glob(["**/*"]),
+    visibility = ["//visibility:public"],
+)
+
+"""
+
+KAFKAPYTHONCLIENT_BUILD_CONTENT = """
+
+filegroup(
+    name = "all",
+    srcs = glob(["**/*.py"]),
     visibility = ["//visibility:public"],
 )
 
