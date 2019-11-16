@@ -780,10 +780,9 @@ TEST(HttpUtility, CheckIsIpAddress) {
     std::string& expect_host = std::get<2>(pattern);
     uint16_t expect_port = std::get<3>(pattern);
 
-    const auto host_attributes = Utility::isIpAddress(try_host);
-    bool is_ip_address = std::get<0>(host_attributes);
-    std::string retrieved_host = std::get<1>(host_attributes);
-    uint16_t retrieved_port = std::get<2>(host_attributes);
+    const auto host_attributes = Utility::parseAuthority(try_host);
+    ;
+    bool is_ip_address = host_attributes.is_ip_address;
 
     if (bool_status_pattern) {
       EXPECT_TRUE(is_ip_address);
@@ -791,8 +790,8 @@ TEST(HttpUtility, CheckIsIpAddress) {
       EXPECT_FALSE(is_ip_address);
     }
 
-    EXPECT_EQ(expect_host, retrieved_host);
-    EXPECT_EQ(expect_port, retrieved_port);
+    EXPECT_EQ(expect_host, host_attributes.host);
+    EXPECT_EQ(expect_port, host_attributes.port);
   }
 }
 

@@ -91,12 +91,12 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     return;
   }
 
-  const auto host_attributes = Http::Utility::isIpAddress(host, default_port);
-  bool is_ip_address = std::get<0>(host_attributes);
-  absl::string_view host_to_resolve = std::get<1>(host_attributes);
+  const auto host_attributes = Http::Utility::parseAuthority(host, default_port);
+  bool is_ip_address = host_attributes.is_ip_address;
+  absl::string_view host_to_resolve = host_attributes.host;
 
   if (is_ip_address) {
-    default_port = std::get<2>(host_attributes);
+    default_port = host_attributes.port;
   }
 
   // TODO(mattklein123): Right now, the same host with different ports will become two

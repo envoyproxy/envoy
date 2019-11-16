@@ -4,7 +4,6 @@
 
 #include <cstdint>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "envoy/http/header_map.h"
@@ -626,47 +625,51 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-const std::tuple<bool, std::string, uint32_t> Utility::ParseAuthority(const std::string& host,
-                                                                      uint32_t default_port) {
+const Utility::AuthorityAttributes Utility::parseAuthority(const std::string& host,
+                                                           uint32_t default_port) {
   const auto colon_pos_front = host.find(':');
   auto colon_pos = host.rfind(':');
-  std::string pure_host = host;
-  uint32_t pure_port = default_port;
+  AuthorityAttributes auth_attr;
+  auth_attr.host = host;
+  auth_attr.port = default_port;
 
-  const auto open_bracket_pos = host.find('[');
-  const auto close_bracket_pos = host.find(']');
+  const auto open_bracket_pos = auth_attr.host.find('[');
+  const auto close_bracket_pos = auth_attr.host.find(']');
 
   bool bracket_pair_exist =
       open_bracket_pos != absl::string_view::npos && close_bracket_pos != absl::string_view::npos;
 
-  if (colon_pos != absl::string_view::npos && pure_host.find('.') != absl::string_view::npos) {
-    pure_host = host.substr(0, colon_pos);
+  if (colon_pos != absl::string_view::npos && auth_attr.host.find('.') != absl::string_view::npos) {
+    auth_attr.host = host.substr(0, colon_pos);
     const auto port_str = host.substr(colon_pos + 1);
 
-    if (port_str.empty() || !absl::SimpleAtoi(port_str, &pure_port) || pure_port > 65535) {
-      pure_host = host;
-      pure_port = default_port;
+    if (port_str.empty() || !absl::SimpleAtoi(port_str, &auth_attr.port) ||
+        auth_attr.port > 65535) {
+      auth_attr.host = host;
+      auth_attr.port = default_port;
     }
   } else if (colon_pos_front != colon_pos && bracket_pair_exist) {
-    pure_host = host.substr(open_bracket_pos + 1, close_bracket_pos - 1);
+    auth_attr.host = host.substr(open_bracket_pos + 1, close_bracket_pos - 1);
 
     if (close_bracket_pos != host.size() - 1) {
       const auto port_str = host.substr(close_bracket_pos + 2);
 
-      if (port_str.empty() || !absl::SimpleAtoi(port_str, &pure_port) || pure_port > 65535) {
-        pure_host = host;
-        pure_port = default_port;
+      if (port_str.empty() || !absl::SimpleAtoi(port_str, &auth_attr.port) ||
+          auth_attr.port > 65535) {
+        auth_attr.host = host;
+        auth_attr.port = default_port;
       }
     }
   }
 
   try {
-    Network::Utility::parseInternetAddress(pure_host, pure_port);
-    return std::make_tuple(true, pure_host, pure_port);
+    Network::Utility::parseInternetAddress(auth_attr.host, auth_attr.port);
+    auth_attr.is_ip_address = true;
   } catch (const EnvoyException&) {
+    auth_attr.is_ip_address = false;
   }
 
-  return std::make_tuple(false, pure_host, pure_port);
+  return auth_attr;
 }
 
 } // namespace Http
