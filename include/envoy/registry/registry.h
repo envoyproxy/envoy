@@ -132,10 +132,19 @@ public:
     return *factories;
   }
 
-  static void registerFactory(Base& factory, absl::string_view name) {
+  static std::vector<std::string>& deprecatedFactoryNames() {
+    static auto* deprecated_factory_names = new std::vector<std::string>();
+    return *deprecated_factory_names;
+  } 
+
+  static void registerFactory(Base& factory, absl::string_view name, bool is_deprecated = false) {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+    }
+
+    if (is_deprecated) {
+      deprecatedFactoryNames().emplace_back(name);
     }
   }
 
@@ -148,6 +157,14 @@ public:
       return nullptr;
     }
     return it->second;
+  }
+
+  static bool isDeprecated(absl::string_view name) {
+    auto it = std::find(deprecatedFactoryNames().begin(), deprecatedFactoryNames().end(), name);
+    if (it != deprecatedFactoryNames().end()) {
+      return true;
+    }
+    return false;
   }
 
 private:
@@ -227,7 +244,7 @@ public:
 
     for (auto deprecated_name : deprecated_names) {
       ASSERT(!deprecated_name.empty());
-      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name);
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, true);
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
