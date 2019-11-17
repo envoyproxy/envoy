@@ -18,9 +18,6 @@ EdsClusterImpl::EdsClusterImpl(
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
       validation_visitor_(factory_context.messageValidationVisitor()) {
-        std::cout << "foo" << std::endl;
-        std::cout << factory_context.clusterManager().localClusterName() << std::endl;
-        std::cout << "bar" << std::endl;
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();

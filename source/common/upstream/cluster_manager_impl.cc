@@ -222,10 +222,8 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // We need to know whether we're zone aware  early on, so make sure we do this lookup
   // before we load any clusters.
-  absl::optional<std::string> local_cluster_name;
   if (!cm_config.local_cluster_name().empty()) {
     local_cluster_name_ = cm_config.local_cluster_name();
-    local_cluster_name = cm_config.local_cluster_name();
   }
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
@@ -296,15 +294,15 @@ ClusterManagerImpl::ClusterManagerImpl(
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateClusterCounts();
 
-  if (local_cluster_name &&
-      (active_clusters_.find(local_cluster_name.value()) == active_clusters_.end())) {
+  if (local_cluster_name_ &&
+      (active_clusters_.find(local_cluster_name_.value()) == active_clusters_.end())) {
     throw EnvoyException(
-        fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
+        fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
   }
 
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
   // we can instantiate the thread local cluster manager.
-  tls_->set([this, local_cluster_name](
+  tls_->set([this, local_cluster_name = local_cluster_name_](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
