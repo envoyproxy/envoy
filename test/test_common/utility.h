@@ -18,6 +18,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -549,7 +550,7 @@ public:
   }
 
   /**
-   * Check that generated json as string is equal to expected response as unordered map.
+   * Check that generated json as string is equal unordered map.
    *
    * @param json_string response as json string.
    * @param expected_map unordered map which contains expected data.

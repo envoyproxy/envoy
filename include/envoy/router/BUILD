@@ -62,6 +62,7 @@ envoy_cc_library(
         "//include/envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
