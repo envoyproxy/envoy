@@ -117,11 +117,6 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
-   * @return bool whether Envoy is running in zone aware mode.
-   */
-  virtual bool zoneAware() PURE;
 };
 
 /**

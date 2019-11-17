@@ -652,8 +652,7 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
                                      const std::string& version_info, bool added_via_api,
                                      ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api,
-                                !local_cluster_name_.empty());
+      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
   auto& new_cluster = new_cluster_pair.first;
   Cluster& cluster_reference = *new_cluster;
 
@@ -1345,14 +1344,14 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, bool zone_aware) {
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
       cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
       outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
-      api_, zone_aware);
+      api_);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,

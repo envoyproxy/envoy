@@ -92,7 +92,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      std::move(outlier_event_logger_), false, validation_visitor_, *api_, false);
+      std::move(outlier_event_logger_), false, validation_visitor_, *api_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -133,7 +133,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      std::move(outlier_event_logger_), false, validation_visitor_, *api_, false);
+      std::move(outlier_event_logger_), false, validation_visitor_, *api_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -172,7 +172,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      std::move(outlier_event_logger_), false, validation_visitor_, *api_, false);
+      std::move(outlier_event_logger_), false, validation_visitor_, *api_);
   auto cluster = create_result.first;
   cluster->initialize([] {});
 
@@ -211,7 +211,7 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
         ClusterFactoryImplBase::create(
             cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
             random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-            std::move(outlier_event_logger_), false, validation_visitor_, *api_, false);
+            std::move(outlier_event_logger_), false, validation_visitor_, *api_);
       },
       EnvoyException,
       "Didn't find a registered cluster factory implementation for name: "

@@ -292,8 +292,7 @@ public:
    */
   virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
-                   bool zone_aware) PURE;
+                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration proto.

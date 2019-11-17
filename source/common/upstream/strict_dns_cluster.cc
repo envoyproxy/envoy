@@ -8,7 +8,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api, bool zone_aware)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
@@ -24,10 +24,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
                                     : Config::Utility::translateClusterHosts(cluster.hosts()));
   const auto& locality_lb_endpoints = load_assignment.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-    if (zone_aware && locality_lb_endpoint.priority() != 0) {
-      throw EnvoyException(
-          "Cannot use endpoints with non-zero priority when using zone aware routing.");
-    }
+    validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
       if (!socket_address.resolver_name().empty()) {
@@ -173,12 +171,10 @@ StrictDnsClusterFactory::createClusterImpl(
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
-  return std::make_pair(
-      std::make_shared<StrictDnsClusterImpl>(cluster, context.runtime(), selected_dns_resolver,
-                                             socket_factory_context, std::move(stats_scope),
-                                             context.addedViaApi(), context.zoneAware()),
-
-      nullptr);
+  return std::make_pair(std::make_shared<StrictDnsClusterImpl>(
+                            cluster, context.runtime(), selected_dns_resolver,
+                            socket_factory_context, std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 /**
