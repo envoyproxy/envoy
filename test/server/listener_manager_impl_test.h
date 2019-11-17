@@ -152,8 +152,8 @@ protected:
         .WillOnce(Invoke([this, expected_num_options,
                           &expected_state](const Network::Address::InstanceConstSharedPtr&,
                                            Network::Address::SocketType,
-                                           const Network::Socket::OptionsSharedPtr& options,
-                                           bool, bool) -> Network::SocketSharedPtr {
+                                           const Network::Socket::OptionsSharedPtr& options, bool,
+                                           bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), expected_num_options);
           EXPECT_TRUE(

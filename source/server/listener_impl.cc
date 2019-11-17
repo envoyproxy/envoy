@@ -26,13 +26,14 @@
 namespace Envoy {
 namespace Server {
 
-ListenSocketFactoryImpl::ListenSocketFactoryImpl(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
-    Network::Address::SocketType socket_type, const Network::Socket::OptionsSharedPtr& options,
-    bool bind_to_port, const std::string& listener_name, bool reuse_port)
-    : factory_(factory), local_address_(address), socket_type_(socket_type),
-      options_(options), bind_to_port_(bind_to_port), listener_name_(listener_name),
-      reuse_port_(reuse_port) {
+ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                                                 Network::Address::InstanceConstSharedPtr address,
+                                                 Network::Address::SocketType socket_type,
+                                                 const Network::Socket::OptionsSharedPtr& options,
+                                                 bool bind_to_port,
+                                                 const std::string& listener_name, bool reuse_port)
+    : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
+      bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
 
   // If reuse_port_ is false, create a socket here which will be used by all worker
   // threads; otherwise, if port is 0, still need to create a socket here, because
@@ -44,13 +45,14 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     }
 
     ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
-        local_address_->asString());
+              local_address_->asString());
   }
 }
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions() {
   // socket might be nullptr depending on factory_ implementation.
-  Network::SocketSharedPtr socket = factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_, reuse_port_);
+  Network::SocketSharedPtr socket = factory_.createListenSocket(
+      local_address_, socket_type_, options_, bind_to_port_, reuse_port_);
 
   // Binding is done by now.
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
@@ -94,7 +96,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
-      reuse_port_((socket_type_ == Network::Address::SocketType::Datagram) ? true : PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_port, false)),
+      reuse_port_((socket_type_ == Network::Address::SocketType::Datagram)
+                      ? true
+                      : PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_port, false)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(

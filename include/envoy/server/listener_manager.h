@@ -52,11 +52,9 @@ public:
    * @param bind_to_port supplies whether to actually bind the socket.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
-  virtual Network::SocketSharedPtr
-  createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                     Network::Address::SocketType socket_type,
-                     const Network::Socket::OptionsSharedPtr& options,
-                     bool bind_to_port, bool reuse_port) PURE;
+  virtual Network::SocketSharedPtr createListenSocket(
+      Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
+      const Network::Socket::OptionsSharedPtr& options, bool bind_to_port, bool reuse_port) PURE;
 
   /**
    * Creates a list of filter factories.

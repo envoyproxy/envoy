@@ -772,12 +772,9 @@ ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Addre
                                                ListenerImpl& listener) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(proto_address);
-  return std::make_shared<ListenSocketFactoryImpl>(factory_, listener.address(),
-						   socket_type,
-                                                  listener.listenSocketOptions(),
-                                                  listener.bindToPort(), listener.name(),
-                                                  listener.reusePort());
-
+  return std::make_shared<ListenSocketFactoryImpl>(
+      factory_, listener.address(), socket_type, listener.listenSocketOptions(),
+      listener.bindToPort(), listener.name(), listener.reusePort());
 }
 
 } // namespace Server

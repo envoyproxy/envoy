@@ -20,13 +20,13 @@ namespace Server {
 class ListenerManagerImpl;
 
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
-                                    protected Logger::Loggable<Logger::Id::config> {
+                                protected Logger::Loggable<Logger::Id::config> {
 public:
   ListenSocketFactoryImpl(ListenerComponentFactory& factory,
-                              Network::Address::InstanceConstSharedPtr address,
-                              Network::Address::SocketType socket_type,
-                              const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-                              const std::string& listener_name, bool reuse_port);
+                          Network::Address::InstanceConstSharedPtr address,
+                          Network::Address::SocketType socket_type,
+                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+                          const std::string& listener_name, bool reuse_port);
 
   // Network::ListenSocketFactory
   Network::Address::SocketType socketType() const override { return socket_type_; }
@@ -41,6 +41,7 @@ public:
 
     return absl::nullopt;
   }
+
 protected:
   Network::SocketSharedPtr createListenSocketAndApplyOptions();
 
