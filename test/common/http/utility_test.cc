@@ -514,11 +514,12 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
       }));
-  Utility::sendLocalReply(false, callbacks,
-                          Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
-                                                  absl::make_optional<Grpc::Status::GrpcStatus>(
-                                                      Grpc::Status::GrpcStatus::ResourceExhausted),
-                                                  false});
+  Utility::sendLocalReply(
+      false, callbacks,
+      Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
+                              absl::make_optional<Grpc::Status::GrpcStatus>(
+                                  Grpc::Status::WellKnownGrpcStatus::ResourceExhausted),
+                              false});
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {

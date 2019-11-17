@@ -1041,8 +1041,9 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("\"test_value\"|-|\"test_va|-",
-              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_EQ(
+        "\"test_value\"|-|\"test_va|-",
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 
   {
