@@ -22,13 +22,9 @@ TRACE_HEADERS_TO_PROPAGATE = [
     "uber-trace-id"
 ]
 
-
-@app.route('/service/<service_number>')
+@app.route('/<service_number>')
 def hello(service_number):
-  return ('Hello from behind Envoy (service {})! hostname: {} resolved'
-          'hostname: {}\n'.format(os.environ['SERVICE_NAME'], socket.gethostname(),
-                                  socket.gethostbyname(socket.gethostname())))
-
+  return ('Message for {} to service {}\n'.format(service_number, os.environ['SERVICE_NAME']))
 
 @app.route('/trace/<service_number>')
 def trace(service_number):

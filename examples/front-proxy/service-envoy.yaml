@@ -19,7 +19,7 @@ static_resources:
               - "*"
               routes:
               - match:
-                  prefix: "/service"
+                  prefix: "/7"
                 route:
                   cluster: local_service
           http_filters:
