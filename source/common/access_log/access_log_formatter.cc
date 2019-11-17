@@ -661,7 +661,8 @@ FilterStateFormatter::FilterStateFormatter(const std::string& key,
 
 std::string FilterStateFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                          const Http::HeaderMap&,
-                                         const StreamInfo::StreamInfo& stream_info) const {
+                                         const StreamInfo::StreamInfo& stream_info,
+                                         const absl::string_view&) const {
   const StreamInfo::FilterState& filter_state = stream_info.filterState();
   if (!filter_state.hasDataWithName(key_)) {
     return UnspecifiedValueString;

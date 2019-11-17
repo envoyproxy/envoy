@@ -487,10 +487,10 @@ message LocalReplyConfig {
 }
 
 message ResponseMapper {
-  // Filter is used to determine if the response should be changed.
+  // Filter is used to determine if the response should be rewritten.
   accesslog.v2.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
 
-  // Rewriter defines which values in local reply should be changed.
+  // Rewriter defines how to rewrite determined response.
   ResponseRewriter rewriter = 2 [(validate.rules).message = {required: true}];
 }
 

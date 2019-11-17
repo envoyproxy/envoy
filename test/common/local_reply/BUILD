@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/local_reply:local_reply_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
