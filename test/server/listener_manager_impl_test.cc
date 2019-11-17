@@ -1048,7 +1048,7 @@ filter_chains:
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 }
 
-TEST_F(ListenerManagerImplTest, BindToPortEqualToTrue) {
+TEST_F(ListenerManagerImplTest, ReusePortEqualToTrue) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_));
