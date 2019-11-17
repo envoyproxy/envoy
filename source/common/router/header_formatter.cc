@@ -224,6 +224,10 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());
     };
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamRemoteAddress()->asString();
+    };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::Utility::formatDownstreamAddressNoPort(

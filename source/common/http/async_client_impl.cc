@@ -131,8 +131,7 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
   }
 
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-  headers.insertEnvoyInternalRequest().value().setReference(
-      Headers::get().EnvoyInternalRequestValues.True);
+  headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }

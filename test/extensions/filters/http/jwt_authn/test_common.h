@@ -82,6 +82,7 @@ rules:
     path: "/"
   requires:
     provider_name: "example_provider"
+bypass_cors_preflight: true
 )";
 
 // The name of provider for above config.

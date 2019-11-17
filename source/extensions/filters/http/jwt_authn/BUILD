@@ -60,6 +60,7 @@ envoy_cc_library(
         ":filter_config_interface",
         ":matchers_lib",
         "//include/envoy/http:filter_interface",
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http:well_known_names",
     ],
 )
