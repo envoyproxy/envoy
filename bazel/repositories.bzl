@@ -66,12 +66,8 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
     _repository_impl(
-        name = "six_archive",
-        build_file = "@com_google_protobuf//:six.BUILD",
-    )
-    native.bind(
         name = "six",
-        actual = "@six_archive//:six",
+        build_file = "@com_google_protobuf//third_party:six.BUILD",
     )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
@@ -321,6 +317,7 @@ def _net_zlib():
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
+
     native.bind(
         name = "zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
@@ -514,27 +511,10 @@ def _com_google_absl():
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
-        # The patch includes
-        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
-        # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when protobuf 3.10 is released.
-        patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
+        patch_args = ["-p1"],
     )
 
-    # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
-    # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
-    # https://github.com/bazelbuild/bazel/issues/3219.
-    _repository_impl(
-        "com_google_protobuf_cc",
-        repository_key = "com_google_protobuf",
-        # The patch includes
-        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
-        # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when protobuf 3.10 is released.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:protobuf.patch"],
-    )
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
@@ -549,7 +529,7 @@ def _com_google_protobuf():
     )
     native.bind(
         name = "protoc",
-        actual = "@com_google_protobuf_cc//:protoc",
+        actual = "@com_google_protobuf//:protoc",
     )
 
     # Needed for `bazel fetch` to work with @com_google_protobuf
@@ -758,6 +738,7 @@ def _foreign_cc_dependencies():
 
 def _rules_proto_dependencies():
     _repository_impl("rules_proto")
+    _repository_impl("rules_python")
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"
