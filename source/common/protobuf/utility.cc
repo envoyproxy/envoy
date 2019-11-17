@@ -69,11 +69,6 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
       }
       break;
     }
-    double double_value;
-    if (YAML::convert<double>::decode(node, double_value)) {
-      value.set_number_value(double_value);
-      break;
-    }
     // Otherwise, fall back on string.
     value.set_string_value(node.as<std::string>());
     break;
