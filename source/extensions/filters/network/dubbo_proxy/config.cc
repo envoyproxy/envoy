@@ -137,10 +137,8 @@ void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
 
   ENVOY_LOG(debug, "    dubbo filter #{}", filter_factories_.size());
   ENVOY_LOG(debug, "      name: {}", string_name);
-
-  const Json::ObjectSharedPtr filter_config =
-      MessageUtil::getJsonObjectFromMessage(proto_config.config());
-  ENVOY_LOG(debug, "      config: {}", filter_config->asJsonString());
+  ENVOY_LOG(debug, "    config: {}",
+            MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactory<DubboFilters::NamedDubboFilterConfigFactory>(
