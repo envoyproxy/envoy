@@ -15,7 +15,7 @@ public:
   // PathUtil::canonicalPath(), since we don't have direct access to the
   // HeaderMapImpl constructor.
   HeaderEntry& pathHeaderEntry(const std::string& path_value) {
-    headers_.insertPath().value(path_value);
+    headers_.setPath(path_value);
     return *headers_.Path();
   }
   HeaderMapImpl headers_;

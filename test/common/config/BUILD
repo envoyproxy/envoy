@@ -7,10 +7,6 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
-load(
-    "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
-)
 
 envoy_package()
 
@@ -320,10 +316,9 @@ envoy_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
+envoy_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
-    extension_name = "envoy.extensions.common.crypto.utility_lib",
     deps = [
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",

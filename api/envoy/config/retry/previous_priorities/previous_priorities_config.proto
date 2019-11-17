@@ -30,6 +30,7 @@ option java_package = "io.envoyproxy.envoy.config.retry.previous_priorities";
 //
 // Using this PriorityFilter requires rebuilding the priority load, which runs in O(# of
 // priorities), which might incur significant overhead for clusters with many priorities.
+// [#extension: envoy.retry_priorities.previous_priorities]
 message PreviousPrioritiesConfig {
   // How often the priority load should be updated based on previously attempted priorities. Useful
   // to allow each priorities to receive more than one request before being excluded or to reduce

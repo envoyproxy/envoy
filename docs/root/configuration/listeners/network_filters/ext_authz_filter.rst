@@ -37,6 +37,7 @@ A sample filter configuration could be:
         grpc_service:
           envoy_grpc:
             cluster_name: ext-authz
+        include_peer_certificate: true
 
   clusters:
     - name: ext-authz

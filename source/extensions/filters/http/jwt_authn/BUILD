@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -59,14 +60,17 @@ envoy_cc_library(
         ":filter_config_interface",
         ":matchers_lib",
         "//include/envoy/http:filter_interface",
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http:well_known_names",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["filter_factory.cc"],
     hdrs = ["filter_factory.h"],
+    security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     deps = [
         ":filter_lib",
         "//include/envoy/registry",

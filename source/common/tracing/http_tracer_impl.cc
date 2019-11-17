@@ -94,7 +94,7 @@ static void addGrpcTags(Span& span, const Http::HeaderMap& headers) {
   }
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
   // Set error tag when status is not OK.
-  if (grpc_status_code && grpc_status_code.value() != Grpc::Status::GrpcStatus::Ok) {
+  if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
 }
