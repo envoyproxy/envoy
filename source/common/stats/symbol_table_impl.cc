@@ -87,7 +87,6 @@ void SymbolTableImpl::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   for (Symbol symbol : symbols) {
     appendEncoding(symbol, mem_block_);
   }
-  // ASSERT(static_cast<uint64_t>(bytes - storage_.get()) == data_bytes_required_);
 }
 
 std::pair<uint64_t, uint64_t> SymbolTableImpl::Encoding::decodeNumber(const uint8_t* encoding) {
