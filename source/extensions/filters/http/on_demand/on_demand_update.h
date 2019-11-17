@@ -26,6 +26,8 @@ public:
 
   void onDestroy() override {}
 
+  void notify() override;
+
 private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};

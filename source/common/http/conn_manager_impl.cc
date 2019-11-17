@@ -482,10 +482,10 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    const HeaderString& host, const std::function<void()>& route_config_updated_cb) {
+    const HeaderString& host, StreamDecoderFilterSharedPtr filter_to_notify) {
   ASSERT(!host.empty());
   auto& host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
-  route_config_provider_->requestVirtualHostsUpdate(host_header, route_config_updated_cb);
+  route_config_provider_->requestVirtualHostsUpdate(host_header, std::move(filter_to_notify));
 }
 
 bool ConnectionManagerImpl::RdsRouteConfigUpdateRequester::canRequestRouteConfigUpdate() {
@@ -1360,9 +1360,9 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 }
 
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
-    const std::function<void()>& route_config_updated_cb) {
+    StreamDecoderFilterSharedPtr decoder_filter_to_notify) {
   route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
-                                                           route_config_updated_cb);
+                                                           std::move(decoder_filter_to_notify));
 }
 
 bool ConnectionManagerImpl::ActiveStream::canRequestRouteConfigUpdate() {
@@ -2257,9 +2257,8 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   return true;
 }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
-    const std::function<void()>& route_config_updated_cb) {
-  parent_.requestRouteConfigUpdate(route_config_updated_cb);
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate() {
+  parent_.requestRouteConfigUpdate(handle_);
 }
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canRequestRouteConfigUpdate() {

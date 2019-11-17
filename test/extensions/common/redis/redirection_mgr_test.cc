@@ -81,7 +81,7 @@ public:
         // Only notify the time-advancing thread that we're about to wait with time_mutex_ locked.
         // This ensures that this thread is properly waiting before the time-advancing thread gets
         // to notify this thread that time has been advanced. Otherwise, this thread might miss
-        // the notification.
+        // the observer.
         nthreads_waiting_++;
         setter_wait_cv_.notifyOne();
         wait_cv_.wait(time_mutex_);

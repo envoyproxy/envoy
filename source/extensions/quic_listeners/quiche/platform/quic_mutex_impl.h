@@ -39,7 +39,7 @@ private:
   absl::Mutex mu_;
 };
 
-// A Notification allows threads to receive notification of a single occurrence
+// A Notification allows threads to receive observer of a single occurrence
 // of a single event.
 class QUIC_EXPORT_PRIVATE QuicNotificationImpl {
 public:

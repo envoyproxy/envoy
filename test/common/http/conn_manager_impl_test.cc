@@ -74,7 +74,7 @@ public:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    void requestVirtualHostsUpdate(const std::string&, const std::function<void()>&) override {
+    void requestVirtualHostsUpdate(const std::string&, Http::StreamDecoderFilterSharedPtr) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 

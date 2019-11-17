@@ -64,6 +64,7 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         ":header_map_interface",
+        "//include/envoy/observer:notifiable_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/event:dispatcher_interface",

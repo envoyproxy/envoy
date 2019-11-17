@@ -240,7 +240,9 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
           std::set_difference(it->aliases_.begin(), it->aliases_.end(), aliases.begin(),
                               aliases.end(), std::back_inserter(aliases_not_in_update));
           if (aliases_not_in_update.empty()) {
-            it->cb_();
+            if (auto to_notify = it->to_notify.lock()) {
+              to_notify->notify();
+            }
             it = callbacks.erase(it);
           } else {
             it++;
@@ -260,11 +262,11 @@ void RdsRouteConfigProviderImpl::validateConfig(
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
-    const std::string& for_domain, const std::function<void()>& route_config_updated_cb) {
+    const std::string& for_domain, Http::StreamDecoderFilterSharedPtr filter_to_notify) {
   factory_context_.dispatcher().post(
       [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
   config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push_back(
-      {{for_domain}, route_config_updated_cb});
+      {{for_domain}, filter_to_notify});
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

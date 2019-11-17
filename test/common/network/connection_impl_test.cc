@@ -581,7 +581,7 @@ TEST_P(ConnectionImplTest, ReadDisableAfterClose) {
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
 #ifdef __APPLE__
   // On our current macOS build, the client connection does not get the early
-  // close notification and instead gets the close after reading the FIN.
+  // close observer and instead gets the close after reading the FIN.
   return;
 #endif
   setUpBasicConnection();
@@ -1812,7 +1812,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  // With half-close semantics enabled we will not wait for early close notification.
+  // With half-close semantics enabled we will not wait for early close observer.
   // See the `Envoy::Network::ConnectionImpl::readDisable()' method for more details.
   EXPECT_CALL(*file_event_, setEnabled(0));
   connection_->enableHalfClose(true);

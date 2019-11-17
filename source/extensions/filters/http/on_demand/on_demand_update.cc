@@ -13,7 +13,7 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::requestRouteConfigUpdate() {
   if (callbacks_->route() != nullptr || !callbacks_->canRequestRouteConfigUpdate()) {
     return Http::FilterHeadersStatus::Continue;
   } else {
-    callbacks_->requestRouteConfigUpdate([this]() -> void { onRouteConfigUpdateCompletion(); });
+    callbacks_->requestRouteConfigUpdate();
     return Http::FilterHeadersStatus::StopIteration;
   }
 }
@@ -40,11 +40,11 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
 // has been propagated to workers, at which point the request processing is restarted from the
 // beginning.
-void OnDemandRouteUpdate::onRouteConfigUpdateCompletion() {
+void OnDemandRouteUpdate::notify() {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
   if (callbacks_->canResolveRouteAfterConfigUpdate() && // route can be resolved after an on-demand
-                                                        // VHDS update
+      // VHDS update
       !callbacks_->decodingBuffer() &&                  // Redirects with body not yet supported.
       callbacks_->recreateStream()) {
     // cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();

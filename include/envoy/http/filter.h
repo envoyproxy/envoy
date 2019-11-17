@@ -15,6 +15,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
+#include "envoy/observer/notifiable.h"
 
 #include "absl/types/optional.h"
 
@@ -442,7 +443,7 @@ public:
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to the worker thread.
    */
-  virtual void requestRouteConfigUpdate(const std::function<void()>& route_config_updated_cb) PURE;
+  virtual void requestRouteConfigUpdate() PURE;
 
   /**
    *
@@ -480,7 +481,7 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase {
+class StreamDecoderFilter : public StreamFilterBase, public Observer::Notifiable {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -530,6 +531,8 @@ public:
    * Called at the end of the stream, when all data has been decoded.
    */
   virtual void decodeComplete() {}
+
+  void notify() override {}
 };
 
 using StreamDecoderFilterSharedPtr = std::shared_ptr<StreamDecoderFilter>;

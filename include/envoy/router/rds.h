@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/router/router.h"
+#include "envoy/http/filter.h"
 
 namespace Envoy {
 namespace Router {
@@ -61,7 +62,7 @@ public:
    * propagated to worker threads
    */
   virtual void requestVirtualHostsUpdate(const std::string& for_domain,
-                                         const std::function<void()>& route_config_updated_cb) PURE;
+                                         Http::StreamDecoderFilterSharedPtr filter_to_notify) PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;

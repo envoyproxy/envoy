@@ -197,7 +197,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 ListenerImpl::~ListenerImpl() {
   // The filter factories may have pending initialize actions (like in the case of RDS). Those
   // actions will fire in the destructor to avoid blocking initial server startup. If we are using
-  // a local init manager we should block the notification from trying to move us from warming to
+  // a local init manager we should block the observer from trying to move us from warming to
   // active. This is done here explicitly by resetting the watcher and then clearing the factory
   // vector for clarity.
   init_watcher_.reset();

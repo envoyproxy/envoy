@@ -103,7 +103,7 @@ void CodecClient::responseDecodeComplete(ActiveRequest& request) {
 
   // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
   // of CodecClient will deal with the premature response case and we should not handle any
-  // further reset notification.
+  // further reset observer.
   request.encoder_->getStream().removeCallbacks(request);
 }
 

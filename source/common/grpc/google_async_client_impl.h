@@ -29,7 +29,7 @@ class GoogleAsyncRequestImpl;
 
 struct GoogleAsyncTag {
   // Operation defines tags that are handed to the gRPC AsyncReaderWriter for use in completion
-  // notification for their namesake operations. Read* and Write* operations may be outstanding
+  // observer for their namesake operations. Read* and Write* operations may be outstanding
   // simultaneously, but there will be no more than one operation of each type in-flight for a given
   // stream. Init and Finish will both be issued exclusively when no other operations are in-flight
   // for a stream. See
@@ -234,7 +234,7 @@ private:
                          Http::HeaderMap& header_map);
   // Write the first PendingMessage in the write queue if non-empty.
   void writeQueued();
-  // Deliver notification and update stats when the connection closes.
+  // Deliver observer and update stats when the connection closes.
   void notifyRemoteClose(Status::GrpcStatus grpc_status, Http::HeaderMapPtr trailing_metadata,
                          const std::string& message);
   // Schedule stream for deferred deletion.
