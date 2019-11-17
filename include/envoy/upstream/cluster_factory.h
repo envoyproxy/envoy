@@ -128,9 +128,8 @@ public:
   virtual ~ClusterFactory() = default;
 
   /**
-   * Create a new instance of cluster. If the implementation is unable to produce a cluster
-   * instance with the provided parameters, it should throw an EnvoyException in the case of
-   * general error.
+   * Create a new instance of cluster. If the implementation is unable to produce a cluster instance
+   * with the provided parameters, it should throw an EnvoyException in the case of general error.
    * @param cluster supplies the general protobuf configuration for the cluster.
    * @param context supplies the cluster's context.
    * @return a pair containing the cluster instance as well as an option thread aware load
@@ -140,8 +139,7 @@ public:
   create(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context) PURE;
 
   /**
-   * @return std::string the identifying name for a particular implementation of a cluster
-   * factory.
+   * @return std::string the identifying name for a particular implementation of a cluster factory.
    */
   virtual std::string name() PURE;
 

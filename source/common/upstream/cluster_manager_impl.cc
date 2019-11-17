@@ -347,10 +347,9 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
 
 void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // This routine is called when a cluster has finished initializing. The cluster has not yet
-  // been setup for cross-thread updates to avoid needless updates during initialization. The
-  // order of operations here is important. We start by initializing the thread aware load
-  // balancer if needed. This must happen first so cluster updates are heard first by the load
-  // balancer.
+  // been setup for cross-thread updates to avoid needless updates during initialization. The order
+  // of operations here is important. We start by initializing the thread aware load balancer if
+  // needed. This must happen first so cluster updates are heard first by the load balancer.
   auto cluster_data = active_clusters_.find(cluster.info()->name());
   if (cluster_data->second->thread_aware_lb_ != nullptr) {
     cluster_data->second->thread_aware_lb_->initialize();
@@ -544,12 +543,11 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   //    primary/secondary init, static/CDS init, warming all clusters, etc.
   // 2) After initial server load, we handle warming independently for each cluster in the warming
   //    map.
-  // Note: It's likely possible that all warming logic could be centralized in the init manager,
-  // but
-  //       a decision was made to split the logic given how complex the init manager already is.
-  //       In the future we may decide to undergo a refactor to unify the logic but the
-  //       effort/risk to do that right now does not seem worth it given that the logic is
-  //       generally pretty clean and easy to understand.
+  // Note: It's likely possible that all warming logic could be centralized in the init manager, but
+  //       a decision was made to split the logic given how complex the init manager already is. In
+  //       the future we may decide to undergo a refactor to unify the logic but the effort/risk to
+  //       do that right now does not seem worth it given that the logic is generally pretty clean
+  //       and easy to understand.
   const bool use_active_map =
       init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized;
   loadCluster(cluster, version_info, true, use_active_map ? active_clusters_ : warming_clusters_);
@@ -725,9 +723,9 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
 void ClusterManagerImpl::updateClusterCounts() {
   // This if/else block implements a control flow mechanism that can be used by an ADS
   // implementation to properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can
-  // use it to detect when a previously sent cluster becomes warm before sending routes that
-  // depend on it. This can improve incidence of HTTP 503 responses from Envoy when a route is
-  // used before it's supporting cluster is ready.
+  // use it to detect when a previously sent cluster becomes warm before sending routes that depend
+  // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
+  // it's supporting cluster is ready.
   //
   // We achieve that by leaving CDS in the paused state as long as there is at least
   // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
@@ -969,8 +967,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
     ConnPoolsContainer* to_clear = getHttpConnPoolsContainer(old_host);
     if (to_clear == nullptr) {
-      // This could happen if we have cleaned out the host before iterating through every
-      // connection pool. Handle it by just continuing.
+      // This could happen if we have cleaned out the host before iterating through every connection
+      // pool. Handle it by just continuing.
       return;
     }
 
@@ -1004,10 +1002,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
   for (const auto& pair : container.pools_) {
     pair.second->addDrainedCallback([this, old_host]() -> void {
       if (destroying_) {
-        // It is possible for a connection pool to fire drain callbacks during destruction.
-        // Instead of checking if old_host actually exists in the map, it's clearer and cleaner to
-        // keep track of destruction as a separate state and check for it here. This also allows
-        // us to do this check here versus inside every different connection pool implementation.
+        // It is possible for a connection pool to fire drain callbacks during destruction. Instead
+        // of checking if old_host actually exists in the map, it's clearer and cleaner to keep
+        // track of destruction as a separate state and check for it here. This also allows us to
+        // do this check here versus inside every different connection pool implementation.
         return;
       }
 
@@ -1022,9 +1020,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
       }
     });
 
-    // The above addDrainedCallback() drain completion callback might execute immediately. This
-    // can then effectively nuke 'container', which means we can't continue to loop on its
-    // contents (we're done here).
+    // The above addDrainedCallback() drain completion callback might execute immediately. This can
+    // then effectively nuke 'container', which means we can't continue to loop on its contents
+    // (we're done here).
     if (host_tcp_conn_pool_map_.count(old_host) == 0) {
       break;
     }
@@ -1083,12 +1081,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host, ThreadLocal::Slot& tls) {
+
   // Drain all HTTP connection pool connections in the case of a host health failure. If outlier/
   // health is due to ECMP flow hashing issues for example, a new set of connections might do
   // better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
-  // more granular host set changes, we should be able to capture single host changes and make
-  // them more targeted.
+  // more granular host set changes, we should be able to capture single host changes and make them
+  // more targeted.
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
   {
     const auto container = config.getHttpConnPoolsContainer(host);
@@ -1113,9 +1112,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
     //
-    // TODO(ggreenway) PERF: If there are a large number of connections, this could take a long
-    // time and halt other useful work. Consider breaking up this work. Note that this behavior is
-    // noted in the configuration documentation in cluster setting
+    // TODO(ggreenway) PERF: If there are a large number of connections, this could take a long time
+    // and halt other useful work. Consider breaking up this work. Note that this behavior is noted
+    // in the configuration documentation in cluster setting
     // "close_connections_on_host_health_failure". Update the docs if this if this changes.
     while (true) {
       const auto& it = config.host_tcp_conn_map_.find(host);
@@ -1202,8 +1201,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   // cluster.
   //
   // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
-  // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we
-  // are going with a more targeted approach for now.
+  // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
+  // going with a more targeted approach for now.
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     parent_.drainConnPools(host_set->hosts());
   }
