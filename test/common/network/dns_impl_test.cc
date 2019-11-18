@@ -2,6 +2,8 @@
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
 
+#include <bitset>
+#include <iostream>
 #include <list>
 #include <memory>
 #include <string>
@@ -405,6 +407,8 @@ public:
   DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
   void SetUp() override {
+    std::cerr << "Creating resolver in test {use_tcp_for_dns_lookups}: "
+              << use_tcp_for_dns_lookups() << std::endl;
     resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
@@ -883,6 +887,8 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
   struct ares_options opts;
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  std::bitset<sizeof(int)> flags_bits(opts.flags);
+  std::cerr << "bits: " << flags_bits << std::endl;
   EXPECT_TRUE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
   EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::Auto,
                                         [&](std::list<DnsResponse>&& results) -> void {
@@ -910,6 +916,8 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
   struct ares_options opts;
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  std::bitset<sizeof(int)> flags_bits(opts.flags);
+  std::cerr << "bits: " << flags_bits << std::endl;
   EXPECT_FALSE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
   EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::Auto,
                                         [&](std::list<DnsResponse>&& results) -> void {

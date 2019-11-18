@@ -1,7 +1,9 @@
 #include "common/network/dns_impl.h"
 
+#include <bitset>
 #include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <list>
 #include <memory>
 #include <string>
@@ -32,6 +34,9 @@ DnsResolverImpl::DnsResolverImpl(
     optmask |= ARES_OPT_FLAGS;
     options.flags |= ARES_FLAG_USEVC;
   }
+
+  std::bitset<sizeof(int)> flags_bits(options.flags);
+  std::cerr << "setting channel bits: " << flags_bits << std::endl;
 
   initializeChannel(&options, optmask);
 
