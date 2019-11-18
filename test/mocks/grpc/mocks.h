@@ -103,7 +103,7 @@ public:
 
 MATCHER_P(ProtoBufferEq, expected, "") {
   typename std::remove_const<decltype(expected)>::type proto;
-  if (!proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length())) {
+  if (!proto.ParseFromString(arg->toString())) {
     *result_listener << "\nParse of buffer failed\n";
     return false;
   }

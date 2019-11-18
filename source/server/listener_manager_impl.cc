@@ -77,9 +77,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -107,9 +106,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -132,9 +130,8 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =

@@ -491,7 +491,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   } else {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
     if (!is_trailers_only_response) {
-      response_headers_->setGrpcStatus(enumToInt(grpc_status.value()));
+      response_headers_->setGrpcStatus(grpc_status.value());
     }
   }
 
