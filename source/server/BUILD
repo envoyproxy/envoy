@@ -155,6 +155,7 @@ envoy_cc_library(
     hdrs = envoy_select_hot_restart(["hot_restarting_parent.h"]),
     deps = [
         ":hot_restarting_base",
+        ":listener_lib",
         "//source/common/memory:stats_lib",
     ],
 )
@@ -377,6 +378,7 @@ envoy_cc_library(
         "abseil_optional",
     ],
     deps = [
+        ":active_raw_udp_listener_config",
         ":configuration_lib",
         ":connection_handler_lib",
         ":guarddog_lib",

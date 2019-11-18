@@ -113,7 +113,6 @@ message TcpProxy {
     option (validate.required) = true;
 
     // The upstream cluster to connect to.
-    //
     string cluster = 2;
 
     // Multiple upstream clusters can be specified for a given route. The

@@ -216,6 +216,13 @@ message Cluster {
         // If DEFAULT_SUBSET is selected, load balancing is performed over the
         // endpoints matching the values from the default_subset field.
         DEFAULT_SUBSET = 3;
+
+        // If KEYS_SUBSET is selected, subset selector matching is performed again with metadata
+        // keys reduced to
+        // :ref:`fallback_keys_subset<envoy_api_field_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.fallback_keys_subset>`.
+        // It allows for a fallback to a different, less specific selector if some of the keys of
+        // the selector are considered optional.
+        KEYS_SUBSET = 4;
       }
 
       // List of keys to match with the weighted cluster metadata.
@@ -225,6 +232,18 @@ message Cluster {
       // metadata.
       LbSubsetSelectorFallbackPolicy fallback_policy = 2
           [(validate.rules).enum = {defined_only: true}];
+
+      // Subset of
+      // :ref:`keys<envoy_api_field_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` used
+      // by
+      // :ref:`KEYS_SUBSET<envoy_api_enum_value_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+      // fallback policy.
+      // It has to be a non empty list if KEYS_SUBSET fallback policy is selected.
+      // For any other fallback policy the parameter is not used and should not be set.
+      // Only values also present in
+      // :ref:`keys<envoy_api_field_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` are
+      // allowed, but `fallback_keys_subset` cannot be equal to `keys`.
+      repeated string fallback_keys_subset = 3;
     }
 
     // The behavior used when no endpoint subset matches the selected route's

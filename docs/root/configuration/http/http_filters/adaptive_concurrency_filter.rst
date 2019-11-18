@@ -33,7 +33,7 @@ time (minRTT) for an upstream.
 Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The minRTT is periodically measured by only allowing a single outstanding request at a time to an
+The minRTT is periodically measured by only allowing a very low outstanding request count to an
 upstream cluster and measuring the latency under these ideal conditions. The length of this minRTT
 calculation window is variable depending on the number of requests the filter is configured to
 aggregate to represent the expected latency of an upstream.
@@ -41,8 +41,8 @@ aggregate to represent the expected latency of an upstream.
 A configurable *jitter* value is used to randomly delay the start of the minRTT calculation window
 by some amount of time. This is not necessary and can be disabled; however, it is recommended to
 prevent all hosts in a cluster from being in a minRTT calculation window (and having a concurrency
-limit of 1) at the same time. The jitter helps negate the effect of the minRTT calculation on the
-downstream success rate if retries are enabled.
+limit of 3 by default) at the same time. The jitter helps negate the effect of the minRTT
+calculation on the downstream success rate if retries are enabled.
 
 It is possible that there is a noticeable increase in request 503s during the minRTT measurement
 window because of the potentially significant drop in the concurrency limit. This is expected and it
@@ -170,6 +170,9 @@ adaptive_concurrency.gradient_controller.sample_aggregate_percentile
     Overrides the percentile value used to represent the collection of latency samples in
     calculations. A value of `95` indicates the 95th percentile. The runtime value specified is
     clamped to the range [0,100].
+
+adaptive_concurrency.gradient_controller.min_concurrency
+    Overrides the concurrency that is pinned while measuring the minRTT.
 
 Statistics
 ----------

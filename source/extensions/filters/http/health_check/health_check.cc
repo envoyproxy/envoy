@@ -103,9 +103,9 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
           headers.EnvoyDegraded() != nullptr);
     }
 
-    headers.insertEnvoyUpstreamHealthCheckedCluster().value(context_.localInfo().clusterName());
+    headers.setEnvoyUpstreamHealthCheckedCluster(context_.localInfo().clusterName());
   } else if (context_.healthCheckFailed()) {
-    headers.insertEnvoyImmediateHealthCheckFail().value(
+    headers.setReferenceEnvoyImmediateHealthCheckFail(
         Http::Headers::get().EnvoyImmediateHealthCheckFailValues.True);
   }
 

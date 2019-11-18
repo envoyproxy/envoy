@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/exception.h"
