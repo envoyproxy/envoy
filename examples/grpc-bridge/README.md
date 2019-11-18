@@ -117,7 +117,7 @@ grpc-client-proxy_1  | [2019-11-07T16:34:50.455Z] "POST /kv.KV/Get HTTP/1.1" 200
 
 # Troubleshooting
 
-* Errors building the `client` or `server` are related for the missing gRPC stubs.
+* Errors building the `client` or `server` are related to the missing gRPC stubs.
 * Make sure to produce the stubs before building
   * The error below is when the server is missing the stubs in the kv dir.
 
