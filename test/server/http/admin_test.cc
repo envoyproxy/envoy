@@ -931,6 +931,75 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   }
 }
 
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByKey) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("listeners_config");
+    return msg;
+  });
+  auto route_entry = admin_.getConfigTracker().add("routes", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("routes_config");
+    return msg;
+  });
+  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("clusters_config");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "listeners_config"
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?key=listeners", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpNonExistentKey) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("listeners_config");
+    return msg;
+  });
+  EXPECT_EQ(Http::Code::NotFound, getCallback("/config_dump?key=routes", header_map, response));
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpListKeys) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("clusters_config");
+    return msg;
+  });
+  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("listeners_config");
+    return msg;
+  });
+
+  const std::string expected_text = R"EOF({
+ "keys": [
+  "clusters",
+  "listeners"
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?list_keys", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_text, output);
+}
+
 TEST_P(AdminInstanceTest, Memory) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;

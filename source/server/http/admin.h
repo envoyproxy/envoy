@@ -234,6 +234,11 @@ private:
   void writeListenersAsJson(Buffer::Instance& response);
   void writeListenersAsText(Buffer::Instance& response);
 
+  /**
+   * Helper methods for the /config_dump url handler.
+   */
+  void writeDumpKeysAsJson(Buffer::Instance& response) const;
+
   template <class StatType>
   static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {

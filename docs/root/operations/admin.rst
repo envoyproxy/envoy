@@ -129,6 +129,19 @@ modify different aspects of the server:
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
+.. _operations_admin_interface_config_dump_by_key:
+
+.. http:get:: /config_dump?key={}
+  Dump only the currently loaded configuration that matches the specified key. See the
+  :ref:`response definition <envoy_api_msg_admin.v2alpha.ConfigDump>` for more information.
+
+.. _operations_admin_interface_config_dump_list_keys:
+
+.. http:get:: /config_dump?list_keys
+  Lists the configuration components that will be dumped by /config_dump in JSON format. Any
+  key in this list can be used as the value for the /config_dump?key= query parameter to filter
+  the dumped configuration.
+
 .. http:get:: /contention
 
   Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) in JSON
