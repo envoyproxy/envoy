@@ -1,6 +1,5 @@
 Version history
 ---------------
-
 1.13.0 (pending)
 ================
 * api: remove all support for v1
@@ -13,6 +12,11 @@ Version history
 * http: add support for encoding http1 trailers. To disable use :ref:`disable_trailers <envoy_api_field.core.Http1ProtocolOptions.disable_trailers>`.
 * http: add support for encoding http1 trailers, to disable use :ref:`disable_trailers <envoy_api_field_core.Http1ProtocolOptions.disable_trailers>`.
 * http: add support for encoding http1 trailers, to enable use :ref:`enable_trailers <envoy_api_field_core.Http1ProtocolOptions.enable_trailers>`.
+
+1.12.1 (November 8, 2019)
+=========================
+* listener: fixed CVE-2019-18836 by clearing accept filters before connection creation.
+
 
 1.12.0 (October 31, 2019)
 =========================
