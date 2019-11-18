@@ -95,7 +95,7 @@ public:
    */
   void reset() {
     if (data_ != nullptr) {
-      delete [] static_cast<uint8_t*>(data_);
+      delete [] reinterpret_cast<uint8_t*>(reinterpret_cast<void*>(data_));
       data_ = nullptr;
     }
     capacity_ = 0;
@@ -131,7 +131,7 @@ public:
 
 private:
   static T* alloc(uint64_t size) {
-    return static_cast<T*>(new uint8_t[size]);
+    return reinterpret_cast<T*>(reinterpret_cast<void*>(new uint8_t[size]));
   }
 
   T* data_;
