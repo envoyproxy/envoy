@@ -37,7 +37,6 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Router {

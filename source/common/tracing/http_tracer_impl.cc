@@ -225,13 +225,13 @@ CustomTagConstSharedPtr
 HttpTracerUtility::createCustomTag(const envoy::type::tracing::v2::CustomTag& tag) {
   switch (tag.type_case()) {
   case envoy::type::tracing::v2::CustomTag::kLiteral:
-    return std::make_shared<Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
+    return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
   case envoy::type::tracing::v2::CustomTag::kEnvironment:
-    return std::make_shared<Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
+    return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
   case envoy::type::tracing::v2::CustomTag::kRequestHeader:
-    return std::make_shared<Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
+    return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
   case envoy::type::tracing::v2::CustomTag::kMetadata:
-    return std::make_shared<Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
+    return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

@@ -26,7 +26,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
-        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],

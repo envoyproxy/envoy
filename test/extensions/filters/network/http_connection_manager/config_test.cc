@@ -9,7 +9,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -20,7 +19,6 @@ using testing::_;
 using testing::An;
 using testing::Return;
 using testing::ReturnRef;
-using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -189,9 +187,10 @@ http_filters:
   for (const std::string& custom_tag : custom_tags) {
     EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
   }
-  EXPECT_NE(dynamic_cast<const Tracing::RequestHeaderCustomTag*>(
-                custom_tag_map.find("foo")->second.get()),
-            nullptr);
+  const Tracing::RequestHeaderCustomTag* foo = dynamic_cast<const Tracing::RequestHeaderCustomTag*>(
+      custom_tag_map.find("foo")->second.get());
+  EXPECT_NE(foo, nullptr);
+  EXPECT_EQ(foo->tag(), "foo");
 
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());

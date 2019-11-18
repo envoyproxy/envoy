@@ -289,8 +289,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
       envoy::type::tracing::v2::CustomTag::Header headerTag;
       headerTag.set_name(header);
-      custom_tags.emplace(header,
-                          std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag));
+      custom_tags.emplace(
+          header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
     }
     for (const auto& tag : tracing_config.custom_tags()) {
       custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
