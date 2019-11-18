@@ -70,7 +70,6 @@ private:
     absl::optional<std::string> version_;
   };
 
-  // Use these helpers to ensure resource_versions_ and resource_names_ get updated together.
   void setResourceVersion(const std::string& resource_name, const std::string& resource_version);
   void setResourceWaitingForServer(const std::string& resource_name);
   void setLostInterestInResource(const std::string& resource_name);
@@ -80,9 +79,6 @@ private:
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
   std::unordered_map<std::string, ResourceVersion> resource_versions_;
-  // The keys of resource_versions_. Only tracked separately because std::map does not provide an
-  // iterator into just its keys, e.g. for use in std::set_difference.
-  std::set<std::string> resource_names_;
 
   const std::string type_url_;
   // callbacks_ is expected to be a WatchMap.
