@@ -32,8 +32,8 @@ void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::requestAliasResolution(const std::set<std::string>& aliases) {
-  grpc_mux_->requestAliasesResolution(type_url_, aliases);
+void DeltaSubscriptionImpl::requestAliasResolution(const std::set<std::string>& aliases) {
+  context_->requestAliasesResolution(type_url_, aliases);
 }
 
 void DeltaSubscriptionImpl::updateResourceInterest(
