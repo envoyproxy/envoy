@@ -69,7 +69,7 @@ message RouteMatch {
   repeated api.v2.route.HeaderMatcher headers = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -82,6 +82,13 @@ message RouteAction {
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
     WeightedCluster weighted_clusters = 2;
+
+    // Envoy will determine the cluster to route to by reading the value of the
+    // Thrift header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist Envoy will
+    // respond with an unknown method exception or an internal error exception,
+    // respectively.
+    string cluster_header = 6 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in

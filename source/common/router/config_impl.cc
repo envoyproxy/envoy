@@ -481,11 +481,11 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 
   std::string path(headers.Path()->value().getStringView());
   if (insert_envoy_original_path) {
-    headers.insertEnvoyOriginalPath().value(*headers.Path());
+    headers.setEnvoyOriginalPath(path);
   }
   ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
                          : absl::StartsWithIgnoreCase(path, matched_path));
-  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
+  headers.setPath(path.replace(0, matched_path.size(), rewrite));
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,

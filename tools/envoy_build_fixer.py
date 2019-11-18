@@ -13,9 +13,10 @@ import re
 import subprocess
 import sys
 import tempfile
+import paths
 
 # Where does Buildozer live?
-BUILDOZER_PATH = os.getenv('BUILDOZER_BIN', '$GOPATH/bin/buildozer')
+BUILDOZER_PATH = paths.getBuildozer()
 
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
@@ -66,10 +67,12 @@ def RunBuildozer(cmds, contents):
 
 # Add an Apache 2 license and envoy_package() import and rule as needed.
 def FixPackageAndLicense(contents):
-  # Ensure we have an envoy_package import load if this is a real Envoy package.
+  # Ensure we have an envoy_package import load if this is a real Envoy package. We also allow
+  # the prefix to be overridden if envoy is included in a larger workspace.
   if re.search(ENVOY_RULE_REGEX, contents):
     contents = RunBuildozer([
-        ('new_load //bazel:envoy_build_system.bzl envoy_package', '__pkg__'),
+        ('new_load {}//bazel:envoy_build_system.bzl envoy_package'.format(
+            os.getenv("ENVOY_BAZEL_PREFIX", "")), '__pkg__'),
     ], contents)
     # Envoy package is inserted after the load block containing the
     # envoy_package import.

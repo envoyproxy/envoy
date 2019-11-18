@@ -142,7 +142,7 @@ public:
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
 
     Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl(response_headers_init));
-    response_headers->insertStatus().value(response_code);
+    response_headers->setStatus(response_code);
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(response_code));

@@ -265,6 +265,8 @@ public:
   MOCK_CONST_METHOD0(metadataMatchCriteria,
                      const std::vector<MetadataMatchCriterionConstSharedPtr>&());
   MOCK_CONST_METHOD1(mergeMatchCriteria, MetadataMatchCriteriaConstPtr(const ProtobufWkt::Struct&));
+  MOCK_CONST_METHOD1(filterMatchCriteria,
+                     MetadataMatchCriteriaConstPtr(const std::set<std::string>&));
 };
 
 class MockTlsContextMatchCriteria : public TlsContextMatchCriteria {
