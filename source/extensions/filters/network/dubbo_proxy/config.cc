@@ -18,7 +18,8 @@ namespace DubboProxy {
 
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    const Server::Configuration::FilterChainContext&) {
   std::shared_ptr<Config> filter_config(std::make_shared<ConfigImpl>(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {

@@ -34,7 +34,9 @@ class DubboFilterConfigTestBase {
 public:
   void testConfig(DubboProxyProto& config) {
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({
+      cb = factory_.createFilterFactoryFromProto(config, context_, MockFilterChainContext{});
+    });
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
@@ -50,7 +52,8 @@ class DubboFilterConfigTest : public DubboFilterConfigTestBase, public testing::
 TEST_F(DubboFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy(), context),
+                   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy(), context,
+                   MockFilterChainContext{}),
                ProtoValidationException);
 }
 
@@ -61,7 +64,8 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, context, MockFilterChainContext{});
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -76,7 +80,8 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("my_stat_prefix");
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, context, MockFilterChainContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -109,8 +114,9 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithUnknownFilter) {
 
   DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
 
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "no_such_filter");
+  EXPECT_THROW_WITH_REGEX(
+      factory_.createFilterFactoryFromProto(config, context_, MockFilterChainContext{}),
+      EnvoyException, "no_such_filter");
 }
 
 // Test config with multiple filters.

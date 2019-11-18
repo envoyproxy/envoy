@@ -39,7 +39,8 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::FactoryContext& context,
+      const Server::Configuration::FilterChainContext& filter_chain_context) override;
 };
 
 DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);

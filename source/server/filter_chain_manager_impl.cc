@@ -23,6 +23,8 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 } // namespace
 
+FilterChainContextImpl::FilterChainContextImpl(uint64_t tag) : tag_(tag) {}
+
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }

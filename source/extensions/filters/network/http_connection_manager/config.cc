@@ -75,7 +75,8 @@ Network::FilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    const Server::Configuration::FilterChainContext&) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {

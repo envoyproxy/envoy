@@ -48,7 +48,8 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::FactoryContext& context,
+      const Server::Configuration::FilterChainContext&) override;
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
       const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions&

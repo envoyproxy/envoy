@@ -287,8 +287,9 @@ filter_chains:
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                        Configuration::FactoryContext&) override {
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, Configuration::FactoryContext&,
+                               const Server::Configuration::FilterChainContext&) override {
     return [](Network::FilterManager&) -> void {};
   }
 
@@ -360,8 +361,9 @@ class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFac
 public:
   // Configuration::NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Configuration::FactoryContext& context) override {
+  createFilterFactoryFromProto(const Protobuf::Message&, Configuration::FactoryContext& context,
+                               const FilterChainContextFilterChainContext filter_chain_context
+                                   filter_chain_context) override {
     return commonFilterFactory(context);
   }
 
@@ -3065,8 +3067,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   public:
     // NamedListenerFilterConfigFactory
     Network::ListenerFilterFactoryCb
-    createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Configuration::ListenerFactoryContext&) override {
+    createFilterFactoryFromProto(const Protobuf::Message&, Configuration::ListenerFactoryContext&,
+                                 const Server::Configuration::FilterChainContext&) override {
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilter>());
       };
@@ -3139,8 +3141,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   public:
     // NamedListenerFilterConfigFactory
     Network::ListenerFilterFactoryCb
-    createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Configuration::ListenerFactoryContext&) override {
+    createFilterFactoryFromProto(const Protobuf::Message&, Configuration::ListenerFactoryContext&,
+                                 const Server::Configuration::FilterChainContext&) override {
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilterIPv6>());
       };

@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -23,6 +24,12 @@ public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
+};
+
+class FilterChainContextImpl : public Configuration::FilterChainContext {
+public:
+  FilterChainContextImpl(uint64_t tag);
+  uint64_t tag_;
 };
 
 class FilterChainManagerImpl;

@@ -103,7 +103,8 @@ ProtocolType ProtocolOptionsConfigImpl::protocol(ProtocolType downstream_protoco
 
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    const Server::Configuration::FilterChainContext&) {
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {

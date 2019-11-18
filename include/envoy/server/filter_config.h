@@ -95,6 +95,8 @@ public:
   virtual Api::Api& api() PURE;
 };
 
+class FilterChainContext {};
+
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
  * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
@@ -332,8 +334,9 @@ public:
    * @param context supplies the filter's context.
    * @return Network::FilterFactoryCb the factory creation function.
    */
-  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                FactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message& config, FactoryContext& context,
+      const Server::Configuration::FilterChainContext& filter_chain_context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter

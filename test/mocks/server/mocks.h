@@ -606,6 +606,8 @@ public:
   testing::NiceMock<Envoy::Api::MockApi> api_{};
 };
 
+class MockFilterChainContext : public virtual FilterChainContext {};
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

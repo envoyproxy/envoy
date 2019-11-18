@@ -69,7 +69,8 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-    Configuration::FactoryContext& context) {
+    Configuration::FactoryContext& context,
+    const Server::Configuration::FilterChainContext& filter_chain_context) {
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
@@ -89,7 +90,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
 
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
-    Network::FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
+    Network::FilterFactoryCb callback =
+        factory.createFilterFactoryFromProto(*message, context, filter_chain_context);
     ret.push_back(callback);
   }
   return ret;
@@ -684,6 +686,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   workers_started_ = true;
   uint32_t i = 0;
   for (const auto& worker : workers_) {
+    ENVOY_LOG(info, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener);
@@ -820,12 +823,12 @@ ListenerFilterChainFactoryBuilder::InternalBuilder::buildFilterChainInternal(
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-
+  FilterChainContextImpl filter_chain_context{tag};
   return std::make_unique<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, outer_builder_.factory_context_,
                                                   std::move(server_names)),
       outer_builder_.parent_.parent_.factory_.createNetworkFilterFactoryList(
-          filter_chain.filters(), outer_builder_.parent_),
+          filter_chain.filters(), outer_builder_.parent_, filter_chain_context),
       tag);
 }
 

@@ -55,7 +55,9 @@ class ThriftFilterConfigTestBase {
 public:
   void testConfig(envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& config) {
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
+    EXPECT_NO_THROW({
+      cb = factory_.createFilterFactoryFromProto(config, context_, MockFilterChainContext{});
+    });
     EXPECT_TRUE(factory_.isTerminalFilter());
 
     Network::MockConnection connection;
@@ -87,7 +89,8 @@ INSTANTIATE_TEST_SUITE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
 
 TEST_F(ThriftFilterConfigTest, ValidateFail) {
   EXPECT_THROW(factory_.createFilterFactoryFromProto(
-                   envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy(), context_),
+                   envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy(), context_,
+                   MockFilterChainContext{}),
                ProtoValidationException);
 }
 
@@ -150,8 +153,9 @@ thrift_filters:
   envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy config =
       parseThriftProxyFromV2Yaml(yaml);
 
-  EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
-                          "no_such_filter");
+  EXPECT_THROW_WITH_REGEX(
+      factory_.createFilterFactoryFromProto(config, context_, MockFilterChainContext{}),
+      EnvoyException, "no_such_filter");
 }
 
 // Test config with multiple filters.

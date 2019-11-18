@@ -21,7 +21,8 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
-      Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::FactoryContext& context,
+      const Server::Configuration::FilterChainContext& filter_chain_context) override;
 };
 
 } // namespace TcpProxy

@@ -12,7 +12,8 @@ namespace ClientSslAuth {
 
 Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    const Server::Configuration::FilterChainContext&) {
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());
 

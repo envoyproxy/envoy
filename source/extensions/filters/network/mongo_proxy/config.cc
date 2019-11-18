@@ -15,7 +15,8 @@ namespace MongoProxy {
 
 Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::mongo_proxy::v2::MongoProxy& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    const Server::Configuration::FilterChainContext&) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 

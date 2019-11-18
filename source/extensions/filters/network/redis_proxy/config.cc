@@ -26,7 +26,8 @@ inline void addUniqueClusters(
 
 Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    const Server::Configuration::FilterChainContext&) {
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(proto_config.has_settings());

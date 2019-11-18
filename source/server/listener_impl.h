@@ -261,6 +261,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
+  bool started_on_worker_{false};
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

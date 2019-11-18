@@ -74,6 +74,8 @@ public:
   void enableListeners() override;
   const std::string& statPrefix() override { return per_handler_stat_prefix_; }
 
+  class FilterChainDrainManager {};
+
   /**
    * Wrapper for an active listener owned by this handler.
    */
