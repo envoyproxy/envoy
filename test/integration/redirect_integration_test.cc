@@ -113,7 +113,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
   EXPECT_EQ("authority2", upstream_request_->headers().Host()->value().getStringView());
   EXPECT_EQ("via_value", upstream_request_->headers().Via()->value().getStringView());
 
-  Http::TestHeaderMapImpl response_with_big_body({{":status", "200"}, {"content-length", "2000000"}});
+  Http::TestHeaderMapImpl response_with_big_body(
+      {{":status", "200"}, {"content-length", "2000000"}});
   upstream_request_->encodeHeaders(response_with_big_body, false);
   upstream_request_->encodeData(2000000, true);
 
