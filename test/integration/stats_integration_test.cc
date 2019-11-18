@@ -259,7 +259,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/10/17  8484     43340       44000   stats: add unit support to histogram
   // 2019/11/01  8859     43563       44000   build: switch to libc++ by default
   // 2019/11/15  9040     43371       44000   build: update protobuf to 3.10.1
-  // 2019/11/13  8779     42856       43000   use var-length coding for name length
+  // 2019/11/18  8779     42887       43000   use var-length coding for name length
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -273,7 +273,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 42856); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 42887); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 
@@ -306,7 +306,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/10/17  8484     34998       35000   stats: add unit support to histogram
   // 2019/11/01  8859     35221       36000   build: switch to libc++ by default
   // 2019/11/15  9040     35029       35500   build: update protobuf to 3.10.1
-  // 2019/11/13  8779     34990       35000   use var-length coding for name lengths
+  // 2019/11/13  8779     35021       35000   use var-length coding for name lengths
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -320,7 +320,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35029); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 35021); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 35500);
 }
 
