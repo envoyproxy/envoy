@@ -894,12 +894,16 @@ message RetryPolicy {
   }
 
   message RetryBudget {
-    // Specifies the limit on concurrent retries as a percentage of outstanding requests.
+    // Specifies the limit on concurrent retries as a percentage of outstanding requests. This
+    // parameter is optional.
+    //
     // Defaults to 20%.
     type.Percent percent_budget = 1;
 
-    // Specifies the minimum retry concurrency allowed for the retry budget.
-    // Defaults to 3.
+    // Specifies the minimum retry concurrency allowed for the retry budget. This parameter is
+    // optional.
+    //
+    // Defaults to 10.
     google.protobuf.UInt32Value min_concurrency = 2;
   }
 

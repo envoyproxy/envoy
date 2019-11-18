@@ -164,6 +164,13 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
   // clang-format on
 
+  //
+  struct RetryBudget {
+    double budget_pct;
+    uint32_t min_concurrency;
+  };
+  using RetryBudget = struct RetryBudget;
+
   virtual ~RetryPolicy() = default;
 
   /**
@@ -227,6 +234,12 @@ public:
    * @return absl::optional<std::chrono::milliseconds> maximum retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
+
+  /**
+   * @return absl::optional<RetryBudget> limit on allowed concurrent retries in relation to current
+   * outstanding requests.
+   */
+  virtual absl::optional<RetryBudget> retryBudget() const PURE;
 };
 
 /**

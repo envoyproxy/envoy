@@ -59,7 +59,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
-      retriable_request_headers_(route_policy.retriableRequestHeaders()) {
+      retriable_request_headers_(route_policy.retriableRequestHeaders()),
+      retry_budget_(route_policy.retryBudget()) {
 
   retry_on_ = route_policy.retryOn();
   retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
@@ -232,12 +233,37 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
     return RetryStatus::No;
   }
 
+  if (retryBudgetExceeded()) {
+    return RetryStatus::NoRetryLimitExceeded;
+  }
+
   ASSERT(!callback_);
   callback_ = callback;
   cluster_.resourceManager(priority_).retries().inc();
   cluster_.stats().upstream_rq_retry_.inc();
   enableBackoffTimer();
   return RetryStatus::Yes;
+}
+
+bool RetryStateImpl::retryBudgetExceeded() {
+  if (!retry_budget_) {
+    return false;
+  }
+
+  // If a retry budget was configured, we cannot exceed the configured percentage of total
+  // outstanding requests/connections.
+
+  // @tallen is this right?
+  const uint64_t current_active = cluster_.resourceManager(priority_).connections().count() +
+                                  cluster_.resourceManager(priority_).requests().count() +
+                                  cluster_.resourceManager(priority_).pendingRequests().count();
+
+  if (current_active < retry_budget_->min_concurrency) {
+    return false;
+  }
+
+  const double normalized_pct = retry_budget_->budget_pct / 100.0;
+  return cluster_.resourceManager(priority_).retries().count() * normalized_pct >= current_active;
 }
 
 RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,

@@ -72,6 +72,7 @@ private:
       open_gauge_.set(canCreate() ? 0 : 1);
     }
     uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
+    uint64_t count() override { return current_.load(); }
 
     /**
      * We set the gauge instead of incrementing and decrementing because,

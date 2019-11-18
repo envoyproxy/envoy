@@ -255,6 +255,7 @@ public:
   }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  absl::optional<RetryBudget> retryBudget() const override { return retry_budget_; }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
@@ -274,6 +275,7 @@ private:
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
+  absl::optional<RetryBudget> retry_budget_;
 };
 
 /**
