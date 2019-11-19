@@ -128,12 +128,12 @@ class MutableHttpConnection;
 
 class PerConnectionObject {
 public:
-  PerConnectionObject(MutableHttpConnection& mutable_connection)
-    : mutable_connection_(mutable_connection) {}
   virtual ~PerConnectionObject() = default;
 
-private:
-  MutableHttpConnection& mutable_connection_;
+  /**
+   * @return MutableHttpConnection& the mutable http connection, this is expected not to be nullptr.
+   */
+  virtual MutableHttpConnection& mutable_http_connection() PURE;
 };
 using PerConnectionObjectSharedPtr = std::shared_ptr<PerConnectionObject>;
 
@@ -143,16 +143,16 @@ using PerConnectionObjectSharedPtr = std::shared_ptr<PerConnectionObject>;
  */
 class MutableHttpConnection {
 public:
-  MutableHttpConnection(Network::Connection& connection)
-    :connection_(connection){}
   virtual ~MutableHttpConnection() = default;
 
   // Fill with the things that we want HTTP filters to be able to do to the connection such as
   // setting certain socket options, etc. Everything needs to be abstracted and then flowed through
   // to the underlying writable Network::Connection.
 
-private:
-  Network::Connection& connection_;
+  /**
+   * @return Network::Connection* the originating connection, this is expected not to be nullptr.
+   */
+  virtual Network::Connection* connection() PURE;
 };
 
 /**
@@ -173,6 +173,8 @@ public:
    * already and if so, return it. Otherwise it will be created via the creation function. Objects
    * are keyed by name and thus can be shared between filters if needed.
    * @param object_name supplies the name of the object to create or fetch.
+   * @param mutable_connection provides abstraction to modify the underlying network connection
+   *        state.
    * @param creation_function supplies function used to create the object if it does not already
    *        exist. The creation function will be passed a mutable HTTP connection object that it
    *        can use for singleton operations against the connection.
@@ -181,6 +183,7 @@ public:
       std::function<PerConnectionObjectSharedPtr(MutableHttpConnection& connection)>;
   virtual PerConnectionObjectSharedPtr
   createPerConnectionObject(const std::string& object_name,
+                            MutableHttpConnection& mutable_connection,
                             const PerConnectionObjectCreator& creation_function) PURE;
 
   /**

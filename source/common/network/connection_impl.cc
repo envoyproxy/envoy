@@ -439,45 +439,6 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
     static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
   }
 }
-void ConnectionImpl::setSocketRecvBufferSize(uint32_t buffer_size) {
-  if (ioHandle().fd() == -1) {
-    return;
-  }
-  // Modify the receive buffer size to 'buffer_size'
-  if (setsockopt(ioHandle().fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t)) == -1) {
-         ENVOY_CONN_LOG(debug,
-             "Failed to modify socket receive buffer size: buffer_size={}", *this, buffer_size);
-  }
-}
-
-uint32_t ConnectionImpl::getSocketRecvBufferSize() {
-  uint32_t option_len;
-  uint32_t recv_buf_size = 0;
-
-  if (ioHandle().fd() == -1) {
-    return 0;
-  }
-  // Read the set receive buffer size as it is double the value configured through
-  // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
-  if (getsockopt(ioHandle().fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len) == -1) { 
-         ENVOY_CONN_LOG(debug, "Failed to read socket receive buffer size", *this);
-  }
-
-  return recv_buf_size;
-}
-
-void ConnectionImpl::setSocketRecvLoWat(uint32_t low_watermark) {
-  if (ioHandle().fd() == -1) {
-    return;
-  }
-  // Modify the receive buffer low watermark to 'low_watermark' value
-  if (setsockopt(
-        ioHandle().fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark, sizeof(uint32_t)) == -1) {
-         ENVOY_CONN_LOG(debug,
-             "Failed to set socket receive buffer low watermark size: buffer_size={}", 
-             *this, low_watermark);
-  }
-}
 
 void ConnectionImpl::onLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);

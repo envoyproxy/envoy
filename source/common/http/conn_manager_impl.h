@@ -3,8 +3,8 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <map>
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -40,8 +40,6 @@
 
 namespace Envoy {
 namespace Http {
-
-//using PerConnectionObjectMap = std::map<const std::string, PerConnectionObjectSharedPtr&>;
 
 /**
  * Implementation of both ConnectionManager and ServerConnectionCallbacks. This is a
@@ -138,9 +136,10 @@ private:
 
     // Http::StreamFilterCallbacks
     const Network::Connection* connection() override;
-    PerConnectionObjectSharedPtr createPerConnectionObject(
-      const std::string& object_name,
-      const PerConnectionObjectCreator& creation_function) override;
+    PerConnectionObjectSharedPtr
+    createPerConnectionObject(const std::string& object_name,
+                              MutableHttpConnection& mutable_connection,
+                              const PerConnectionObjectCreator& creation_function) override;
     Event::Dispatcher& dispatcher() override;
     void resetStream() override;
     Router::RouteConstSharedPtr route() override;
@@ -694,7 +693,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-  static std::map<const std::string, PerConnectionObjectSharedPtr>  per_connection_object_map_;
+  std::map<const std::string, PerConnectionObjectSharedPtr> per_connection_object_map_;
 };
 
 } // namespace Http

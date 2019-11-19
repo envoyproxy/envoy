@@ -304,9 +304,11 @@ private:
 
   // Http::StreamDecoderFilterCallbacks
   const Network::Connection* connection() override { return nullptr; }
-  PerConnectionObjectSharedPtr createPerConnectionObject(
-    const std::string&,
-    const PerConnectionObjectCreator&) override { return nullptr; }
+  PerConnectionObjectSharedPtr
+  createPerConnectionObject(const std::string&, MutableHttpConnection&,
+                            const PerConnectionObjectCreator&) override {
+    return nullptr;
+  }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }

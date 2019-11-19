@@ -85,9 +85,6 @@ public:
   State state() const override;
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
-  void setSocketRecvBufferSize(uint32_t buffer_size) override;
-  uint32_t getSocketRecvBufferSize() override;
-  void setSocketRecvLoWat(uint32_t low_watermark) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return above_high_watermark_; }

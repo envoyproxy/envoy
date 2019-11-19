@@ -134,6 +134,10 @@ public:
   MOCK_METHOD0(connection, const Network::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
+  MOCK_METHOD3(createPerConnectionObject,
+               PerConnectionObjectSharedPtr(const std::string& object_name,
+                                            MutableHttpConnection& mutable_connection,
+                                            const PerConnectionObjectCreator& creation_function));
   MOCK_METHOD0(clusterInfo, Upstream::ClusterInfoConstSharedPtr());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(clearRouteCache, void());
@@ -207,6 +211,10 @@ public:
   MOCK_METHOD0(connection, const Network::Connection*());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(resetStream, void());
+  MOCK_METHOD3(createPerConnectionObject,
+               PerConnectionObjectSharedPtr(const std::string& object_name,
+                                            MutableHttpConnection& mutable_connection,
+                                            const PerConnectionObjectCreator& creation_function));
   MOCK_METHOD0(clusterInfo, Upstream::ClusterInfoConstSharedPtr());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(clearRouteCache, void());
