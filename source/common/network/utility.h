@@ -69,6 +69,20 @@ public:
   static const std::string UNIX_SCHEME;
 
   /**
+   * retrieve host part from authority.
+   * @param authority authority
+   * @return std::string retrieved host
+   */
+  static std::string hostFromAuthrotiry(const absl::string_view& authority);
+
+  /**
+   * retrieve port part from authority.
+   * @param authority authority
+   * @return std::string retrieved port
+   */
+  static std::string portFromAuthrotiry(const absl::string_view& authority);
+
+  /**
    * Resolve a URL.
    * @param url supplies the url to resolve.
    * @return Address::InstanceConstSharedPtr the resolved address.
@@ -133,7 +147,7 @@ public:
    * @return pointer to the Instance, or nullptr if unable to parse the address.
    */
   static Address::InstanceConstSharedPtr
-  parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+  parseInternetAddress(const absl::string_view& ip_address, uint16_t port = 0, bool v6only = true);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws
@@ -152,8 +166,8 @@ public:
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
    * @return pointer to the Instance.
    */
-  static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address,
-                                                                     bool v6only = true);
+  static Address::InstanceConstSharedPtr
+  parseInternetAddressAndPort(const absl::string_view& ip_address, bool v6only = true);
 
   /**
    * Get the local address of the first interface address that is of type
@@ -342,7 +356,7 @@ public:
                                                TimeSource& time_source, uint32_t& packets_dropped);
 
 private:
-  static void throwWithMalformedIp(const std::string& ip_address);
+  static void throwWithMalformedIp(const absl::string_view& ip_address);
 
   /**
    * Takes a number and flips the order in byte chunks. The last byte of the input will be the

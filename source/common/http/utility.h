@@ -414,7 +414,7 @@ struct AuthorityAttributes {
  * @param default_port If passed authority does not have port, this value is returned
  * @return hostname parse result. that includes whether host is IP Address, hostname and portname
  */
-const AuthorityAttributes parseAuthority(const std::string& host, uint32_t default_port = 0);
+const AuthorityAttributes parseAuthority(const absl::string_view& host, uint32_t default_port = 0);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

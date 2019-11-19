@@ -625,47 +625,49 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-const Utility::AuthorityAttributes Utility::parseAuthority(const std::string& host,
+const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_view& host,
                                                            uint32_t default_port) {
-  AuthorityAttributes auth_attr;
-  auth_attr.host = host;
+  Utility::AuthorityAttributes auth_attr;
+  auth_attr.host = std::string(host.data());
   auth_attr.port = default_port;
   const auto comma_pos = host.rfind(":");
   bool have_port = false;
 
-  if ((comma_pos != std::string::npos && comma_pos == host.find(":")) ||
-      host.rfind("]:") != std::string::npos) {
+  if ((comma_pos != absl::string_view::npos && comma_pos == host.find(":")) ||
+      host.rfind("]:") != absl::string_view::npos) {
     have_port = true;
   }
 
-  try {
-    if (have_port) {
+  if (have_port) {
+    try {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddressAndPort(host);
       auth_attr.host = instance->ip()->addressAsString();
       auth_attr.port = instance->ip()->port();
-    } else {
-      const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddress(host, auth_attr.port);
-      auth_attr.host = instance->ip()->addressAsString();
-    }
+      auth_attr.is_ip_address = true;
+    } catch (const EnvoyException&) {
+      // If authority has FQDN and port, Network::Utility::parseInternetAddressAndPort should be
+      // failed so that we must parse authority on here
+      if (comma_pos != absl::string_view::npos && comma_pos == host.find(":")) {
+        auth_attr.host = Network::Utility::hostFromAuthrotiry(host);
+        const auto port_str = Network::Utility::portFromAuthrotiry(host);
+        uint64_t port64 = 0;
 
-    auth_attr.is_ip_address = true;
-  } catch (const EnvoyException&) {
-    // If authority has FQDN and port, Network::Utility::parseInternetAddressAndPort should be
-    // failed so that we must parse authority on here
-    if (comma_pos != std::string::npos && comma_pos == host.find(":")) {
-      auth_attr.host = host.substr(0, comma_pos);
-      const auto port_str = host.substr(comma_pos + 1);
-      uint64_t port64 = 0;
-
-      if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-        port64 = 0;
+        if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+          auth_attr.host = std::string(host.data());
+          port64 = 0;
+        }
+        auth_attr.port = static_cast<uint32_t>(port64);
       }
-      auth_attr.port = port64;
     }
-
-    auth_attr.is_ip_address = false;
+  } else {
+    try {
+      const Network::Address::InstanceConstSharedPtr instance =
+          Network::Utility::parseInternetAddress(host, default_port);
+      auth_attr.host = instance->ip()->addressAsString();
+      auth_attr.is_ip_address = true;
+    } catch (const EnvoyException&) {
+    }
   }
 
   return auth_attr;

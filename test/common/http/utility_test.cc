@@ -756,12 +756,13 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
 }
 
 TEST(HttpUtility, CheckIsIpAddress) {
-  std::array<std::tuple<bool, std::string, std::string, uint16_t>, 15> patterns{
+  std::array<std::tuple<bool, std::string, std::string, uint32_t>, 13> patterns{
       std::make_tuple(true, "1.2.3.4", "1.2.3.4", 0),
       std::make_tuple(true, "1.2.3.4:0", "1.2.3.4", 0),
       std::make_tuple(true, "0.0.0.0:0", "0.0.0.0", 0),
       std::make_tuple(true, "127.0.0.1:0", "127.0.0.1", 0),
       std::make_tuple(true, "[::]:0", "::", 0),
+      std::make_tuple(true, "[::]", "::", 0),
       std::make_tuple(true, "[1::2:3]:0", "1::2:3", 0),
       std::make_tuple(true, "fd12:3456:7890:1234:5678:9012:3456:7890",
                       "fd12:3456:7890:1234:5678:9012:3456:7890", 0),
@@ -773,12 +774,11 @@ TEST(HttpUtility, CheckIsIpAddress) {
 
   for (auto&& pattern : patterns) {
     bool bool_status_pattern = std::get<0>(pattern);
-    std::string& try_host = std::get<1>(pattern);
-    std::string& expect_host = std::get<2>(pattern);
-    uint16_t expect_port = std::get<3>(pattern);
+    auto try_host = std::get<1>(pattern);
+    auto expect_host = std::get<2>(pattern);
+    auto expect_port = std::get<3>(pattern);
 
     const auto host_attributes = Utility::parseAuthority(try_host);
-    ;
     bool is_ip_address = host_attributes.is_ip_address;
 
     if (bool_status_pattern) {
