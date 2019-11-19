@@ -27,16 +27,6 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
-public:
-  ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto any = std::make_unique<ProtobufWkt::Any>();
-    any->set_type_url("UnknownType");
-    any->set_value("\xde\xad\xbe\xef");
-    return any;
-  }
-};
-
 const ProtobufWkt::Value& nullValue() {
   static const ProtobufWkt::Value* v = []() -> ProtobufWkt::Value* {
     auto* vv = new ProtobufWkt::Value();
@@ -57,6 +47,34 @@ ProtobufWkt::Value numberValue(double num) {
   val.set_number_value(num);
   return val;
 }
+
+class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto any = std::make_unique<ProtobufWkt::Any>();
+    any->set_type_url("UnknownType");
+    any->set_value("\xde\xad\xbe\xef");
+    return any;
+  }
+};
+
+class TestSerializedStructFilterState : public StreamInfo::FilterState::Object {
+public:
+  TestSerializedStructFilterState() {
+    (*struct_.mutable_fields())["inner_key"] = stringValue("inner_value");
+  }
+
+  TestSerializedStructFilterState(const ProtobufWkt::Struct& s) { struct_.CopyFrom(s); }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto s = std::make_unique<ProtobufWkt::Struct>();
+    s->CopyFrom(struct_);
+    return s;
+  }
+
+private:
+  ProtobufWkt::Struct struct_;
+};
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0", AccessLogFormatUtils::protocolToString(Http::Protocol::Http10));
@@ -975,6 +993,67 @@ TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
   }
 }
 
+TEST(AccessLogFormatterTest, FilterStateFormatter) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_.setData("key",
+                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("key-struct",
+                                    std::make_unique<TestSerializedStructFilterState>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("key-no-serialization",
+                                    std::make_unique<StreamInfo::FilterState::Object>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  {
+    FilterStateFormatter formatter("key", absl::optional<size_t>());
+
+    EXPECT_EQ("\"test_value\"", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("test_value")));
+  }
+  {
+    FilterStateFormatter formatter("key-struct", absl::optional<size_t>());
+
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}",
+              formatter.format(header, header, header, stream_info));
+
+    ProtobufWkt::Value expected;
+    (*expected.mutable_struct_value()->mutable_fields())["inner_key"] = stringValue("inner_value");
+
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(expected));
+  }
+
+  // not found case
+  {
+    FilterStateFormatter formatter("key-not-found", absl::optional<size_t>());
+
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+  }
+
+  // unserializable case
+  {
+    FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>());
+
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+  }
+
+  // size limit
+  {
+    FilterStateFormatter formatter("key", absl::optional<size_t>(5));
+
+    EXPECT_EQ("\"test", formatter.format(header, header, header, stream_info));
+
+    // N.B. Does not truncate.
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("test_value")));
+  }
+}
+
 TEST(AccessLogFormatterTest, StartTimeFormatter) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
@@ -1158,7 +1237,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
 
   JsonFormatterImpl formatter(key_mapping, true);
 
-  std::string json =
+  const std::string json =
       formatter.format(request_header, response_header, response_trailer, stream_info);
   ProtobufWkt::Struct output;
   MessageUtil::loadFromJson(json, output);
@@ -1166,6 +1245,52 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
   const auto& fields = output.fields();
   EXPECT_EQ("test_value", fields.at("test_key").string_value());
   EXPECT_EQ("inner_value", fields.at("test_obj.inner_key").string_value());
+  EXPECT_EQ("inner_value",
+            fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
+}
+
+TEST(AccessLogFormatterTets, JsonFormatterFilterStateTest) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_.setData("test_key",
+                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"test_key", "\"test_value\""}, {"test_obj", "{\"inner_key\":\"inner_value\"}"}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key", "%FILTER_STATE(test_key)%"}, {"test_obj", "%FILTER_STATE(test_obj)%"}};
+
+  JsonFormatterImpl formatter(key_mapping, false);
+
+  verifyJsonOutput(formatter.format(header, header, header, stream_info), expected_json_map);
+}
+
+TEST(AccessLogFormatterTets, JsonFormatterTypedFilterStateTest) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_.setData("test_key",
+                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key", "%FILTER_STATE(test_key)%"}, {"test_obj", "%FILTER_STATE(test_obj)%"}};
+
+  JsonFormatterImpl formatter(key_mapping, true);
+
+  std::string json = formatter.format(header, header, header, stream_info);
+  ProtobufWkt::Struct output;
+  MessageUtil::loadFromJson(json, output);
+
+  const auto& fields = output.fields();
+  EXPECT_EQ("test_value", fields.at("test_key").string_value());
   EXPECT_EQ("inner_value",
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
 }
@@ -1226,6 +1351,45 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
       }
     }
   }
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterTypedTest) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
+      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+
+  ProtobufWkt::Value list;
+  list.mutable_list_value()->add_values()->set_bool_value(true);
+  list.mutable_list_value()->add_values()->set_string_value("two");
+  list.mutable_list_value()->add_values()->set_number_value(3.14);
+
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["list"] = list;
+
+  stream_info.filter_state_.setData("test_obj",
+                                    std::make_unique<TestSerializedStructFilterState>(s),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"request_duration", "%REQUEST_DURATION%"},
+      {"request_duration_multi", "%REQUEST_DURATION%ms"},
+      {"filter_state", "%FILTER_STATE(test_obj)%"},
+  };
+
+  JsonFormatterImpl formatter(key_mapping, true);
+
+  const auto json = formatter.format(header, header, header, stream_info);
+  ProtobufWkt::Struct output;
+  MessageUtil::loadFromJson(json, output);
+
+  EXPECT_THAT(output.fields().at("request_duration"), ProtoEq(numberValue(5.0)));
+  EXPECT_THAT(output.fields().at("request_duration_multi"), ProtoEq(stringValue("5ms")));
+
+  ProtobufWkt::Value expected;
+  expected.mutable_struct_value()->CopyFrom(s);
+  EXPECT_THAT(output.fields().at("filter_state"), ProtoEq(expected));
 }
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
@@ -1397,7 +1561,3 @@ TEST(AccessLogFormatterTest, ParserFailures) {
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy
-
-// TODO: test json formatter with filter state
-// TODO: test filter state truncation
-// TODO: test numeric json output

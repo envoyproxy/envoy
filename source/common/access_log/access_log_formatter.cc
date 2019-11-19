@@ -10,6 +10,7 @@
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/http/utility.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -71,10 +72,6 @@ const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
 
 FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
-}
-
-std::string AccessLogFormatUtils::durationToString(const std::chrono::nanoseconds& time) {
-  return fmt::format_int(std::chrono::duration_cast<std::chrono::milliseconds>(time).count()).str();
 }
 
 const std::string&
@@ -693,11 +690,6 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.issuerPeerCertificate();
         });
-  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.subjectPeerCertificate();
-        });
   } else if (field_name == "DOWNSTREAM_PEER_CERT") {
     field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
         [](const Ssl::ConnectionInfo& connection_info) {
@@ -967,9 +959,8 @@ FilterStateFormatter::formatValue(const Http::HeaderMap&, const Http::HeaderMap&
 
   // TODO(zuercher): find a way to perform this without converting to JSON and back.
   ProtobufWkt::Value val;
-  ProtobufWkt::Struct* str = val.mutable_struct_value();
   try {
-    MessageUtil::loadFromJson(json, *str);
+    MessageUtil::loadFromJson(json, val, ProtobufMessage::getNullValidationVisitor());
   } catch (EnvoyException& ex) {
     // Unlikely since it was just generated.
     return unspecifiedValue();
