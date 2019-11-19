@@ -44,13 +44,14 @@ public:
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
+  NiceMock<Server::Configuration::MockFilterChainContext> filter_chain_context_;
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
   EXPECT_THROW(
       HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager(),
-          context_, Server::Configuration::MockFilterChainContext{}),
+          context_, filter_chain_context_),
       ProtoValidationException);
 }
 
@@ -785,10 +786,10 @@ http_filters:
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.thread_local_, allocateSlot());
-  Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(
-      proto_config, context_, Server::Configuration::MockFilterChainContext{});
-  Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(
-      proto_config, context_, Server::Configuration::MockFilterChainContext{});
+  Network::FilterFactoryCb cb1 =
+      factory.createFilterFactoryFromProto(proto_config, context_, filter_chain_context_);
+  Network::FilterFactoryCb cb2 =
+      factory.createFilterFactoryFromProto(proto_config, context_, filter_chain_context_);
   EXPECT_TRUE(factory.isTerminalFilter());
 }
 

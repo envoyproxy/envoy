@@ -609,6 +609,7 @@ public:
 };
 
 class MockFilterChainContext : public virtual FilterChainContext {
+public:
   MOCK_CONST_METHOD0(getTag, uint64_t());
 };
 

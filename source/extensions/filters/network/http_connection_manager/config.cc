@@ -108,12 +108,11 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // as these captured objects are also global singletons.
   return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
           filter_config, &context,
-          &filter_chain_context](Network::FilterManager& filter_manager) -> void {
+          tag = filter_chain_context.getTag()](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *filter_config, context.drainDecision(), context.filterChainDrainDecision(),
-        filter_chain_context.getTag(), context.random(), context.httpContext(), context.runtime(),
-        context.localInfo(), context.clusterManager(), &context.overloadManager(),
-        context.dispatcher().timeSource())});
+        *filter_config, context.drainDecision(), context.filterChainDrainDecision(), tag,
+        context.random(), context.httpContext(), context.runtime(), context.localInfo(),
+        context.clusterManager(), &context.overloadManager(), context.dispatcher().timeSource())});
   };
 }
 
