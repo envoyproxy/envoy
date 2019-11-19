@@ -409,10 +409,10 @@ struct AuthorityAttributes {
 };
 
 /**
- * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and portname
+ * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name
  * @param host host/authority
  * @param default_port If passed authority does not have port, this value is returned
- * @return hostname parse result. that includes whether host is IP Address, hostname and portname
+ * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 const AuthorityAttributes parseAuthority(const absl::string_view& host, uint32_t default_port = 0);
 } // namespace Utility
