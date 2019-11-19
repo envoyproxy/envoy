@@ -86,9 +86,10 @@ private:
 class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message&, Server::Configuration::FactoryContext& context,
-      const FilterChainContextServer::Configuration::FilterChainContext&) override {
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext& context,
+                               const Server::Configuration::FilterChainContext&) override {
     return [&context](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
     };

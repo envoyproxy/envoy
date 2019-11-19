@@ -243,10 +243,11 @@ public:
   }
 
   MOCK_METHOD1(createLdsApi_, LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config));
-  MOCK_METHOD2(createNetworkFilterFactoryList,
+  MOCK_METHOD3(createNetworkFilterFactoryList,
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                   Configuration::FactoryContext& context));
+                   Configuration::FactoryContext& context,
+                   const Configuration::FilterChainContext& filter_chain_context));
   MOCK_METHOD2(createListenerFilterFactoryList,
                std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
@@ -498,6 +499,7 @@ public:
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(drainDecision, const Network::DrainDecision&());
+  MOCK_METHOD0(filterChainDrainDecision, const Network::PartitionedDrainDecision&());
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());

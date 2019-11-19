@@ -21,6 +21,8 @@
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_creator.h"
 
+#include "server/drain_manager_util.h"
+
 #include "test/common/http/conn_manager_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -424,8 +426,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   filter_callbacks.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
-  ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
-                                     cluster_manager, nullptr, config.time_system_);
+  ConnectionManagerImpl conn_manager(
+      config, drain_close, Server::PartitionedDrainCloseAdapter(drain_close), 0, random,
+      http_context, runtime, local_info, cluster_manager, nullptr, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

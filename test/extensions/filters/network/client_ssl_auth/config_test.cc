@@ -43,8 +43,8 @@ ip_white_list:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, context, MockFilterChainContext{});
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
+      proto_config, context, Server::Configuration::MockFilterChainContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -61,8 +61,8 @@ ip_white_list:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, context, MockFilterChainContext{});
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
+      proto_config, context, Server::Configuration::MockFilterChainContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -82,8 +82,8 @@ ip_white_list:
           factory.createEmptyConfigProto().get());
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, context, MockFilterChainContext{});
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
+      proto_config, context, Server::Configuration::MockFilterChainContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -93,7 +93,7 @@ TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ClientSslAuthConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth(), context,
-                   MockFilterChainContext{}),
+                   Server::Configuration::MockFilterChainContext{}),
                ProtoValidationException);
 }
 

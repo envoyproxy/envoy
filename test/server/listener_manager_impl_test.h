@@ -103,7 +103,7 @@ protected:
         .WillOnce(Invoke([raw_listener, need_init](
                              const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
                              Configuration::FactoryContext& context,
-                             const Server::Configuration::FilterChainContext& filter_chain_context)
+                             const Server::Configuration::FilterChainContext&)
                              -> std::vector<Network::FilterFactoryCb> {
           std::shared_ptr<ListenerHandle> notifier(raw_listener);
           raw_listener->context_ = &context;
