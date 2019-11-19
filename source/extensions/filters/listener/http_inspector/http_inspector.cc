@@ -19,8 +19,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace HttpInspector {
 
-Config::Config(Stats::Scope& scope)
-    : stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
+Config::Config(Stats::Scope& scope) : scope_(scope) {}
 
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
@@ -47,6 +46,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   }
 
   cb_ = &cb;
+  config_->createStats(socket.localAddress()->asString());
+
   const ParseState parse_state = onRead();
   switch (parse_state) {
   case ParseState::Error:

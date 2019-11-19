@@ -35,9 +35,10 @@ public:
 
   void init(bool include_inline_recv = true) {
     filter_ = std::make_unique<Filter>(cfg_);
-
+    local_address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(Return("raw_buffer"));
+    EXPECT_CALL(socket_, localAddress()).WillRepeatedly(ReturnRef(local_address_));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
@@ -55,6 +56,7 @@ public:
     }
   }
 
+  Network::Address::InstanceConstSharedPtr local_address_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Stats::IsolatedStoreImpl store_;
@@ -88,6 +90,7 @@ TEST_F(HttpInspectorTest, InlineReadIoError) {
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   // It's arguable if io error should bump the not_found counter
   EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InlineReadInspectHttp10) {
@@ -111,6 +114,7 @@ TEST_F(HttpInspectorTest, InlineReadInspectHttp10) {
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::Continue);
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http10_found", cfg_->stats().http10_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InlineReadParseError) {
@@ -132,6 +136,7 @@ TEST_F(HttpInspectorTest, InlineReadParseError) {
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::Continue);
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InspectHttp10) {
@@ -155,6 +160,7 @@ TEST_F(HttpInspectorTest, InspectHttp10) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http10_found", cfg_->stats().http10_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InspectHttp11) {
@@ -178,6 +184,7 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http11_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http11_found", cfg_->stats().http11_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
@@ -201,6 +208,7 @@ TEST_F(HttpInspectorTest, InspectHttp11WithNonEmptyRequestBody) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http11_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http11_found", cfg_->stats().http11_found_.name());
 }
 
 TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
@@ -221,6 +229,7 @@ TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http11_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http11_found", cfg_->stats().http11_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpMethod) {
@@ -238,6 +247,7 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(0, cfg_->stats().http11_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http11_found", cfg_->stats().http11_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
@@ -255,6 +265,7 @@ TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
   EXPECT_CALL(cb_, continueFilterChain(_));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, OldHttpProtocol) {
@@ -273,6 +284,7 @@ TEST_F(HttpInspectorTest, OldHttpProtocol) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http10_found", cfg_->stats().http10_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InvalidRequestLine) {
@@ -290,6 +302,7 @@ TEST_F(HttpInspectorTest, InvalidRequestLine) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InspectHttp2) {
@@ -316,6 +329,7 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http2_found", cfg_->stats().http2_found_.name());
 }
 
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
@@ -335,6 +349,7 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   EXPECT_CALL(cb_, continueFilterChain(true)).Times(0);
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, ReadError) {
@@ -346,6 +361,7 @@ TEST_F(HttpInspectorTest, ReadError) {
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().read_error_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.read_error", cfg_->stats().read_error_.name());
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
@@ -386,6 +402,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http2_found", cfg_->stats().http2_found_.name());
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
@@ -419,6 +436,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
@@ -452,6 +470,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http10_found", cfg_->stats().http10_found_.name());
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
@@ -482,6 +501,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
   while (!end_stream) {
     file_event_callback_(Event::FileReadyType::Read);
   }
@@ -517,6 +537,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
@@ -551,6 +572,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http_not_found", cfg_->stats().http_not_found_.name());
 }
 
 TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
@@ -596,6 +618,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http10_found", cfg_->stats().http10_found_.name());
 }
 
 TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
@@ -632,6 +655,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+  EXPECT_EQ("http_inspector.1.2.3.4:80.http10_found", cfg_->stats().http10_found_.name());
 }
 
 } // namespace

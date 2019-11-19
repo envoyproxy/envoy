@@ -34,6 +34,8 @@ struct HttpInspectorStats {
   ALL_HTTP_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+using HttpInspectorStatsPtr = std::unique_ptr<HttpInspectorStats>;
+
 enum class ParseState {
   // Parse result is out. It could be http family or empty.
   Done,
@@ -50,12 +52,22 @@ class Config {
 public:
   Config(Stats::Scope& scope);
 
-  const HttpInspectorStats& stats() const { return stats_; }
+  void createStats(const std::string& address) {
+    stats_ = std::make_unique<HttpInspectorStats>(generateStats(address));
+  }
+
+  const HttpInspectorStats& stats() const { return *stats_; }
 
   static constexpr uint32_t MAX_INSPECT_SIZE = 8192;
 
 private:
-  HttpInspectorStats stats_;
+  HttpInspectorStats generateStats(const std::string& address) {
+    return {ALL_HTTP_INSPECTOR_STATS(
+        POOL_COUNTER_PREFIX(scope_, absl::StrCat("http_inspector.", address, ".")))};
+  }
+
+  Stats::Scope& scope_;
+  HttpInspectorStatsPtr stats_{nullptr};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
