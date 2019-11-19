@@ -136,7 +136,13 @@ public:
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
    *         they should be doing graceful closes on connections when possible.
    */
-  virtual const Network::DrainDecision& drainDecision() PURE;
+  virtual Network::DrainDecision& drainDecision() PURE;
+
+  /**
+   * @return const FilterChainDrainDecision& a drain decision that filters can use to determine if
+   *         they should be doing graceful closes on connections when possible.
+   */
+  virtual const Network::PartitionedDrainDecision& filterChainDrainDecision() PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.

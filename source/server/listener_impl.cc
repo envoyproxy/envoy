@@ -97,6 +97,13 @@ Network::SocketSharedPtr UdpListenSocketFactory::getListenSocket() {
   return socket;
 }
 
+FilterChainDrainDecision::FilterChainDrainDecision(ListenerImpl& listener) : listener_(listener) {}
+
+bool FilterChainDrainDecision::drainClose(uint64_t) const {
+  UNREFERENCED_PARAMETER(listener_);
+  return false;
+}
+
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                            bool workers_started, uint64_t hash,
@@ -120,7 +127,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
-      continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
+      continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      filter_chain_drain_(*this) {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -283,6 +291,9 @@ Upstream::ClusterManager& ListenerImpl::clusterManager() {
 }
 Event::Dispatcher& ListenerImpl::dispatcher() { return parent_.server_.dispatcher(); }
 Network::DrainDecision& ListenerImpl::drainDecision() { return *this; }
+Network::PartitionedDrainDecision& ListenerImpl::filterChainDrainDecision() {
+  return filter_chain_drain_;
+}
 Grpc::Context& ListenerImpl::grpcContext() { return parent_.server_.grpcContext(); }
 bool ListenerImpl::healthCheckFailed() { return parent_.server_.healthCheckFailed(); }
 Tracing::HttpTracer& ListenerImpl::httpTracer() { return httpContext().tracer(); }

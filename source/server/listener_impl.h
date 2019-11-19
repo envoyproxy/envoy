@@ -84,6 +84,18 @@ public:
   }
 };
 
+class ListenerImpl;
+
+class FilterChainDrainDecision : public Network::PartitionedDrainDecision {
+public:
+  FilterChainDrainDecision(ListenerImpl& listener);
+  virtual ~FilterChainDrainDecision() = default;
+  bool drainClose(uint64_t filter_chain_tag) const override;
+
+private:
+  ListenerImpl& listener_;
+};
+
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
 
@@ -171,6 +183,8 @@ public:
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
   Network::DrainDecision& drainDecision() override;
+  Network::PartitionedDrainDecision& filterChainDrainDecision() override;
+
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Tracing::HttpTracer& httpTracer() override;
@@ -262,6 +276,7 @@ private:
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
   bool started_on_worker_{false};
+  FilterChainDrainDecision filter_chain_drain_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
