@@ -360,7 +360,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
       strict_header_validation_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
+      connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.connection_header_sanitization")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -532,6 +534,15 @@ int ConnectionImpl::onHeadersCompleteBase() {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
     }
+  } else if (connection_header_sanitization_ && current_header_map_->Connection()) {
+    // If we fail to sanitize the request, return a 400 to the client
+    if (!Utility::sanitizeConnectionHeader(*current_header_map_)) {
+      absl::string_view header_value = current_header_map_->Connection()->value().getStringView();
+      ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
+                     header_value);
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError();
+    }
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));
@@ -628,9 +639,9 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   // request-target. A proxy that forwards such a request MUST generate a
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
-  headers.insertHost().value(std::string(absolute_url.host_and_port()));
+  headers.setHost(absolute_url.host_and_port());
 
-  headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
+  headers.setPath(absolute_url.path_and_query_params());
   active_request_->request_url_.clear();
 }
 
@@ -650,7 +661,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     handlePath(*headers, parser_.method);
     ASSERT(active_request_->request_url_.empty());
 
-    headers->insertMethod().value(method_string, strlen(method_string));
+    headers->setMethod(method_string);
 
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
     // presence of content-length or chunked transfer-encoding indicates a body vs. a particular
@@ -787,7 +798,7 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
-  headers->insertStatus().value(parser_.status_code);
+  headers->setStatus(parser_.status_code);
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed

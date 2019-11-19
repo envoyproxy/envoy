@@ -308,7 +308,8 @@ private:
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
 
-  bool strict_header_validation_;
+  const bool strict_header_validation_;
+  const bool connection_header_sanitization_;
 };
 
 /**

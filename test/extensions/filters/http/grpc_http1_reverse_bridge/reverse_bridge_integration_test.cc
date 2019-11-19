@@ -83,15 +83,15 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
 
   // Respond to the request.
   Http::TestHeaderMapImpl response_headers;
-  response_headers.insertStatus().value(200);
-  response_headers.insertContentType().value(std::string("application/x-protobuf"));
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-protobuf");
   upstream_request_->encodeHeaders(response_headers, false);
 
   Buffer::OwnedImpl response_data{"defgh"};
   upstream_request_->encodeData(response_data, false);
 
   Http::TestHeaderMapImpl response_trailers;
-  response_trailers.insertGrpcStatus().value(std::string("0"));
+  response_trailers.setGrpcStatus(std::string("0"));
   upstream_request_->encodeTrailers(response_trailers);
 
   response->waitForEndStream();
