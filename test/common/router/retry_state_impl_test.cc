@@ -51,39 +51,42 @@ public:
   void incrOutstandingResource(TestResourceType resource, uint32_t num) {
     for (uint32_t i = 0; i < num; ++i) {
       switch (resource) {
-        case TestResourceType::Retry:
-          cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().inc();
-          resource_manager_cleanup_tasks_.emplace_back([this]() {
-            cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().dec();
-          });
-          break;
-        case TestResourceType::Connection:
-          cluster_.resourceManager(Upstream::ResourcePriority::Default).connections().inc();
-          resource_manager_cleanup_tasks_.emplace_back([this]() {
-            cluster_.resourceManager(Upstream::ResourcePriority::Default).connections().dec();
-          });
-          break;
-        case TestResourceType::Request:
-          cluster_.resourceManager(Upstream::ResourcePriority::Default).requests().inc();
-          resource_manager_cleanup_tasks_.emplace_back([this]() {
-            cluster_.resourceManager(Upstream::ResourcePriority::Default).requests().dec();
-          });
-          break;
-        case TestResourceType::PendingRequest:
-          cluster_.resourceManager(Upstream::ResourcePriority::Default).pendingRequests().inc();
-          resource_manager_cleanup_tasks_.emplace_back([this]() {
-            cluster_.resourceManager(Upstream::ResourcePriority::Default).pendingRequests().dec();
-          });
-          break;
+      case TestResourceType::Retry:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().dec();
+        });
+        break;
+      case TestResourceType::Connection:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).connections().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).connections().dec();
+        });
+        break;
+      case TestResourceType::Request:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).requests().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).requests().dec();
+        });
+        break;
+      case TestResourceType::PendingRequest:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).pendingRequests().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).pendingRequests().dec();
+        });
+        break;
       }
     }
   }
 
-  void TearDown() override {
+  void cleanupOutstandingResources() {
     for (auto& task : resource_manager_cleanup_tasks_) {
       task();
     }
+    resource_manager_cleanup_tasks_.clear();
   }
+
+  void TearDown() override { cleanupOutstandingResources(); }
 
   NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
@@ -937,14 +940,16 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceCxAllow) {
   policy_.retry_budget_ = RetryPolicy::RetryBudget();
   policy_.retry_budget_->budget_pct = 20.0;
   policy_.retry_budget_->min_concurrency = 5;
-  cluster_.resetResourceManager(50 /* cx */, 50 /* rq_pending */, 50 /* rq */, 50 /* rq_retry */, 50 /* conn_pool */);
+  cluster_.resetResourceManager(10 /* cx */, 10 /* rq_pending */, 10 /* rq */, 10 /* rq_retry */,
+                                10 /* conn_pool */);
 
-  // Have 5 active connections, causing retry to be allowed.
-  incrOutstandingResource(TestResourceType::Connection, 5);
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "5"}};
 
-  Http::TestHeaderMapImpl request_headers{
-    {"x-envoy-retry-on", "5xx"},
-    {"x-envoy-max-retries", "5"}};
+  // Mix of requests/connections that meet the minimum concurrency.
+  incrOutstandingResource(TestResourceType::Connection, 1);
+  incrOutstandingResource(TestResourceType::Request, 2);
+  incrOutstandingResource(TestResourceType::PendingRequest, 2);
 
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -954,27 +959,54 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceCxAllow) {
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
 }
 
-// Test percentage-based retry budgets configured to disallow retries.
-TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceCxDisallow) {
+// Test percentage-based retry budgets that haven't met the minimum concurrency. It is expected that
+// the budget will not be enforced.
+TEST_F(RouterRetryStateImplTest, RetryBudgetMinimumConcurrency) {
   policy_.retry_budget_ = RetryPolicy::RetryBudget();
   policy_.retry_budget_->budget_pct = 20.0;
   policy_.retry_budget_->min_concurrency = 5;
-  cluster_.resetResourceManager(50 /* cx */, 0 /* rq_pending */, 0 /* rq */, 11 /* rq_retry */, 0 /* conn_pool */);
+  cluster_.resetResourceManager(10 /* cx */, 10 /* rq_pending */, 10 /* rq */, 11 /* rq_retry */,
+                                10 /* conn_pool */);
 
-  // Have 5 active connections and 1 active retry. This exceeds the 20%, so retry should not be
-  // allowed
   incrOutstandingResource(TestResourceType::Retry, 1);
-  incrOutstandingResource(TestResourceType::Connection, 5);
+  incrOutstandingResource(TestResourceType::Request, 1);
 
-  Http::TestHeaderMapImpl request_headers{
-    {"x-envoy-retry-on", "5xx"},
-    {"x-envoy-max-retries", "5"}};
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "5"}};
 
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
+  // Even though there's a 1:1 ratio between retries and outstanding requests with a 20% budget
+  // configured, the minimum concurrency requirement hasn't been met. Therefore, we expect the retry
+  // to be allowed since max retries are 5.
+  expectTimerCreateAndEnable();
   Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
-  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded, state_->shouldRetryHeaders(bad_response_headers, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
+}
+
+// Test percentage-based retry budgets configured to disallow retries.
+TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceDisallow) {
+  policy_.retry_budget_ = RetryPolicy::RetryBudget();
+  policy_.retry_budget_->budget_pct = 20.0;
+  policy_.retry_budget_->min_concurrency = 5;
+  cluster_.resetResourceManager(50 /* cx */, 10 /* rq_pending */, 10 /* rq */, 11 /* rq_retry */,
+                                10 /* conn_pool */);
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "5"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  // Mix of requests/connections that meet the minimum concurrency.
+  incrOutstandingResource(TestResourceType::Retry, 1);
+  incrOutstandingResource(TestResourceType::Connection, 3);
+  incrOutstandingResource(TestResourceType::Request, 2);
+
+  Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryHeaders(bad_response_headers, callback_));
 }
 
 } // namespace
