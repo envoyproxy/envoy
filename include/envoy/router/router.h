@@ -164,9 +164,14 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
   // clang-format on
 
-  //
+  /**
+   * Limitations placed on concurrent retries as a percentage of the number of active requests.
+   */
   struct RetryBudget {
+    // The percentage of active requests that are allowed to be retries.
     double budget_pct;
+
+    // The minimum number of active requests before enforcing the retry budget.
     uint32_t min_concurrency;
   };
   using RetryBudget = struct RetryBudget;
