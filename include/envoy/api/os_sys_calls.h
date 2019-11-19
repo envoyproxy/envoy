@@ -24,7 +24,7 @@ public:
   /**
    * @see chmod (man 2 chmod)
    */
-  virtual SysCallIntResult chmod(const std::string& path, int mode) PURE;
+  virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
 
   /**
    * @see ioctl (man 2 ioctl)

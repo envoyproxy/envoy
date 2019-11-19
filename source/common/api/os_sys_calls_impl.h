@@ -13,7 +13,7 @@ class OsSysCallsImpl : public OsSysCalls {
 public:
   // Api::OsSysCalls
   SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) override;
-  SysCallIntResult chmod(const std::string& path, int mode) override;
+  SysCallIntResult chmod(const std::string& path, mode_t mode) override;
   SysCallIntResult ioctl(int sockfd, unsigned long int request, void* argp) override;
   SysCallSizeResult writev(int fd, const iovec* iovec, int num_iovec) override;
   SysCallSizeResult readv(int fd, const iovec* iovec, int num_iovec) override;

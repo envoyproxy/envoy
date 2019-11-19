@@ -15,7 +15,7 @@ SysCallIntResult OsSysCallsImpl::bind(int sockfd, const sockaddr* addr, socklen_
   return {rc, errno};
 }
 
-SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, int mode) {
+SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   const int rc = ::chmod(path.c_str(), mode);
   return {rc, errno};
 }
