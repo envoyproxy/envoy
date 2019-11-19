@@ -116,7 +116,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
-    _com_github_eile_tclap()
+    _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
@@ -230,9 +230,9 @@ def _com_github_envoyproxy_sqlparser():
         actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
     )
 
-def _com_github_eile_tclap():
+def _com_github_mirror_tclap():
     _repository_impl(
-        name = "com_github_eile_tclap",
+        name = "com_github_mirror_tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
         patch_args = ["-p1"],
         # If and when we pick up tclap 1.4 or later release,
@@ -243,7 +243,7 @@ def _com_github_eile_tclap():
     )
     native.bind(
         name = "tclap",
-        actual = "@com_github_eile_tclap//:tclap",
+        actual = "@com_github_mirror_tclap//:tclap",
     )
 
 def _com_github_fmtlib_fmt():
