@@ -761,9 +761,7 @@ TEST(HttpUtility, CheckIsIpAddress) {
       std::make_tuple(true, "1.2.3.4:0", "1.2.3.4", 0),
       std::make_tuple(true, "0.0.0.0:0", "0.0.0.0", 0),
       std::make_tuple(true, "127.0.0.1:0", "127.0.0.1", 0),
-      std::make_tuple(true, "[::1]:0", "::1", 0),
       std::make_tuple(true, "[::]:0", "::", 0),
-      std::make_tuple(true, "[::1]", "::1", 0),
       std::make_tuple(true, "[1::2:3]:0", "1::2:3", 0),
       std::make_tuple(true, "fd12:3456:7890:1234:5678:9012:3456:7890",
                       "fd12:3456:7890:1234:5678:9012:3456:7890", 0),
@@ -771,7 +769,6 @@ TEST(HttpUtility, CheckIsIpAddress) {
       std::make_tuple(true, "[a:b:c:d::]:0", "a:b:c:d::", 0),
       std::make_tuple(false, "hoge.hoge.com", "hoge.hoge.com", 0),
       std::make_tuple(false, "hoge.hoge.com:8000", "hoge.hoge.com", 8000),
-      std::make_tuple(false, "hoge.hoge.com:hoge", "hoge.hoge.com:hoge", 0),
       std::make_tuple(false, "hoge", "hoge", 0)};
 
   for (auto&& pattern : patterns) {

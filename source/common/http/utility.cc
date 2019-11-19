@@ -627,45 +627,44 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
 
 const Utility::AuthorityAttributes Utility::parseAuthority(const std::string& host,
                                                            uint32_t default_port) {
-  const auto colon_pos_front = host.find(':');
-  auto colon_pos = host.rfind(':');
   AuthorityAttributes auth_attr;
   auth_attr.host = host;
   auth_attr.port = default_port;
+  const auto comma_pos = host.rfind(":");
+  bool have_port = false;
 
-  const auto open_bracket_pos = auth_attr.host.find('[');
-  const auto close_bracket_pos = auth_attr.host.find(']');
-
-  bool bracket_pair_exist =
-      open_bracket_pos != absl::string_view::npos && close_bracket_pos != absl::string_view::npos;
-
-  if (colon_pos != absl::string_view::npos && auth_attr.host.find('.') != absl::string_view::npos) {
-    auth_attr.host = host.substr(0, colon_pos);
-    const auto port_str = host.substr(colon_pos + 1);
-
-    if (port_str.empty() || !absl::SimpleAtoi(port_str, &auth_attr.port) ||
-        auth_attr.port > 65535) {
-      auth_attr.host = host;
-      auth_attr.port = default_port;
-    }
-  } else if (colon_pos_front != colon_pos && bracket_pair_exist) {
-    auth_attr.host = host.substr(open_bracket_pos + 1, close_bracket_pos - 1);
-
-    if (close_bracket_pos != host.size() - 1) {
-      const auto port_str = host.substr(close_bracket_pos + 2);
-
-      if (port_str.empty() || !absl::SimpleAtoi(port_str, &auth_attr.port) ||
-          auth_attr.port > 65535) {
-        auth_attr.host = host;
-        auth_attr.port = default_port;
-      }
-    }
+  if ((comma_pos != std::string::npos && comma_pos == host.find(":")) ||
+      host.rfind("]:") != std::string::npos) {
+    have_port = true;
   }
 
   try {
-    Network::Utility::parseInternetAddress(auth_attr.host, auth_attr.port);
+    if (have_port) {
+      const Network::Address::InstanceConstSharedPtr instance =
+          Network::Utility::parseInternetAddressAndPort(host);
+      auth_attr.host = instance->ip()->addressAsString();
+      auth_attr.port = instance->ip()->port();
+    } else {
+      const Network::Address::InstanceConstSharedPtr instance =
+          Network::Utility::parseInternetAddress(host, auth_attr.port);
+      auth_attr.host = instance->ip()->addressAsString();
+    }
+
     auth_attr.is_ip_address = true;
   } catch (const EnvoyException&) {
+    // If authority has FQDN and port, Network::Utility::parseInternetAddressAndPort should be
+    // failed so that we must parse authority on here
+    if (comma_pos != std::string::npos && comma_pos == host.find(":")) {
+      auth_attr.host = host.substr(0, comma_pos);
+      const auto port_str = host.substr(comma_pos + 1);
+      uint64_t port64 = 0;
+
+      if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+        port64 = 0;
+      }
+      auth_attr.port = port64;
+    }
+
     auth_attr.is_ip_address = false;
   }
 
