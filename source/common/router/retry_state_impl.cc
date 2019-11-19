@@ -253,8 +253,6 @@ bool RetryStateImpl::retryBudgetExceeded() {
 
   // If a retry budget was configured, we cannot exceed the configured percentage of total
   // outstanding requests/connections.
-
-  // @tallen is this right?
   const uint64_t current_active = cluster_.resourceManager(priority_).connections().count() +
                                   cluster_.resourceManager(priority_).requests().count() +
                                   cluster_.resourceManager(priority_).pendingRequests().count();
