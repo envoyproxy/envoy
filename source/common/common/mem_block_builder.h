@@ -8,7 +8,7 @@
 namespace Envoy {
 
 // Manages a block of raw memory for objects of type T. T is generally expected
-// to be a POD, where it makes esnse to memcpy over it. This class carries extra
+// to be a POD, where it makes sense to memcpy over it. This class carries extra
 // member variables for tracking size, and a write-pointer to support safe
 // appends.
 //
@@ -23,24 +23,24 @@ namespace Envoy {
 // roughly as efficient as raw memcpy.
 template <class T> class MemBlockBuilder {
 public:
-  // Constructs a MemBlockBuilder allowing for 'size' instances of T.
-  explicit MemBlockBuilder(uint64_t size)
-      : data_(alloc(size)), capacity_(size), capacity_remaining_(size), write_ptr_(data_) {}
-  MemBlockBuilder() : data_(nullptr), capacity_(0), capacity_remaining_(0), write_ptr_(nullptr) {}
-  ~MemBlockBuilder() { reset(); }
+  // Constructs a MemBlockBuilder allowing for 'capacity' instances of T.
+  explicit MemBlockBuilder(uint64_t capacity)
+      : data_(std::make_unique<T[]>(capacity)), capacity_(capacity), capacity_remaining_(capacity),
+        write_ptr_(data_.get()) {}
+  MemBlockBuilder() : capacity_(0), capacity_remaining_(0), write_ptr_(nullptr) {}
 
   /**
    * Populates (or repopulates) the MemBlockBuilder to make it the specified
-   * size. This does not have resize semantics; when populate() is called any
+   * capacity. This does not have resize semantics; when populate() is called any
    * previous contents are erased.
    *
-   * @param size The number of memory elements to allocate.
+   * @param capcity The number of memory elements to allocate.
    */
-  void populate(uint64_t size) {
-    data_ = alloc(size);
-    capacity_ = size;
-    capacity_remaining_ = size;
-    write_ptr_ = data_;
+  void populate(uint64_t capacity) {
+    data_ = std::make_unique<T[]>(capacity);
+    capacity_ = capacity;
+    capacity_remaining_ = capacity;
+    write_ptr_ = data_.get();
   }
 
   /**
@@ -57,6 +57,7 @@ public:
    */
   void appendOne(T object) {
     RELEASE_ASSERT(capacity_remaining_ >= 1, "insufficient capacity");
+    ASSERT(write_ptr_ < (data_.get() + capacity_));
     *write_ptr_++ = object;
     --capacity_remaining_;
   }
@@ -71,6 +72,7 @@ public:
    */
   void appendData(const T* data, uint64_t size) {
     RELEASE_ASSERT(capacity_remaining_ >= size, "insufficient capacity");
+    ASSERT((write_ptr_ + size) <= (data_.get() + capacity_));
     if (size != 0) {
       memcpy(write_ptr_, data, size * sizeof(T));
     }
@@ -83,7 +85,7 @@ public:
    *
    * @param src the block to append.
    */
-  void appendBlock(const MemBlockBuilder& src) { appendData(src.data_, src.size()); }
+  void appendBlock(const MemBlockBuilder& src) { appendData(src.data_.get(), src.size()); }
 
   /**
    * @return the number of elements remaining in the MemBlockBuilder.
@@ -94,10 +96,7 @@ public:
    * Empties the contents of this.
    */
   void reset() {
-    if (data_ != nullptr) {
-      delete [] reinterpret_cast<uint8_t*>(reinterpret_cast<void*>(data_));
-      data_ = nullptr;
-    }
+    data_.reset();
     capacity_ = 0;
     capacity_remaining_ = 0;
     write_ptr_ = nullptr;
@@ -112,9 +111,7 @@ public:
     write_ptr_ = nullptr;
     capacity_ = 0;
     capacity_remaining_ = 0;
-    std::unique_ptr<T[]> ret(data_);
-    data_ = nullptr;
-    return ret;
+    return std::move(data_);
   }
 
   /**
@@ -122,19 +119,15 @@ public:
    *
    * This is exposed to help with unit testing.
    */
-  std::vector<T> toVector() const { return std::vector<T>(data_, write_ptr_); }
+  std::vector<T> toVector() const { return std::vector<T>(data_.get(), write_ptr_); }
 
   /**
    * @return The number of elements the have been added to the builder.
    */
-  uint64_t size() const { return write_ptr_ - data_; }
+  uint64_t size() const { return write_ptr_ - data_.get(); }
 
 private:
-  static T* alloc(uint64_t size) {
-    return reinterpret_cast<T*>(reinterpret_cast<void*>(new uint8_t[size]));
-  }
-
-  T* data_;
+  std::unique_ptr<T[]> data_;
   uint64_t capacity_;
   uint64_t capacity_remaining_;
   T* write_ptr_;

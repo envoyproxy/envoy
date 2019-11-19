@@ -61,27 +61,4 @@ TEST(MemBlockBuilderTest, AppendUint32) {
   EXPECT_EQ(0, mem_block.capacity());
 }
 
-static uint32_t calls_to_constructor = 0;
-static uint32_t calls_to_destructor = 0;
-
-class TrackConstructors {
- public:
-  TrackConstructors() { ++calls_to_constructor; }
-  ~TrackConstructors() { ++calls_to_destructor; }
-};
-
-TEST(MemBlockBuilderTesaet, AppendNonPod) {
-  {
-    MemBlockBuilder<TrackConstructors> mem_block(10);
-  }
-  EXPECT_EQ(0, calls_to_constructor);
-  EXPECT_EQ(0, calls_to_destructor);
-  {
-    MemBlockBuilder<TrackConstructors> mem_block(10);
-    std::unique_ptr<TrackConstructors[]> data = mem_block.release();
-  }
-  EXPECT_EQ(0, calls_to_constructor);
-  EXPECT_EQ(0, calls_to_destructor);
-}
-
 } // namespace Envoy
