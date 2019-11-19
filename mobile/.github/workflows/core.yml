@@ -1,6 +1,8 @@
 name: core
 
-on: [push]
+on:
+  push:
+  pull_request:
 
 jobs:
   unittests:
