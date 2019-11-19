@@ -111,6 +111,8 @@ protected:
     }
   }
 
+  // TODO(bencebeky): Factor out parts common with
+  // EnvoyQuicDispatcherTest::createFullChloPacket() to test_utils.
   void GenerateCHLO(quic::QuicConnectionId connection_id) {
     client_sockets_.push_back(std::make_unique<Socket>(
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/
@@ -255,6 +257,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
 
   // Cancel buffered packet expiration alarm to avoid failing assertion in
   // QuicBufferedPacketStore destructor.
+  // TODO(danzh2010): Remove once #8496 lands.
   auto alarm = quic::test::QuicBufferedPacketStorePeer::expiration_alarm(buffered_packets);
   if (alarm) {
     alarm->Cancel();
