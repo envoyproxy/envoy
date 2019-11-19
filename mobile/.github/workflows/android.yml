@@ -1,6 +1,8 @@
 name: android
 
-on: [push]
+on:
+  push:
+  pull_request:
 
 jobs:
   linuxdist:
