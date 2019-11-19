@@ -964,11 +964,8 @@ message RetryPolicy {
   // HTTP headers which must be present in the request for retries to be attempted.
   repeated HeaderMatcher retriable_request_headers = 10;
 
-  // Specifies a limit on concurrent retries. This parameter is optional.
-  //
-  // .. note::
-  //
-  //   It is not recommended to use retry budgets with retry circuit breakers.
+  // Specifies a limit on concurrent retries in relation to the number of active
+  // requests/connections. This parameter is optional.
   RetryBudget retry_budget = 11;
 }
 

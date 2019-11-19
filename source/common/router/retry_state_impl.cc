@@ -234,6 +234,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   }
 
   if (retryBudgetExceeded()) {
+    cluster_.stats().upstream_rq_retry_budget_exceeded_.inc();
     return RetryStatus::NoRetryLimitExceeded;
   }
 

@@ -957,6 +957,7 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceCxAllow) {
   expectTimerCreateAndEnable();
   Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
+  EXPECT_EQ(0UL, cluster_.stats().upstream_rq_retry_budget_exceeded_.value());
 }
 
 // Test percentage-based retry budgets that haven't met the minimum concurrency. It is expected that
@@ -983,6 +984,7 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetMinimumConcurrency) {
   expectTimerCreateAndEnable();
   Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
+  EXPECT_EQ(0UL, cluster_.stats().upstream_rq_retry_budget_exceeded_.value());
 }
 
 // Test percentage-based retry budgets configured to disallow retries.
@@ -1007,6 +1009,7 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceDisallow) {
   Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryHeaders(bad_response_headers, callback_));
+  EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_budget_exceeded_.value());
 }
 
 } // namespace
