@@ -95,7 +95,11 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class FilterChainContext {};
+class FilterChainContext {
+public:
+  virtual ~FilterChainContext() = default;
+  virtual uint64_t getTag() const PURE;
+};
 
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
@@ -136,11 +140,11 @@ public:
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
    *         they should be doing graceful closes on connections when possible.
    */
-  virtual Network::DrainDecision& drainDecision() PURE;
+  virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return const FilterChainDrainDecision& a drain decision that filters can use to determine if
-   *         they should be doing graceful closes on connections when possible.
+   * @return const PartitionedDrainDecision& a drain decision which take a filter chain id and
+   * return if the connections attached to that filter chain need closing.
    */
   virtual const Network::PartitionedDrainDecision& filterChainDrainDecision() PURE;
 

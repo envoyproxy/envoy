@@ -30,6 +30,9 @@ public:
 class FilterChainContextImpl : public Configuration::FilterChainContext {
 public:
   FilterChainContextImpl(uint64_t tag);
+  uint64_t getTag() const override { return tag_; }
+
+private:
   uint64_t tag_;
 };
 

@@ -51,8 +51,10 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Network::ConnectionCallbacks {
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
-                        Runtime::RandomGenerator& random_generator, Http::Context& http_context,
-                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                        const Network::PartitionedDrainDecision& filter_chain_drain,
+                        uint64_t filter_chain_tag, Runtime::RandomGenerator& random_generator,
+                        Http::Context& http_context, Runtime::Loader& runtime,
+                        const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager* overload_manager, TimeSource& time_system);
   ~ConnectionManagerImpl() override;
@@ -670,6 +672,8 @@ private:
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
   const Network::DrainDecision& drain_close_;
+  const Network::PartitionedDrainDecision& filter_chain_drain_;
+  uint64_t filter_chain_tag_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
   // An idle timer for the connection. This is only armed when there are no streams on the

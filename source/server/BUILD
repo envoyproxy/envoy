@@ -81,7 +81,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "drain_manager_lib",
     srcs = ["drain_manager_impl.cc"],
-    hdrs = ["drain_manager_impl.h"],
+    hdrs = [
+        "drain_manager_impl.h",
+        "drain_manager_util.h",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

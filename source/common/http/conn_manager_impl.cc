@@ -93,20 +93,20 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
   return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
-ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
-                                             const Network::DrainDecision& drain_close,
-                                             Runtime::RandomGenerator& random_generator,
-                                             Http::Context& http_context, Runtime::Loader& runtime,
-                                             const LocalInfo::LocalInfo& local_info,
-                                             Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager* overload_manager,
-                                             TimeSource& time_source)
+ConnectionManagerImpl::ConnectionManagerImpl(
+    ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
+    const Network::PartitionedDrainDecision& filter_chain_drain, uint64_t filter_chain_tag,
+    Runtime::RandomGenerator& random_generator, Http::Context& http_context,
+    Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+    Upstream::ClusterManager& cluster_manager, Server::OverloadManager* overload_manager,
+    TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
-      drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
-      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
-      listener_stats_(config_.listenerStats()),
+      drain_close_(drain_close), filter_chain_drain_(filter_chain_drain),
+      filter_chain_tag_(filter_chain_tag), random_generator_(random_generator),
+      http_context_(http_context), runtime_(runtime), local_info_(local_info),
+      cluster_manager_(cluster_manager), listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_ref_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().StopAcceptingRequests)

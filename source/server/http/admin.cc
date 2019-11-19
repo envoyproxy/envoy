@@ -51,6 +51,8 @@
 #include "common/stats/histogram_impl.h"
 #include "common/upstream/host_utility.h"
 
+#include "server/drain_manager_util.h"
+
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -1307,7 +1309,8 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // Don't pass in the overload manager so that the admin interface is accessible even when
   // the envoy is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
+      *this, server_.drainManager(), PartitionedDrainCloseAdapter(server_.drainManager()),
+      /* filter_chain_tag= */ 0, server_.random(), server_.httpContext(), server_.runtime(),
       server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSource())});
   return true;
 }
