@@ -465,4 +465,9 @@ message JwtAuthentication {
   // The *rules* field above is checked first, if it could not find any matches,
   // check this one.
   FilterStateRule filter_state_rules = 3;
+
+  // When set to true, bypass the `CORS preflight request
+  // <http://www.w3.org/TR/cors/#cross-origin-request-with-preflight>`_ regardless of JWT
+  // requirements specified in the rules.
+  bool bypass_cors_preflight = 4;
 }

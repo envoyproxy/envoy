@@ -3179,7 +3179,7 @@ virtual_hosts:
       hedge_policy: {hedge_on_per_try_timeout: true}
   - match: {prefix: /bar}
     route:
-      hedge_policy: {additional_request_chance: {numerator: 30.0, denominator: HUNDRED}}
+      hedge_policy: {additional_request_chance: {numerator: 30, denominator: HUNDRED}}
       cluster: www
   - match: {prefix: /}
     route: {cluster: www}
@@ -4502,8 +4502,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|path)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -4539,8 +4539,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|regex)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -4576,8 +4576,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(path|regex)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
@@ -5092,6 +5092,37 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
 
   EXPECT_EQ((*it)->name(), "c");
   EXPECT_EQ((*it)->value().value().string_value(), "override3");
+}
+
+TEST(MetadataMatchCriteriaImpl, Filter) {
+  auto pv1 = ProtobufWkt::Value();
+  pv1.set_string_value("v1");
+  auto pv2 = ProtobufWkt::Value();
+  pv2.set_number_value(2.0);
+  auto pv3 = ProtobufWkt::Value();
+  pv3.set_bool_value(true);
+
+  auto metadata_matches = ProtobufWkt::Struct();
+  auto parent_fields = metadata_matches.mutable_fields();
+  parent_fields->insert({"a", pv1});
+  parent_fields->insert({"b", pv2});
+  parent_fields->insert({"c", pv3});
+
+  auto matches = MetadataMatchCriteriaImpl(metadata_matches);
+  auto filtered_matches1 = matches.filterMatchCriteria({"b", "c"});
+  auto filtered_matches2 = matches.filterMatchCriteria({"a"});
+
+  EXPECT_EQ(matches.metadataMatchCriteria().size(), 3);
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria().size(), 2);
+  EXPECT_EQ(filtered_matches2->metadataMatchCriteria().size(), 1);
+
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->name(), "b");
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->value().value().number_value(), 2.0);
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[1]->name(), "c");
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[1]->value().value().bool_value(), true);
+
+  EXPECT_EQ(filtered_matches2->metadataMatchCriteria()[0]->name(), "a");
+  EXPECT_EQ(filtered_matches2->metadataMatchCriteria()[0]->value().value().string_value(), "v1");
 }
 
 class RouteEntryMetadataMatchTest : public testing::Test, public ConfigImplTestBase {};
