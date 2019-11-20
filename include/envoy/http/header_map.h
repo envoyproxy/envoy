@@ -181,9 +181,13 @@ public:
    */
   Type type() const { return type_; }
 
-  bool operator==(const char* rhs) const { return getStringView() == absl::string_view(rhs); }
+  bool operator==(const char* rhs) const {
+    return getStringView() == absl::NullSafeStringView(rhs);
+  }
   bool operator==(absl::string_view rhs) const { return getStringView() == rhs; }
-  bool operator!=(const char* rhs) const { return getStringView() != absl::string_view(rhs); }
+  bool operator!=(const char* rhs) const {
+    return getStringView() != absl::NullSafeStringView(rhs);
+  }
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
