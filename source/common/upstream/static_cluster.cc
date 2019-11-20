@@ -1,4 +1,5 @@
 #include "common/upstream/static_cluster.h"
+
 #include "envoy/common/exception.h"
 
 namespace Envoy {
