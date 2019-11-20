@@ -408,7 +408,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            Event::TestTimeSystem& time_system, bool enable_half_close)
-    : http_type_(type), socket_(std::move(listen_socket)),
+    : http_type_(type), socket_(Network::SocketSharedPtr(listen_socket.release())),
+      socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "fake_upstream")),

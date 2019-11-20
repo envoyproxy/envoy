@@ -59,6 +59,10 @@ public:
 };
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
+  testFormatting("DOWNSTREAM_REMOTE_ADDRESS", "127.0.0.1:0");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
 
@@ -675,6 +679,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%%%PROTOCOL%", {"%HTTP/1.1"}, {}},
       {"%PROTOCOL%%%", {"HTTP/1.1%"}, {}},
       {"%%%PROTOCOL%%%", {"%HTTP/1.1%"}, {}},
+      {"%DOWNSTREAM_REMOTE_ADDRESS%", {"127.0.0.1:0"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
@@ -853,6 +858,10 @@ request_headers_to_add:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     append: true
+  - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -861,6 +870,7 @@ request_headers_to_add:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
 }
 
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
@@ -1097,6 +1107,10 @@ response_headers_to_add:
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     append: true
   - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
+  - header:
       key: "x-request-start"
       value: "%START_TIME(%s.%3f)%"
     append: true
@@ -1139,6 +1153,7 @@ response_headers_to_remove: ["x-nope"]
 
   resp_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
   EXPECT_TRUE(header_map.has("x-request-start-multiple"));
   EXPECT_TRUE(header_map.has("x-safe"));
   EXPECT_FALSE(header_map.has("x-nope"));

@@ -89,6 +89,10 @@ public:
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
+  uint32_t minConcurrency() const {
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
+  }
+
 private:
   class RuntimeKeyValues {
   public:
@@ -104,6 +108,8 @@ private:
     const std::string SampleAggregatePercentileKey =
         "adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
     const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
+    const std::string MinConcurrencyKey =
+        "adaptive_concurrency.gradient_controller.min_concurrency";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
@@ -130,6 +136,9 @@ private:
 
   // The percentile value considered when processing samples.
   const double sample_aggregate_percentile_;
+
+  // The concurrency limit set while measuring the minRTT.
+  const uint32_t min_concurrency_;
 };
 using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 
@@ -143,10 +152,10 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  *
  * The algorithm:
  * ==============
- * An ideal round-trip time (minRTT) is measured periodically by only allowing a single outstanding
- * request at a time and measuring the round-trip time to the upstream. This information is then
- * used in the calculation of a number called the gradient, using time-sampled latencies
- * (sampleRTT):
+ * An ideal round-trip time (minRTT) is measured periodically by only allowing a small number of
+ * outstanding requests at a time and measuring the round-trip time to the upstream. This
+ * information is then used in the calculation of a number called the gradient, using time-sampled
+ * latencies (sampleRTT):
  *
  *     gradient = minRTT / sampleRTT
  *
@@ -171,14 +180,14 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  * concept of mutually exclusive sampling windows.
  *
  * When the gradient controller is instantiated, it starts inside of a minRTT calculation window
- * (indicated by inMinRTTSamplingWindow() returning true) and the concurrency limit is pinned to 1.
- * This window lasts until the configured number of requests is received, the minRTT value is
- * updated, and the minRTT value is set by a single worker thread. To prevent sampleRTT calculations
- * from triggering during this window, the update window mutex is held. Since it's necessary for a
- * worker thread to know which update window update window mutex is held for, they check the state
- * of inMinRTTSamplingWindow() after each sample. When the minRTT calculation is complete, a timer
- * is set to trigger the next minRTT sampling window by the worker thread who updates the minRTT
- * value.
+ * (indicated by inMinRTTSamplingWindow() returning true) and the concurrency limit is pinned to the
+ * configured min_concurrency. This window lasts until the configured number of requests is
+ * received, the minRTT value is updated, and the minRTT value is set by a single worker thread. To
+ * prevent sampleRTT calculations from triggering during this window, the update window mutex is
+ * held. Since it's necessary for a worker thread to know which update window update window mutex is
+ * held for, they check the state of inMinRTTSamplingWindow() after each sample. When the minRTT
+ * calculation is complete, a timer is set to trigger the next minRTT sampling window by the worker
+ * thread who updates the minRTT value.
  *
  * If the controller is not in a minRTT sampling window, it's possible that the controller is in a
  * sampleRTT calculation window. In this, all of the latency samples are consolidated into a
