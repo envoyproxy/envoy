@@ -33,7 +33,19 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
+
   Network::SocketSharedPtr getListenSocket() override;
+
+  /**
+   * @return the socket shared by worker threads; otherwise return null.
+   *
+   * Worker threads share socket in two cases:
+   * - reuse_port is set to 'false'.
+   * - reuse_port is set to 'true' but port is 0. In this case, returns a ephemeral socket
+   *   which is used to reserve a port.
+   *
+   * Note: for UDP, 'reuse_port' is always 'true'.
+   */
   absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
     if (socket_) {
       return *socket_;

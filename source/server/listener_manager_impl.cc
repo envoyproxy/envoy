@@ -569,7 +569,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
         stats_.listener_create_success_.inc();
 
         if (listener.reusePort()) {
-          // The shared socket created for acquiring port number when port is configured as 0
+          // The shared socket created for reserving port number when port is configured as 0
           // can be closed here.
           auto sharedSocket = listener.getSocketFactory()->sharedSocket();
           if (sharedSocket.has_value()) {

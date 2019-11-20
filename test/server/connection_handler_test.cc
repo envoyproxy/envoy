@@ -267,35 +267,7 @@ TEST_F(ConnectionHandlerTest, AddDisabledListener) {
   handler_->disableListeners();
   handler_->addListener(*test_listener);
 }
-/*
-TEST_F(ConnectionHandlerTest, RemoveReusePortListener) {
-InSequence s;
 
-Network::MockListener* listener = new NiceMock<Network::MockListener>();
-Network::ListenerCallbacks* listener_callbacks;
-TestListener* test_listener = addListener(1, true, false, "test_listener", listener);
-test_listener->reuse_port_ = true;
-
-// TestListener is not a mock, createReusePortSocket() should return reuse_port_socket_ here
-EXPECT_CALL(dispatcher_, createListener_(Ref(*test_listener->reuse_port_socket_), _, _))
-    .WillOnce(
-        Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool) -> Network::Listener* {
-          listener_callbacks = &cb;
-          return listener;
-        }));
-
-// ListenerConfig::socket() is still used to get the local address
-EXPECT_CALL(test_listener->socket_, localAddress()).Times(1);
-handler_->addListener(*test_listener);
-
-// Test stop/remove of reuse port listener.
-EXPECT_CALL(*listener, onDestroy());
-handler_->stopListeners(1);
-
-EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
-handler_->removeListeners(1);
-}
-*/
 TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
   InSequence s;
 
