@@ -370,8 +370,9 @@ void Router::onEvent(Network::ConnectionEvent event) {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  // Ensure resetStream() isn't called from onDestroy(), since we've
-  // closed the connection already.
+  // Release connection resources and ensure resetStream() won't close the connection
+  // from onDestroy(), since it's been closed already.
+  upstream_request_->resetStream(false);
   cleanup();
 }
 
@@ -415,14 +416,16 @@ FilterStatus Router::UpstreamRequest::start() {
   return FilterStatus::Continue;
 }
 
-void Router::UpstreamRequest::resetStream() {
+void Router::UpstreamRequest::resetStream(const bool close) {
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
   }
 
   if (conn_data_ != nullptr) {
     conn_state_ = nullptr;
-    conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    if (close) {
+      conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    }
     conn_data_.reset();
   }
 }
