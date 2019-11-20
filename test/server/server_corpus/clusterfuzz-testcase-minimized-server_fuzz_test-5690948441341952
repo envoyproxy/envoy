@@ -1,0 +1,1 @@
+static_resources {   clusters {     name: " "     type: STRICT_DNS     connect_timeout { nanos:   8 }     outlier_detection {       interval {         nanos:   800000000       }       success_rate_minimum_hosts {       }     }   } }

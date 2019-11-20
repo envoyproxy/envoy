@@ -1,0 +1,23 @@
+actions {
+  new_stream {
+  }
+}
+actions {
+  mutate {
+    buffer: 2
+    offset: 2
+    value: 2
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+      }
+    }
+  }
+}

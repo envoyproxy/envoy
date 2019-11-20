@@ -1,0 +1,11 @@
+dynamic_resources:
+  lds_config:
+    path: {{ lds_json_path }}
+  cds_config:
+    path: {{ cds_json_path }}
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0

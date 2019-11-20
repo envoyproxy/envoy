@@ -1,0 +1,27 @@
+config {
+  virtual_hosts {
+    name: "e"
+    domains: "e"
+    cors {
+      filter_enabled {
+        default_value {
+        }
+      }
+      shadow_enabled {
+        default_value {
+        }
+      }
+    }
+    response_headers_to_add {
+      header {
+        key: "A\000\000\000\000\000\000\000"
+      }
+    }
+  }
+  vhds {
+    config_source {
+      ads {
+      }
+    }
+  }
+}

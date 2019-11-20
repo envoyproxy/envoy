@@ -1,0 +1,21 @@
+config {
+  virtual_hosts {
+    name: " "
+    domains: "*"
+    routes {
+      match {
+        regex: ".*"
+      }
+      route {
+        cluster: "}"
+        prefix_rewrite: "%"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":path"
+    value: "\001\000"
+  }
+}

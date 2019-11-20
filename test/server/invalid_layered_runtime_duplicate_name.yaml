@@ -1,0 +1,8 @@
+layered_runtime:
+  layers:
+    - name: some_static_layer
+      static_layer:
+        foo: bar
+    - name: some_static_layer
+      static_layer:
+        foo: baz

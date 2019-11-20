@@ -1,0 +1,27 @@
+static_resources {
+  listeners {
+    name: "listener_0"
+    address {
+      pipe {
+        path: "\000\000\000j"
+      }
+    }
+    filter_chains {
+      tls_context {
+        session_ticket_keys_sds_secret_config {
+        }
+      }
+    }
+    tcp_fast_open_queue_length {
+      value: 1
+    }
+  }
+}
+admin {
+  access_log_path: "/tmp/admin_access,lOg"
+  address {
+    pipe {
+      path: "\026runt"
+    }
+  }
+}

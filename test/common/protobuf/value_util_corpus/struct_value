@@ -1,0 +1,58 @@
+struct_value {
+  fields {
+    key: "null"
+    value {
+      null_value: NULL_VALUE
+    }
+  }
+  fields {
+    key: "number"
+    value {
+      number_value: 3.14159265358979323
+    }
+  }
+  fields {
+    key: "string"
+    value {
+      string_value: "string"
+    }
+  }
+  fields {
+    key: "bool"
+    value {
+      bool_value: true
+    }
+  }
+  fields {
+    key: "list"
+    value {
+      list_value {
+        values {
+          string_value: "some"
+        }
+        values {
+          string_value: "thing"
+        }
+      }
+    }
+  }
+  fields {
+    key: "struct"
+    value {
+      struct_value {
+        fields {
+          key: "foo"
+          value {
+            number_value: 42
+          }
+        }
+        fields {
+          key: "bar"
+          value {
+            number_value: 37
+          }
+        }
+      }
+    }
+  }
+}

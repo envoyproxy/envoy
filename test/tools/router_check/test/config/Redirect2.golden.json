@@ -1,0 +1,63 @@
+[
+  {
+    "test_name": "Test_1",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/foo",
+      "ssl": true,
+      "internal": true
+    },
+    "validate": {
+      "path_redirect": "",
+      "cluster_name": "www2"
+    }
+  },
+  {
+    "test_name": "Test_2",
+    "input": {
+      ":authority": "redirect.lyft.com",
+      ":path": "/foo",
+      "ssl": false,
+      "internal": false
+    },
+    "validate": {
+      "path_redirect": "http://new.lyft.com/foo",
+      "cluster_name": ""
+    }
+  },
+  {
+    "test_name": "Test_3",
+    "input": {
+      ":authority": "redirect.lyft.com",
+      ":path": "/foo"
+    },
+    "validate": {
+      "path_redirect": "http://new.lyft.com/foo",
+      "cluster_name": ""
+    }
+  },
+  {
+    "test_name": "Test_4",
+    "input": {
+      ":authority": "redirect.lyft.com",
+      ":path": "/foo",
+      "ssl": false
+    },
+    "validate": {
+      "path_redirect": "http://new.lyft.com/foo",
+      "cluster_name": ""
+    }
+  },
+  {
+    "test_name": "Test_5",
+    "input": {
+      ":authority": "redirect.lyft.com",
+      "ssl": false,
+      ":path": "/foo"
+    },
+    "validate": {
+      "path_redirect": "http://new.lyft.com/foo",
+      "cluster_name": ""
+    }
+  }
+]

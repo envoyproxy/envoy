@@ -1,0 +1,190 @@
+{
+    "env": "production",
+    "hosts": [
+        {
+            "ip_address": "10.0.14.27",
+            "last_check_in": "2015-12-10 22:05:30.286993+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1a",
+                "canary": false,
+                "instance_id": "i-f6647241",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.14.29",
+            "last_check_in": "2015-12-10 22:05:17.258545+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1a",
+                "canary": false,
+                "instance_id": "i-f0647247",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.16.205",
+            "last_check_in": "2015-12-10 22:05:19.921349+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1d",
+                "canary": false,
+                "instance_id": "i-95fc6525",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.16.208",
+            "last_check_in": "2015-12-10 22:05:16.312951+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1d",
+                "canary": false,
+                "instance_id": "i-d6ec7266",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.16.209",
+            "last_check_in": "2015-12-10 22:05:22.075746+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1d",
+                "canary": false,
+                "instance_id": "i-d5ec7265",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.16.43",
+            "last_check_in": "2015-12-10 22:05:16.808453+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1d",
+                "canary": true,
+                "instance_id": "i-11e726a1",
+                "onebox_name": null,
+                "region": "us-east-1",
+                "load_balancing_weight": 40
+            }
+        },
+        {
+            "ip_address": "10.0.26.143",
+            "last_check_in": "2015-12-10 22:06:08.487769+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1d",
+                "canary": false,
+                "instance_id": "i-9f7aee2f",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.42.185",
+            "last_check_in": "2015-12-10 22:05:03.713194+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1e",
+                "canary": false,
+                "instance_id": "i-3edbb280",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.43.141",
+            "last_check_in": "2015-12-10 22:05:15.724613+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1e",
+                "canary": false,
+                "instance_id": "i-dd7b1063",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.43.142",
+            "last_check_in": "2015-12-10 22:06:04.331018+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1e",
+                "canary": false,
+                "instance_id": "i-de7b1060",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.43.143",
+            "last_check_in": "2015-12-10 22:05:24.151133+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1e",
+                "canary": false,
+                "instance_id": "i-df7b1061",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.5.0",
+            "last_check_in": "2015-12-10 22:06:09.605907+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1a",
+                "canary": false,
+                "instance_id": "i-497f7efe",
+                "onebox_name": null,
+                "region": "us-east-1"
+            }
+        },
+        {
+            "ip_address": "10.0.5.2",
+            "last_check_in": "2015-12-10 22:06:09.036531+00:00",
+            "port": 80,
+            "revision": "700b197acd50e1cbd23bcfd47125c55e9e1fd2b8",
+            "service": "fare",
+            "tags": {
+                "az": "us-east-1a",
+                "canary": false,
+                "instance_id": "i-4e7f7ef9",
+                "onebox_name": null,
+                "region": "us-east-1",
+                "load_balancing_weight": 90
+            }
+        }
+    ],
+    "service": "fare"
+}

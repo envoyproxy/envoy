@@ -1,0 +1,16 @@
+@import url("theme.css");
+
+/*Changing content max-width 100% ( 800px is default )*/
+.wy-nav-content {
+  max-width: 100% !important;
+}
+
+/* Splits a long line descriptions in tables in to multiple lines */
+.wy-table-responsive table td, .wy-table-responsive table th {
+  white-space: normal !important;
+}
+
+/* align multi line csv table columns */
+table.docutils div.line-block {
+    margin-left: 0;
+}

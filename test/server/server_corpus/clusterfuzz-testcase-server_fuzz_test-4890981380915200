@@ -1,0 +1,13 @@
+stats_flush_interval {
+  seconds: 13792273858822144
+}
+tracing {
+}
+admin {
+  access_log_path: "127.0.0.1"
+  address {
+    pipe {
+      path: "\177"
+    }
+  }
+}

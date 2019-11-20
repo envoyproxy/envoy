@@ -1,0 +1,3 @@
+requests>=2.22.0
+grpcio
+protobuf==3.8.0

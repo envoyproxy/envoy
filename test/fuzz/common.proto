@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package test.fuzz;
+
+import "envoy/api/v2/core/base.proto";
+
+import "google/protobuf/wrappers.proto";
+
+// Common fuzzing input types.
+
+message Headers {
+  repeated envoy.api.v2.core.HeaderValue headers = 1;
+}
+
+message StreamInfo {
+  envoy.api.v2.core.Metadata dynamic_metadata = 1;
+  uint64 start_time = 2;
+  google.protobuf.UInt32Value response_code = 3;
+  envoy.api.v2.core.Metadata upstream_metadata = 4;
+}

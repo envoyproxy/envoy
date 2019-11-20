@@ -1,0 +1,26 @@
+[
+  {
+    "test_name": "Test_1",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/foo",
+      "ssl": true,
+      "internal": true
+    },
+    "validate": {
+      "path_redirect": "",
+      "cluster_name": "www2"
+    }
+  },
+  {
+    "test_name": "Test_2",
+    "input": {
+      ":authority": "redirect.lyft.com",
+      ":path": "/foo"
+    },
+    "validate": {
+      "cluster_name": "",
+      "path_redirect": "http://new.lyft.com/foo"
+    }
+  }
+]

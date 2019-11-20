@@ -1,0 +1,33 @@
+#include "extensions/filters/http/router/config.h"
+
+#include "envoy/config/filter/http/router/v2/router.pb.validate.h"
+
+#include "common/router/router.h"
+#include "common/router/shadow_writer_impl.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace RouterFilter {
+
+Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::http::router::v2::Router& proto_config,
+    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
+  Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
+      stat_prefix, context, std::make_unique<Router::ShadowWriterImpl>(context.clusterManager()),
+      proto_config));
+
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*filter_config));
+  };
+}
+
+/**
+ * Static registration for the router filter. @see RegisterFactory.
+ */
+REGISTER_FACTORY(RouterFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+
+} // namespace RouterFilter
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

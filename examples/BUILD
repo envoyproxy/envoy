@@ -1,0 +1,30 @@
+licenses(["notice"])  # Apache 2
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+)
+
+envoy_package()
+
+filegroup(
+    name = "configs",
+    srcs = [
+        "cors/backend/front-envoy.yaml",
+        "cors/backend/service-envoy.yaml",
+        "cors/frontend/front-envoy.yaml",
+        "cors/frontend/service-envoy.yaml",
+        "front-proxy/front-envoy.yaml",
+        "front-proxy/service-envoy.yaml",
+        "grpc-bridge/config/s2s-grpc-envoy.yaml",
+        "grpc-bridge/config/s2s-python-envoy.yaml",
+        "jaeger-tracing/front-envoy-jaeger.yaml",
+        "jaeger-tracing/service1-envoy-jaeger.yaml",
+        "jaeger-tracing/service2-envoy-jaeger.yaml",
+        "lua/envoy.yaml",
+        "lua/lib/mylibrary.lua",
+        "zipkin-tracing/front-envoy-zipkin.yaml",
+        "zipkin-tracing/service1-envoy-zipkin.yaml",
+        "zipkin-tracing/service2-envoy-zipkin.yaml",
+    ],
+)
