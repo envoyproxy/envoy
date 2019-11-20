@@ -212,6 +212,10 @@ public:
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
+class FilterChainFactoryContext : public virtual FactoryContext {
+  virtual uint64_t getTag() const PURE;
+};
+
 class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
@@ -27,12 +28,57 @@ public:
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
 };
 
-class FilterChainContextImpl : public Configuration::FilterChainContext {
+class FilterChainContextImpl : public Configuration::FilterChainFactoryContext {
 public:
   FilterChainContextImpl(uint64_t tag);
   uint64_t getTag() const override { return tag_; }
 
 private:
+  uint64_t tag_;
+};
+
+class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
+                                      public Network::DrainDecision {
+public:
+  FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context, uint64_t tag);
+
+  // FilterChainFactoryContext
+  uint64_t getTag() const override;
+
+  // DrainDecision
+  bool drainClose() const override;
+
+  // Configuration::FactoryContext
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Network::DrainDecision& drainDecision() override;
+  const Network::PartitionedDrainDecision& filterChainDrainDecision() override;
+
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::SlotAllocator& threadLocal() override;
+  Admin& admin() override;
+  const envoy::api::v2::core::Metadata& listenerMetadata() const override;
+  envoy::api::v2::core::TrafficDirection direction() const override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  OptProcessContextRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+
+private:
+  Configuration::FactoryContext& parent_context_;
   uint64_t tag_;
 };
 

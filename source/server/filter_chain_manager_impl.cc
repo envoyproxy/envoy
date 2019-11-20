@@ -25,6 +25,92 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 FilterChainContextImpl::FilterChainContextImpl(uint64_t tag) : tag_(tag) {}
 
+FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
+    Configuration::FactoryContext& parent_context, uint64_t tag)
+    : parent_context_(parent_context), tag_(tag) {}
+
+// FilterChainFactoryContext
+uint64_t FilterChainFactoryContextImpl::getTag() const { return tag_; }
+
+// DrainDecision
+bool FilterChainFactoryContextImpl::drainClose() const { return false; }
+
+// Covariant
+ThreadLocal::SlotAllocator& FilterChainFactoryContextImpl::threadLocal() {
+  return parent_context_.threadLocal();
+}
+
+// Deligate to parent
+const envoy::api::v2::core::Metadata& FilterChainFactoryContextImpl::listenerMetadata() const {
+  return parent_context_.listenerMetadata();
+};
+envoy::api::v2::core::TrafficDirection FilterChainFactoryContextImpl::direction() const {
+  return parent_context_.direction();
+};
+
+ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValidationVisitor() {
+  return parent_context_.messageValidationVisitor();
+}
+
+Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }
+AccessLog::AccessLogManager& FilterChainFactoryContextImpl::accessLogManager() {
+  return parent_context_.accessLogManager();
+}
+Upstream::ClusterManager& FilterChainFactoryContextImpl::clusterManager() {
+  return parent_context_.clusterManager();
+}
+
+Event::Dispatcher& FilterChainFactoryContextImpl::dispatcher() {
+  return parent_context_.dispatcher();
+}
+
+const Network::PartitionedDrainDecision& FilterChainFactoryContextImpl::filterChainDrainDecision() {
+  return parent_context_.filterChainDrainDecision();
+}
+Grpc::Context& FilterChainFactoryContextImpl::grpcContext() {
+  return parent_context_.grpcContext();
+}
+bool FilterChainFactoryContextImpl::healthCheckFailed() {
+  return parent_context_.healthCheckFailed();
+}
+Tracing::HttpTracer& FilterChainFactoryContextImpl::httpTracer() { return httpContext().tracer(); }
+Http::Context& FilterChainFactoryContextImpl::httpContext() {
+  return parent_context_.httpContext();
+}
+
+const LocalInfo::LocalInfo& FilterChainFactoryContextImpl::localInfo() const {
+  return parent_context_.localInfo();
+}
+Envoy::Runtime::RandomGenerator& FilterChainFactoryContextImpl::random() {
+  return parent_context_.random();
+}
+Envoy::Runtime::Loader& FilterChainFactoryContextImpl::runtime() {
+  return parent_context_.runtime();
+}
+Stats::Scope& FilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
+Singleton::Manager& FilterChainFactoryContextImpl::singletonManager() {
+  return parent_context_.singletonManager();
+}
+OverloadManager& FilterChainFactoryContextImpl::overloadManager() {
+  return parent_context_.overloadManager();
+}
+
+Admin& FilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
+
+TimeSource& FilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
+
+Api::Api& FilterChainFactoryContextImpl::api() { return parent_context_.api(); }
+ServerLifecycleNotifier& FilterChainFactoryContextImpl::lifecycleNotifier() {
+  return parent_context_.lifecycleNotifier();
+}
+OptProcessContextRef FilterChainFactoryContextImpl::processContext() {
+  return parent_context_.processContext();
+}
+Configuration::ServerFactoryContext&
+FilterChainFactoryContextImpl::getServerFactoryContext() const {
+  return parent_context_.getServerFactoryContext();
+}
+
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
