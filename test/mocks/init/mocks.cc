@@ -22,8 +22,11 @@ ExpectableTargetImpl::expectInitializeWillCallReady() {
 }
 
 ExpectableSharedTargetImpl::ExpectableSharedTargetImpl(absl::string_view name)
-    : ExpectableSharedTargetImpl(name, [this]() { ++count_; }) {}
+    : ExpectableSharedTargetImpl(name, [this]() { initialize(); }) {}
 ExpectableSharedTargetImpl::ExpectableSharedTargetImpl(absl::string_view name, InitializeFn fn)
     : SharedTargetImpl(name, fn) {}
+::testing::internal::TypedExpectation<void()>& ExpectableSharedTargetImpl::expectInitialize() {
+  return EXPECT_CALL(*this, initialize());
+}
 } // namespace Init
 } // namespace Envoy

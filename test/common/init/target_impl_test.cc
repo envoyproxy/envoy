@@ -62,125 +62,104 @@ TEST(InitTargetImplTest, ReadyWhenWatcherUnavailable) {
   EXPECT_FALSE(target.ready());
 }
 
-TEST(SharedTargetImplTest, InitializeTwiceBeforeReady) {
-  ManagerImpl m1("m1");
-  ManagerImpl m2("m2");
-  ExpectableWatcherImpl w1;
-  ExpectableWatcherImpl w2;
-  ExpectableSharedTargetImpl t;
-  m1.add(t);
-  EXPECT_EQ(0, t.count_);
-  m2.add(t);
-  EXPECT_EQ(0, t.count_);
-  EXPECT_EQ(Manager::State::Uninitialized, m1.state());
-  EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  m1.initialize(w1);
-  m2.initialize(w2);
-  EXPECT_EQ(1, t.count_);
-  EXPECT_EQ(Manager::State::Initializing, m1.state());
-  EXPECT_EQ(Manager::State::Initializing, m2.state());
-  w1.expectReady().Times(1);
-  w2.expectReady().Times(1);
-  t.ready();
-  EXPECT_EQ(Manager::State::Initialized, m1.state());
-  EXPECT_EQ(Manager::State::Initialized, m2.state());
+// SharedTarget acts as TargetImpl if single watcher is provided.
+TEST(InitSharedTargetTestImpl, InitializeSingleWatcher) {
+  InSequence s;
+
+  ExpectableSharedTargetImpl target;
+  ExpectableWatcherImpl watcher;
+
+  // initializing the target through its handle should invoke initialize()...
+  target.expectInitialize();
+  EXPECT_TRUE(target.createHandle("test")->initialize(watcher));
+
+  // calling ready() on the target should invoke the saved watcher handle...
+  watcher.expectReady();
+  EXPECT_TRUE(target.ready());
+
+  // calling ready() a second time should have no effect.
+  watcher.expectReady().Times(0);
+  target.ready();
 }
 
-// Two managers initialize the same target at their own interests.
-TEST(SharedTargetImplTest, ConcurrentManagerInitialization) {
-  ManagerImpl m1("m1");
-  ManagerImpl m2("m2");
-  ExpectableWatcherImpl w1;
-  ExpectableWatcherImpl w2;
-  ExpectableSharedTargetImpl t;
-  m1.add(t);
-  EXPECT_EQ(0, t.count_);
-  m2.add(t);
-  EXPECT_EQ(0, t.count_);
-  EXPECT_EQ(Manager::State::Uninitialized, m1.state());
-  EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  m1.initialize(w1);
-  EXPECT_EQ(1, t.count_);
-  EXPECT_EQ(Manager::State::Initializing, m1.state());
-  EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  w1.expectReady().Times(1);
-  t.ready();
-  EXPECT_EQ(Manager::State::Initialized, m1.state());
-  EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  w1.expectReady().Times(0);
-  w2.expectReady().Times(1);
-  m2.initialize(w2);
-  EXPECT_EQ(Manager::State::Initialized, m2.state());
-  EXPECT_EQ(1, t.count_) << "target init function should be invoked only once";
+// Initializing TargetHandle return false if uninitialized SharedTarget is destroyed.
+TEST(InitSharedTargetTestImpl, InitializeWhenUnavailable) {
+  InSequence s;
+  ExpectableWatcherImpl watcher;
+  TargetHandlePtr handle;
+  {
+    ExpectableSharedTargetImpl target;
+
+    // initializing the target after it's been destroyed should do nothing.
+    handle = target.createHandle("test");
+    target.expectInitialize().Times(0);
+  }
+  EXPECT_FALSE(handle->initialize(watcher));
 }
 
-// One manager initialized the target, followed by another manager adding the target.
-TEST(SharedTargetImplTest, OnLateManagers) {
-  ManagerImpl m1("m1");
-  ManagerImpl m2("m2");
-  ExpectableWatcherImpl w1;
-  ExpectableWatcherImpl w2;
-  ExpectableSharedTargetImpl t;
-  m1.add(t);
-  EXPECT_EQ(0, t.count_);
-  EXPECT_EQ(Manager::State::Uninitialized, m1.state());
-  w1.expectReady().Times(1);
-  m1.initialize(w1);
-  EXPECT_EQ(1, t.count_);
-  EXPECT_EQ(Manager::State::Initializing, m1.state());
-  t.ready();
-  EXPECT_EQ(Manager::State::Initialized, m1.state());
-  EXPECT_EQ(Manager::State::Uninitialized, m2.state());
-  w1.expectReady().Times(0);
-  w2.expectReady().Times(1);
-  m2.initialize(w2);
-  EXPECT_EQ(Manager::State::Initialized, m2.state());
-}
-
-// If the shared target is destroyed, all the linked init manager will be notified.
-TEST(SharedTargetImplTest, DetroyedSharedTargetIsConsideredReadyTarget) {
-  ManagerImpl m("test");
+// Initializing TargetHandle return false if initialized SharedTarget is destroyed.
+TEST(InitSharedTargetTestImpl, ReInitializeWhenUnavailable) {
+  InSequence s;
   ExpectableWatcherImpl w;
-  // Adding shared targets in all kinds of states and destroy the target.
+  TargetHandlePtr handle;
   {
-    ExpectableSharedTargetImpl t1("t1");
-    m.add(t1);
-  }
+    ExpectableSharedTargetImpl target;
 
-  {
-    ManagerImpl m2("");
-    ExpectableSharedTargetImpl t2("t2");
-    m2.add(t2);
-    m2.initialize(ExpectableWatcherImpl());
-    m.add(t2);
-  }
+    target.expectInitialize();
+    TargetHandlePtr handle1 = target.createHandle("m1");
+    ExpectableWatcherImpl w1;
+    EXPECT_TRUE(handle1->initialize(w1));
 
-  {
-    ManagerImpl m3("");
-    ExpectableSharedTargetImpl t3("t3");
-    m3.add(t3);
-    ExpectableWatcherImpl w3;
-    w3.expectReady().Times(1);
-    m3.initialize(w3);
-    m.add(t3);
-    t3.ready();
+    // initializing the target after it's been destroyed should do nothing.
+    handle = target.createHandle("m2");
+    target.expectInitialize().Times(0);
+    // target destroyed
   }
-
-  {
-    ManagerImpl m4("");
-    ExpectableSharedTargetImpl t4("t4");
-    m4.add(t4);
-    ExpectableWatcherImpl w4;
-    w4.expectReady().Times(1);
-    m4.initialize(w4);
-    t4.ready();
-    m.add(t4);
-  }
-  // initialization should complete despite the destroyed target
-  w.expectReady().Times(1);
-  m.initialize(w);
-  EXPECT_EQ(Manager::State::Initialized, m.state());
+  EXPECT_FALSE(handle->initialize(w));
 }
+
+// SharedTarget notifies multiple watchers.
+TEST(InitSharedTargetTestImpl, NotifyAllWatcherWhenInitialization) {
+  InSequence s;
+  ExpectableWatcherImpl w1;
+  ExpectableSharedTargetImpl target;
+
+  target.expectInitialize();
+  TargetHandlePtr handle1 = target.createHandle("m1");
+  EXPECT_TRUE(handle1->initialize(w1));
+
+  ExpectableWatcherImpl w2;
+  target.expectInitialize().Times(0);
+  TargetHandlePtr handle2 = target.createHandle("m2");
+  // calling ready() on the target should invoke all the saved watchers.
+  w1.expectReady();
+  EXPECT_TRUE(target.ready());
+  w2.expectReady();
+  EXPECT_TRUE(handle2->initialize(w2));
+}
+
+// Initialized SharedTarget notifies further watcher immediately at second initialization attempt.
+TEST(InitSharedTargetTestImpl, InitializedSharedTargetNotifyWatcherWhenAddedAgain) {
+  InSequence s;
+  ExpectableWatcherImpl w1;
+  ExpectableSharedTargetImpl target;
+
+  target.expectInitialize();
+  TargetHandlePtr handle1 = target.createHandle("m1");
+  EXPECT_TRUE(handle1->initialize(w1));
+
+  // calling ready() on the target should invoke the saved watcher handle(s).
+  w1.expectReady();
+  EXPECT_TRUE(target.ready());
+
+  ExpectableWatcherImpl w2;
+  target.expectInitialize().Times(0);
+  TargetHandlePtr handle2 = target.createHandle("m2");
+  // w2 is notified with no further target.ready().
+  w2.expectReady();
+  EXPECT_TRUE(handle2->initialize(w2));
+}
+
 } // namespace
 } // namespace Init
 } // namespace Envoy
