@@ -29,8 +29,8 @@ XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2::XRayCon
     ENVOY_LOG(error, "Failed to read sampling rules manifest because of {}.", e.what());
   }
 
-  XRayConfiguration xconfig(proto_config.daemon_endpoint(), proto_config.segment_name(),
-                            sampling_rules_json);
+  XRayConfiguration xconfig{proto_config.daemon_endpoint(), proto_config.segment_name(),
+                            sampling_rules_json};
   auto xray_driver = std::make_unique<XRay::Driver>(xconfig, server);
 
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(xray_driver), server.localInfo());

@@ -1,44 +1,110 @@
 #include "extensions/tracers/xray/xray_tracer_impl.h"
 
 #include "common/common/macros.h"
+#include "common/common/utility.h"
+
+#include "extensions/tracers/xray/localized_sampling.h"
+#include "extensions/tracers/xray/tracer.h"
+#include "extensions/tracers/xray/xray_configuration.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-static const char DefaultDaemonEndpoint[] = "127.0.0.1:2000";
-Driver::Driver(const XRayConfiguration& config, Server::Instance& server) : xray_config_(config) {
+constexpr static char DefaultDaemonEndpoint[] = "127.0.0.1:2000";
+static XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
+  const auto& lowered_header = header.get();
+  XRayHeader result;
+  for (const auto& token : StringUtil::splitToken(lowered_header, ";")) {
+    if (absl::StartsWith(token, "root=")) {
+      result.trace_id_ = std::string(StringUtil::cropLeft(token, "="));
+    } else if (absl::StartsWith(token, "parent=")) {
+      result.parent_id_ = std::string(StringUtil::cropLeft(token, "="));
+    } else if (absl::StartsWith(token, "sampled=")) {
+      const auto s = StringUtil::cropLeft(token, "=");
+      if (s == "1") {
+        result.sample_decision_ = SamplingDecision::Sampled;
+      } else if (s == "0") {
+        result.sample_decision_ = SamplingDecision::NotSampled;
+      } else {
+        result.sample_decision_ = SamplingDecision::Unknown;
+      }
+    }
+  }
+  return result;
+}
+
+Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
+    : xray_config_(config), tls_slot_ptr_(server.threadLocal().allocateSlot()) {
 
   const std::string daemon_endpoint =
       config.daemon_endpoint_.empty() ? DefaultDaemonEndpoint : config.daemon_endpoint_;
 
   ENVOY_LOG(debug, "send X-Ray generated segments to daemon address on {}", daemon_endpoint);
-  std::string span_name =
-      config.segment_name_.empty() ? server.localInfo().clusterName() : config.segment_name_;
+  sampling_strategy_ = std::make_unique<XRay::LocalizedSamplingStrategy>(
+      xray_config_.sampling_rules_, server.random(), server.timeSource());
 
-  sampling_strategy_ = std::make_unique<XRay::SamplingStrategy>(server.random().random());
-  tracer_.emplace(span_name, server.timeSource());
+  tls_slot_ptr_->set([this,
+                      &server](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    std::string span_name = xray_config_.segment_name_.empty() ? server.localInfo().clusterName()
+                                                               : xray_config_.segment_name_;
+    TracerPtr tracer = std::make_unique<Tracer>(span_name, server.timeSource());
+    return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
+  });
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
-                                   const std::string& operation_name, SystemTime start_time,
+                                   const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
+  // First thing is to determine whether this request will be sampled or not.
+  // if there's a X-Ray header and it has a sampling decision already determined (i.e. Sample=1)
+  // then we can skip, otherwise, we ask the sampling strategy whether this request should be
+  // sampled or not.
+  //
+  // The second step is create a Span.
+  // If we have a XRay TraceID in the headers, then we create a SpanContext to pass that trace-id
+  // around if no TraceID (which means no x-ray header) then this is a brand new span.
 
   UNREFERENCED_PARAMETER(config);
-  UNREFERENCED_PARAMETER(operation_name);
   UNREFERENCED_PARAMETER(start_time);
+  // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const SamplingRequest request{request_headers.Host()->value().getStringView(),
-                                request_headers.Method()->value().getStringView(),
-                                request_headers.Path()->value().getStringView()};
-
-  if (!sampling_strategy_->sampleRequest(request)) {
-    return nullptr;
+  const auto* header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
+  absl::optional<bool> should_trace;
+  XRayHeader xray_header;
+  if (header) {
+    Http::LowerCaseString lowered_header_value{std::string(header->value().getStringView())};
+    xray_header = parseXRayHeader(lowered_header_value);
+    // if the sample_decision in the x-ray header is unknown then we try to make a decision based
+    // on the sampling strategy
+    if (xray_header.sample_decision_ == SamplingDecision::Sampled) {
+      should_trace = true;
+    } else if (xray_header.sample_decision_ == SamplingDecision::NotSampled) {
+      should_trace = false;
+    } else {
+      ENVOY_LOG(
+          trace,
+          "Unable to determine from the X-Ray trace header whether request is sampled or not");
+    }
   }
 
-  return tracer_->startSpan();
+  if (!should_trace.has_value()) {
+    const SamplingRequest request{std::string{request_headers.Host()->value().getStringView()},
+                                  std::string{request_headers.Method()->value().getStringView()},
+                                  std::string{request_headers.Path()->value().getStringView()}};
+
+    should_trace = sampling_strategy_->shouldTrace(request);
+  }
+
+  if (should_trace.value()) {
+    auto tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
+    return tracer->startSpan(xray_config_.segment_name_, operation_name, start_time,
+                             header ? absl::optional<XRayHeader>(xray_header) : absl::nullopt);
+  }
+  return nullptr;
 }
+
 } // namespace XRay
 } // namespace Tracers
 } // namespace Extensions

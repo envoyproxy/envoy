@@ -64,17 +64,13 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
         value.set_number_value(int_value);
       } else {
         // Proto3 JSON mapping allows use string for integer, this still has to be converted from
-        // int_value to support 0x and 0o literals.
+        // int_value to support hexadecimal and octal literals.
         value.set_string_value(std::to_string(int_value));
       }
       break;
     }
-    double double_value;
-    if (YAML::convert<double>::decode(node, double_value)) {
-      value.set_number_value(double_value);
-      break;
-    }
-    // Otherwise, fall back on string.
+    // Fall back on string, including float/double case. When protobuf parse the JSON into a message
+    // it will convert based on the type in the message definition.
     value.set_string_value(node.as<std::string>());
     break;
   }
