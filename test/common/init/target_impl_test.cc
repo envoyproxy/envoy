@@ -1,5 +1,3 @@
-#include "common/init/manager_impl.h"
-
 #include "test/mocks/init/mocks.h"
 
 #include "gtest/gtest.h"
