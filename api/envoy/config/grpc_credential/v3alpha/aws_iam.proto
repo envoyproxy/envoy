@@ -10,6 +10,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Grpc Credentials AWS IAM]
 // Configuration for AWS IAM Grpc Credentials Plugin
+// [#extension: envoy.grpc_credentials.aws_iam]
 
 message AwsIamConfig {
   // The `service namespace

@@ -261,7 +261,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   }
 }
 
-void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const ProtobufWkt::Message& inner) {
+void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const Protobuf::Message& inner) {
   udpa::type::v1::TypedStruct typed_struct;
   (*typed_struct.mutable_type_url()) =
       absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());

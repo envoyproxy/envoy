@@ -178,5 +178,5 @@ build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
-try-import clang.bazelrc
-try-import user.bazelrc
+try-import %workspace%/clang.bazelrc
+try-import %workspace%/user.bazelrc

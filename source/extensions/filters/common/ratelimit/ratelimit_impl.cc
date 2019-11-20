@@ -94,7 +94,7 @@ void GrpcClientImpl::onSuccess(
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
-  ASSERT(status != Grpc::Status::GrpcStatus::Ok);
+  ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   callbacks_->complete(LimitStatus::Error, nullptr, nullptr);
   callbacks_ = nullptr;
 }

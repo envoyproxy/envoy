@@ -73,17 +73,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   return sysCallResultToIoCallResult(result);
 }
 
-Api::IoCallUint64Result IoSocketHandleImpl::sendto(const Buffer::RawSlice& slice, int flags,
-                                                   const Address::Instance& address) {
-  const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&address);
-  sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
-
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.sendto(fd_, slice.mem_, slice.len_, flags,
-                                                           sock_addr, address_base->sockAddrLen());
-  return sysCallResultToIoCallResult(result);
-}
-
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Ip* self_ip,

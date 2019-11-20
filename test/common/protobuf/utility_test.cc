@@ -357,6 +357,44 @@ TEST_F(ProtobufUtilityTest, ValueUtilHash) {
   EXPECT_NE(ValueUtil::hash(v), 0);
 }
 
+TEST_F(ProtobufUtilityTest, MessageUtilLoadYamlDouble) {
+  ProtobufWkt::DoubleValue v;
+  MessageUtil::loadFromYaml("value: 1.0", v, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_DOUBLE_EQ(1.0, v.value());
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
+  EXPECT_EQ(ValueUtil::loadFromYaml("null").ShortDebugString(), "null_value: NULL_VALUE");
+  EXPECT_EQ(ValueUtil::loadFromYaml("true").ShortDebugString(), "bool_value: true");
+  EXPECT_EQ(ValueUtil::loadFromYaml("1").ShortDebugString(), "number_value: 1");
+  EXPECT_EQ(ValueUtil::loadFromYaml("9223372036854775807").ShortDebugString(),
+            "string_value: \"9223372036854775807\"");
+  EXPECT_EQ(ValueUtil::loadFromYaml("\"foo\"").ShortDebugString(), "string_value: \"foo\"");
+  EXPECT_EQ(ValueUtil::loadFromYaml("foo").ShortDebugString(), "string_value: \"foo\"");
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
+  EXPECT_EQ(ValueUtil::loadFromYaml("[foo, bar]").ShortDebugString(),
+            "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }");
+  EXPECT_EQ(ValueUtil::loadFromYaml("foo: bar").ShortDebugString(),
+            "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlException) {
+  std::string bad_yaml = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+)EOF";
+
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "bad conversion");
+  EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
+                             "Unexpected YAML exception");
+}
+
 TEST_F(ProtobufUtilityTest, HashedValue) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
