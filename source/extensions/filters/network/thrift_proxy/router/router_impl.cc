@@ -350,14 +350,18 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void Router::onEvent(Network::ConnectionEvent event) {
-  ASSERT(upstream_request_ && !upstream_request_->response_complete_);
+  if (upstream_request_== nullptr) {
+    return;
+  }
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
+    ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
+    ENVOY_STREAM_LOG(debug, "upstream local close", *callbacks_);
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
@@ -365,6 +369,10 @@ void Router::onEvent(Network::ConnectionEvent event) {
     // Connected is consumed by the connection pool.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+
+  // Ensure resetStream() isn't called from onDestroy(), since we've
+  // closed the connection already.
+  cleanup();
 }
 
 const Network::Connection* Router::downstreamConnection() const {
