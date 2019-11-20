@@ -283,7 +283,8 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
                                           {":authority", "vhost.first"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {vhdsRequestResourceName("vhost.first")}, {},
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.first")}, {},
                                            vhds_stream_));
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(Config::TypeUrl::get().VirtualHost,
                                                                  {buildVirtualHost2()}, {}, "4",
@@ -349,7 +350,8 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
                                           {":authority", "vhost.first"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {vhdsRequestResourceName("vhost.first")}, {},
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.first")}, {},
                                            vhds_stream_));
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(Config::TypeUrl::get().VirtualHost,
                                                                  {buildVirtualHost2()}, {}, "4",
@@ -394,7 +396,8 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
                                           {":authority", "vhost.third"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {vhdsRequestResourceName("vhost.third")}, {},
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.third")}, {},
                                            vhds_stream_));
   // Send an empty response back (the management server isn't aware of vhost.third)
   notifyAboutAliasResolutionFailure("4", vhds_stream_, {"vhost.third"});
@@ -434,7 +437,8 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
                                           {":authority", "vhost.third"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {vhdsRequestResourceName("vhost.third")}, {},
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.third")}, {},
                                            vhds_stream_));
   // Send an empty response back (the management server isn't aware of vhost.third)
   sendDeltaDiscoveryResponseWithUnresolvedAliases({buildVirtualHost2()}, {}, "4", vhds_stream_,

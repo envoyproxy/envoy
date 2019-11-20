@@ -12,4 +12,3 @@ envoy_cc_library(
     name = "notifiable_interface",
     hdrs = ["notifiable.h"],
 )
-

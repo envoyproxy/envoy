@@ -11,5 +11,5 @@ public:
   virtual void notify() {}
 };
 
-} // namespace Notification
+} // namespace Observer
 } // namespace Envoy

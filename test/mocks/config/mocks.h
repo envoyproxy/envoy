@@ -97,8 +97,8 @@ public:
                       const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
                       std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
-  MOCK_METHOD2(requestAliasesResolution, void(const std::string& type_url,
-                   const std::set<std::string>& aliases));
+  MOCK_METHOD2(requestAliasesResolution,
+               void(const std::string& type_url, const std::set<std::string>& aliases));
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {

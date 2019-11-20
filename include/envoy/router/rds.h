@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "envoy/api/v2/rds.pb.h"
-#include "envoy/router/router.h"
 #include "envoy/http/filter.h"
+#include "envoy/router/router.h"
 
 namespace Envoy {
 namespace Router {

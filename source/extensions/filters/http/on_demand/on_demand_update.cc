@@ -44,7 +44,7 @@ void OnDemandRouteUpdate::notify() {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
   if (callbacks_->canResolveRouteAfterConfigUpdate() && // route can be resolved after an on-demand
-      // VHDS update
+                                                        // VHDS update
       !callbacks_->decodingBuffer() &&                  // Redirects with body not yet supported.
       callbacks_->recreateStream()) {
     // cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
