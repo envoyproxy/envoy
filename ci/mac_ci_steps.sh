@@ -6,10 +6,13 @@ function finish {
   echo "disk space at end of build:"
   df -h
 }
-trap finish EXIT
+trap finish EXIT ERR
 
 echo "disk space at beginning of build:"
 df -h
+
+wget -S -O /tmp/protoc-gen-validate.tar.gz https://github.com/envoyproxy/protoc-gen-validate/archive/a18376249eb51cdd517f67fe8703897322812e6d.tar.gz
+rm -f /tmp/protoc-gen-validate.tar.gz
 
 . "$(dirname "$0")"/setup_cache.sh
 
