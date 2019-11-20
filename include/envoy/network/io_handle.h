@@ -61,15 +61,6 @@ public:
   virtual Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
-   * Send buffer to address.
-   * @param slice points to the location of the data to be sent.
-   * @param to_address is the destination address.
-   * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
-   * err_ = nullptr and rc_ = the bytes written for success.
-   */
-  virtual Api::IoCallUint64Result sendto(const Buffer::RawSlice& slice, int flags,
-                                         const Address::Instance& address) PURE;
-  /**
    * Send a message to the address.
    * @param slices points to the location of data to be sent.
    * @param num_slice indicates number of slices |slices| contains.

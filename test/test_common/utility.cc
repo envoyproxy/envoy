@@ -440,9 +440,11 @@ std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
   }
 }
 
-bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString(key)) != nullptr; }
+bool TestHeaderMapImpl::has(const std::string& key) const {
+  return get(LowerCaseString(key)) != nullptr;
+}
 
-bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
+bool TestHeaderMapImpl::has(const LowerCaseString& key) const { return get(key) != nullptr; }
 
 } // namespace Http
 

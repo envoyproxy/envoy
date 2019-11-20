@@ -20,7 +20,6 @@ protected:
 };
 
 TEST_F(JsonLoaderTest, Basic) {
-  EXPECT_THROW(Factory::loadFromFile("bad_file", *api_), Exception);
   EXPECT_THROW(Factory::loadFromString("{"), Exception);
 
   {
@@ -373,106 +372,6 @@ TEST_F(JsonLoaderTest, AsString) {
     }
     return true;
   });
-}
-
-TEST_F(JsonLoaderTest, AsJsonString) {
-  // We can't do simply equality of asJsonString(), since there is a reliance on internal ordering,
-  // e.g. of map traversal, in the output.
-  const std::string json_string = "{\"name1\": \"value1\", \"name2\": true}";
-  const ObjectSharedPtr json = Factory::loadFromString(json_string);
-  const ObjectSharedPtr json2 = Factory::loadFromString(json->asJsonString());
-  EXPECT_EQ("value1", json2->getString("name1"));
-  EXPECT_TRUE(json2->getBoolean("name2"));
-}
-
-TEST_F(JsonLoaderTest, ListAsString) {
-  {
-    std::list<std::string> list = {};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_TRUE(output.empty());
-  }
-
-  {
-    std::list<std::string> list = {"one"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(1, output.size());
-    EXPECT_EQ("one", output[0]->asString());
-  }
-
-  {
-    std::list<std::string> list = {"one", "two", "three", "four"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(4, output.size());
-    EXPECT_EQ("one", output[0]->asString());
-    EXPECT_EQ("two", output[1]->asString());
-    EXPECT_EQ("three", output[2]->asString());
-    EXPECT_EQ("four", output[3]->asString());
-  }
-
-  {
-    std::list<std::string> list = {"127.0.0.1:46465", "127.0.0.1:52211", "127.0.0.1:58941"};
-    Json::ObjectSharedPtr json =
-        Json::Factory::loadFromString(Json::Factory::listAsJsonString(list));
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(3, output.size());
-    EXPECT_EQ("127.0.0.1:46465", output[0]->asString());
-    EXPECT_EQ("127.0.0.1:52211", output[1]->asString());
-    EXPECT_EQ("127.0.0.1:58941", output[2]->asString());
-  }
-}
-
-TEST_F(JsonLoaderTest, YamlScalar) {
-  EXPECT_EQ(true, Factory::loadFromYamlString("true")->asBoolean());
-  EXPECT_EQ("true", Factory::loadFromYamlString("\"true\"")->asString());
-  EXPECT_EQ(1, Factory::loadFromYamlString("1")->asInteger());
-  EXPECT_EQ("1", Factory::loadFromYamlString("\"1\"")->asString());
-  EXPECT_DOUBLE_EQ(1.0, Factory::loadFromYamlString("1.0")->asDouble());
-  EXPECT_EQ("1.0", Factory::loadFromYamlString("\"1.0\"")->asString());
-}
-
-TEST_F(JsonLoaderTest, YamlObject) {
-  {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("[foo, bar]");
-    std::vector<Json::ObjectSharedPtr> output = json->asObjectArray();
-    EXPECT_EQ(2, output.size());
-    EXPECT_EQ("foo", output[0]->asString());
-    EXPECT_EQ("bar", output[1]->asString());
-  }
-  {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("foo: bar");
-    EXPECT_EQ("bar", json->getString("foo"));
-  }
-  {
-    const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("Null");
-    EXPECT_TRUE(json->isNull());
-  }
-}
-
-TEST_F(JsonLoaderTest, YamlAsJsonString) {
-  const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("");
-  EXPECT_EQ(json->asJsonString(), "null");
-}
-
-TEST_F(JsonLoaderTest, BadYamlException) {
-  std::string bad_yaml = R"EOF(
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: {{ ntop_ip_loopback_address }}
-      port_value: 0
-)EOF";
-
-  EXPECT_THROW_WITH_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
-                          "bad conversion");
-  EXPECT_THROW_WITHOUT_REGEX(Json::Factory::loadFromYamlString(bad_yaml), EnvoyException,
-                             "Unexpected YAML exception");
 }
 
 } // namespace
