@@ -55,6 +55,7 @@ envoy_cc_library(
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/network:transport_socket_interface",
         "//include/envoy/stats:primitive_stats_macros",
         "//include/envoy/stats:stats_macros",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
@@ -148,6 +149,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/upstream:types_interface",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -169,6 +171,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

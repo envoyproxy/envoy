@@ -109,7 +109,7 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
 
 bool InstanceImplPosix::illegalPath(const std::string& path) {
   // Special case, allow /dev/fd/* access here so that config can be passed in a
-  // file descriptor from an execing bootstrap script. The reason we do this
+  // file descriptor from a bootstrap script via exec. The reason we do this
   // _before_ canonicalizing the path is that different unix flavors implement
   // /dev/fd/* differently, for example on linux they are symlinks to /dev/pts/*
   // which are symlinks to /proc/self/fds/. On BSD (and darwin) they are not

@@ -1,4 +1,6 @@
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"      // for proto link
+#include "envoy/service/auth/v2alpha/external_auth.pb.h" // for proto link
 
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
@@ -44,14 +46,13 @@ public:
   void expectCallSend(envoy::service::auth::v2::CheckRequest& request) {
     EXPECT_CALL(*async_client_,
                 sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-        .WillOnce(Invoke(
-            [this](
-                absl::string_view service_full_name, absl::string_view method_name,
-                Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                const absl::optional<std::chrono::milliseconds>& timeout) -> Grpc::AsyncRequest* {
+        .WillOnce(
+            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
+                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(use_alpha_ ? V2Alpha : V2, service_full_name);
               EXPECT_EQ("Check", method_name);
-              EXPECT_EQ(timeout_->count(), timeout->count());
+              EXPECT_EQ(timeout_->count(), options.timeout->count());
               return &async_request_;
             }));
   }
@@ -73,7 +74,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
   auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::GrpcStatus::Ok);
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::OK;
 
@@ -96,8 +97,9 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
   const std::string empty_body{};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::GrpcStatus::Ok, envoy::type::StatusCode::OK, empty_body, expected_headers);
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok,
+                                    envoy::type::StatusCode::OK, empty_body, expected_headers);
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
@@ -120,7 +122,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 
   auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
 
@@ -144,7 +146,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
 
   auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::GrpcStatus::Unknown);
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
 
@@ -169,9 +171,9 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const std::string expected_body{"test"};
   const auto expected_headers =
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
-  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
-                                                      envoy::type::StatusCode::Unauthorized,
-                                                      expected_body, expected_headers);
+  auto check_response = TestCommon::makeCheckResponse(
+      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::StatusCode::Unauthorized,
+      expected_body, expected_headers);
   auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,
                                                       expected_body, expected_headers);
 

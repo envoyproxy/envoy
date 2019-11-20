@@ -65,8 +65,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    logging_context_ =
-        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
+    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                                         log_lock, options_.logFormatEscaped());
 
     configureComponentLogLevels();
 
@@ -77,16 +77,17 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_system, local_address, listener_hooks, *restarter_, *stats_store_,
-        access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory_,
-        file_system_, std::move(process_context));
+        *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
+        *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
+        thread_factory_, file_system_, std::move(process_context));
 
     break;
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         restarter_->logLock());
+    logging_context_ =
+        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                          restarter_->logLock(), options_.logFormatEscaped());
     break;
   }
 }

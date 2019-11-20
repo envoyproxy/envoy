@@ -6,16 +6,17 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -27,7 +28,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
@@ -38,6 +38,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",
         "//source/common/router:scoped_rds_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",

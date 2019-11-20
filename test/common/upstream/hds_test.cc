@@ -85,7 +85,8 @@ protected:
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
+    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
+        envoy::type::HTTP1);
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
     auto* socket_address = health_check->add_locality_endpoints()
@@ -140,7 +141,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
       envoy::service::discovery::v2::Capability::TCP);
 
   EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node_));
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(request), false));
   createHdsDelegate();
 }
@@ -148,7 +149,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
 // Test if processMessage processes endpoints from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageEndpoints) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -186,7 +187,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
 // Test if processMessage processes health checks from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageHealthChecks) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -206,7 +207,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
       hc->mutable_unhealthy_threshold()->set_value(j + 1);
       hc->mutable_healthy_threshold()->set_value(j + 1);
       hc->mutable_grpc_health_check();
-      hc->mutable_http_health_check()->set_use_http2(false);
+      hc->mutable_http_health_check()->set_codec_client_type(envoy::type::HTTP1);
       hc->mutable_http_health_check()->set_path("/healthcheck");
     }
   }
@@ -223,7 +224,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -236,10 +237,26 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   hds_delegate_->onReceiveMessage(std::move(message));
 }
 
+// Tests OnReceiveMessage given a HealthCheckSpecifier message without interval field
+TEST_F(HdsTest, TestDefaultIntervalOnReceiveMessage) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  // notice that interval field is intentionally left undefined
+
+  // Process message
+  EXPECT_CALL(*server_response_timer_, enableTimer(std::chrono::milliseconds(1000), _))
+      .Times(AtLeast(1));
+  hds_delegate_->onReceiveMessage(std::move(message));
+}
+
 // Tests that SendResponse responds to the server in a timely fashion
 // given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalSendResponse) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
@@ -256,7 +273,7 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
 }
 
 TEST_F(HdsTest, TestStreamConnectionFailure) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _))
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))
@@ -288,7 +305,7 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
 // a HealthCheckSpecifier message that contains a single endpoint
 // which times out
 TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
-  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 

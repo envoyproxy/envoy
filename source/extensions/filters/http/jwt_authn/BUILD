@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -43,6 +44,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/http:message_lib",
+        "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
     ],
 )
@@ -58,19 +60,23 @@ envoy_cc_library(
         ":filter_config_interface",
         ":matchers_lib",
         "//include/envoy/http:filter_interface",
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http:well_known_names",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["filter_factory.cc"],
     hdrs = ["filter_factory.h"],
+    security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     deps = [
         ":filter_lib",
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -82,6 +88,7 @@ envoy_cc_library(
         ":verifier_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:config_lib",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -93,7 +100,6 @@ envoy_cc_library(
         ":authenticator_lib",
         ":extractor_lib",
         "//include/envoy/http:header_map_interface",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 

@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -13,10 +14,8 @@ envoy_package()
 envoy_cc_library(
     name = "http_inspector_lib",
     srcs = ["http_inspector.cc"],
-    hdrs = [
-        "http_inspector.h",
-        "http_protocol_header.h",
-    ],
+    hdrs = ["http_inspector.h"],
+    external_deps = ["http_parser"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -29,9 +28,10 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":http_inspector_lib",
         "//include/envoy/registry",

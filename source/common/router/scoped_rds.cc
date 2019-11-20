@@ -13,6 +13,8 @@
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 
+#include "absl/strings/str_join.h"
+
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
 using Envoy::Config::ConfigProvider;
@@ -98,7 +100,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           scoped_rds.scoped_rds_config_source(),
           Grpc::Common::typeUrl(
               envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
-          *scope_, *this, true);
+          *scope_, *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -115,7 +117,7 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
       route_provider_(static_cast<RdsRouteConfigProviderImpl*>(
           parent_.route_config_provider_manager_
               .createRdsRouteConfigProvider(rds, parent_.factory_context_, parent_.stat_prefix_,
-                                            init_manager, true)
+                                            init_manager)
               .release())),
       rds_update_callback_handle_(route_provider_->subscription().addUpdateCallback([this]() {
         // Subscribe to RDS update.
@@ -255,7 +257,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   stats_.config_reload_.inc();
   if (!exception_msgs.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+                                     absl::StrJoin(exception_msgs, ", ")));
   }
 }
 
@@ -267,7 +269,8 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::api::v2::ScopedRouteConfiguration(iter->second->configProto()),
       std::make_shared<ConfigImpl>(rds_subscription.routeConfigUpdate()->routeConfiguration(),
-                                   factory_context_, false));
+                                   factory_context_.getServerFactoryContext(),
+                                   factory_context_.messageValidationVisitor(), false));
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =

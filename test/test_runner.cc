@@ -87,7 +87,6 @@ int TestRunner::RunTests(int argc, char** argv) {
   // they are available in the test XML.
   // TODO(htuch): Log these as well?
   testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
-  testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
   TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 
@@ -108,7 +107,7 @@ int TestRunner::RunTests(int argc, char** argv) {
   TestEnvironment::initializeOptions(argc, argv);
   Thread::MutexBasicLockable lock;
   Logger::Context logging_state(TestEnvironment::getOptions().logLevel(),
-                                TestEnvironment::getOptions().logFormat(), lock);
+                                TestEnvironment::getOptions().logFormat(), lock, false);
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;

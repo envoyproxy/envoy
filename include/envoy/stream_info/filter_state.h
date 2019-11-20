@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 
 #include "common/common/fmt.h"
+#include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 
@@ -25,6 +26,13 @@ public:
   class Object {
   public:
     virtual ~Object() = default;
+
+    /**
+     * @return Protobuf::MessagePtr an unique pointer to the proto serialization of the filter
+     * state. If returned message type is ProtobufWkt::Any it will be directly used in protobuf
+     * logging. nullptr if the filter state cannot be serialized or serialization is not supported.
+     */
+    virtual ProtobufTypes::MessagePtr serializeAsProto() const { return nullptr; }
   };
 
   virtual ~FilterState() = default;

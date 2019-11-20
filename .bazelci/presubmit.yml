@@ -1,11 +1,14 @@
 ---
 tasks:
-  release:
+  gcc:
     platform: ubuntu1804
     build_targets:
       - "//source/exe:envoy-static"
+  rbe:
+    platform: ubuntu1804
     test_targets:
       - "//test/..."
     test_flags:
-    # Workaround for https://github.com/envoyproxy/envoy/issues/7647
-      - "--deleted_packages=//test/extensions/tracers/dynamic_ot"
+      - "--config=remote-clang"
+      - "--config=remote-ci"
+      - "--jobs=75"

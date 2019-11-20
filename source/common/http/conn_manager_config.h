@@ -26,7 +26,9 @@ namespace Http {
   COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_cx_http1_total)                                                               \
   COUNTER(downstream_cx_http2_total)                                                               \
+  COUNTER(downstream_cx_http3_total)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
+  COUNTER(downstream_cx_max_duration_reached)                                                      \
   COUNTER(downstream_cx_overload_disable_keepalive)                                                \
   COUNTER(downstream_cx_protocol_error)                                                            \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
@@ -44,6 +46,7 @@ namespace Http {
   COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_http1_total)                                                               \
   COUNTER(downstream_rq_http2_total)                                                               \
+  COUNTER(downstream_rq_http3_total)                                                               \
   COUNTER(downstream_rq_idle_timeout)                                                              \
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_overload_close)                                                            \
@@ -58,13 +61,14 @@ namespace Http {
   GAUGE(downstream_cx_active, Accumulate)                                                          \
   GAUGE(downstream_cx_http1_active, Accumulate)                                                    \
   GAUGE(downstream_cx_http2_active, Accumulate)                                                    \
+  GAUGE(downstream_cx_http3_active, Accumulate)                                                    \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_ssl_active, Accumulate)                                                      \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_upgrades_active, Accumulate)                                                 \
   GAUGE(downstream_rq_active, Accumulate)                                                          \
-  HISTOGRAM(downstream_cx_length_ms)                                                               \
-  HISTOGRAM(downstream_rq_time)
+  HISTOGRAM(downstream_cx_length_ms, Milliseconds)                                                 \
+  HISTOGRAM(downstream_rq_time, Milliseconds)
 
 /**
  * Wrapper struct for connection manager stats. @see stats_macros.h
@@ -229,9 +233,25 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl
+   * has no route config.
+   */
+  virtual bool isRoutable() const PURE;
+
+  /**
+   * @return optional maximum connection duration timeout for manager connections.
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+
+  /**
    * @return maximum request headers size the connection manager will accept.
    */
   virtual uint32_t maxRequestHeadersKb() const PURE;
+
+  /**
+   * @return maximum number of request headers the codecs will accept.
+   */
+  virtual uint32_t maxRequestHeadersCount() const PURE;
 
   /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a

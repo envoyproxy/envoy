@@ -76,10 +76,11 @@ public:
                  AsyncRequest*(absl::string_view service_full_name, absl::string_view method_name,
                                Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
                                Tracing::Span& parent_span,
-                               const absl::optional<std::chrono::milliseconds>& timeout));
-  MOCK_METHOD3_T(startRaw,
+                               const Http::AsyncClient::RequestOptions& options));
+  MOCK_METHOD4_T(startRaw,
                  RawAsyncStream*(absl::string_view service_full_name, absl::string_view method_name,
-                                 RawAsyncStreamCallbacks& callbacks));
+                                 RawAsyncStreamCallbacks& callbacks,
+                                 const Http::AsyncClient::StreamOptions& options));
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {
@@ -102,7 +103,7 @@ public:
 
 MATCHER_P(ProtoBufferEq, expected, "") {
   typename std::remove_const<decltype(expected)>::type proto;
-  if (!proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length())) {
+  if (!proto.ParseFromString(arg->toString())) {
     *result_listener << "\nParse of buffer failed\n";
     return false;
   }

@@ -92,7 +92,7 @@ filter_chains:
                                    .listenerManager()
                                    .listeners()[1]
                                    .get()
-                                   .socket()
+                                   .listenSocketFactory()
                                    .localAddress()
                                    ->ip()
                                    ->port();

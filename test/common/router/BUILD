@@ -34,7 +34,7 @@ envoy_cc_test_library(
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -63,7 +63,6 @@ envoy_cc_test(
     name = "rds_impl_test",
     srcs = ["rds_impl_test.cc"],
     deps = [
-        "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
@@ -74,6 +73,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -110,6 +110,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -129,6 +130,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -207,6 +209,7 @@ envoy_cc_fuzz_test(
         "//source/common/router:config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -223,7 +226,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -276,7 +279,6 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
     ],
 )
 
@@ -296,7 +298,6 @@ envoy_cc_test(
     srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:metadata_lib",
-        "//source/common/config:rds_json_lib",
         "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
@@ -307,6 +308,8 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

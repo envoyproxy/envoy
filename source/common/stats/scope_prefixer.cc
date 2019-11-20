@@ -38,10 +38,10 @@ Gauge& ScopePrefixer::gaugeFromStatName(StatName name, Gauge::ImportMode import_
   return scope_.gaugeFromStatName(StatName(stat_name_storage.get()), import_mode);
 }
 
-Histogram& ScopePrefixer::histogramFromStatName(StatName name) {
+Histogram& ScopePrefixer::histogramFromStatName(StatName name, Histogram::Unit unit) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.histogramFromStatName(StatName(stat_name_storage.get()));
+  return scope_.histogramFromStatName(StatName(stat_name_storage.get()), unit);
 }
 
 OptionalCounter ScopePrefixer::findCounter(StatName name) const { return scope_.findCounter(name); }

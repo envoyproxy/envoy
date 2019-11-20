@@ -106,6 +106,17 @@ public:
     registerTestServerPorts({"http"});
   }
 
+  // Regression test to catch the code declaring a gRPC service method for {SotW,delta}
+  // when the user's bootstrap config asks for the other type.
+  void verifyGrpcServiceMethod() {
+    EXPECT_TRUE(xds_stream_->waitForHeadersComplete());
+    Envoy::Http::LowerCaseString path_string(":path");
+    std::string expected_method(sotwOrDelta() == Grpc::SotwOrDelta::Sotw
+                                    ? "/envoy.api.v2.ClusterDiscoveryService/StreamClusters"
+                                    : "/envoy.api.v2.ClusterDiscoveryService/DeltaClusters");
+    EXPECT_EQ(xds_stream_->headers().get(path_string)->value(), expected_method);
+  }
+
   void acceptXdsConnection() {
     AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
@@ -113,6 +124,7 @@ public:
     result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
+    verifyGrpcServiceMethod();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 

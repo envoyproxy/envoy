@@ -377,6 +377,9 @@ DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& 
 
 void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
                               Api::Api& api) {
+  // Maximum recursion depth for walkDirectory().
+  static constexpr uint32_t MaxWalkDepth = 16;
+
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
     throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
@@ -560,7 +563,7 @@ void RtdsSubscription::start() {
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_,
       Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
-      store_, *this, /*is_delta=*/false);
+      store_, *this);
   subscription_->start({resource_name_});
 }
 

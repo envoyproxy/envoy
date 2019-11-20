@@ -52,7 +52,8 @@ public:
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
                          bool expect_node = false) override {
-    expectSendMessage(cluster_names, version, expect_node, Grpc::Status::GrpcStatus::Ok, "");
+    expectSendMessage(cluster_names, version, expect_node, Grpc::Status::WellKnownGrpcStatus::Ok,
+                      "");
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
@@ -71,7 +72,7 @@ public:
     }
     expected_request.set_response_nonce(last_response_nonce_);
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
-    if (error_code != Grpc::Status::GrpcStatus::Ok) {
+    if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
@@ -80,7 +81,7 @@ public:
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "", true);
     subscription_->start(cluster_names);
@@ -111,8 +112,8 @@ public:
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-      expectSendMessage(last_cluster_names_, version_, false, Grpc::Status::GrpcStatus::Internal,
-                        "bad config");
+      expectSendMessage(last_cluster_names_, version_, false,
+                        Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
     subscription_->grpcMux()->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);

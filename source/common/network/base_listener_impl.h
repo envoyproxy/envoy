@@ -16,14 +16,18 @@ namespace Network {
  */
 class BaseListenerImpl : public virtual Listener {
 public:
-  BaseListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket);
+  /**
+   * @param socket the listening socket for this listener. It might be shared
+   * with other listeners if all listeners use single listen socket.
+   */
+  BaseListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket);
 
 protected:
   virtual Address::InstanceConstSharedPtr getLocalAddress(int fd);
 
   Address::InstanceConstSharedPtr local_address_;
   Event::DispatcherImpl& dispatcher_;
-  Socket& socket_;
+  const SocketSharedPtr socket_;
 };
 
 } // namespace Network

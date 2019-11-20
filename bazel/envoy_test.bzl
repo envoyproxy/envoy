@@ -88,9 +88,8 @@ def envoy_cc_fuzz_test(
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        deps = deps + [
+        deps = deps + envoy_stdlib_deps() + [
             repository + "//test/fuzz:fuzz_runner_lib",
-            repository + "//bazel:dynamic_stdlib",
         ],
         repository = repository,
         tags = tags,

@@ -348,33 +348,37 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
   const Http2Settings client_http2settings{fromHttp2Settings(input.h2_settings().client())};
+  const Http1Settings client_http1settings;
   NiceMock<MockConnectionCallbacks> client_callbacks;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+  uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
 
   if (http2) {
-    client = std::make_unique<Http2::TestClientConnectionImpl>(client_connection, client_callbacks,
-                                                               stats_store, client_http2settings,
-                                                               max_request_headers_kb);
+    client = std::make_unique<Http2::TestClientConnectionImpl>(
+        client_connection, client_callbacks, stats_store, client_http2settings,
+        max_request_headers_kb, max_response_headers_count);
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, stats_store,
-                                                           client_callbacks);
+                                                           client_callbacks, client_http1settings,
+                                                           max_response_headers_count);
   }
 
   NiceMock<Network::MockConnection> server_connection;
   NiceMock<MockServerConnectionCallbacks> server_callbacks;
   if (http2) {
     const Http2Settings server_http2settings{fromHttp2Settings(input.h2_settings().server())};
-    server = std::make_unique<Http2::TestServerConnectionImpl>(server_connection, server_callbacks,
-                                                               stats_store, server_http2settings,
-                                                               max_request_headers_kb);
+    server = std::make_unique<Http2::TestServerConnectionImpl>(
+        server_connection, server_callbacks, stats_store, server_http2settings,
+        max_request_headers_kb, max_request_headers_count);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
-    server = std::make_unique<Http1::ServerConnectionImpl>(server_connection, stats_store,
-                                                           server_callbacks, server_http1settings,
-                                                           max_request_headers_kb);
+    server = std::make_unique<Http1::ServerConnectionImpl>(
+        server_connection, stats_store, server_callbacks, server_http1settings,
+        max_request_headers_kb, max_request_headers_count);
   }
 
   ReorderBuffer client_write_buf{*server};

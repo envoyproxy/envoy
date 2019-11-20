@@ -89,6 +89,7 @@ public:
 protected:
   bool remoteClosed() { return remote_closed_; }
   void closeLocal(bool end_stream);
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
 
@@ -159,7 +160,8 @@ private:
   };
 
   struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
+                                      uint64_t) const override {
       return nullptr;
     }
 
@@ -169,6 +171,7 @@ private:
 
     const std::string& name() const override { return EMPTY_STRING; }
     bool usesVhds() const override { return false; }
+    bool mostSpecificHeaderMutationsWins() const override { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
@@ -183,7 +186,9 @@ private:
       return nullptr;
     }
     bool includeAttemptCount() const override { return false; }
-
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };
@@ -221,6 +226,9 @@ private:
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
     std::chrono::milliseconds timeout() const override {
       if (timeout_) {
@@ -237,6 +245,9 @@ private:
       return absl::nullopt;
     }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+      return nullptr;
+    }
+    const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
       return nullptr;
     }
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -315,7 +326,6 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -390,7 +400,7 @@ private:
   bool send_xff_{true};
 
   friend class AsyncClientImpl;
-  friend class AsyncClientImplRouteTest;
+  friend class AsyncClientImplUnitTest;
 };
 
 class AsyncRequestImpl final : public AsyncClient::Request,
@@ -427,6 +437,7 @@ private:
   AsyncClient::Callbacks& callbacks_;
   std::unique_ptr<MessageImpl> response_;
   bool cancelled_{};
+  Tracing::SpanPtr child_span_;
 
   friend class AsyncClientImpl;
 };

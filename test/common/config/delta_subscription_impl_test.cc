@@ -18,15 +18,15 @@ protected:
 
 TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
-  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name3", "name4"});
-  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
+  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
-  expectSendMessage({}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  expectSendMessage({}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name3", "name4"});
-  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
+  expectSendMessage({"name1", "name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
-  expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name4"});
 }
 
@@ -38,7 +38,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   startSubscription({"name1", "name2", "name3"});
   subscription_->pause();
 
-  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::GrpcStatus::Ok, "", {});
+  expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   // If not for the pause, these updates would make the expectSendMessage fail due to too many
   // messages being sent.
   subscription_->updateResourceInterest({"name3", "name4"});
@@ -143,7 +143,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, stats,
       std::chrono::milliseconds(12345), false);
 
-  EXPECT_CALL(*async_client, startRaw(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 
   subscription->start({"name1"});
   subscription->updateResourceInterest({"name1", "name2"});

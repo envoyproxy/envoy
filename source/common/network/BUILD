@@ -4,7 +4,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
@@ -53,6 +52,15 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_balancer_lib",
+    srcs = ["connection_balancer_impl.cc"],
+    hdrs = ["connection_balancer_impl.h"],
+    deps = [
+        "//include/envoy/network:connection_balancer_interface",
     ],
 )
 
@@ -115,6 +123,17 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_library(
+    name = "hash_policy_lib",
+    srcs = ["hash_policy.cc"],
+    hdrs = ["hash_policy.h"],
+    deps = [
+        "//include/envoy/network:hash_policy_interface",
+        "//source/common/common:hash_lib",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -192,7 +211,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -265,6 +283,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
@@ -281,7 +300,10 @@ envoy_cc_library(
     srcs = ["transport_socket_options_impl.cc"],
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
+        ":application_protocol_lib",
+        ":upstream_server_name_lib",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
     ],

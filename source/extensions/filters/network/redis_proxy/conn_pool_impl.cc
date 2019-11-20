@@ -21,11 +21,13 @@ InstanceImpl::InstanceImpl(
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
     Api::Api& api, Stats::ScopePtr&& stats_scope,
-    const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats)
-    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
-      api_(api), stats_scope_(std::move(stats_scope)),
+    const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
+    Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager)
+    : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
+      tls_(tls.allocateSlot()), config_(config), api_(api), stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
-                                                     POOL_COUNTER(*stats_scope_))} {
+                                                     POOL_COUNTER(*stats_scope_))},
+      redirection_manager_(std::move(redirection_manager)) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -245,7 +247,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     host_address_map_key = host_address;
   } else {
     const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
-    uint64_t ip_port_number;
+    uint32_t ip_port_number;
     if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
       return nullptr;
     }
@@ -268,7 +270,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     if (!ipv6) {
       // Only create an IPv4 address instance if we need a new Upstream::HostImpl.
       const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
-      uint64_t ip_port_number;
+      uint32_t ip_port_number;
       if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
         return nullptr;
       }

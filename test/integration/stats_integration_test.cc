@@ -254,6 +254,11 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/09/02  8118     42830       43000   Share symbol-tables in cluster/host stats.
   // 2019/09/16  8100     42894       43000   Add transport socket matcher in cluster.
   // 2019/09/25  8226     43022       44000   dns: enable dns failure refresh rate configuration
+  // 2019/09/30  8354     43310       44000   Implement transport socket match.
+  // 2019/10/17  8537     43308       44000   add new enum value HTTP3
+  // 2019/10/17  8484     43340       44000   stats: add unit support to histogram
+  // 2019/11/01  8859     43563       44000   build: switch to libc++ by default
+  // 2019/11/15  9040     43371       44000   build: update protobuf to 3.10.1
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -263,7 +268,11 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 43022); // 104 bytes higher than a debug build.
+  //
+  // If you encounter a failure here, please see
+  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // for details on how to fix.
+  EXPECT_MEMORY_EQ(m_per_cluster, 43371); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 
@@ -291,6 +300,11 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/09/02  8118     34585       34500   Share symbol-tables in cluster/host stats.
   // 2019/09/16  8100     34585       34500   Add transport socket matcher in cluster.
   // 2019/09/25  8226     34777       35000   dns: enable dns failure refresh rate configuration
+  // 2019/09/30  8354     34969       35000   Implement transport socket match.
+  // 2019/10/17  8537     34966       35000   add new enum value HTTP3
+  // 2019/10/17  8484     34998       35000   stats: add unit support to histogram
+  // 2019/11/01  8859     35221       36000   build: switch to libc++ by default
+  // 2019/11/15  9040     35029       35500   build: update protobuf to 3.10.1
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -300,8 +314,12 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 34777); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 36000);
+  //
+  // If you encounter a failure here, please see
+  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // for details on how to fix.
+  EXPECT_MEMORY_EQ(m_per_cluster, 35029); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 35500);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
@@ -326,13 +344,20 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // ----------  -----    -----------------   -----
   // 2019/09/09  8189     2739         3100   Initial per-host memory snapshot
   // 2019/09/10  8216     1283         1315   Use primitive counters for host stats
+  // 2019/11/01  8859     1299         1315   build: switch to libc++ by default
+  // 2019/11/12  8998     1299         1350   test: adjust memory limit for macOS
+  // 2019/11/15  9040     1283         1350   build: update protobuf to 3.10.1
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
   // will need to find the correct value only after failing CI and looking
   // at the logs.
+  //
+  // If you encounter a failure here, please see
+  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_host, 1283);
-  EXPECT_MEMORY_LE(m_per_host, 1315);
+  EXPECT_MEMORY_LE(m_per_host, 1350);
 }
 
 } // namespace

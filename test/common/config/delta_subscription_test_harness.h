@@ -40,7 +40,7 @@ public:
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
         init_fetch_timeout, false);
-    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
   void doSubscriptionTearDown() override {
@@ -76,7 +76,7 @@ public:
                          bool expect_node = false) override {
     UNREFERENCED_PARAMETER(version);
     UNREFERENCED_PARAMETER(expect_node);
-    expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "", {});
+    expectSendMessage(cluster_names, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   }
 
   void expectSendMessage(const std::set<std::string>& subscribe,
@@ -101,7 +101,7 @@ public:
       (*expected_request.mutable_initial_resource_versions())[resource.first] = resource.second;
     }
 
-    if (error_code != Grpc::Status::GrpcStatus::Ok) {
+    if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
@@ -146,7 +146,7 @@ public:
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-      expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
+      expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
     static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
         ->onDiscoveryResponse(std::move(response));
@@ -163,7 +163,7 @@ public:
                         cluster_names.begin(), cluster_names.end(),
                         std::inserter(unsub, unsub.begin()));
 
-    expectSendMessage(sub, unsub, Grpc::Status::GrpcStatus::Ok, "", {});
+    expectSendMessage(sub, unsub, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
     subscription_->updateResourceInterest(cluster_names);
     last_cluster_names_ = cluster_names;
   }

@@ -11,19 +11,21 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Server {
 
 LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, bool is_delta)
+                       ProtobufMessage::ValidationVisitor& validation_visitor)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
       lds_config, Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
-      *scope_, *this, is_delta);
+      *scope_, *this);
   init_manager.add(init_target_);
 }
 
@@ -39,6 +41,8 @@ void LdsApiImpl::onConfigUpdate(
   }
 
   bool any_applied = false;
+  listener_manager_.beginListenerUpdate();
+
   // We do all listener removals before adding the new listeners. This allows adding a new listener
   // with the same address as a listener that is to be removed. Do not change the order.
   for (const auto& removed_listener : removed_resources) {
@@ -48,8 +52,9 @@ void LdsApiImpl::onConfigUpdate(
     }
   }
 
-  std::vector<std::string> exception_msgs;
+  ListenerManager::FailureStates failure_state;
   std::unordered_set<std::string> listener_names;
+  std::string message;
   for (const auto& resource : added_resources) {
     envoy::api::v2::Listener listener;
     try {
@@ -66,17 +71,21 @@ void LdsApiImpl::onConfigUpdate(
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", listener.name(), e.what()));
+      failure_state.push_back(std::make_unique<envoy::admin::v2alpha::UpdateFailureState>());
+      auto& state = failure_state.back();
+      state->set_details(e.what());
+      state->mutable_failed_configuration()->PackFrom(resource);
+      absl::StrAppend(&message, listener.name(), ": ", e.what(), "\n");
     }
   }
+  listener_manager_.endListenerUpdate(std::move(failure_state));
 
   if (any_applied) {
     system_version_info_ = system_version_info;
   }
   init_target_.ready();
-  if (!exception_msgs.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+  if (!message.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}", message));
   }
 }
 

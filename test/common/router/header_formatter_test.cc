@@ -5,7 +5,6 @@
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
@@ -60,6 +59,10 @@ public:
 };
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
+  testFormatting("DOWNSTREAM_REMOTE_ADDRESS", "127.0.0.1:0");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressWithoutPortVariable) {
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
 
@@ -668,6 +671,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   static const TestCase test_cases[] = {
       // Valid inputs
+      {"", {}, {}},
       {"%PROTOCOL%", {"HTTP/1.1"}, {}},
       {"[%PROTOCOL%", {"[HTTP/1.1"}, {}},
       {"%PROTOCOL%]", {"HTTP/1.1]"}, {}},
@@ -675,6 +679,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%%%PROTOCOL%", {"%HTTP/1.1"}, {}},
       {"%PROTOCOL%%%", {"HTTP/1.1%"}, {}},
       {"%%%PROTOCOL%%%", {"%HTTP/1.1%"}, {}},
+      {"%DOWNSTREAM_REMOTE_ADDRESS%", {"127.0.0.1:0"}, {}},
       {"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", {"127.0.0.1"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
@@ -685,8 +690,10 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
+      {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
@@ -717,9 +724,7 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
-      // TODO(dio): Un-terminated variable expressions with arguments and argument errors for
-      // generic %VAR are not checked anymore. Find a way to get the same granularity as before for
-      // following cases.
+      // Parsing errors in variable expressions that take a JSON-array parameter.
       {"%UPSTREAM_METADATA(no array)%",
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
@@ -730,11 +735,40 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
         "Error(offset 2, line 1): Invalid value.\n"}},
+      {"%UPSTREAM_METADATA([\"unterminated array\")%",
+       {},
+       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
+        "'UPSTREAM_METADATA([\"unterminated array\"', but found ')'"}},
+      {"%UPSTREAM_METADATA([not-a-string])%",
+       {},
+       {"Invalid header configuration. Expecting '\"' or whitespace after 'UPSTREAM_METADATA([', "
+        "but found 'n'"}},
+      {"%UPSTREAM_METADATA([\"\\",
+       {},
+       {"Invalid header configuration. Un-terminated backslash in JSON string after "
+        "'UPSTREAM_METADATA([\"'"}},
+      {"%UPSTREAM_METADATA([\"ns\", \"key\"]x",
+       {},
+       {"Invalid header configuration. Expecting ')' or whitespace after "
+        "'UPSTREAM_METADATA([\"ns\", \"key\"]', but found 'x'"}},
+      {"%UPSTREAM_METADATA([\"ns\", \"key\"])x",
+       {},
+       {"Invalid header configuration. Expecting '%' or whitespace after "
+        "'UPSTREAM_METADATA([\"ns\", \"key\"])', but found 'x'"}},
 
       {"%PER_REQUEST_STATE no parens%",
        {},
        {"Invalid header configuration. Expected format PER_REQUEST_STATE(<data_name>), "
         "actual format PER_REQUEST_STATE no parens"}},
+
+      {"%REQ%",
+       {},
+       {"Invalid header configuration. Expected format REQ(<header-name>), "
+        "actual format REQ"}},
+      {"%REQ no parens%",
+       {},
+       {"Invalid header configuration. Expected format REQ(<header-name>), "
+        "actual format REQno parens"}},
 
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
@@ -757,6 +791,10 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
+  Http::HeaderMapImpl request_headers;
+  request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
+  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
+
   // Upstream metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
       TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
@@ -764,6 +802,8 @@ TEST(HeaderParserTest, TestParseInternal) {
         filter_metadata:
           ns:
             key: value
+          '"quoted"':
+            '"key"': value
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
@@ -797,8 +837,12 @@ TEST(HeaderParserTest, TestParseInternal) {
 
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
 
+    if (!test_case.expected_output_) {
+      EXPECT_FALSE(header_map.has("x-header")) << descriptor;
+      continue;
+    }
+
     EXPECT_TRUE(header_map.has("x-header")) << descriptor;
-    EXPECT_TRUE(test_case.expected_output_) << descriptor;
     EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
   }
 }
@@ -814,6 +858,10 @@ request_headers_to_add:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     append: true
+  - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -822,6 +870,7 @@ request_headers_to_add:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
 }
 
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
@@ -1058,6 +1107,10 @@ response_headers_to_add:
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     append: true
   - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
+  - header:
       key: "x-request-start"
       value: "%START_TIME(%s.%3f)%"
     append: true
@@ -1100,6 +1153,7 @@ response_headers_to_remove: ["x-nope"]
 
   resp_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
   EXPECT_TRUE(header_map.has("x-request-start-multiple"));
   EXPECT_TRUE(header_map.has("x-safe"));
   EXPECT_FALSE(header_map.has("x-nope"));

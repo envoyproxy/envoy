@@ -112,9 +112,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
     const auto* route_entry = decoder_callbacks_->route()->routeEntry();
 
-    const FaultSettings* tmp = route_entry->perFilterConfigTyped<FaultSettings>(name);
-    const FaultSettings* per_route_settings =
-        tmp ? tmp : route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
+    const auto* per_route_settings =
+        route_entry->mostSpecificPerFilterConfigTyped<FaultSettings>(name);
     fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
   }
 
