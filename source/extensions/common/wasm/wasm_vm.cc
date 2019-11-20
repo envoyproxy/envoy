@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "extensions/common/wasm/null/null.h"
-
 #include "extensions/common/wasm/v8/v8.h"
 #include "extensions/common/wasm/well_known_names.h"
 

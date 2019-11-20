@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/common/assert.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "extensions/common/wasm/wasm_vm_base.h"
 #include "extensions/common/wasm/well_known_names.h"
@@ -19,7 +20,7 @@ namespace Common {
 namespace Wasm {
 namespace V8 {
 
-VmGlobalStats global_stats_;
+ThreadSafeSingleton<VmGlobalStats> global_stats_;
 
 wasm::Engine* engine() {
   static const auto engine = wasm::Engine::make();
@@ -38,7 +39,8 @@ using FuncDataPtr = std::unique_ptr<FuncData>;
 
 class V8 : public WasmVmBase {
 public:
-  V8(Stats::ScopeSharedPtr scope) : WasmVmBase(scope, &global_stats_, WasmRuntimeNames::get().V8) {}
+  V8(Stats::ScopeSharedPtr scope)
+      : WasmVmBase(scope, &global_stats_.get(), WasmRuntimeNames::get().V8) {}
 
   // Extensions::Common::Wasm::WasmVm
   absl::string_view runtime() override { return WasmRuntimeNames::get().V8; }

@@ -7,6 +7,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "extensions/common/wasm/null/null_vm_plugin.h"
 #include "extensions/common/wasm/wasm_vm_base.h"
@@ -18,16 +19,16 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-extern VmGlobalStats global_stats_;
+extern ThreadSafeSingleton<VmGlobalStats> global_stats_;
 
 // The NullVm wraps a C++ WASM plugin which has been compiled with the WASM API
 // and linked directly into the Envoy process. This is useful for development
 // in that it permits the debugger to set breakpoints in both Envoy and the plugin.
 struct NullVm : public WasmVmBase {
   NullVm(Stats::ScopeSharedPtr scope)
-      : WasmVmBase(scope, &global_stats_, WasmRuntimeNames::get().Null) {}
+      : WasmVmBase(scope, &global_stats_.get(), WasmRuntimeNames::get().Null) {}
   NullVm(const NullVm& other)
-      : WasmVmBase(other.scope_, &global_stats_, WasmRuntimeNames::get().Null),
+      : WasmVmBase(other.scope_, &global_stats_.get(), WasmRuntimeNames::get().Null),
         plugin_name_(other.plugin_name_) {}
 
   // WasmVm
