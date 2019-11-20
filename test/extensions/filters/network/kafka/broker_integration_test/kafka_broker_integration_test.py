@@ -7,6 +7,7 @@ import shutil
 import socket
 import subprocess
 import time
+import urllib.request
 from kafka import KafkaProducer
 
 
@@ -43,13 +44,6 @@ class TestStringMethods(unittest.TestCase):
     # https://docs.oracle.com/javase/9/management/monitoring-and-management-using-jmx-technology.htm
     # Let's make it simple and just disable JMX.
     launcher_environment['KAFKA_JMX_OPTS'] = " "
-
-    print(
-        subprocess.Popen("which java",
-                         shell=True,
-                         env=launcher_environment,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE).communicate())
 
     try:
       # Setup a temporary directory, which will be used by Kafka & Zookeeper servers.
@@ -130,7 +124,7 @@ class TestStringMethods(unittest.TestCase):
       print("kafka: " + str(kp) if kp else "ok")
 
       try:
-        kafka_server = '127.0.0.1:9092'
+        kafka_server = '127.0.0.1:19092'
         print("Client will be connecting to " + kafka_server)
         producer = KafkaProducer(bootstrap_servers=kafka_server)
         for _ in range(100):
@@ -140,6 +134,32 @@ class TestStringMethods(unittest.TestCase):
         print("Send operations finished successfully")
       except Exception as e:
         print("Send exception occurred: " + str(e))
+
+      # Now let's get Envoy stats.
+      stats_url = 'http://127.0.0.1:9901/stats'
+      requests = {}
+      responses = {}
+      with urllib.request.urlopen(stats_url) as remote_metrics_url:
+        payload = remote_metrics_url.read().decode()
+        lines = payload.splitlines()
+        for line in lines:
+          request_prefix = 'kafka.testfilter.request.'
+          response_prefix = 'kafka.testfilter.response.'
+          if line.startswith(request_prefix):
+            data = line[len(request_prefix):].split(': ')
+            requests[data[0]] = int(data[1])
+            pass
+          if line.startswith(response_prefix) and '_response:' in line:
+            data = line[len(response_prefix):].split(': ')
+            responses[data[0]] = int(data[1])
+      print(requests)
+      print(responses)
+
+      try:
+        self.assertGreaterEqual(requests['produce_request'], 100)
+        self.assertGreaterEqual(responses['produce_response'], 100)
+      except Exception as e:
+        print("Assertion error: " + str(e))
 
       print("Check service state (2)")
       ep = envoy_handle.poll()
@@ -151,31 +171,27 @@ class TestStringMethods(unittest.TestCase):
 
     finally:
       # Teardown - kill Kafka, Zookeeper, and Envoy. Then delete their data directory.
+      print("Cleaning up")
+
       if kafka_handle:
         kafka_handle.kill()
         print('=========KAFKA=========')
         print(kafka_handle.communicate())
         kafka_handle.wait()
-      else:
-        print('no kafka')
 
       if zk_handle:
         zk_handle.kill()
         print('=========ZOOKEEPER=========')
         print(zk_handle.communicate())
         zk_handle.wait()
-      else:
-        print('no zk')
 
       if envoy_handle:
         envoy_handle.kill()
         print('=========ENVOY=========')
         print(envoy_handle.communicate())
         envoy_handle.wait()
-      else:
-        print('no envoy')
 
-      print("Cleaning up")
+      print("Removing temporary directory: " + kafka_tmp_dir)
       shutil.rmtree(kafka_tmp_dir)
 
     self.assertTrue(False)

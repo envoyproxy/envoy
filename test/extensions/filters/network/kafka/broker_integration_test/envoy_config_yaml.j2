@@ -8,7 +8,7 @@ static_resources:
     - filters:
       - name: envoy.filters.network.kafka_broker
         config:
-          stat_prefix: adam1
+          stat_prefix: testfilter
       - name: envoy.tcp_proxy
         config:
           stat_prefix: ingress_tcp
