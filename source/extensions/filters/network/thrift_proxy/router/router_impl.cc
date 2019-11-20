@@ -184,8 +184,8 @@ RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
 void Router::onDestroy() {
   if (upstream_request_ != nullptr) {
     upstream_request_->resetStream();
+    cleanup();
   }
-  cleanup();
 }
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
