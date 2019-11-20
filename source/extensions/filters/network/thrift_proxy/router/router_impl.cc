@@ -414,7 +414,6 @@ void Router::UpstreamRequest::resetStream() {
 
   if (conn_data_ != nullptr) {
     conn_state_ = nullptr;
-    conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
     conn_data_.reset();
   }
 }

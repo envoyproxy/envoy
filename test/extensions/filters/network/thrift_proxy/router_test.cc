@@ -565,7 +565,6 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
   EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
       .WillOnce(Return(ThriftFilters::ResponseStatus::Reset));
-  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
 
   upstream_callbacks_->onUpstreamData(buffer, true);
   destroyRouter();
@@ -617,7 +616,6 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroy) {
   initializeRouter();
   startRequest(MessageType::Call);
   connectUpstream();
-  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   destroyRouter();
 }
 
