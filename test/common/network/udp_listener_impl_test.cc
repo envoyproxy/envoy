@@ -412,12 +412,15 @@ TEST_P(UdpListenerImplTest, SendData) {
         client_socket_->ioHandle(), *client_socket_->localAddress(), data);
 
     bytes_read = result.rc_;
+    std::cerr << "=========== client readFromSocket bytes_read: " << bytes_read
+              << " retry: " << retry << " result is ok: " << result.ok()
+              << " peer address ptr : " << data.addresses_.peer_.get();
+    EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
 
     if (bytes_read >= bytes_to_read || retry == 10 ||
-        (!result.ok() && result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again)) {
+        result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       break;
     }
-    EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
 
     retry++;
     ::usleep(10000);
