@@ -102,7 +102,7 @@ To sum this up in pseudo algorithms:
   normalized_total_health = min(100, Σ(health(P_0)...health(P_X)))
   priority_load(C_0) = min(100, Σ(health(P_0)...health(P_k)) * 100 / normalized_total_health), where P_0...P_k belong to C_0
   priority_load(C_X) = min(100 - Σ(priority_load(C_0)..priority_load(C_X-1)),
-                           Σ(health(P_x)...health(P_X)) * 100 / normalized_total_health)
+                           Σ(health(P_x)...health(P_X)) * 100 / normalized_total_health), where P_x...P_X belong to C_X
 
 The example shows how the aggregate cluster level load balancer selects the cluster. E.g.,
 healths of {{20, 20, 10}, {25, 25}} would result in a priority load of {{28%, 28%, 14%}, {30%, 0%}} of traffic. When normalized total health drops below 100, traffic is distributed after normalizing
