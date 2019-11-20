@@ -11,8 +11,6 @@ class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
   OnDemandRouteUpdate() = default;
 
-  Envoy::Http::FilterHeadersStatus requestRouteConfigUpdate();
-
   void onRouteConfigUpdateCompletion();
 
   // Http::StreamDecoderFilter

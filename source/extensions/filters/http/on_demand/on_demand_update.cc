@@ -9,17 +9,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
-Http::FilterHeadersStatus OnDemandRouteUpdate::requestRouteConfigUpdate() {
-  if (callbacks_->route() != nullptr || !callbacks_->canRequestRouteConfigUpdate()) {
-    return Http::FilterHeadersStatus::Continue;
-  } else {
-    callbacks_->requestRouteConfigUpdate();
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-}
-
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::HeaderMap&, bool) {
-  filter_iteration_state_ = requestRouteConfigUpdate();
+  if (callbacks_->route() != nullptr || !callbacks_->canRequestRouteConfigUpdate()) {
+    filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
+    return filter_iteration_state_;
+  }
+  callbacks_->requestRouteConfigUpdate();
+  filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
   return filter_iteration_state_;
 }
 
