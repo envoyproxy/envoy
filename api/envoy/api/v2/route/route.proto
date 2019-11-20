@@ -187,7 +187,8 @@ message Route {
     DirectResponseAction direct_response = 7;
 
     // [#not-implemented-hide:]
-    // If true, a filter will define the action (e.g., it could dynamically generate the RouteAction).
+    // If true, a filter will define the action (e.g., it could dynamically generate the
+    // RouteAction).
     FilterAction filter_action = 17;
   }
 
