@@ -20,5 +20,7 @@ py_test(
         "//bazel:remote_jdk11",
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = ["@com_github_pallets_jinja//:jinja2"],
 )
