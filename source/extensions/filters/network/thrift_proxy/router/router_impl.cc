@@ -350,7 +350,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void Router::onEvent(Network::ConnectionEvent event) {
-  if (upstream_request_ == nullptr) {
+  if (upstream_request_ == nullptr || conn_state_ == nullptr) {
     return;
   }
 
@@ -370,10 +370,13 @@ void Router::onEvent(Network::ConnectionEvent event) {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  // Release connection resources and ensure resetStream() won't close the connection
-  // from onDestroy(), since it's been closed already.
-  upstream_request_->resetStream(false);
-  cleanup();
+  // If we are called from resetStream(), nothing else is needed.
+  if (upstream_request_->conn_state_) {
+    // Release connection resources and ensure resetStream() won't close the connection
+    // from onDestroy(), since it's been closed already.
+    upstream_request_->resetStream(false);
+    cleanup();
+  }
 }
 
 const Network::Connection* Router::downstreamConnection() const {
@@ -419,6 +422,7 @@ FilterStatus Router::UpstreamRequest::start() {
 void Router::UpstreamRequest::resetStream(const bool close) {
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+    conn_pool_handle_ = nullptr;
   }
 
   if (conn_data_ != nullptr) {
