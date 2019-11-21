@@ -18,6 +18,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Adaptive Concurrency]
 // Adaptive Concurrency Control :ref:`configuration overview
 // <config_http_filters_adaptive_concurrency>`.
+// [#extension: envoy.filters.http.adaptive_concurrency]
 
 // Configuration parameters for the gradient controller.
 message GradientControllerConfig {
@@ -56,6 +57,9 @@ message GradientControllerConfig {
     // Example: If the interval is 10s and the jitter is 15%, the next window will begin
     // somewhere in the range (10s - 11.5s).
     type.Percent jitter = 3;
+
+    // The concurrency limit set while measuring the minRTT. Defaults to 3.
+    google.protobuf.UInt32Value min_concurrency = 4 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // The percentile to use when summarizing aggregated samples. Defaults to p50.

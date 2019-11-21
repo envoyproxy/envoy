@@ -240,6 +240,7 @@ message TagSpecifier {
 
 // Stats configuration proto schema for built-in *envoy.statsd* sink. This sink does not support
 // tagged metrics.
+// [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
   oneof statsd_specifier {
     option (validate.required) = true;
@@ -288,6 +289,7 @@ message StatsdSink {
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_api_msg_config.metrics.v2.StatsConfig>`.
+// [#extension: envoy.stat_sinks.dog_statsd]
 message DogStatsdSink {
   reserved 2;
 
@@ -313,6 +315,7 @@ message DogStatsdSink {
 // Note that only a single HystrixSink should be configured.
 //
 // Streaming is started through an admin endpoint :http:get:`/hystrix_event_stream`.
+// [#extension: envoy.stat_sinks.hystrix]
 message HystrixSink {
   // The number of buckets the rolling statistical window is divided into.
   //
