@@ -250,6 +250,21 @@ public:
   virtual void setBufferLimits(uint32_t limit) PURE;
 
   /**
+   * Set the receive buffer size for the socket to a value specified by the 'buffer_size'
+   */
+  virtual void setSocketRecvBufferSize(uint32_t buffer_size) const PURE;
+
+  /**
+   * Return the receive buffer size for the socket
+   */
+  virtual uint32_t getSocketRecvBufferSize() const PURE;
+
+  /**
+   * Set the receive buffer low water-mark size to a value specified by 'low_watermark'
+   */
+  virtual void setSocketRecvLoWat(uint32_t low_watermark) const PURE;
+
+  /**
    * Get the value set with setBufferLimits.
    */
   virtual uint32_t bufferLimit() const PURE;
