@@ -150,7 +150,7 @@ concurrency_limit_params:
     nanos: 123000000
 min_rtt_calc_params:
   buffer:
-    value: 25
+    value: 33
   jitter:
     value: 13.2
   interval:
@@ -182,7 +182,7 @@ min_rtt_calc_params:
   EXPECT_CALL(runtime_.snapshot_, getInteger(_, 7)).WillOnce(Return(9));
   EXPECT_EQ(config.minConcurrency(), 9);
 
-  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 25.0)).WillOnce(Return(77.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 33.0)).WillOnce(Return(77.0));
   EXPECT_EQ(config.minRTTBufferPercent(), .77);
 }
 
@@ -203,7 +203,7 @@ min_rtt_calc_params:
   EXPECT_EQ(config.sampleAggregatePercentile(), .5);
   EXPECT_EQ(config.jitterPercent(), .15);
   EXPECT_EQ(config.minConcurrency(), 3);
-  EXPECT_EQ(config.minRTTBufferPercent(), 0.1);
+  EXPECT_EQ(config.minRTTBufferPercent(), 0.25);
 }
 
 TEST_F(GradientControllerTest, MinRTTLogicTest) {
