@@ -11,6 +11,7 @@ Version history
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * http: support :ref:`auto_host_rewrite_header<envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig.auto_host_rewrite_header>` in the dynamic forward proxy.
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
+* server: added interface for pre startup checks and posix implementation that checks for hard limit on open files and inotify watch limits
 * redis: performance improvement for larger split commands by avoiding string copies.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * server: fixed a bug in config validation for configs with runtime layers
