@@ -355,6 +355,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
     FAIL() << "Unsupported gRPC-Web response content-type: "
            << response_headers.ContentType()->value().getStringView();
   }
+  EXPECT_EQ(0, response_trailers.size());
 }
 
 INSTANTIATE_TEST_SUITE_P(Unary, GrpcWebFilterTest,

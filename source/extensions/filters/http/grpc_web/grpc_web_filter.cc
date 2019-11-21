@@ -208,6 +208,8 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
         return Http::HeaderMap::Iterate::Continue;
       },
       &temp);
+  // Clear out the trailers so they don't get added since it is now in the body
+  trailers.removePrefix(Envoy::Http::LowerCaseString(""));
   Buffer::OwnedImpl buffer;
   // Adds the trailers frame head.
   buffer.add(&GRPC_WEB_TRAILER, 1);
