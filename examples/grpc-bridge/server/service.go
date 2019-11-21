@@ -8,7 +8,7 @@ import (
 
 	"sync"
 
-	"github.com/envoyproxy/envoy/examples/grpc-bridge/service/gen"
+  "github.com/envoyproxy/envoy/examples/grpc-bridge/server/kv"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -35,7 +35,7 @@ func (k *KV) Set(ctx context.Context, in *kv.SetRequest) (*kv.SetResponse, error
 
 	k.store[in.Key] = in.Value
 
-	return &kv.SetResponse{true}, nil
+	return &kv.SetResponse{Ok: true}, nil
 }
 
 func NewKVStore() (kv *KV) {
