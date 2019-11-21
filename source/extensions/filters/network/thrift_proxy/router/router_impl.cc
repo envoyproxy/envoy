@@ -350,7 +350,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void Router::onEvent(Network::ConnectionEvent event) {
-  if (upstream_request_ == nullptr || conn_state_ == nullptr) {
+  if (upstream_request_ == nullptr) {
     return;
   }
 
