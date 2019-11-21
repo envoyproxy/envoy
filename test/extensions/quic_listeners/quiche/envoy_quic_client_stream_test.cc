@@ -161,7 +161,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
 }
 
 TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
     return;
   }
