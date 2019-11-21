@@ -62,7 +62,7 @@ message GrpcService {
       }
     }
 
-    // [#next-free-field: 7]
+    // [#next-free-field: 8]
     message CallCredentials {
       message ServiceAccountJWTAccessCredentials {
         string json_key = 1;
@@ -86,6 +86,26 @@ message GrpcService {
         oneof config_type {
           google.protobuf.Any typed_config = 3;
         }
+      }
+
+      message StsService {
+        string token_exchange_service_uri = 1 [(validate.rules).string.uri = true];
+
+        string resource = 2;
+
+        string audience = 3;
+
+        string scope = 4;
+
+        string requested_token_type = 5;
+
+        string subject_token_path = 6 [(validate.rules).string = {min_bytes: 1}];
+
+        string subject_token_type = 7 [(validate.rules).string = {min_bytes: 1}];
+
+        string actor_token_path = 8;
+
+        string actor_token_type = 9;
       }
 
       oneof credential_specifier {
@@ -115,6 +135,11 @@ message GrpcService {
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a823c6a4b19ffc71fb33e90154ee2ad07.
         // https://grpc.io/docs/guides/auth.html#extending-grpc-to-support-other-authentication-mechanisms.
         MetadataCredentialsFromPlugin from_plugin = 6;
+
+        // Custom security token service which implements OAuth 2.0 token exchange.
+        // https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16
+        // See https://github.com/grpc/grpc/pull/19587.
+        StsService sts_service = 7;
       }
     }
 
