@@ -768,11 +768,11 @@ TEST(HttpUtility, CheckIsIpAddress) {
                       "fd12:3456:7890:1234:5678:9012:3456:7890", 0),
       std::make_tuple(true, "[a::1]:0", "a::1", 0),
       std::make_tuple(true, "[a:b:c:d::]:0", "a:b:c:d::", 0),
-      std::make_tuple(false, "hoge.hoge.com", "hoge.hoge.com", 0),
-      std::make_tuple(false, "hoge.hoge.com:8000", "hoge.hoge.com", 8000),
-      std::make_tuple(false, "hoge.hoge.com:abc", "hoge.hoge.com:abc", 0),
+      std::make_tuple(false, "example.com", "example.com", 0),
+      std::make_tuple(false, "example.com:8000", "example.com", 8000),
+      std::make_tuple(false, "example.com:abc", "example.com:abc", 0),
       std::make_tuple(false, "localhost:10000", "localhost", 10000),
-      std::make_tuple(false, "hoge", "hoge", 0)};
+      std::make_tuple(false, "localhost", "localhost", 0)};
 
   for (auto&& pattern : patterns) {
     bool bool_status_pattern = std::get<0>(pattern);
