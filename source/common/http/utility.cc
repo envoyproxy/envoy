@@ -755,13 +755,13 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
   auth_attr.port = default_port;
   auth_attr.host = authority.data();
 
-  const auto comma_pos = authority.rfind(":");
+  const auto colon_pos = authority.rfind(":");
 
   bool is_ipv6 = false;
   bool have_port_ipv4 = false;
   bool have_port_ipv6 = false;
 
-  if (comma_pos != absl::string_view::npos && comma_pos != authority.find(":")) {
+  if (colon_pos != absl::string_view::npos && colon_pos != authority.find(":")) {
     is_ipv6 = true;
   }
 
@@ -769,7 +769,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     have_port_ipv6 = true;
   }
 
-  if (comma_pos != absl::string_view::npos && comma_pos == authority.find(":")) {
+  if (colon_pos != absl::string_view::npos && colon_pos == authority.find(":")) {
     have_port_ipv4 = true;
   }
 
