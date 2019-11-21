@@ -95,7 +95,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   bool is_ip_address = host_attributes.is_ip_address;
   std::string host_to_resolve = host_attributes.host;
 
-  if (is_ip_address) {
+  if (host_attributes.port != default_port) {
     default_port = host_attributes.port;
   }
 

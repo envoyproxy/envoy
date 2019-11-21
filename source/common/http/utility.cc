@@ -780,32 +780,37 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
       auth_attr.host = instance->ip()->addressAsString();
       auth_attr.port = instance->ip()->port();
       auth_attr.is_ip_address = true;
+
+      return auth_attr;
     } catch (const EnvoyException&) {
-      // If authority has FQDN and port like hoge.com:8000,
+      // If authority has FQDN and port like localhost:8000,
       // Network::Utility::parseInternetAddressAndPort should be failed so that we must parse
       // authority on here
-      if (comma_pos != absl::string_view::npos && comma_pos == authority.find(":")) {
-        auth_attr.host = Network::Utility::hostFromIpAddress(authority);
-        const auto port_str = Network::Utility::portFromIpAddress(authority);
-        uint64_t port64 = 0;
 
-        if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-          auth_attr.host = authority.data();
-          port64 = 0;
-        }
+      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
 
-        auth_attr.port = static_cast<uint32_t>(port64);
+      const auto port_str = Network::Utility::portFromIpAddress(authority);
+      uint64_t port64 = 0;
+
+      // This section should be false if authority is like hoge.com:abc, we can't regard as abc as
+      // port so that must regard hoge.com:abc as host and return them
+      if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+        auth_attr.host = authority.data();
+        auth_attr.port = default_port;
+        return auth_attr;
       }
-    }
 
-    return auth_attr;
+      auth_attr.port = static_cast<uint32_t>(port64);
+    }
   }
 
-  const auto extracted_host = !have_port_ipv6 && is_ipv6
-                                  ? Network::Utility::hostFromIpAddress(authority)
-                                  : authority.data();
-
   try {
+    // if authority is like ipv6 address with brackets without port like [::], we should extract ::
+    // as host because parse it validly on parseInternetAddress() because this function can't
+    // receive host with bracket but return exception
+    const auto extracted_host = !have_port_ipv6 && is_ipv6
+                                    ? Network::Utility::hostFromIpAddress(authority)
+                                    : auth_attr.host;
     const Network::Address::InstanceConstSharedPtr instance =
         Network::Utility::parseInternetAddress(extracted_host, default_port);
     auth_attr.host = instance->ip()->addressAsString();

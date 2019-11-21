@@ -756,7 +756,7 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
 }
 
 TEST(HttpUtility, CheckIsIpAddress) {
-  std::array<std::tuple<bool, std::string, std::string, uint32_t>, 15> patterns{
+  std::array<std::tuple<bool, std::string, std::string, uint32_t>, 16> patterns{
       std::make_tuple(true, "1.2.3.4", "1.2.3.4", 0),
       std::make_tuple(true, "1.2.3.4:0", "1.2.3.4", 0),
       std::make_tuple(true, "0.0.0.0:4000", "0.0.0.0", 4000),
@@ -771,6 +771,7 @@ TEST(HttpUtility, CheckIsIpAddress) {
       std::make_tuple(false, "hoge.hoge.com", "hoge.hoge.com", 0),
       std::make_tuple(false, "hoge.hoge.com:8000", "hoge.hoge.com", 8000),
       std::make_tuple(false, "hoge.hoge.com:abc", "hoge.hoge.com:abc", 0),
+      std::make_tuple(false, "localhost:10000", "localhost", 10000),
       std::make_tuple(false, "hoge", "hoge", 0)};
 
   for (auto&& pattern : patterns) {
