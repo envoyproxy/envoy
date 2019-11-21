@@ -35,23 +35,31 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
       bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
 
+  bool create_socket = false;
   if (local_address_->type() == Network::Address::Type::Ip) {
     if (socket_type_ == Network::Address::SocketType::Datagram) {
       ASSERT(reuse_port_ == true);
     }
 
-    // If reuse_port_ is false, create a socket here which will be used by all worker
-    // threads; otherwise, if port is 0, still need to create a socket here, because
-    // a random port will be assigned, then all worker threads should use same port.
-    if (!reuse_port_ || local_address_->ip()->port() == 0) {
-      socket_ = createListenSocketAndApplyOptions();
-      if (socket_ && local_address_->ip()->port() == 0) {
-        local_address_ = socket_->localAddress();
-      }
+    if (reuse_port_ == false) {
+      // create a socket which will be used by all worker threads
+      create_socket = true;
+    } else if (local_address_->ip()->port() == 0) {
+      // port is 0, need to create a socket here for reserving a real port number,
+      // then all worker threads should use same port.
+      create_socket = true;
     }
   } else {
     // Listeners with Unix domain socket always use shared socket.
+    create_socket = true;
+  }
+
+  if (create_socket) {
     socket_ = createListenSocketAndApplyOptions();
+  }
+
+  if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
+    local_address_ = socket_->localAddress();
   }
 
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
@@ -88,8 +96,20 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
 Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 
   if (reuse_port_) {
-    auto socket = createListenSocketAndApplyOptions();
-    return socket;
+    Network::SocketSharedPtr socket;
+    absl::call_once(steal_once_, [this, &socket]() {
+      if (socket_) {
+        // the socket_ created for reserving port number is handed over to first
+        // worker thread got here.
+        socket = std::move(socket_);
+      }
+    });
+
+    if (socket) {
+      return socket;
+    }
+
+    return createListenSocketAndApplyOptions();
   }
 
   return socket_;

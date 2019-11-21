@@ -14,6 +14,8 @@
 
 #include "server/filter_chain_manager_impl.h"
 
+#include "absl/base/call_once.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -38,16 +40,9 @@ public:
 
   /**
    * @return the socket shared by worker threads; otherwise return null.
-   *
-   * Worker threads share socket in two cases:
-   * - reuse_port is set to 'false'.
-   * - reuse_port is set to 'true' but port is 0. In this case, returns a ephemeral socket
-   *   which is used to reserve a port.
-   *
-   * Note: for UDP, 'reuse_port' is always 'true'.
    */
   absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-    if (socket_) {
+    if (!reuse_port_ && socket_) {
       return *socket_;
     }
 
@@ -66,8 +61,10 @@ private:
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
   const std::string& listener_name_;
-  bool reuse_port_;
+  const bool reuse_port_;
   Network::SocketSharedPtr socket_;
+
+  absl::once_flag steal_once_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
