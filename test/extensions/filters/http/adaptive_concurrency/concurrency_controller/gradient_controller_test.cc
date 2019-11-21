@@ -353,6 +353,8 @@ min_rtt_calc_params:
     value: 0.0
   interval: 30s
   request_count: 5
+  buffer:
+    value: 10
 )EOF";
 
   auto controller = makeController(yaml);
