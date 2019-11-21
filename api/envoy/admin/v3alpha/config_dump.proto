@@ -31,7 +31,22 @@ message ConfigDump {
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v3alpha.ClustersConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v3alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v3alpha.RoutesConfigDump>`
+  //
+  // Dump a specific configuration component with
+  // :ref:`/config_dump?key={} <operations_admin_interface_config_dump_by_key>` You can see
+  // which configurations you can specify with
+  // :ref:`/config_dump?list_keys <operations_admin_interface_config_dump_list_keys>`.
   repeated google.protobuf.Any configs = 1;
+}
+
+// The :ref:`/config_dump <operations_admin_interface_config_dump_list_keys>` admin endpoint uses
+// this wrapper message to return a list of components that can be dumped.
+message ConfigDumpKeys {
+  // Lists configurations that will be dumped by the :ref:`/config_dump
+  // <operations_admin_interface_config_dump>`. Any key in this list can be passed to
+  // :ref:`/config_dump?key={} <operations_admin_interface_config_dump_by_key>` to dump a specific
+  // configuration.
+  repeated string keys = 1;
 }
 
 message UpdateFailureState {
