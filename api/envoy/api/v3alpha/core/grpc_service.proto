@@ -89,7 +89,7 @@ message GrpcService {
       }
 
       message StsService {
-        string token_exchange_service_uri = 1 [(validate.rules).string.uri = true];
+        string token_exchange_service_uri = 1 [(validate.rules).string = {uri: true}];
 
         string resource = 2;
 
