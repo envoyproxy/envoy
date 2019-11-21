@@ -73,7 +73,7 @@ TargetHandlePtr SharedTargetImpl::createHandle(absl::string_view handle_name) co
 
 bool SharedTargetImpl::ready() {
   initialized_ = true;
-  bool all_notified = true;
+  bool all_notified = !watcher_handles_.empty();
   for (auto& watcher_handle : watcher_handles_) {
     all_notified = watcher_handle->ready() && all_notified;
   }

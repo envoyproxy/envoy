@@ -8,15 +8,23 @@ namespace Envoy {
 namespace Init {
 namespace {
 
-TEST(InitTargetImplTest, Name) {
-  ExpectableTargetImpl target;
-  EXPECT_EQ("target test", target.name());
+template <typename T> std::string getName() { return ""; }
+template <> std::string getName<ExpectableTargetImpl>() { return "target test"; }
+template <> std::string getName<ExpectableSharedTargetImpl>() { return "shared target test"; }
+
+// Testing common cases for all the target implementation.
+template <typename T> class TargetImplTest : public ::testing::Test {};
+
+TYPED_TEST_SUITE_P(TargetImplTest);
+TYPED_TEST_P(TargetImplTest, Name) {
+  TypeParam target;
+  EXPECT_EQ(getName<TypeParam>(), target.name());
 }
 
-TEST(InitTargetImplTest, InitializeWhenAvailable) {
+TYPED_TEST_P(TargetImplTest, InitializeWhenAvailable) {
   InSequence s;
 
-  ExpectableTargetImpl target;
+  TypeParam target;
   ExpectableWatcherImpl watcher;
 
   // initializing the target through its handle should invoke initialize()...
@@ -32,21 +40,24 @@ TEST(InitTargetImplTest, InitializeWhenAvailable) {
   EXPECT_FALSE(target.ready());
 }
 
-TEST(InitTargetImplTest, InitializeWhenUnavailable) {
+// Initializing TargetHandle return false if uninitialized SharedTarget is destroyed.
+TYPED_TEST_P(TargetImplTest, InitializeWhenUnavailable) {
+  InSequence s;
   ExpectableWatcherImpl watcher;
   TargetHandlePtr handle;
   {
-    ExpectableTargetImpl target;
+    TypeParam target;
 
     // initializing the target after it's been destroyed should do nothing.
     handle = target.createHandle("test");
     target.expectInitialize().Times(0);
+    // target destroyed here
   }
   EXPECT_FALSE(handle->initialize(watcher));
 }
 
-TEST(InitTargetImplTest, ReadyWhenWatcherUnavailable) {
-  ExpectableTargetImpl target;
+TYPED_TEST_P(TargetImplTest, ReadyWhenWatcherUnavailable) {
+  TypeParam target;
   {
     ExpectableWatcherImpl watcher;
 
@@ -56,47 +67,22 @@ TEST(InitTargetImplTest, ReadyWhenWatcherUnavailable) {
 
     // calling ready() on the target after the watcher has been destroyed should do nothing.
     watcher.expectReady().Times(0);
+    // watcher destroyed here
   }
   EXPECT_FALSE(target.ready());
 }
 
-// SharedTarget acts as TargetImpl if single watcher is provided.
-TEST(InitSharedTargetTestImpl, InitializeSingleWatcher) {
-  InSequence s;
+REGISTER_TYPED_TEST_SUITE_P(TargetImplTest, Name, InitializeWhenAvailable,
+                            InitializeWhenUnavailable, ReadyWhenWatcherUnavailable);
+using TargetImplTypes = ::testing::Types<ExpectableTargetImpl, ExpectableSharedTargetImpl>;
+INSTANTIATE_TYPED_TEST_SUITE_P(My, TargetImplTest, TargetImplTypes);
 
-  ExpectableSharedTargetImpl target;
-  ExpectableWatcherImpl watcher;
+TYPED_TEST_SUITE(TargetImplTest, TargetImplTypes);
 
-  // initializing the target through its handle should invoke initialize()...
-  target.expectInitialize();
-  EXPECT_TRUE(target.createHandle("test")->initialize(watcher));
-
-  // calling ready() on the target should invoke the saved watcher handle...
-  watcher.expectReady();
-  EXPECT_TRUE(target.ready());
-
-  // calling ready() a second time should have no effect.
-  watcher.expectReady().Times(0);
-  target.ready();
-}
-
-// Initializing TargetHandle return false if uninitialized SharedTarget is destroyed.
-TEST(InitSharedTargetTestImpl, InitializeWhenUnavailable) {
-  InSequence s;
-  ExpectableWatcherImpl watcher;
-  TargetHandlePtr handle;
-  {
-    ExpectableSharedTargetImpl target;
-
-    // initializing the target after it's been destroyed should do nothing.
-    handle = target.createHandle("test");
-    target.expectInitialize().Times(0);
-  }
-  EXPECT_FALSE(handle->initialize(watcher));
-}
+// Below are the specialized tests for different implementations of Target
 
 // Initializing TargetHandle return false if initialized SharedTarget is destroyed.
-TEST(InitSharedTargetTestImpl, ReInitializeWhenUnavailable) {
+TEST(InitSharedTargetImplTest, ReInitializeWhenUnavailable) {
   InSequence s;
   ExpectableWatcherImpl w;
   TargetHandlePtr handle;
@@ -117,7 +103,7 @@ TEST(InitSharedTargetTestImpl, ReInitializeWhenUnavailable) {
 }
 
 // SharedTarget notifies multiple watchers.
-TEST(InitSharedTargetTestImpl, NotifyAllWatcherWhenInitialization) {
+TEST(InitSharedTargetImplTest, NotifyAllWatcherWhenInitialization) {
   InSequence s;
   ExpectableWatcherImpl w1;
   ExpectableSharedTargetImpl target;
@@ -137,7 +123,7 @@ TEST(InitSharedTargetTestImpl, NotifyAllWatcherWhenInitialization) {
 }
 
 // Initialized SharedTarget notifies further watcher immediately at second initialization attempt.
-TEST(InitSharedTargetTestImpl, InitializedSharedTargetNotifyWatcherWhenAddedAgain) {
+TEST(InitSharedTargetImplTest, InitializedSharedTargetNotifyWatcherWhenAddedAgain) {
   InSequence s;
   ExpectableWatcherImpl w1;
   ExpectableSharedTargetImpl target;
@@ -158,6 +144,31 @@ TEST(InitSharedTargetTestImpl, InitializedSharedTargetNotifyWatcherWhenAddedAgai
   EXPECT_TRUE(handle2->initialize(w2));
 }
 
+TEST(InitSharedTargetImplTest, EarlySharedTargetReadyNotifyWatchers) {
+  InSequence s;
+
+  ExpectableSharedTargetImpl target;
+
+  // No watcher yet. Nothing will be notified at this moment.
+  EXPECT_FALSE(target.ready());
+
+  // It's arguable if the shared target should be initialized after ready()
+  // is already invoked.
+  target.expectInitialize().Times(0);
+
+  ExpectableWatcherImpl w1;
+  TargetHandlePtr handle1 = target.createHandle("m1");
+  // w1 is notified with no further target.ready().
+  w1.expectReady();
+  EXPECT_TRUE(handle1->initialize(w1));
+
+  ExpectableWatcherImpl w2;
+  target.expectInitialize().Times(0);
+  TargetHandlePtr handle2 = target.createHandle("m2");
+  // w2 is notified with no further target.ready().
+  w2.expectReady();
+  EXPECT_TRUE(handle2->initialize(w2));
+}
 } // namespace
 } // namespace Init
 } // namespace Envoy
