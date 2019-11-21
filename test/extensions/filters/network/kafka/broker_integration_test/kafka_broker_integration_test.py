@@ -10,6 +10,7 @@ import time
 import urllib.request
 from kafka import KafkaProducer
 
+
 class KafkaBrokerIntegrationTest(unittest.TestCase):
 
   services = None
@@ -69,6 +70,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
 
     self.assertGreaterEqual(requests['produce_request'], 100)
     self.assertGreaterEqual(responses['produce_response'], 100)
+
 
 class ServicesHolder:
   """
@@ -141,7 +143,9 @@ class ServicesHolder:
     # Start Envoy in the background, pointing to rendered config file.
     envoy_binary = os.path.join('.', 'source', 'exe', 'envoy-static')
     envoy_args = [os.path.abspath(envoy_binary), '-c', envoy_config_file]
-    self.envoy_handle = subprocess.Popen(envoy_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    self.envoy_handle = subprocess.Popen(envoy_args,
+                                         stdout=subprocess.DEVNULL,
+                                         stderr=subprocess.DEVNULL)
     print("Envoy started")
 
     # Find the Kafka server 'bin' directory.
@@ -151,18 +155,18 @@ class ServicesHolder:
     zk_binary = os.path.join(kafka_bin_dir, 'zookeeper-server-start.sh')
     zk_args = [os.path.abspath(zk_binary), zookeeper_config_file]
     self.zk_handle = subprocess.Popen(zk_args,
-                                 env=launcher_environment,
-                                 stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL)
+                                      env=launcher_environment,
+                                      stdout=subprocess.DEVNULL,
+                                      stderr=subprocess.DEVNULL)
     print("Zookeeper server started")
 
     # Start Kafka in background, pointing to rendered config file.
     kafka_binary = os.path.join(kafka_bin_dir, 'kafka-server-start.sh')
     kafka_args = [os.path.abspath(kafka_binary), kafka_config_file]
     self.kafka_handle = subprocess.Popen(kafka_args,
-                                    env=launcher_environment,
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL)
+                                         env=launcher_environment,
+                                         stdout=subprocess.DEVNULL,
+                                         stderr=subprocess.DEVNULL)
     print("Kafka server started")
 
     time.sleep(30)
@@ -214,6 +218,7 @@ class ServicesHolder:
     status = self.kafka_handle.poll()
     if status:
       raise Exception("Kafka died with: " + str(status))
+
 
 class RenderingHelper:
   """
