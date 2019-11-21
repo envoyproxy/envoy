@@ -8,7 +8,8 @@ import tempfile
 import time
 import unittest
 
-from kafka import KafkaConsumer, KafkaProducer, TopicPartition
+from kafka import KafkaAdminClient, KafkaConsumer, KafkaProducer, TopicPartition
+from kafka.admin import ConfigResource, ConfigResourceType, NewPartitions, NewTopic
 import urllib.request
 
 
@@ -39,7 +40,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     This test verifies that consumer sends fetches correctly, and receives nothing.
     """
     consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092', fetch_max_wait_ms=500)
-    consumer.assign([TopicPartition("empty_topic", 0)])
+    consumer.assign([TopicPartition('test_kafka_consumer_with_no_messages_received', 0)])
     for _ in range(10):
       records = consumer.poll(timeout_ms=1000)
       self.assertEqual(len(records), 0)
@@ -50,13 +51,15 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     # This means that consumer will send roughly 2 (1000/500) requests per API call (so 20 total).
     # So increase of 10 (half of that value) should be safe enough to test.
     self.metrics.assert_metric_increase('fetch', 10)
+    # Metadata is used by consumer to figure out current partition leader.
+    self.metrics.assert_metric_increase('metadata', 1)
 
   def test_kafka_producer_and_consumer(self):
     """
     This test verifies that producer can send messages, and consumer can receive them.
     """
     messages_to_send = 100
-    partition = TopicPartition('producer_and_consumer_topic', 0)
+    partition = TopicPartition('test_kafka_producer_and_consumer', 0)
 
     producer = KafkaProducer(bootstrap_servers='127.0.0.1:19092')
     for _ in range(messages_to_send):
@@ -76,11 +79,54 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
       received_messages += poll_result[partition]
 
     self.metrics.collect_final_metrics()
+    self.metrics.assert_metric_increase('metadata', 2)
     self.metrics.assert_metric_increase('produce', 100)
     # 'fetch_max_bytes' was set to a very low value, so client will need to send a FetchRequest
     # multiple times to broker to get all 100 messages (otherwise all 100 records could have been
     # received in one go).
     self.metrics.assert_metric_increase('fetch', 20)
+    # Both producer & consumer had to fetch cluster metadata.
+    self.metrics.assert_metric_increase('metadata', 2)
+
+  def test_admin_client(self):
+    """
+    This test verifies that Kafka Admin Client can still be used to manage Kafka.
+    """
+    admin_client = KafkaAdminClient(bootstrap_servers='127.0.0.1:19092')
+
+    # Create a topic with 3 partitions.
+    new_topic_spec = NewTopic(name='test_admin_client', num_partitions=3, replication_factor=1)
+    create_response = admin_client.create_topics([new_topic_spec])
+    error_data = create_response.topic_errors
+    self.assertEqual(len(error_data), 1)
+    self.assertEqual(error_data[0], (new_topic_spec.name, 0, None))
+
+    # Alter topic (change some Kafka-level property).
+    config_resource = ConfigResource(ConfigResourceType.TOPIC, new_topic_spec.name,
+                                     {'flush.messages': 42})
+    alter_response = admin_client.alter_configs([config_resource])
+    error_data = alter_response.resources
+    self.assertEqual(len(error_data), 1)
+    self.assertEqual(error_data[0][0], 0)
+
+    # Add 2 more partitions to topic.
+    new_partitions_spec = {new_topic_spec.name: NewPartitions(5)}
+    new_partitions_response = admin_client.create_partitions(new_partitions_spec)
+    error_data = create_response.topic_errors
+    self.assertEqual(len(error_data), 1)
+    self.assertEqual(error_data[0], (new_topic_spec.name, 0, None))
+
+    # Delete a topic.
+    delete_response = admin_client.delete_topics([new_topic_spec.name])
+    error_data = create_response.topic_errors
+    self.assertEqual(len(error_data), 1)
+    self.assertEqual(error_data[0], (new_topic_spec.name, 0, None))
+
+    self.metrics.collect_final_metrics()
+    self.metrics.assert_metric_increase('create_topics', 1)
+    self.metrics.assert_metric_increase('alter_configs', 1)
+    self.metrics.assert_metric_increase('create_partitions', 1)
+    self.metrics.assert_metric_increase('delete_topics', 1)
 
 
 class MetricsHolder:
@@ -148,6 +194,8 @@ class ServicesHolder:
     self.kafka_handle = None
 
   def start(self):
+    print(subprocess.getoutput('ls -lR'))
+
     # Find java installation that we are going to use to start Zookeeper & Kafka.
     java_directory = self.find_java()
 
