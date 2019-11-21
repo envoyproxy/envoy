@@ -395,7 +395,6 @@ TEST_P(UdpListenerImplTest, SendData) {
         server_socket_->localAddress()->ip()->port()));
   }
 
-  std::cerr << "========== send_from_addr " << send_from_addr->asString() << "\n";
   UdpSendData send_data{send_from_addr->ip(), *client_socket_->localAddress(), *buffer};
 
   auto send_result = listener_->send(send_data);
@@ -412,9 +411,6 @@ TEST_P(UdpListenerImplTest, SendData) {
         client_socket_->ioHandle(), *client_socket_->localAddress(), data);
 
     bytes_read = result.rc_;
-    std::cerr << "=========== client readFromSocket bytes_read: " << bytes_read
-              << " retry: " << retry << " result is ok: " << result.ok()
-              << " peer address ptr : " << data.addresses_.peer_.get();
     EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
 
     if (bytes_read >= bytes_to_read || retry == 10 ||
