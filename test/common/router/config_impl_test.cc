@@ -1391,8 +1391,8 @@ most_specific_header_mutations_wins: true
 
 // Validate that we can't add :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoPseudoHeader) {
-  for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
-                                    ":protocol", ":no-chunks", ":status"}) {
+  for (const std::string& header :
+       {":path", ":authority", ":method", ":scheme", ":status", ":protocol"}) {
     const std::string yaml = fmt::format(R"EOF(
 name: foo
 virtual_hosts:
@@ -1417,8 +1417,8 @@ virtual_hosts:
 
 // Validate that we can't remove :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
-  for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
-                                    ":protocol", ":no-chunks", ":status", "host"}) {
+  for (const std::string& header :
+       {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 name: foo
 virtual_hosts:
