@@ -6,7 +6,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"

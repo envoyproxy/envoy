@@ -90,8 +90,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     // We keep track of the original content-type to ensure that we handle
     // gRPC content type variations such as application/grpc+proto.
     content_type_ = std::string(headers.ContentType()->value().getStringView());
-    headers.ContentType()->value(upstream_content_type_);
-    headers.insertAccept().value(upstream_content_type_);
+    headers.setContentType(upstream_content_type_);
+    headers.setAccept(upstream_content_type_);
 
     if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
@@ -132,9 +132,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
     // perform an early return with a useful error message in grpc-message.
     if (content_type == nullptr ||
         content_type->value().getStringView() != upstream_content_type_) {
-      headers.insertGrpcMessage().value(badContentTypeMessage(headers));
-      headers.insertGrpcStatus().value(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
-      headers.insertStatus().value(enumToInt(Http::Code::OK));
+      headers.setGrpcMessage(badContentTypeMessage(headers));
+      headers.setGrpcStatus(Envoy::Grpc::Status::WellKnownGrpcStatus::Unknown);
+      headers.setStatus(enumToInt(Http::Code::OK));
 
       if (content_type != nullptr) {
         content_type->value(content_type_);
@@ -169,7 +169,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
   if (end_stream) {
     // Insert grpc-status trailers to communicate the error code.
     auto& trailers = encoder_callbacks_->addEncodedTrailers();
-    trailers.insertGrpcStatus().value(grpc_status_);
+    trailers.setGrpcStatus(grpc_status_);
 
     if (withhold_grpc_frames_) {
       // Compute the size of the payload and construct the length prefix.
