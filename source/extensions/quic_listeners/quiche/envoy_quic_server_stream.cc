@@ -184,7 +184,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
     return;
   }
 
-  if (!quic::VersionUsesQpack(transport_version()) && !FinishedReadingTrailers()) {
+  if (!quic::VersionUsesHttp3(transport_version()) && !FinishedReadingTrailers()) {
     // For Google QUIC implementation, trailers may arrived earlier and wait to
     // be consumed after reading all the body. Consume it here.
     // IETF QUIC shouldn't reach here because trailers are sent on same stream.
@@ -199,7 +199,7 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
                                                       const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   if (session()->connection()->connected() &&
-      (quic::VersionUsesQpack(transport_version()) || sequencer()->IsClosed()) &&
+      (quic::VersionUsesHttp3(transport_version()) || sequencer()->IsClosed()) &&
       !FinishedReadingTrailers()) {
     // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
