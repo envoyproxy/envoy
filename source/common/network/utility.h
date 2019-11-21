@@ -73,14 +73,16 @@ public:
    * @param authority authority
    * @return std::string retrieved host
    */
-  static std::string hostFromAuthrotiry(const absl::string_view& authority);
+  static std::string hostFromIpAddress(const absl::string_view& authority);
 
   /**
    * retrieve port part from authority.
    * @param authority authority
+   * @param default_port default port
    * @return std::string retrieved port
    */
-  static std::string portFromAuthrotiry(const absl::string_view& authority);
+  static std::string portFromIpAddress(const absl::string_view& authority,
+                                       uint32_t default_port = 0);
 
   /**
    * Resolve a URL.

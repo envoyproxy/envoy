@@ -25,6 +25,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -389,6 +390,129 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 }
 
+bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
+  static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
+  static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
+
+  // Remove any headers nominated by the Connection header. The TE header
+  // is sanitized and removed only if it's empty after removing unsupported values
+  // See https://github.com/envoyproxy/envoy/issues/8623
+  const auto& cv = Http::Headers::get().ConnectionValues;
+  const auto& connection_header_value = headers.Connection()->value();
+
+  StringUtil::CaseUnorderedSet headers_to_remove{};
+  std::vector<absl::string_view> connection_header_tokens =
+      StringUtil::splitToken(connection_header_value.getStringView(), ",", false);
+
+  // If we have 10 or more nominated headers, fail this request
+  if (connection_header_tokens.size() >= MAX_ALLOWED_NOMINATED_HEADERS) {
+    ENVOY_LOG_MISC(trace, "Too many nominated headers in request");
+    return false;
+  }
+
+  // Split the connection header and evaluate each nominated header
+  for (const auto& token : connection_header_tokens) {
+
+    const auto token_sv = StringUtil::trim(token);
+
+    // Build the LowerCaseString for header lookup
+    const LowerCaseString lcs_header_to_remove{std::string(token_sv)};
+
+    // If the Connection token value is not a nominated header, ignore it here since
+    // the connection header is removed elsewhere when the H1 request is upgraded to H2
+    if ((lcs_header_to_remove.get() == cv.Close) ||
+        (lcs_header_to_remove.get() == cv.Http2Settings) ||
+        (lcs_header_to_remove.get() == cv.KeepAlive) ||
+        (lcs_header_to_remove.get() == cv.Upgrade)) {
+      continue;
+    }
+
+    // By default we will remove any nominated headers
+    bool keep_header = false;
+
+    // Determine whether the nominated header contains invalid values
+    HeaderEntry* nominated_header = NULL;
+
+    if (lcs_header_to_remove == Http::Headers::get().Connection) {
+      // Remove the connection header from the nominated tokens if it's self nominated
+      // The connection header itself is *not removed*
+      ENVOY_LOG_MISC(trace, "Skipping self nominated header [{}]", token_sv);
+      keep_header = true;
+      headers_to_remove.emplace(token_sv);
+
+    } else if ((lcs_header_to_remove == Http::Headers::get().ForwardedFor) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedHost) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedProto) ||
+               !token_sv.find(':')) {
+
+      // An attacker could nominate an X-Forwarded* header, and its removal may mask
+      // the origin of the incoming request and potentially alter its handling.
+      // Additionally, pseudo headers should never be nominated. In both cases, we
+      // should fail the request.
+      // See: https://nathandavison.com/blog/abusing-http-hop-by-hop-request-headers
+
+      ENVOY_LOG_MISC(trace, "Invalid nomination of {} header", token_sv);
+      return false;
+    } else {
+      // Examine the value of all other nominated headers
+      nominated_header = headers.get(lcs_header_to_remove);
+    }
+
+    if (nominated_header) {
+      auto nominated_header_value_sv = nominated_header->value().getStringView();
+
+      const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
+
+      // reject the request if the TE header is too large
+      if (is_te_header && (nominated_header_value_sv.size() >= MAX_ALLOWED_TE_VALUE_SIZE)) {
+        ENVOY_LOG_MISC(trace, "TE header contains a value that exceeds the allowable length");
+        return false;
+      }
+
+      if (is_te_header) {
+        for (const auto& header_value :
+             StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
+
+          const absl::string_view header_sv = StringUtil::trim(header_value);
+
+          // If trailers exist in the TE value tokens, keep the header, removing any other values
+          // that may exist
+          if (StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                   Http::Headers::get().TEValues.Trailers)) {
+            keep_header = true;
+            break;
+          }
+        }
+
+        if (keep_header) {
+          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
+                                            Http::Headers::get().TEValues.Trailers.size());
+        }
+      }
+    }
+
+    if (!keep_header) {
+      ENVOY_LOG_MISC(trace, "Removing nominated header [{}]", token_sv);
+      headers.remove(lcs_header_to_remove);
+      headers_to_remove.emplace(token_sv);
+    }
+  }
+
+  // Lastly remove extra nominated headers from the Connection header
+  if (!headers_to_remove.empty()) {
+    const std::string new_value = StringUtil::removeTokens(connection_header_value.getStringView(),
+                                                           ",", headers_to_remove, ",");
+
+    if (new_value.empty()) {
+      headers.removeConnection();
+    } else {
+      headers.Connection()->value(new_value);
+    }
+  }
+
+  return true;
+}
+
 const std::string& Utility::getProtocolString(const Protocol protocol) {
   switch (protocol) {
   case Protocol::Http10:
@@ -570,8 +694,8 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
     //
     // We do checking for each char in the string. If the current char is included in the defined
-    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded] to
-    // the returned string one by one) started from the current index.
+    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
+    // to the returned string one by one) started from the current index.
     if (ch < ' ' || ch >= '~' || ch == '%') {
       return PercentEncoding::encode(value, i);
     }
@@ -625,49 +749,68 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_view& host,
+const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_view& authority,
                                                            uint32_t default_port) {
   Utility::AuthorityAttributes auth_attr;
-  auth_attr.host = std::string(host.data());
   auth_attr.port = default_port;
-  const auto comma_pos = host.rfind(":");
-  bool have_port = false;
+  auth_attr.host = authority.data();
 
-  if ((comma_pos != absl::string_view::npos && comma_pos == host.find(":")) ||
-      host.rfind("]:") != absl::string_view::npos) {
-    have_port = true;
+  const auto comma_pos = authority.rfind(":");
+
+  bool is_ipv6 = false;
+  bool have_port_ipv4 = false;
+  bool have_port_ipv6 = false;
+
+  if (comma_pos != absl::string_view::npos && comma_pos != authority.find(":")) {
+    is_ipv6 = true;
   }
 
-  if (have_port) {
+  if (authority.rfind("]:") != absl::string_view::npos) {
+    have_port_ipv6 = true;
+  }
+
+  if (comma_pos != absl::string_view::npos && comma_pos == authority.find(":")) {
+    have_port_ipv4 = true;
+  }
+
+  if (have_port_ipv4 || have_port_ipv6) {
     try {
       const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddressAndPort(host);
+          Network::Utility::parseInternetAddressAndPort(authority);
       auth_attr.host = instance->ip()->addressAsString();
       auth_attr.port = instance->ip()->port();
       auth_attr.is_ip_address = true;
     } catch (const EnvoyException&) {
-      // If authority has FQDN and port, Network::Utility::parseInternetAddressAndPort should be
-      // failed so that we must parse authority on here
-      if (comma_pos != absl::string_view::npos && comma_pos == host.find(":")) {
-        auth_attr.host = Network::Utility::hostFromAuthrotiry(host);
-        const auto port_str = Network::Utility::portFromAuthrotiry(host);
+      // If authority has FQDN and port like hoge.com:8000,
+      // Network::Utility::parseInternetAddressAndPort should be failed so that we must parse
+      // authority on here
+      if (comma_pos != absl::string_view::npos && comma_pos == authority.find(":")) {
+        auth_attr.host = Network::Utility::hostFromIpAddress(authority);
+        const auto port_str = Network::Utility::portFromIpAddress(authority);
         uint64_t port64 = 0;
 
         if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-          auth_attr.host = std::string(host.data());
+          auth_attr.host = authority.data();
           port64 = 0;
         }
+
         auth_attr.port = static_cast<uint32_t>(port64);
       }
     }
-  } else {
-    try {
-      const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddress(host, default_port);
-      auth_attr.host = instance->ip()->addressAsString();
-      auth_attr.is_ip_address = true;
-    } catch (const EnvoyException&) {
-    }
+
+    return auth_attr;
+  }
+
+  const auto extracted_host = !have_port_ipv6 && is_ipv6
+                                  ? Network::Utility::hostFromIpAddress(authority)
+                                  : authority.data();
+
+  try {
+    const Network::Address::InstanceConstSharedPtr instance =
+        Network::Utility::parseInternetAddress(extracted_host, default_port);
+    auth_attr.host = instance->ip()->addressAsString();
+    auth_attr.is_ip_address = true;
+  } catch (const EnvoyException&) {
   }
 
   return auth_attr;
