@@ -205,7 +205,8 @@ private:
     ~UpstreamRequest() override;
 
     FilterStatus start();
-    void resetStream(bool close = true);
+    void resetStream();
+    void releaseConnection(bool close);
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,

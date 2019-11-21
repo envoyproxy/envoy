@@ -370,13 +370,7 @@ void Router::onEvent(Network::ConnectionEvent event) {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  // If we are called from resetStream(), nothing else is needed.
-  if (upstream_request_->conn_state_) {
-    // Release connection resources and ensure resetStream() won't close the connection
-    // from onDestroy(), since it's been closed already.
-    upstream_request_->resetStream(false);
-    cleanup();
-  }
+  upstream_request_->releaseConnection(false);
 }
 
 const Network::Connection* Router::downstreamConnection() const {
@@ -401,7 +395,11 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
 
-Router::UpstreamRequest::~UpstreamRequest() = default;
+Router::UpstreamRequest::~UpstreamRequest() {
+  if (conn_pool_handle_) {
+    conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
+}
 
 FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
@@ -419,20 +417,23 @@ FilterStatus Router::UpstreamRequest::start() {
   return FilterStatus::Continue;
 }
 
-void Router::UpstreamRequest::resetStream(const bool close) {
+void Router::UpstreamRequest::releaseConnection(const bool close) {
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
   }
 
-  if (conn_data_ != nullptr) {
-    conn_state_ = nullptr;
-    if (close) {
-      conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-    }
-    conn_data_.reset();
+  conn_state_ = nullptr;
+
+  // The event triggered by close will also release this connection so clear conn_data_ before
+  // closing.
+  auto conn_data = std::move(conn_data_);
+  if (close && conn_data != nullptr) {
+    conn_data->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 }
+
+void Router::UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
