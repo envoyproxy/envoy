@@ -33,13 +33,14 @@ void checkSysctlLong(const std::string& path, int64_t expected, Filesystem::Inst
           );
         }
 
-        return;
       } else {
         ENVOY_LOG_MISC(error, "Could not read contents of {} as a number",
                        "Envoy will log this message if the value could not be read as an int or is "
                        "less than {}",
                        path, expected);
       }
+
+      return;
     } catch (const EnvoyException& e) {
       ENVOY_LOG_MISC(error, "Exception when trying to check contents of {} - {}", path, e.what());
     }
@@ -50,8 +51,6 @@ void checkSysctlLong(const std::string& path, int64_t expected, Filesystem::Inst
   }
 }
 
-// Check system wide configurations such as user level
-// file watches, file limit permissions etc...
 void checkPlatformSettings(Filesystem::Instance& file_system) {
   struct rlimit current_limits;
 
