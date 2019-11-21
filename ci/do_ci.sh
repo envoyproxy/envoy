@@ -241,7 +241,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   # https://github.com/envoyproxy/envoy/pull/5611.
   [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
-  test/run_envoy_bazel_coverage.sh //test/extensions/quic_listeners/quiche/integration/...
+  test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then

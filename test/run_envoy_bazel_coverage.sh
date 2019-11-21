@@ -29,7 +29,7 @@ echo "=========== ${COVERAGE_TARGETS}\n============ ${BAZEL_BUILD_OPTIONS}"
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=all \
-    --test_arg="-l trace" --test_env=HEAPCHECK= \
+    --test_arg="-l info" --test_env=HEAPCHECK= \
     //test/coverage:coverage_tests
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
