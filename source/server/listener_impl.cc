@@ -35,22 +35,27 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
       bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
 
-  if (socket_type_ == Network::Address::SocketType::Datagram) {
-    ASSERT(reuse_port_ == true);
-  }
-
-  // If reuse_port_ is false, create a socket here which will be used by all worker
-  // threads; otherwise, if port is 0, still need to create a socket here, because
-  // a random port will be assigned, then all worker threads should use same port.
-  if (!reuse_port_ || local_address_->ip()->port() == 0) {
-    socket_ = createListenSocketAndApplyOptions();
-    if (socket_ && local_address_->ip() != nullptr && local_address_->ip()->port() == 0) {
-      local_address_ = socket_->localAddress();
+  if (local_address_->type() == Network::Address::Type::Ip) {
+    if (socket_type_ == Network::Address::SocketType::Datagram) {
+      ASSERT(reuse_port_ == true);
     }
 
-    ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
-              local_address_->asString());
+    // If reuse_port_ is false, create a socket here which will be used by all worker
+    // threads; otherwise, if port is 0, still need to create a socket here, because
+    // a random port will be assigned, then all worker threads should use same port.
+    if (!reuse_port_ || local_address_->ip()->port() == 0) {
+      socket_ = createListenSocketAndApplyOptions();
+      if (socket_ && local_address_->ip()->port() == 0) {
+        local_address_ = socket_->localAddress();
+      }
+    }
+  } else {
+    // Listeners with Unix domain socket always use shared socket.
+    socket_ = createListenSocketAndApplyOptions();
   }
+
+  ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
+            local_address_->asString());
 }
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions() {
