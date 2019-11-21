@@ -86,6 +86,7 @@ message GrpcService {
         }
       }
 
+      // [#next-free-field: 10]
       message StsService {
         string token_exchange_service_uri = 1 [(validate.rules).string = {uri: true}];
 
