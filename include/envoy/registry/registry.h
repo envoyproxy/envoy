@@ -9,6 +9,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/logger.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -105,7 +106,7 @@ template <typename T> class InjectFactory;
  * Example lookup: BaseFactoryType *factory =
  * FactoryRegistry<BaseFactoryType>::getFactory("example_factory_name");
  */
-template <class Base> class FactoryRegistry {
+template <class Base> class FactoryRegistry : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Return a sorted vector of registered factory names.
@@ -132,19 +133,23 @@ public:
     return *factories;
   }
 
-  static std::vector<std::string>& deprecatedFactoryNames() {
-    static auto* deprecated_factory_names = new std::vector<std::string>();
+  static absl::flat_hash_map<std::string, std::string>& deprecatedFactoryNames() {
+    static auto* deprecated_factory_names = new absl::flat_hash_map<std::string, std::string>;
     return *deprecated_factory_names;
   }
 
-  static void registerFactory(Base& factory, absl::string_view name, bool is_deprecated = false) {
+  /**
+   * instead_value are used when passed name was deprecated.
+   */
+  static void registerFactory(Base& factory, absl::string_view name,
+                              absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
 
-    if (is_deprecated) {
-      deprecatedFactoryNames().emplace_back(name);
+    if (instead_value.size() != 0) {
+      deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
     }
   }
 
@@ -152,6 +157,8 @@ public:
    * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    */
   static Base* getFactory(absl::string_view name) {
+    checkDeprecated(name);
+
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;
@@ -159,12 +166,13 @@ public:
     return it->second;
   }
 
-  static bool isDeprecated(absl::string_view name) {
-    auto it = std::find(deprecatedFactoryNames().begin(), deprecatedFactoryNames().end(), name);
-    if (it != deprecatedFactoryNames().end()) {
-      return true;
+  static void checkDeprecated(absl::string_view name) {
+    auto it = deprecatedFactoryNames().find(name);
+    const bool status = it != deprecatedFactoryNames().end();
+    if (status) {
+      const auto factory_name = getFactory(name)->name();
+      ENVOY_LOG(warn, "{} {} is deprecated, use {} instead.", factory_name, it->first, it->second);
     }
-    return false;
   }
 
 private:
@@ -244,7 +252,7 @@ public:
 
     for (auto deprecated_name : deprecated_names) {
       ASSERT(!deprecated_name.empty());
-      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, true);
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, instance_.name());
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {

@@ -61,10 +61,6 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
-  if (Registry::FactoryRegistry<ClusterFactory>::isDeprecated(cluster_type)) {
-    ENVOY_LOG_MISC(warn, "deprecated cluster name was used {}", cluster_type);
-  }
-
   ClusterFactoryContextImpl context(
       cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime, random,
       dispatcher, log_manager, local_info, admin, singleton_manager,

@@ -63,10 +63,6 @@ resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& socket_addr
         Registry::FactoryRegistry<Resolver>::getFactory(Config::AddressResolverNames::get().IP);
   } else {
     resolver = Registry::FactoryRegistry<Resolver>::getFactory(resolver_name);
-
-    if (Registry::FactoryRegistry<Resolver>::isDeprecated(resolver_name)) {
-      ENVOY_LOG_MISC(warn, "deprecated resolver name was used {}", resolver_name);
-    }
   }
   if (resolver == nullptr) {
     throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));

@@ -30,9 +30,6 @@ bool NullVm::load(const std::string& name, bool /* allow_precompiled */) {
     return false;
   }
 
-  if (Registry::FactoryRegistry<NullVmPluginFactory>::isDeprecated(name)) {
-    ENVOY_LOG(warn, "deprecated vm plugin name was used {}", name);
-  }
   plugin_name_ = name;
   plugin_ = factory->create();
   return true;

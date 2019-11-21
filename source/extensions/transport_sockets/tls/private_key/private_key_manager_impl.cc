@@ -16,11 +16,6 @@ PrivateKeyMethodManagerImpl::createPrivateKeyMethodProvider(
       Registry::FactoryRegistry<Ssl::PrivateKeyMethodProviderInstanceFactory>::getFactory(
           config.provider_name());
 
-  if (Registry::FactoryRegistry<Ssl::PrivateKeyMethodProviderInstanceFactory>::isDeprecated(
-          config.provider_name())) {
-    ENVOY_LOG_MISC(warn, "deprecated ssl private key providing method name was used {}",
-                   config.provider_name());
-  }
   // Create a new provider instance with the configuration.
   if (factory) {
     return factory->createPrivateKeyMethodProviderInstance(config, factory_context);
