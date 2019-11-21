@@ -1,14 +1,15 @@
 #!/usr/bin/python
 
 import os
-import unittest
-import tempfile
 import shutil
 import socket
 import subprocess
+import tempfile
 import time
+import unittest
+
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import urllib.request
-from kafka import KafkaProducer
 
 
 class KafkaBrokerIntegrationTest(unittest.TestCase):
@@ -27,30 +28,95 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
   def setUp(self):
     # We want to check if our services are okay before running any kind of test.
     KafkaBrokerIntegrationTest.services.check_state()
+    self.metrics = MetricsHolder(self)
 
   def tearDown(self):
     # We want to check if our services are okay after running any test.
     KafkaBrokerIntegrationTest.services.check_state()
 
-  def test_t1(self):
-    print("test1")
-    pass
+  def test_kafka_consumer_with_no_messages_received(self):
+    """
+    This test verifies that consumer sends fetches correctly, and receives nothing.
+    """
+    consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092', fetch_max_wait_ms=500)
+    consumer.assign([TopicPartition("empty_topic", 0)])
+    for _ in range(10):
+      records = consumer.poll(timeout_ms=1000)
+      self.assertEqual(len(records), 0)
 
-  def test_t2(self):
-    print("test2")
-    pass
+    self.metrics.collect_final_metrics()
+    # 'consumer.poll()' can translate into 0 or more fetch requests.
+    # We have set API timeout to 1000ms, while fetch_max_wait is 500ms.
+    # This means that consumer will send roughly 2 (1000/500) requests per API call (so 20 total).
+    # So increase of 10 (half of that value) should be safe enough to test.
+    self.metrics.assert_metric_increase('fetch', 10)
 
-  def test_kafka_producer(self):
-    kafka_server = '127.0.0.1:19092'
-    print("Client will be connecting to " + kafka_server)
-    producer = KafkaProducer(bootstrap_servers=kafka_server)
-    for _ in range(100):
-      future = producer.send('testKafkaProducerTopic', b'message_bytes')
+  def test_kafka_producer_and_consumer(self):
+    """
+    This test verifies that producer can send messages, and consumer can receive them.
+    """
+    messages_to_send = 100
+    partition = TopicPartition('producer_and_consumer_topic', 0)
+
+    producer = KafkaProducer(bootstrap_servers='127.0.0.1:19092')
+    for _ in range(messages_to_send):
+      future = producer.send(value=b'some_message_bytes',
+                             topic=partition.topic,
+                             partition=partition.partition)
       send_status = future.get()
       self.assertTrue(send_status.offset >= 0)
-    print("Send operations finished successfully")
 
-    # Now let's get Envoy stats.
+    consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092',
+                             auto_offset_reset='earliest',
+                             fetch_max_bytes=100)
+    consumer.assign([partition])
+    received_messages = []
+    while (len(received_messages) < messages_to_send):
+      poll_result = consumer.poll(timeout_ms=1000)
+      received_messages += poll_result[partition]
+
+    self.metrics.collect_final_metrics()
+    self.metrics.assert_metric_increase('produce', 100)
+    # 'fetch_max_bytes' was set to a very low value, so client will need to send a FetchRequest
+    # multiple times to broker to get all 100 messages (otherwise all 100 records could have been
+    # received in one go).
+    self.metrics.assert_metric_increase('fetch', 20)
+
+
+class MetricsHolder:
+  """
+  Utility for storing Envoy metrics.
+  Expected to be created before the test (to get initial metrics), and then to collect them at the
+  end of test, so the expected increases can be verified.
+  """
+
+  def __init__(self, owner):
+    self.owner = owner
+    self.initial_requests, self.inital_responses = MetricsHolder.get_envoy_stats()
+    self.final_requests = None
+    self.final_responses = None
+
+  def collect_final_metrics(self):
+    self.final_requests, self.final_responses = MetricsHolder.get_envoy_stats()
+
+  def assert_metric_increase(self, message_type, count):
+    request_type = message_type + '_request'
+    response_type = message_type + '_response'
+
+    initial_request_value = self.initial_requests.get(request_type, 0)
+    final_request_value = self.final_requests.get(request_type, 0)
+    self.owner.assertGreaterEqual(final_request_value, initial_request_value + count)
+
+    initial_response_value = self.inital_responses.get(response_type, 0)
+    final_response_value = self.final_responses.get(response_type, 0)
+    self.owner.assertGreaterEqual(final_response_value, initial_response_value + count)
+
+  @staticmethod
+  def get_envoy_stats():
+    """
+    Grab request/response metrics from envoy's stats interface.
+    """
+
     stats_url = 'http://127.0.0.1:9901/stats'
     requests = {}
     responses = {}
@@ -67,9 +133,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
         if line.startswith(response_prefix) and '_response:' in line:
           data = line[len(response_prefix):].split(': ')
           responses[data[0]] = int(data[1])
-
-    self.assertGreaterEqual(requests['produce_request'], 100)
-    self.assertGreaterEqual(responses['produce_response'], 100)
+    return [requests, responses]
 
 
 class ServicesHolder:
@@ -168,7 +232,6 @@ class ServicesHolder:
                                          stdout=subprocess.DEVNULL,
                                          stderr=subprocess.DEVNULL)
     print("Kafka server started")
-
     time.sleep(30)
 
   def find_java(self):
