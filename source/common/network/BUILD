@@ -283,6 +283,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",

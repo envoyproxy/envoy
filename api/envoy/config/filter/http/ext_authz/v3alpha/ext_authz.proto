@@ -16,6 +16,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
+// [#extension: envoy.filters.http.ext_authz]
 
 // [#next-free-field: 11]
 message ExtAuthz {

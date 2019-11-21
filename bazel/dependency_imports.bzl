@@ -2,6 +2,8 @@ load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependen
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@envoy_build_tools//toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_version_repository")
 
 # go version for rules_go
 GO_VERSION = "1.13.3"
@@ -12,6 +14,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_register_toolchains(go_version)
     rbe_toolchains_config()
     gazelle_dependencies()
+    apple_rules_dependencies()
+    upb_bazel_version_repository(name = "upb_bazel_version")
 
     go_repository(
         name = "org_golang_google_grpc",

@@ -24,6 +24,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Http {
@@ -320,7 +321,7 @@ void Utility::sendLocalReply(
     if (!body_text.empty() && !is_head_request) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
-      response_headers->insertGrpcMessage().value(PercentEncoding::encode(body_text));
+      response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
     encode_headers(std::move(response_headers), true); // Trailers only response
     return;
@@ -329,8 +330,8 @@ void Utility::sendLocalReply(
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {
-    response_headers->insertContentLength().value(body_text.size());
-    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+    response_headers->setContentLength(body_text.size());
+    response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);
   }
 
   if (is_head_request) {
@@ -387,6 +388,129 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 }
 
+bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
+  static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
+  static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
+
+  // Remove any headers nominated by the Connection header. The TE header
+  // is sanitized and removed only if it's empty after removing unsupported values
+  // See https://github.com/envoyproxy/envoy/issues/8623
+  const auto& cv = Http::Headers::get().ConnectionValues;
+  const auto& connection_header_value = headers.Connection()->value();
+
+  StringUtil::CaseUnorderedSet headers_to_remove{};
+  std::vector<absl::string_view> connection_header_tokens =
+      StringUtil::splitToken(connection_header_value.getStringView(), ",", false);
+
+  // If we have 10 or more nominated headers, fail this request
+  if (connection_header_tokens.size() >= MAX_ALLOWED_NOMINATED_HEADERS) {
+    ENVOY_LOG_MISC(trace, "Too many nominated headers in request");
+    return false;
+  }
+
+  // Split the connection header and evaluate each nominated header
+  for (const auto& token : connection_header_tokens) {
+
+    const auto token_sv = StringUtil::trim(token);
+
+    // Build the LowerCaseString for header lookup
+    const LowerCaseString lcs_header_to_remove{std::string(token_sv)};
+
+    // If the Connection token value is not a nominated header, ignore it here since
+    // the connection header is removed elsewhere when the H1 request is upgraded to H2
+    if ((lcs_header_to_remove.get() == cv.Close) ||
+        (lcs_header_to_remove.get() == cv.Http2Settings) ||
+        (lcs_header_to_remove.get() == cv.KeepAlive) ||
+        (lcs_header_to_remove.get() == cv.Upgrade)) {
+      continue;
+    }
+
+    // By default we will remove any nominated headers
+    bool keep_header = false;
+
+    // Determine whether the nominated header contains invalid values
+    HeaderEntry* nominated_header = NULL;
+
+    if (lcs_header_to_remove == Http::Headers::get().Connection) {
+      // Remove the connection header from the nominated tokens if it's self nominated
+      // The connection header itself is *not removed*
+      ENVOY_LOG_MISC(trace, "Skipping self nominated header [{}]", token_sv);
+      keep_header = true;
+      headers_to_remove.emplace(token_sv);
+
+    } else if ((lcs_header_to_remove == Http::Headers::get().ForwardedFor) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedHost) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedProto) ||
+               !token_sv.find(':')) {
+
+      // An attacker could nominate an X-Forwarded* header, and its removal may mask
+      // the origin of the incoming request and potentially alter its handling.
+      // Additionally, pseudo headers should never be nominated. In both cases, we
+      // should fail the request.
+      // See: https://nathandavison.com/blog/abusing-http-hop-by-hop-request-headers
+
+      ENVOY_LOG_MISC(trace, "Invalid nomination of {} header", token_sv);
+      return false;
+    } else {
+      // Examine the value of all other nominated headers
+      nominated_header = headers.get(lcs_header_to_remove);
+    }
+
+    if (nominated_header) {
+      auto nominated_header_value_sv = nominated_header->value().getStringView();
+
+      const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
+
+      // reject the request if the TE header is too large
+      if (is_te_header && (nominated_header_value_sv.size() >= MAX_ALLOWED_TE_VALUE_SIZE)) {
+        ENVOY_LOG_MISC(trace, "TE header contains a value that exceeds the allowable length");
+        return false;
+      }
+
+      if (is_te_header) {
+        for (const auto& header_value :
+             StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
+
+          const absl::string_view header_sv = StringUtil::trim(header_value);
+
+          // If trailers exist in the TE value tokens, keep the header, removing any other values
+          // that may exist
+          if (StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                   Http::Headers::get().TEValues.Trailers)) {
+            keep_header = true;
+            break;
+          }
+        }
+
+        if (keep_header) {
+          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
+                                            Http::Headers::get().TEValues.Trailers.size());
+        }
+      }
+    }
+
+    if (!keep_header) {
+      ENVOY_LOG_MISC(trace, "Removing nominated header [{}]", token_sv);
+      headers.remove(lcs_header_to_remove);
+      headers_to_remove.emplace(token_sv);
+    }
+  }
+
+  // Lastly remove extra nominated headers from the Connection header
+  if (!headers_to_remove.empty()) {
+    const std::string new_value = StringUtil::removeTokens(connection_header_value.getStringView(),
+                                                           ",", headers_to_remove, ",");
+
+    if (new_value.empty()) {
+      headers.removeConnection();
+    } else {
+      headers.Connection()->value(new_value);
+    }
+  }
+
+  return true;
+}
+
 const std::string& Utility::getProtocolString(const Protocol protocol) {
   switch (protocol) {
   case Protocol::Http10:
@@ -435,8 +559,8 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
   extractHostPathFromUri(http_uri.uri(), host, path);
 
   MessagePtr message(new RequestMessageImpl());
-  message->headers().insertPath().value(path.data(), path.size());
-  message->headers().insertHost().value(host.data(), host.size());
+  message->headers().setPath(path);
+  message->headers().setHost(host);
 
   return message;
 }
@@ -478,8 +602,8 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   ASSERT(Utility::isUpgrade(headers));
 
   const HeaderString& upgrade = headers.Upgrade()->value();
-  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Connect);
-  headers.insertProtocol().value().setCopy(upgrade.getStringView());
+  headers.setReferenceMethod(Http::Headers::get().MethodValues.Connect);
+  headers.setProtocol(upgrade.getStringView());
   headers.removeUpgrade();
   headers.removeConnection();
   // nghttp2 rejects upgrade requests/responses with content length, so strip
@@ -492,7 +616,7 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
 
 void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
-    headers.insertStatus().value().setInteger(200);
+    headers.setStatus(200);
   }
   headers.removeUpgrade();
   headers.removeConnection();
@@ -506,17 +630,17 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
   const HeaderString& protocol = headers.Protocol()->value();
-  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  headers.insertUpgrade().value().setCopy(protocol.getStringView());
-  headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+  headers.setReferenceMethod(Http::Headers::get().MethodValues.Get);
+  headers.setUpgrade(protocol.getStringView());
+  headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
 }
 
 void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
-    headers.insertUpgrade().value().setCopy(upgrade);
-    headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
-    headers.insertStatus().value().setInteger(101);
+    headers.setUpgrade(upgrade);
+    headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
+    headers.setStatus(101);
   }
 }
 
@@ -568,8 +692,8 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
     //
     // We do checking for each char in the string. If the current char is included in the defined
-    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded] to
-    // the returned string one by one) started from the current index.
+    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
+    // to the returned string one by one) started from the current index.
     if (ch < ' ' || ch >= '~' || ch == '%') {
       return PercentEncoding::encode(value, i);
     }
