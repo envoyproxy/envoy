@@ -350,9 +350,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void Router::onEvent(Network::ConnectionEvent event) {
-  if (upstream_request_ == nullptr) {
-    return;
-  }
+  ASSERT(upstream_request_ && !upstream_request_->response_complete_);
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
