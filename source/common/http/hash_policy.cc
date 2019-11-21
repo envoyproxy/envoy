@@ -135,8 +135,8 @@ HashPolicyImpl::HashPolicyImpl(
       }
       break;
     case envoy::api::v2::route::RouteAction::HashPolicy::kQueryParameter:
-      hash_impls_.emplace_back(new QueryParameterHashMethod(
-          hash_policy->query_parameter().parameter_name(), hash_policy->terminal()));
+      hash_impls_.emplace_back(new QueryParameterHashMethod(hash_policy->query_parameter().name(),
+                                                            hash_policy->terminal()));
       break;
     default:
       throw EnvoyException(

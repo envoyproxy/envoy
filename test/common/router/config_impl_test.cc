@@ -2198,7 +2198,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashIpv6DifferentAddresses) {
 }
 
 TEST_F(RouterMatcherHashPolicyTest, HashQueryParameters) {
-  firstRouteHashPolicy()->mutable_query_parameter()->set_parameter_name("param");
+  firstRouteHashPolicy()->mutable_query_parameter()->set_name("param");
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
