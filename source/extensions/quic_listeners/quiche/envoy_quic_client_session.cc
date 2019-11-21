@@ -27,7 +27,7 @@ void EnvoyQuicClientSession::connect() {
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
   CryptoConnect();
-  set_max_allowed_push_id(0u);
+  SetMaxAllowedPushId(0u);
 }
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
