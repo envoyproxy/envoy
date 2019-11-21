@@ -4,7 +4,6 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
@@ -17,6 +16,7 @@
 #include "server/tag_generator_batch_impl.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "envoy/network/drain_decision.h"
 
 namespace Envoy {
 namespace Server {

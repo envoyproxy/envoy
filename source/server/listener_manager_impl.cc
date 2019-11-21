@@ -823,7 +823,7 @@ ListenerFilterChainFactoryBuilder::InternalBuilder::buildFilterChainInternal(
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-  FilterChainContextImpl filter_chain_context{tag};
+  FilterChainFactoryContextImpl filter_chain_context{outer_builder_.parent_, tag};
   return std::make_unique<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, outer_builder_.factory_context_,
                                                   std::move(server_names)),
