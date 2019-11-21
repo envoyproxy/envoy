@@ -23,21 +23,10 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::SocketSharedPtr listen_socket,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : ActiveQuicListener(dispatcher, parent, *listen_socket,
-                         std::make_unique<EnvoyQuicPacketWriter>(*listen_socket),
-                         dispatcher.createUdpListener(std::move(listen_socket), *this),
-                         listener_config, quic_config) {}
-
-ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
-                                       Network::ConnectionHandler& parent,
-                                       Network::Socket& listen_socket,
-                                       std::unique_ptr<quic::QuicPacketWriter> writer,
-                                       Network::UdpListenerPtr&& listener,
-                                       Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
-      udp_listener_(std::move(listener)), dispatcher_(dispatcher),
-      version_manager_(quic::CurrentSupportedVersions()), listen_socket_(listen_socket) {
+      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
+      listen_socket_(*listen_socket) {
+  udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
@@ -51,7 +40,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_,
       dispatcher, listen_socket_);
-  quic_dispatcher_->InitializeWithWriter(writer.release());
+  quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
 }
 
 void ActiveQuicListener::onListenerShutdown() {
