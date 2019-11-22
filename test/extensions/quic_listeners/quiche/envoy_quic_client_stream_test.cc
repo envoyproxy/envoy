@@ -42,7 +42,6 @@ public:
         stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}} {
-    quic::SetVerbosityLogThreshold(3);
     quic_stream_->setDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));

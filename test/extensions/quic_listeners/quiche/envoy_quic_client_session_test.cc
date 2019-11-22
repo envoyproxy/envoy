@@ -50,7 +50,6 @@ public:
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
-    quic::SetVerbosityLogThreshold(3);
   }
 
   MOCK_METHOD2(SendConnectionClosePacket, void(quic::QuicErrorCode, const std::string&));

@@ -43,7 +43,6 @@ public:
         supported_versions_(quic::CurrentSupportedVersions()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-    quic::SetVerbosityLogThreshold(1);
     quic_config_.set_max_idle_time_before_crypto_handshake(quic::QuicTime::Delta::FromSeconds(10));
   }
 
