@@ -668,7 +668,7 @@ TEST_F(FileUtilsTest, ReadFileContents) {
 }
 
 TEST_F(QuicPlatformTest, PickUnsedPort) {
-  int port = QuicPickUnusedPortOrDie();
+  int port = QuicPickServerPortForTestsOrDie();
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
   for (auto ip_version : supported_versions) {
@@ -694,7 +694,7 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
       .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
+  EXPECT_DEATH_LOG_TO_STDERR(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
@@ -733,16 +733,7 @@ TEST_F(QuicPlatformTest, TestQuicOptional) {
   EXPECT_EQ(1, *maybe_a);
 }
 
-class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
-public:
-  ~QuicMemSliceTest() override = default;
-};
-
-INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
-                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
-                                            Envoy::Buffer::BufferImplementation::New}));
-
-TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
+TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
@@ -753,7 +744,6 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   // str2 is copied.
@@ -781,9 +771,8 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(fragment_releaser_called);
 }
 
-TEST_P(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
+TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   std::string str(1024, 'a');
   buffer.add(str);
   quic::QuicMemSlice slice{quic::QuicMemSliceImpl(buffer, str.length())};
@@ -793,7 +782,7 @@ TEST_P(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
   EXPECT_EQ(str, span.GetData(0));
 }
 
-TEST_P(QuicMemSliceTest, QuicMemSliceStorage) {
+TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
   std::string str(512, 'a');
   struct iovec iov = {const_cast<char*>(str.data()), str.length()};
   SimpleBufferAllocator allocator;

@@ -152,6 +152,11 @@ message VirtualHost {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
+// A filter-defined action type.
+message FilterAction {
+  google.protobuf.Any action = 1;
+}
+
 // A route is both a specification of how to match a request as well as an indication of what to do
 // next (e.g., redirect, forward, rewrite, etc.).
 //
@@ -159,7 +164,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Route {
   reserved 6;
 
@@ -180,6 +185,11 @@ message Route {
 
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
+
+    // [#not-implemented-hide:]
+    // If true, a filter will define the action (e.g., it could dynamically generate the
+    // RouteAction).
+    FilterAction filter_action = 17;
   }
 
   // The Metadata field can be used to provide additional information
@@ -265,9 +275,9 @@ message WeightedCluster {
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field will be considered for
-    // load balancing. Note that this will be merged with what's provided in :ref:
-    // `RouteAction.MetadataMatch <envoy_api_field_route.RouteAction.metadata_match>`, with values
-    // here taking precedence. The filter name should be specified as *envoy.lb*.
+    // load balancing. Note that this will be merged with what's provided in
+    // :ref:`RouteAction.metadata_match <envoy_api_field_route.RouteAction.metadata_match>`, with
+    // values here taking precedence. The filter name should be specified as *envoy.lb*.
     core.Metadata metadata_match = 3;
 
     // Specifies a list of headers to be added to requests when this cluster is selected
@@ -475,7 +485,7 @@ message CorsPolicy {
   google.protobuf.BoolValue allow_credentials = 6;
 
   oneof enabled_specifier {
-    // Specifies if CORS is enabled. Defaults to true. Only effective on route.
+    // Specifies if the CORS filter is enabled. Defaults to true. Only effective on route.
     //
     // .. attention::
     //
@@ -483,28 +493,25 @@ message CorsPolicy {
     //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
     google.protobuf.BoolValue enabled = 7 [deprecated = true];
 
-    // Specifies if CORS is enabled.
+    // Specifies the % of requests for which the CORS filter is enabled.
     //
-    // More information on how this can be controlled via runtime can be found
-    // :ref:`here <cors-runtime>`.
+    // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
+    // filter will be enabled for 100% of the requests.
     //
-    // .. note::
-    //
-    //   This field defaults to 100/:ref:`HUNDRED
-    //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+    // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
+    // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
-  // Specifies if CORS policies are evaluated and tracked when filter is off but
-  // does not enforce any policies.
+  // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
+  // enforced.
   //
-  // More information on how this can be controlled via runtime can be found
-  // :ref:`here <cors-runtime>`.
+  // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
+  // fields have to explicitly disable the filter in order for this setting to take effect.
   //
-  // .. note::
-  //
-  //   This field defaults to 100/:ref:`HUNDRED
-  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
+  // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
@@ -560,16 +567,6 @@ message RouteAction {
     // For some fraction N/D, a random number in the range [0,D) is selected. If the
     // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
-    //
-    // .. note::
-    //
-    //   Parsing this field is implemented such that the runtime key's data may be represented
-    //   as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
-    //   as JSON/YAML and may also be represented as an integer with the assumption that the value
-    //   is an integral percentage out of 100. For instance, a runtime key lookup returning the
-    //   value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
-    //   HUNDRED. This is behaviour is different to that of the deprecated `runtime_key` field,
-    //   where the implicit denominator is 10000.
     core.RuntimeFractionalPercent runtime_fraction = 3;
   }
 
@@ -655,7 +652,7 @@ message RouteAction {
   // Allows enabling and disabling upgrades on a per-route basis.
   // This overrides any enabled/disabled upgrade filter chain specified in the
   // HttpConnectionManager
-  // :ref:upgrade_configs`
+  // :ref:`upgrade_configs
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
   // but does not affect any custom filter chain specified there.
   message UpgradeConfig {
@@ -740,6 +737,8 @@ message RouteAction {
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
+    //
+    // [#next-major-version: host_rewrite_literal]
     string host_rewrite = 6;
 
     // Indicates that during forwarding, the host header will be swapped with
@@ -757,6 +756,8 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
+    //
+    // [#next-major-version: host_rewrite_header]
     string auto_host_rewrite_header = 29;
   }
 

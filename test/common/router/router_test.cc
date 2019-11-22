@@ -1065,10 +1065,10 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
   // First connection is successful and reset happens later on.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   router_.decodeHeaders(headers, true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1105,7 +1105,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
 
   EXPECT_EQ(1U,
@@ -1353,7 +1353,7 @@ TEST_F(RouterTest, GrpcReset) {
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   EXPECT_EQ(1UL, stats_store_.counter("test.rq_reset_after_downstream_response_started").value());
@@ -1446,7 +1446,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(204)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(204)));
   response_timeout_->invokeCallback();
 
   EXPECT_EQ(1U,
@@ -1494,7 +1494,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   per_try_timeout_->invokeCallback();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1545,7 +1545,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   per_try_timeout_->invokeCallback();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1592,7 +1592,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
 
   EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_CALL(*per_try_timeout_, disableTimer());
   EXPECT_CALL(*response_timeout_, disableTimer());
   EXPECT_CALL(callbacks_.stream_info_,
@@ -1627,7 +1627,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -1639,7 +1639,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
@@ -1700,7 +1700,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -1712,7 +1712,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
@@ -1789,7 +1789,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "500"}});
   // Local origin connect success happens for first and third try.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
@@ -1817,7 +1817,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   NiceMock<Http::MockStreamEncoder> encoder3;
   Http::StreamDecoder* response_decoder3 = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -1871,7 +1871,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -1885,7 +1885,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
   per_try_timeout_->invokeCallback();
 
@@ -1912,7 +1912,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
 
   response_timeout_->invokeCallback();
 }
@@ -1935,7 +1935,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -1949,7 +1949,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
   per_try_timeout_->invokeCallback();
 
@@ -2011,7 +2011,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   EXPECT_EQ(1UL, stats_store_.counter("test.rq_retry_skipped_request_not_complete").value());
@@ -2033,7 +2033,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -2045,7 +2045,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
@@ -2071,7 +2071,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
   EXPECT_CALL(encoder2.stream_, resetStream(_)).Times(1);
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
@@ -2099,7 +2099,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(1);
   expectPerTryTimerCreate();
@@ -2111,7 +2111,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
@@ -2128,7 +2128,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(1);
   expectPerTryTimerCreate();
@@ -2180,10 +2180,10 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
       }));
   // First is reset
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _))
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
       .Times(1);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -2195,7 +2195,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
@@ -2258,7 +2258,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
         return nullptr;
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
       .Times(1);
 
@@ -2276,7 +2276,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
 
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   EXPECT_CALL(encoder.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   per_try_timeout_->invokeCallback();
@@ -2287,7 +2287,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
                            -> Http::ConnectionPool::Cancellable* {
         EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+                    putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
         callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
                                 absl::string_view(), cm_.conn_pool_.host_);
         return nullptr;
@@ -2338,7 +2338,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _)).WillOnce(Return(nullptr));
@@ -2374,7 +2374,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   // We expect this reset to kick off a new request.
@@ -2384,7 +2384,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                    putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                               absl::optional<uint64_t>(absl::nullopt)));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
@@ -2451,7 +2451,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
 
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   per_try_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -2463,7 +2463,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS,
+                    putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                               absl::optional<uint64_t>(absl::nullopt)));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
@@ -2582,7 +2582,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   absl::string_view rc_details2 = "upstream_reset_after_response_started{remote reset}";
   EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.
@@ -2616,7 +2616,7 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
 
@@ -3104,7 +3104,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
 TEST_F(RouterTest, InternalRedirectRejectedOnSecondPass) {
   enableRedirects();
-  default_request_headers_.insertEnvoyOriginalUrl().value(std::string("http://www.foo.com"));
+  default_request_headers_.setEnvoyOriginalUrl("http://www.foo.com");
   sendRequest();
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -3120,7 +3120,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
   enableRedirects();
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string(""));
+  redirect_headers_->setLocation("");
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
   Buffer::OwnedImpl data("1234567890");
@@ -3134,7 +3134,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
   enableRedirects();
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string("h"));
+  redirect_headers_->setLocation("h");
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
   Buffer::OwnedImpl data("1234567890");
@@ -3191,7 +3191,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  redirect_headers_->setLocation("https://www.foo.com");
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
@@ -3200,7 +3200,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects();
-  default_request_headers_.insertForwardedProto().value(std::string("http"));
+  default_request_headers_.setForwardedProto("http");
   sendRequest();
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
@@ -3220,7 +3220,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 
   sendRequest();
 
-  redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
+  redirect_headers_->setLocation("https://www.foo.com");
   EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
@@ -3330,7 +3330,7 @@ TEST_F(RouterTest, Redirect) {
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
   EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
-  EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::MovedPermanently));
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
@@ -3351,7 +3351,7 @@ TEST_F(RouterTest, RedirectFound) {
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
   EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
-  EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::Found));
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
@@ -3401,6 +3401,48 @@ TEST_F(RouterTest, DirectResponseWithBody) {
       {":status", "200"}, {"content-length", "15"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+}
+
+TEST_F(RouterTest, DirectResponseWithLocation) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  std::string route_name("route-test-name");
+  EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("http://host/"));
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Created));
+  EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "201"}, {"location", "http://host/"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(span_, injectContext(_)).Times(0);
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+}
+
+TEST_F(RouterTest, DirectResponseWithoutLocation) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  std::string route_name("route-test-name");
+  EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("http://host/"));
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(span_, injectContext(_)).Times(0);
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
@@ -4466,7 +4508,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
   // This should not trigger a retry as the retry state has been deleted.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_EQ(callbacks_.details_, "upstream_reset_before_response_started{remote reset}");
 }

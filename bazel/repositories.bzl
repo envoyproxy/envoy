@@ -6,14 +6,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
-NOBORINGSSL_SKIP_TARGETS = {
-    # The lua filter depends on BoringSSL
-    "lua": "envoy.filters.http.lua",
-
-    # These two extensions are supposed to be replaced with alternative extensions.
-    "tls": "envoy.transport_sockets.tls",
-    "tls_inspector": "envoy.filters.listener.tls_inspector",
-}
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -74,12 +66,8 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
     _repository_impl(
-        name = "six_archive",
-        build_file = "@com_google_protobuf//:six.BUILD",
-    )
-    native.bind(
         name = "six",
-        actual = "@six_archive//:six",
+        build_file = "@com_google_protobuf//third_party:six.BUILD",
     )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
@@ -128,7 +116,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
-    _com_github_eile_tclap()
+    _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
@@ -140,7 +128,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
-    _com_github_nanopb_nanopb()
     _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
@@ -150,10 +137,12 @@ def envoy_dependencies(skip_targets = []):
     _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
+    _com_googlesource_chromium_v8()
     _com_googlesource_quiche()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _upb()
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
@@ -162,6 +151,7 @@ def envoy_dependencies(skip_targets = []):
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
+    _fuzzit_linux()
 
     _python_deps()
     _cc_deps()
@@ -240,14 +230,20 @@ def _com_github_envoyproxy_sqlparser():
         actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
     )
 
-def _com_github_eile_tclap():
+def _com_github_mirror_tclap():
     _repository_impl(
-        name = "com_github_eile_tclap",
+        name = "com_github_mirror_tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
+        patch_args = ["-p1"],
+        # If and when we pick up tclap 1.4 or later release,
+        # this entire issue was refactored away 6 years ago;
+        # https://sourceforge.net/p/tclap/code/ci/5d4ffbf2db794af799b8c5727fb6c65c079195ac/
+        # https://github.com/envoyproxy/envoy/pull/8572#discussion_r337554195
+        patches = ["@envoy//bazel:tclap-win64-ull-sizet.patch"],
     )
     native.bind(
         name = "tclap",
-        actual = "@com_github_eile_tclap//:tclap",
+        actual = "@com_github_mirror_tclap//:tclap",
     )
 
 def _com_github_fmtlib_fmt():
@@ -315,15 +311,13 @@ def _com_github_libevent_libevent():
 
 def _net_zlib():
     location = REPOSITORY_LOCATIONS["net_zlib"]
+
     http_archive(
         name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
-        # The patch is only needed due to https://github.com/madler/zlib/pull/420
-        # TODO(htuch): remove this when zlib #420 merges.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
         **location
     )
+
     native.bind(
         name = "zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
@@ -344,6 +338,10 @@ def _com_github_nghttp2_nghttp2():
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
+        # This patch cannot be picked up due to ABI rules. Better
+        # solve is likely at the next version-major. Discussion at;
+        # https://github.com/nghttp2/nghttp2/pull/1395
+        # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
         **location
     )
@@ -513,27 +511,10 @@ def _com_google_absl():
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
-        # The patch includes
-        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
-        # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when protobuf 3.10 is released.
-        patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
+        patch_args = ["-p1"],
     )
 
-    # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
-    # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
-    # https://github.com/bazelbuild/bazel/issues/3219.
-    _repository_impl(
-        "com_google_protobuf_cc",
-        repository_key = "com_google_protobuf",
-        # The patch includes
-        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
-        # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when protobuf 3.10 is released.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:protobuf.patch"],
-    )
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
@@ -548,7 +529,7 @@ def _com_google_protobuf():
     )
     native.bind(
         name = "protoc",
-        actual = "@com_google_protobuf_cc//:protoc",
+        actual = "@com_google_protobuf//:protoc",
     )
 
     # Needed for `bazel fetch` to work with @com_google_protobuf
@@ -616,6 +597,20 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
         actual = "@envoy//bazel/foreign_cc:curl",
     )
 
+def _com_googlesource_chromium_v8():
+    location = REPOSITORY_LOCATIONS["com_googlesource_chromium_v8"]
+    genrule_repository(
+        name = "com_googlesource_chromium_v8",
+        genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
+        build_file = "@envoy//bazel/external:wee8.BUILD",
+        patches = ["@envoy//bazel/external:wee8.patch"],
+        **location
+    )
+    native.bind(
+        name = "wee8",
+        actual = "@com_googlesource_chromium_v8//:wee8",
+    )
+
 def _com_googlesource_quiche():
     location = REPOSITORY_LOCATIONS["com_googlesource_quiche"]
     genrule_repository(
@@ -649,20 +644,15 @@ def _org_llvm_releases_compiler_rt():
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
-def _com_github_grpc_grpc():
+def _fuzzit_linux():
     _repository_impl(
-        "com_github_grpc_grpc",
-        patches = [
-            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
-            "@envoy//bazel:grpc-protoinfo-1.patch",
-            "@envoy//bazel:grpc-protoinfo-2.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/19860
-            "@envoy//bazel:grpc-protoinfo-3.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/18950
-            "@envoy//bazel:grpc-rename-gettid.patch",
-        ],
-        patch_args = ["-p1"],
+        name = "fuzzit_linux",
+        build_file_content = "exports_files([\"fuzzit\"])",
     )
+
+def _com_github_grpc_grpc():
+    _repository_impl("com_github_grpc_grpc")
+    _repository_impl("build_bazel_rules_apple")
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(
@@ -693,15 +683,16 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
-def _com_github_nanopb_nanopb():
+def _upb():
     _repository_impl(
-        name = "com_github_nanopb_nanopb",
-        build_file = "@com_github_grpc_grpc//third_party:nanopb.BUILD",
+        name = "upb",
+        patches = ["@envoy//bazel:upb.patch"],
+        patch_args = ["-p1"],
     )
 
     native.bind(
-        name = "nanopb",
-        actual = "@com_github_nanopb_nanopb//:nanopb",
+        name = "upb_lib",
+        actual = "@upb//:upb",
     )
 
 def _com_github_google_jwt_verify():
@@ -747,6 +738,7 @@ def _foreign_cc_dependencies():
 
 def _rules_proto_dependencies():
     _repository_impl("rules_proto")
+    _repository_impl("rules_python")
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

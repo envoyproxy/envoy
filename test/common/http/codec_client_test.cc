@@ -289,9 +289,11 @@ class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersi
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()) {
     dispatcher_ = api_->allocateDispatcher();
-    upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+    auto socket = std::make_shared<Network::TcpListenSocket>(
+        Network::Test::getAnyAddress(GetParam()), nullptr, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+        socket->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
@@ -354,7 +356,6 @@ protected:
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
-  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};

@@ -450,6 +450,56 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
 }
 
 // Tests that a gRPC is downgraded to application/x-protobuf and that if the response
+// has a missing content type we respond with a useful error message.
+TEST_F(ReverseBridgeTest, GrpcRequestBadResponseNoContentType) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl headers(
+        {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+  }
+
+  {
+    // We should remove the first five bytes.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("fgh", buffer.toString());
+    EXPECT_CALL(decoder_callbacks_, streamInfo());
+    EXPECT_CALL(decoder_callbacks_.stream_info_,
+                setResponseCodeDetails(absl::string_view("grpc_bridge_content_type_wrong")));
+  }
+
+  {
+    // Subsequent calls to decodeData should do nothing.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("abcdefgh", buffer.toString());
+  }
+
+  Http::TestHeaderMapImpl trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+
+  Http::TestHeaderMapImpl headers({{":status", "400"}});
+  EXPECT_EQ(Http::FilterHeadersStatus::ContinueAndEndStream,
+            filter_->encodeHeaders(headers, false));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().Status, "200"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcStatus, "2"));
+  EXPECT_THAT(
+      headers,
+      HeaderValueOf(
+          Http::Headers::get().GrpcMessage,
+          "envoy reverse bridge: upstream responded with no content-type header, status code 400"));
+}
+
+// Tests that a gRPC is downgraded to application/x-protobuf and that if the response
 // has an invalid content type we respond with a useful error message.
 TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
   initialize();

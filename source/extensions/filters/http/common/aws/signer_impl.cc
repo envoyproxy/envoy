@@ -65,9 +65,10 @@ std::string SignerImpl::createContentHash(Http::Message& message, bool sign_body
   if (!sign_body) {
     return SignatureConstants::get().HashedEmptyString;
   }
-  const auto content_hash =
-      message.body() ? Hex::encode(Envoy::Common::Crypto::Utility::getSha256Digest(*message.body()))
-                     : SignatureConstants::get().HashedEmptyString;
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  const auto content_hash = message.body()
+                                ? Hex::encode(crypto_util.getSha256Digest(*message.body()))
+                                : SignatureConstants::get().HashedEmptyString;
   message.headers().addCopy(SignatureHeaders::get().ContentSha256, content_hash);
   return content_hash;
 }
@@ -80,23 +81,25 @@ std::string SignerImpl::createCredentialScope(absl::string_view short_date) cons
 std::string SignerImpl::createStringToSign(absl::string_view canonical_request,
                                            absl::string_view long_date,
                                            absl::string_view credential_scope) const {
-  return fmt::format(SignatureConstants::get().StringToSignFormat, long_date, credential_scope,
-                     Hex::encode(Envoy::Common::Crypto::Utility::getSha256Digest(
-                         Buffer::OwnedImpl(canonical_request))));
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  return fmt::format(
+      SignatureConstants::get().StringToSignFormat, long_date, credential_scope,
+      Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
 std::string SignerImpl::createSignature(absl::string_view secret_access_key,
                                         absl::string_view short_date,
                                         absl::string_view string_to_sign) const {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto secret_key =
       absl::StrCat(SignatureConstants::get().SignatureVersion, secret_access_key);
-  const auto date_key = Envoy::Common::Crypto::Utility::getSha256Hmac(
+  const auto date_key = crypto_util.getSha256Hmac(
       std::vector<uint8_t>(secret_key.begin(), secret_key.end()), short_date);
-  const auto region_key = Envoy::Common::Crypto::Utility::getSha256Hmac(date_key, region_);
-  const auto service_key = Envoy::Common::Crypto::Utility::getSha256Hmac(region_key, service_name_);
-  const auto signing_key = Envoy::Common::Crypto::Utility::getSha256Hmac(
-      service_key, SignatureConstants::get().Aws4Request);
-  return Hex::encode(Envoy::Common::Crypto::Utility::getSha256Hmac(signing_key, string_to_sign));
+  const auto region_key = crypto_util.getSha256Hmac(date_key, region_);
+  const auto service_key = crypto_util.getSha256Hmac(region_key, service_name_);
+  const auto signing_key =
+      crypto_util.getSha256Hmac(service_key, SignatureConstants::get().Aws4Request);
+  return Hex::encode(crypto_util.getSha256Hmac(signing_key, string_to_sign));
 }
 
 std::string

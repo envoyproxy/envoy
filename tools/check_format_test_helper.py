@@ -245,6 +245,15 @@ def runChecks():
   errors += checkFileExpectingOK("skip_envoy_package.BUILD")
   # Validate that we clean up gratuitous blank lines.
   errors += checkAndFixError("canonical_spacing.BUILD", "envoy_build_fixer check failed")
+  # Validate that unused loads are removed.
+  errors += checkAndFixError("remove_unused_loads.BUILD", "envoy_build_fixer check failed")
+  # Validate that API proto package deps are computed automagically.
+  errors += checkAndFixError("canonical_api_deps.BUILD",
+                             "envoy_build_fixer check failed",
+                             extra_input_files=[
+                                 "canonical_api_deps.cc", "canonical_api_deps.h",
+                                 "canonical_api_deps.other.cc"
+                             ])
   errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
   errors += checkAndFixError(
@@ -272,4 +281,4 @@ if __name__ == "__main__":
   if errors != 0:
     logging.error("%d FAILURES" % errors)
     exit(1)
-  logging.warn("PASS")
+  logging.warning("PASS")

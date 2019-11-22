@@ -1,7 +1,8 @@
 #include "test/common/buffer/buffer_fuzz.h"
 
 #include <fcntl.h>
-#include <unistd.h>
+
+#include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -321,8 +322,8 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
       if (source_buffer.length() > max_alloc) {
         break;
       }
-      target_buffer.move(source_buffer);
       allocated += source_buffer.length();
+      target_buffer.move(source_buffer);
     } else {
       const uint32_t source_length =
           std::min(static_cast<uint32_t>(source_buffer.length()), action.move().length());
@@ -476,9 +477,7 @@ void executeActions(const test::common::buffer::BufferFuzzTestCase& input, Buffe
   }
 }
 
-void BufferFuzz::bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input, bool old_impl) {
-  ENVOY_LOG_MISC(trace, "Using {} buffer implementation", old_impl ? "old" : "new");
-  Buffer::OwnedImpl::useOldImpl(old_impl);
+void BufferFuzz::bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input) {
   Context ctxt;
   // Fuzzed buffers.
   BufferList buffers;

@@ -127,6 +127,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "hash_policy_lib",
+    srcs = ["hash_policy.cc"],
+    hdrs = ["hash_policy.h"],
+    deps = [
+        "//include/envoy/network:hash_policy_interface",
+        "//source/common/common:hash_lib",
+        "@envoy_api//envoy/type:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "io_socket_error_lib",
     srcs = ["io_socket_error_impl.cc"],
     hdrs = ["io_socket_error_impl.h"],
@@ -200,7 +211,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:headers_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -273,6 +283,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",

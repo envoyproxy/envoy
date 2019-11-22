@@ -62,15 +62,6 @@ public:
   const std::string OriginalSrc = "envoy.filters.http.original_src";
   // Dynamic forward proxy filter
   const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
-
-  // Converts names from v1 to v2
-  const Config::V1Converter v1_converter_;
-
-  // NOTE: Do not add any new filters to this list. All future filters are v2 only.
-  HttpFilterNameValues()
-      : v1_converter_({Buffer, Cors, Dynamo, Fault, GrpcHttp1Bridge, GrpcJsonTranscoder, GrpcWeb,
-                       HeaderToMetadata, HealthCheck, IpTagging, RateLimit, Router, Lua,
-                       ExtAuthorization}) {}
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

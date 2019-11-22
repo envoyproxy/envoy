@@ -31,31 +31,31 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
   stat_name_set_->rememberBuiltins(
       {"auth_rq", "digest_rq", "host_rq", "ip_rq", "ping_response_rq", "world_rq", "x509_rq"});
 
-  initOpCode(OpCodes::PING, stats_.ping_resp_, "ping_response");
-  initOpCode(OpCodes::SETAUTH, stats_.auth_resp_, "auth_response");
-  initOpCode(OpCodes::GETDATA, stats_.getdata_resp_, "getdata_resp");
-  initOpCode(OpCodes::CREATE, stats_.create_resp_, "create_resp");
-  initOpCode(OpCodes::CREATE2, stats_.create2_resp_, "create2_resp");
-  initOpCode(OpCodes::CREATECONTAINER, stats_.createcontainer_resp_, "createcontainer_resp");
-  initOpCode(OpCodes::CREATETTL, stats_.createttl_resp_, "createttl_resp");
-  initOpCode(OpCodes::SETDATA, stats_.setdata_resp_, "setdata_resp");
-  initOpCode(OpCodes::GETCHILDREN, stats_.getchildren_resp_, "getchildren_resp");
-  initOpCode(OpCodes::GETCHILDREN2, stats_.getchildren2_resp_, "getchildren2_resp");
-  initOpCode(OpCodes::DELETE, stats_.delete_resp_, "delete_resp");
-  initOpCode(OpCodes::EXISTS, stats_.exists_resp_, "exists_resp");
-  initOpCode(OpCodes::GETACL, stats_.getacl_resp_, "getacl_resp");
-  initOpCode(OpCodes::SETACL, stats_.setacl_resp_, "setacl_resp");
-  initOpCode(OpCodes::SYNC, stats_.sync_resp_, "sync_resp");
-  initOpCode(OpCodes::CHECK, stats_.check_resp_, "check_resp");
-  initOpCode(OpCodes::MULTI, stats_.multi_resp_, "multi_resp");
-  initOpCode(OpCodes::RECONFIG, stats_.reconfig_resp_, "reconfig_resp");
-  initOpCode(OpCodes::SETWATCHES, stats_.setwatches_resp_, "setwatches_resp");
-  initOpCode(OpCodes::CHECKWATCHES, stats_.checkwatches_resp_, "checkwatches_resp");
-  initOpCode(OpCodes::REMOVEWATCHES, stats_.removewatches_resp_, "removewatches_resp");
-  initOpCode(OpCodes::GETEPHEMERALS, stats_.getephemerals_resp_, "getephemerals_resp");
-  initOpCode(OpCodes::GETALLCHILDRENNUMBER, stats_.getallchildrennumber_resp_,
+  initOpCode(OpCodes::Ping, stats_.ping_resp_, "ping_response");
+  initOpCode(OpCodes::SetAuth, stats_.auth_resp_, "auth_response");
+  initOpCode(OpCodes::GetData, stats_.getdata_resp_, "getdata_resp");
+  initOpCode(OpCodes::Create, stats_.create_resp_, "create_resp");
+  initOpCode(OpCodes::Create2, stats_.create2_resp_, "create2_resp");
+  initOpCode(OpCodes::CreateContainer, stats_.createcontainer_resp_, "createcontainer_resp");
+  initOpCode(OpCodes::CreateTtl, stats_.createttl_resp_, "createttl_resp");
+  initOpCode(OpCodes::SetData, stats_.setdata_resp_, "setdata_resp");
+  initOpCode(OpCodes::GetChildren, stats_.getchildren_resp_, "getchildren_resp");
+  initOpCode(OpCodes::GetChildren2, stats_.getchildren2_resp_, "getchildren2_resp");
+  initOpCode(OpCodes::Delete, stats_.delete_resp_, "delete_resp");
+  initOpCode(OpCodes::Exists, stats_.exists_resp_, "exists_resp");
+  initOpCode(OpCodes::GetAcl, stats_.getacl_resp_, "getacl_resp");
+  initOpCode(OpCodes::SetAcl, stats_.setacl_resp_, "setacl_resp");
+  initOpCode(OpCodes::Sync, stats_.sync_resp_, "sync_resp");
+  initOpCode(OpCodes::Check, stats_.check_resp_, "check_resp");
+  initOpCode(OpCodes::Multi, stats_.multi_resp_, "multi_resp");
+  initOpCode(OpCodes::Reconfig, stats_.reconfig_resp_, "reconfig_resp");
+  initOpCode(OpCodes::SetWatches, stats_.setwatches_resp_, "setwatches_resp");
+  initOpCode(OpCodes::CheckWatches, stats_.checkwatches_resp_, "checkwatches_resp");
+  initOpCode(OpCodes::RemoveWatches, stats_.removewatches_resp_, "removewatches_resp");
+  initOpCode(OpCodes::GetEphemerals, stats_.getephemerals_resp_, "getephemerals_resp");
+  initOpCode(OpCodes::GetAllChildrenNumber, stats_.getallchildrennumber_resp_,
              "getallchildrennumber_resp");
-  initOpCode(OpCodes::CLOSE, stats_.close_resp_, "close_resp");
+  initOpCode(OpCodes::Close, stats_.close_resp_, "close_resp");
 }
 
 void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& counter,
@@ -170,19 +170,19 @@ void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags
   std::string opname;
 
   switch (opcode) {
-  case OpCodes::CREATE:
+  case OpCodes::Create:
     opname = "create";
     config_->stats_.create_rq_.inc();
     break;
-  case OpCodes::CREATE2:
+  case OpCodes::Create2:
     opname = "create2";
     config_->stats_.create2_rq_.inc();
     break;
-  case OpCodes::CREATECONTAINER:
+  case OpCodes::CreateContainer:
     opname = "createcontainer";
     config_->stats_.createcontainer_rq_.inc();
     break;
-  case OpCodes::CREATETTL:
+  case OpCodes::CreateTtl:
     opname = "createttl";
     config_->stats_.createttl_rq_.inc();
     break;

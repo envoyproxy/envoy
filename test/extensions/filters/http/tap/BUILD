@@ -53,5 +53,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/tap:config",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
     ],
 )

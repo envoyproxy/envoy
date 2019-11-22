@@ -42,9 +42,9 @@ public:
         client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
                 cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_) {
-    message_->headers().insertMethod().value(std::string("GET"));
-    message_->headers().insertHost().value(std::string("host"));
-    message_->headers().insertPath().value(std::string("/"));
+    message_->headers().setMethod("GET");
+    message_->headers().setHost("host");
+    message_->headers().setPath("/");
     ON_CALL(*cm_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(envoy::api::v2::core::Locality().default_instance()));
   }
@@ -298,7 +298,7 @@ TEST_F(AsyncClientImplTest, Retry) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
 
-  message_->headers().insertEnvoyRetryOn().value(Headers::get().EnvoyRetryOnValues._5xx);
+  message_->headers().setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
 
   // Expect retry and retry timer create.
@@ -343,7 +343,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
 
-  headers.insertEnvoyRetryOn().value(Headers::get().EnvoyRetryOnValues._5xx);
+  headers.setReferenceEnvoyRetryOn(Headers::get().EnvoyRetryOnValues._5xx);
   AsyncClient::Stream* stream =
       client_.start(stream_callbacks_, AsyncClient::StreamOptions().setBufferBodyForRetry(true));
   stream->sendHeaders(headers, false);

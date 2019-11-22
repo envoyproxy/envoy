@@ -39,12 +39,6 @@ SysCallSizeResult OsSysCallsImpl::recv(int socket, void* buffer, size_t length, 
   return {rc, errno};
 }
 
-SysCallSizeResult OsSysCallsImpl::recvfrom(int sockfd, void* buffer, size_t length, int flags,
-                                           struct sockaddr* addr, socklen_t* addrlen) {
-  const ssize_t rc = ::recvfrom(sockfd, buffer, length, flags, addr, addrlen);
-  return {rc, errno};
-}
-
 SysCallSizeResult OsSysCallsImpl::recvmsg(int sockfd, struct msghdr* msg, int flags) {
   const ssize_t rc = ::recvmsg(sockfd, msg, flags);
   return {rc, errno};
@@ -80,12 +74,6 @@ SysCallIntResult OsSysCallsImpl::getsockopt(int sockfd, int level, int optname, 
 
 SysCallIntResult OsSysCallsImpl::socket(int domain, int type, int protocol) {
   const int rc = ::socket(domain, type, protocol);
-  return {rc, errno};
-}
-
-SysCallSizeResult OsSysCallsImpl::sendto(int fd, const void* buffer, size_t size, int flags,
-                                         const sockaddr* addr, socklen_t addrlen) {
-  const int rc = ::sendto(fd, buffer, size, flags, addr, addrlen);
   return {rc, errno};
 }
 

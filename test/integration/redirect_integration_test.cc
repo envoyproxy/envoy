@@ -39,7 +39,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.insertHost().value("pass.through.internal.redirect", 30);
+  default_request_headers_.setHost("pass.through.internal.redirect");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, redirect_response_, 0);
   EXPECT_EQ("302", response->headers().Status()->value().getStringView());
   EXPECT_EQ(
@@ -58,7 +58,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.insertHost().value("handle.internal.redirect", 24);
+  default_request_headers_.setHost("handle.internal.redirect");
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
@@ -85,12 +85,12 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
 TEST_P(RedirectIntegrationTest, InvalidRedirect) {
   initialize();
 
-  redirect_response_.insertLocation().value("invalid_url", 11);
+  redirect_response_.setLocation("invalid_url");
 
   // Send the same request as above, only send an invalid URL as the response.
   // The request should not be redirected.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.insertHost().value("handle.internal.redirect", 24);
+  default_request_headers_.setHost("handle.internal.redirect");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, redirect_response_, 0);
   EXPECT_EQ("302", response->headers().Status()->value().getStringView());
   EXPECT_EQ(

@@ -72,6 +72,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/jwt_authn:config",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -118,6 +119,7 @@ envoy_extension_cc_test(
         "//test/config:utility_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:pkg_cc_proto",
     ],
 )
 

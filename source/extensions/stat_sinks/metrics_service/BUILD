@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -36,10 +37,11 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "data_plane_agnostic",
     deps = [
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
@@ -48,6 +50,5 @@ envoy_cc_library(
         "//source/extensions/stat_sinks/metrics_service:metrics_service_grpc_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/metrics/v2:pkg_cc_proto",
     ],
 )

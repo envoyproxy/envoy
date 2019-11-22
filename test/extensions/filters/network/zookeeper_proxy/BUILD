@@ -34,5 +34,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg_cc_proto",
     ],
 )

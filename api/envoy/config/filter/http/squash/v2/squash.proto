@@ -13,6 +13,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Squash]
 // Squash :ref:`configuration overview <config_http_filters_squash>`.
+// [#extension: envoy.filters.http.squash]
 
 // [#next-free-field: 6]
 message Squash {

@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -97,10 +99,12 @@ protected:
     if (dispatcher_.get() == nullptr) {
       dispatcher_ = api_->allocateDispatcher();
     }
+    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                         nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+        socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
         socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
@@ -207,7 +211,7 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
+  std::shared_ptr<Network::TcpListenSocket> socket_{nullptr};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
@@ -269,7 +273,9 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
-  if (socket_.localAddress()->ip()->version() == Address::IpVersion::v4) {
+  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                       nullptr, true);
+  if (socket_->localAddress()->ip()->version() == Address::IpVersion::v4) {
     broadcast_address.reset(new Address::Ipv4Instance("224.0.0.1", 0));
   } else {
     broadcast_address.reset(new Address::Ipv6Instance("ff02::1", 0));
@@ -317,7 +323,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
             server_connection_->socketOptions());
       }));
 
@@ -361,7 +367,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
             server_connection_->socketOptions());
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
@@ -947,10 +953,12 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   dispatcher_ = api_->allocateDispatcher();
+  socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                       nullptr, true);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
-      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+      socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -1921,10 +1929,12 @@ public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher();
+    socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                         nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
+        socket_->localAddress(), Network::Address::InstanceConstSharedPtr(),
         Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
