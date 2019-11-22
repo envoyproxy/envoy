@@ -414,7 +414,7 @@ TEST(HeaderMapImplTest, InlineAppend) {
     EXPECT_EQ(headers.byteSize().value(), 27);
   }
   {
-    // Custom delimeter.
+    // Custom delimiter.
     HeaderMapImpl headers;
     headers.insertVia();
     EXPECT_EQ(headers.byteSize().value(), Headers::get().Via.get().size());
@@ -972,7 +972,7 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     TestHeaderMapImpl headers;
     const std::string empty;
     headers.setPath(empty);
-    // Append with default delimeter.
+    // Append with default delimiter.
     headers.appendPath(" ", ",");
     headers.setPath(0);
     EXPECT_EQ("0", headers.Path()->value().getStringView());
