@@ -424,7 +424,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    HeaderEntry* nominated_header = NULL;
+    const HeaderEntry* nominated_header = NULL;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -478,8 +478,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
         }
 
         if (keep_header) {
-          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
-                                            Http::Headers::get().TEValues.Trailers.size());
+          headers.setTE(Http::Headers::get().TEValues.Trailers);
         }
       }
     }
@@ -499,7 +498,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     if (new_value.empty()) {
       headers.removeConnection();
     } else {
-      headers.Connection()->value(new_value);
+      headers.setConnection(new_value);
     }
   }
 
