@@ -71,7 +71,7 @@ Notice that *B*, the buffer value added to the minRTT, allows for normal varianc
 latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
 before decreasing the gradient value.
 
-The buffer will be a percentage of the measured minRTT value whose value is modified via the :ref:`buffer <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig.MinimumRTTCalculationParams.buffer>` field in the :ref:`minRTT calculation parameters <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
 
 .. math::
 
