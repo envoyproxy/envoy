@@ -5,6 +5,7 @@ import shutil
 import socket
 import subprocess
 import tempfile
+from threading import Thread
 import time
 import unittest
 
@@ -87,6 +88,48 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     self.metrics.assert_metric_increase('fetch', 20)
     # Both producer & consumer had to fetch cluster metadata.
     self.metrics.assert_metric_increase('metadata', 2)
+
+  def test_consumer_with_consumer_groups(self):
+    """
+    This test verifies that multiple consumers can form a Kafka consumer group.
+    """
+    consumer_count = 10
+    consumers = []
+    for id in range(consumer_count):
+      consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092',
+                               group_id='test',
+                               client_id='test-%s' % id)
+      consumer.subscribe(['test_consumer_with_consumer_groups'])
+      consumers.append(consumer)
+
+    worker_threads = []
+    for consumer in consumers:
+      thread = Thread(target=KafkaBrokerIntegrationTest.worker, args=(consumer,))
+      thread.start()
+      worker_threads.append(thread)
+
+    for thread in worker_threads:
+      thread.join()
+
+    for consumer in consumers:
+      consumer.close()
+
+    self.metrics.collect_final_metrics()
+    self.metrics.assert_metric_increase('api_versions', consumer_count)
+    self.metrics.assert_metric_increase('metadata', consumer_count)
+    self.metrics.assert_metric_increase('join_group', consumer_count)
+    self.metrics.assert_metric_increase('find_coordinator', consumer_count)
+    self.metrics.assert_metric_increase('leave_group', consumer_count)
+
+  @staticmethod
+  def worker(consumer):
+    """
+    Worker thread for Kafka consumer.
+    Multiple poll-s are done here, so that the group can safely form.
+    """
+    poll_operations = 10
+    for i in range(poll_operations):
+      consumer.poll(timeout_ms=1000)
 
   def test_admin_client(self):
     """
@@ -194,8 +237,6 @@ class ServicesHolder:
     self.kafka_handle = None
 
   def start(self):
-    print(subprocess.getoutput('ls -lR'))
-
     # Find java installation that we are going to use to start Zookeeper & Kafka.
     java_directory = self.find_java()
 
@@ -210,11 +251,11 @@ class ServicesHolder:
     # But that forces the JVM to load file that is not present due to:
     # https://docs.oracle.com/javase/9/management/monitoring-and-management-using-jmx-technology.htm
     # Let's make it simple and just disable JMX.
-    launcher_environment['KAFKA_JMX_OPTS'] = " "
+    launcher_environment['KAFKA_JMX_OPTS'] = ' '
 
     # Setup a temporary directory, which will be used by Kafka & Zookeeper servers.
     self.kafka_tmp_dir = tempfile.mkdtemp()
-    print("Temporary directory used for tests: " + self.kafka_tmp_dir)
+    print('Temporary directory used for tests: ' + self.kafka_tmp_dir)
 
     # This directory will store the configuration files fed to services.
     config_dir = self.kafka_tmp_dir + '/config'
@@ -253,12 +294,12 @@ class ServicesHolder:
     # Config files have been rendered, start the services now.
 
     # Start Envoy in the background, pointing to rendered config file.
-    envoy_binary = os.path.join('.', 'source', 'exe', 'envoy-static')
+    envoy_binary = self.find_envoy()
     envoy_args = [os.path.abspath(envoy_binary), '-c', envoy_config_file]
     self.envoy_handle = subprocess.Popen(envoy_args,
                                          stdout=subprocess.DEVNULL,
                                          stderr=subprocess.DEVNULL)
-    print("Envoy started")
+    print('Envoy started')
 
     # Find the Kafka server 'bin' directory.
     kafka_bin_dir = os.path.join('.', 'external', 'kafka_server_binary', 'bin')
@@ -270,7 +311,7 @@ class ServicesHolder:
                                       env=launcher_environment,
                                       stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL)
-    print("Zookeeper server started")
+    print('Zookeeper server started')
 
     # Start Kafka in background, pointing to rendered config file.
     kafka_binary = os.path.join(kafka_bin_dir, 'kafka-server-start.sh')
@@ -279,7 +320,7 @@ class ServicesHolder:
                                          env=launcher_environment,
                                          stdout=subprocess.DEVNULL,
                                          stderr=subprocess.DEVNULL)
-    print("Kafka server started")
+    print('Kafka server started')
     time.sleep(30)
 
   def find_java(self):
@@ -292,43 +333,57 @@ class ServicesHolder:
     for directory in os.listdir(external_dir):
       if 'remotejdk11' in directory:
         result = os.path.join(external_dir, directory, 'bin')
-        print("Using Java: " + result)
+        print('Using Java: ' + result)
         return result
-    raise Exception("Could not find Java in: " + external_dir)
+    raise Exception('Could not find Java in: ' + external_dir)
+
+  def find_envoy(self):
+    """
+    This method locates envoy binary.
+    It's present at ./source/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
+    or at ./external/envoy/source/exe/envoy-static (for bazel-compile_time_options).
+    """
+    candidate = os.path.join('.', 'source', 'exe', 'envoy-static')
+    if os.path.isfile(candidate):
+      return candidate
+    candidate = os.path.join('.', 'external', 'envoy', 'source', 'exe', 'envoy-static')
+    if os.path.isfile(candidate):
+      return candidate
+    raise Exception("Could not find Envoy")
 
   def shut_down(self):
     # Teardown - kill Kafka, Zookeeper, and Envoy. Then delete their data directory.
-    print("Cleaning up")
+    print('Cleaning up')
 
     if self.kafka_handle:
-      print("Killing Kafka")
+      print('Killing Kafka')
       self.kafka_handle.kill()
       self.kafka_handle.wait()
 
     if self.zk_handle:
-      print("Killing Zookeeper")
+      print('Killing Zookeeper')
       self.zk_handle.kill()
       self.zk_handle.wait()
 
     if self.envoy_handle:
-      print("Killing Envoy")
+      print('Killing Envoy')
       self.envoy_handle.kill()
       self.envoy_handle.wait()
 
     if self.kafka_tmp_dir:
-      print("Removing temporary directory: " + self.kafka_tmp_dir)
+      print('Removing temporary directory: ' + self.kafka_tmp_dir)
       shutil.rmtree(self.kafka_tmp_dir)
 
   def check_state(self):
     status = self.envoy_handle.poll()
     if status:
-      raise Exception("Envoy died with: " + str(status))
+      raise Exception('Envoy died with: ' + str(status))
     status = self.zk_handle.poll()
     if status:
-      raise Exception("Zookeeper died with: " + str(status))
+      raise Exception('Zookeeper died with: ' + str(status))
     status = self.kafka_handle.poll()
     if status:
-      raise Exception("Kafka died with: " + str(status))
+      raise Exception('Kafka died with: ' + str(status))
 
 
 class RenderingHelper:
