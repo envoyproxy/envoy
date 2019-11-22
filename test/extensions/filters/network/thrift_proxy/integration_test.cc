@@ -7,6 +7,7 @@
 #include "gtest/gtest.h"
 
 using testing::Combine;
+using testing::HasSubstr;
 using ::testing::TestParamInfo;
 using testing::Values;
 
@@ -298,6 +299,37 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
 
   Stats::CounterSharedPtr counter =
       test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
+  EXPECT_EQ(1U, counter->value());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/9037.
+TEST_P(ThriftConnManagerIntegrationTest, EarlyUpstreamClose) {
+  initializeCall(DriverMode::Success);
+
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(request_bytes_.toString());
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
+  EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  tcp_client->waitForDisconnect();
+
+  EXPECT_THAT(tcp_client->data(), HasSubstr("connection failure"));
+
+  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("thrift.thrift_stats.response_exception");
   EXPECT_EQ(1U, counter->value());
 }
 
