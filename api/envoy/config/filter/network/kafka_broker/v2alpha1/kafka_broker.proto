@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package envoy.config.filter.network.kafka_broker.v2alpha;
+package envoy.config.filter.network.kafka_broker.v2alpha1;
 
 option java_outer_classname = "KafkaBrokerProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.network.kafka_broker.v2alpha";
+option java_package = "io.envoyproxy.envoy.config.filter.network.kafka_broker.v2alpha1";
 
 import "validate/validate.proto";
 
