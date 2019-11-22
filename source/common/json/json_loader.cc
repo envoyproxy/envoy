@@ -13,6 +13,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/utility.h"
+#include "common/protobuf/utility.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"
@@ -681,82 +682,6 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 }
 
 } // namespace
-
-ObjectSharedPtr Factory::loadFromFile(const std::string& file_path, Api::Api& api) {
-  try {
-    const std::string contents = api.fileSystem().fileReadToEnd(file_path);
-    return absl::EndsWith(file_path, ".yaml") ? loadFromYamlString(contents)
-                                              : loadFromString(contents);
-  } catch (EnvoyException& e) {
-    throw Exception(e.what());
-  }
-}
-
-namespace {
-
-FieldSharedPtr parseYamlNode(YAML::Node node) {
-  switch (node.Type()) {
-  case YAML::NodeType::Null:
-    return Field::createNull();
-  case YAML::NodeType::Scalar:
-    // Due to the fact that we prefer to parse without schema or application knowledge (e.g. since
-    // we may have embedded opaque configs), we must use heuristics to resolve what the type of the
-    // scalar is. See discussion in https://github.com/jbeder/yaml-cpp/issues/261.
-    // First, if we know this has been explicitly quoted as a string, do that.
-    if (node.Tag() == "!") {
-      return Field::createValue(node.as<std::string>());
-    }
-    bool bool_value;
-    if (YAML::convert<bool>::decode(node, bool_value)) {
-      return Field::createValue(bool_value);
-    }
-    int64_t int_value;
-    if (YAML::convert<int64_t>::decode(node, int_value)) {
-      return Field::createValue(int_value);
-    }
-    double double_value;
-    if (YAML::convert<double>::decode(node, double_value)) {
-      return Field::createValue(double_value);
-    }
-    // Otherwise, fall back on string.
-    return Field::createValue(node.as<std::string>());
-  case YAML::NodeType::Sequence: {
-    FieldSharedPtr array = Field::createArray();
-    for (auto it : node) {
-      array->append(parseYamlNode(it));
-    }
-    return array;
-  }
-  case YAML::NodeType::Map: {
-    FieldSharedPtr object = Field::createObject();
-    for (auto it : node) {
-      object->insert(it.first.as<std::string>(), parseYamlNode(it.second));
-    }
-    return object;
-  }
-  case YAML::NodeType::Undefined:
-    throw EnvoyException("Undefined YAML value");
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-} // namespace
-
-ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
-  try {
-    return parseYamlNode(YAML::Load(yaml));
-  } catch (YAML::ParserException& e) {
-    throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
-    throw EnvoyException(e.what());
-  } catch (std::exception& e) {
-    // There is a potentially wide space of exceptions thrown by the YAML parser,
-    // and enumerating them all may be difficult. Envoy doesn't work well with
-    // unhandled exceptions, so we capture them and record the exception name in
-    // the Envoy Exception text.
-    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
-  }
-}
 
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   LineCountingStringStream json_stream(json.c_str());

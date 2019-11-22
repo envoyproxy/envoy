@@ -360,7 +360,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                      [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
       strict_header_validation_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
+      connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.connection_header_sanitization")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -531,6 +533,15 @@ int ConnectionImpl::onHeadersCompleteBase() {
     } else {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
+    }
+  } else if (connection_header_sanitization_ && current_header_map_->Connection()) {
+    // If we fail to sanitize the request, return a 400 to the client
+    if (!Utility::sanitizeConnectionHeader(*current_header_map_)) {
+      absl::string_view header_value = current_header_map_->Connection()->value().getStringView();
+      ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
+                     header_value);
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError();
     }
   }
 

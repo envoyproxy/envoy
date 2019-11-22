@@ -59,11 +59,11 @@ public:
                                 quic::QuicPacketWriter& writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Network::ListenerConfig& listener_config,
-                                Server::ListenerStats& stats)
+                                Server::ListenerStats& stats, Network::Socket& listen_socket)
       : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
                                   quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
                                   helper, alarm_factory, &writer, /*owns_writer=*/false,
-                                  supported_versions, listener_config, stats) {}
+                                  supported_versions, listener_config, stats, listen_socket) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return EnvoyQuicConnection::connectionStats();
@@ -97,9 +97,9 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(new TestEnvoyQuicServerConnection(connection_helper_, alarm_factory_,
-                                                           writer_, quic_version_, listener_config_,
-                                                           listener_stats_)),
+        quic_connection_(new TestEnvoyQuicServerConnection(
+            connection_helper_, alarm_factory_, writer_, quic_version_, listener_config_,
+            listener_stats_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
@@ -295,7 +295,8 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
 
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
-  quic::QuicConnectionCloseFrame frame(error, error_details);
+  quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version, error, error_details,
+                                       /* transport_close_frame_type = */ 0);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
   quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
@@ -365,7 +366,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
           /*reset_flag*/ false, /*packet_number=*/1, packet_content));
 
   quic::QuicSocketAddress self_address(
-      envoyAddressInstanceToQuicSocketAddress(listener_config_.socket().localAddress()));
+      envoyAddressInstanceToQuicSocketAddress(listener_config_.socket_->localAddress()));
   auto packet = std::unique_ptr<quic::QuicReceivedPacket>(
       quic::test::ConstructReceivedPacket(*encrypted_packet, connection_helper_.GetClock()->Now()));
 
@@ -378,7 +379,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(quic_connection_->peer_address()),
                   *socket.remoteAddress());
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(self_address), *socket.localAddress());
-        EXPECT_EQ(listener_config_.socket().ioHandle().fd(), socket.ioHandle().fd());
+        EXPECT_EQ(listener_config_.socket_->ioHandle().fd(), socket.ioHandle().fd());
         EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                   socket.detectedTransportProtocol());
         return &filter_chain;

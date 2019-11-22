@@ -1,33 +1,94 @@
+# https://github.com/protocolbuffers/protobuf/pull/6720
+diff --git a/third_party/BUILD b/third_party/BUILD
+new file mode 100644
+index 0000000000..b66101a39a
+--- /dev/null
++++ b/third_party/BUILD
+@@ -0,0 +1 @@
++exports_files(["six.BUILD", "zlib.BUILD"])
+
+# https://github.com/protocolbuffers/protobuf/pull/6896
 diff --git a/src/google/protobuf/stubs/strutil.cc b/src/google/protobuf/stubs/strutil.cc
-index 3844fa6b8b..5486887295 100644
+index 62b3f0a871..bb3df47ccf 100644
 --- a/src/google/protobuf/stubs/strutil.cc
 +++ b/src/google/protobuf/stubs/strutil.cc
-@@ -1065,10 +1065,12 @@ char* FastUInt32ToBufferLeft(uint32 u, char* buffer) {
+@@ -1435,32 +1435,44 @@ AlphaNum::AlphaNum(strings::Hex hex) {
+ // after the area just overwritten.  It comes in multiple flavors to minimize
+ // call overhead.
+ static char *Append1(char *out, const AlphaNum &x) {
+-  memcpy(out, x.data(), x.size());
+-  return out + x.size();
++  if (x.size() > 0) {
++    memcpy(out, x.data(), x.size());
++    out += x.size();
++  }
++  return out;
  }
  
- char* FastInt32ToBufferLeft(int32 i, char* buffer) {
--  uint32 u = i;
-+  uint32 u = 0;
-   if (i < 0) {
-     *buffer++ = '-';
--    u = -i;
-+    u -= i;
-+  } else {
-+    u = i;
-   }
-   return FastUInt32ToBufferLeft(u, buffer);
+ static char *Append2(char *out, const AlphaNum &x1, const AlphaNum &x2) {
+-  memcpy(out, x1.data(), x1.size());
+-  out += x1.size();
+-
+-  memcpy(out, x2.data(), x2.size());
+-  return out + x2.size();
++  if (x1.size() > 0) {
++    memcpy(out, x1.data(), x1.size());
++    out += x1.size();
++  }
++  if (x2.size() > 0) {
++    memcpy(out, x2.data(), x2.size());
++    out += x2.size();
++  }
++  return out;
  }
+ 
+-static char *Append4(char *out,
+-                     const AlphaNum &x1, const AlphaNum &x2,
++static char *Append4(char *out, const AlphaNum &x1, const AlphaNum &x2,
+                      const AlphaNum &x3, const AlphaNum &x4) {
+-  memcpy(out, x1.data(), x1.size());
+-  out += x1.size();
+-
+-  memcpy(out, x2.data(), x2.size());
+-  out += x2.size();
+-
+-  memcpy(out, x3.data(), x3.size());
+-  out += x3.size();
+-
+-  memcpy(out, x4.data(), x4.size());
+-  return out + x4.size();
++  if (x1.size() > 0) {
++    memcpy(out, x1.data(), x1.size());
++    out += x1.size();
++  }
++  if (x2.size() > 0) {
++    memcpy(out, x2.data(), x2.size());
++    out += x2.size();
++  }
++  if (x3.size() > 0) {
++    memcpy(out, x3.data(), x3.size());
++    out += x3.size();
++  }
++  if (x4.size() > 0) {
++    memcpy(out, x4.data(), x4.size());
++    out += x4.size();
++  }
++  return out;
+ }
+ 
+ string StrCat(const AlphaNum &a, const AlphaNum &b) {
 
+# patching for zlib binding
 diff --git a/BUILD b/BUILD
-index 6665de94..55f28582 100644
+index efc3d8e7f..746ad4851 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -19,7 +19,7 @@ config_setting(
+@@ -24,7 +24,7 @@ config_setting(
  # ZLIB configuration
  ################################################################################
- 
+
 -ZLIB_DEPS = ["@zlib//:zlib"]
 +ZLIB_DEPS = ["//external:zlib"]
- 
+
  ################################################################################
  # Protobuf Runtime Library
