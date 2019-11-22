@@ -89,12 +89,12 @@ which is why the incremental protocol variant was introduced. The incremental ap
 indicate only deltas relative to their previous state -- i.e., the client can say that it wants to add or remove its subscription
 to a particular resource name without resending those that have not changed, and the server can send updates only for those
 resources that have changed. The incremental protocol also provides a mechanism for lazy loading of resources. For details on the
-incremental protocol, see :ref:`Incremental xDS <xds_protocol_incremental>` below.
+incremental protocol, see :ref:`Incremental xDS <xds_protocol_incremental_xds>` below.
 
 The second dimension is using a separate gRPC stream for each resource type vs. aggregating all resource types onto a
 single gRPC stream. The former approach was the original mechanism used by xDS, and it offers an eventual consistency
 model. The latter approach was added for environments in which explicit control of sequencing is required. For details, see
-:ref:`Eventual consistency considerations <xds_protocol_eventual_consistency>` below.
+:ref:`Eventual consistency considerations <xds_protocol_eventual_consistency_considerations>` below.
 
 So, the four variants of the xDS transport protocol are:
 
