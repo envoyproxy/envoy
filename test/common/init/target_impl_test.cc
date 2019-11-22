@@ -8,14 +8,13 @@ namespace Envoy {
 namespace Init {
 namespace {
 
+// Testing common cases for all the target implementation.
+template <typename T> class TargetImplTest : public ::testing::Test {};
+TYPED_TEST_SUITE_P(TargetImplTest);
+
 template <typename T> std::string getName() { return ""; }
 template <> std::string getName<ExpectableTargetImpl>() { return "target test"; }
 template <> std::string getName<ExpectableSharedTargetImpl>() { return "shared target test"; }
-
-// Testing common cases for all the target implementation.
-template <typename T> class TargetImplTest : public ::testing::Test {};
-
-TYPED_TEST_SUITE_P(TargetImplTest);
 TYPED_TEST_P(TargetImplTest, Name) {
   TypeParam target;
   EXPECT_EQ(getName<TypeParam>(), target.name());
@@ -75,14 +74,14 @@ TYPED_TEST_P(TargetImplTest, ReadyWhenWatcherUnavailable) {
 REGISTER_TYPED_TEST_SUITE_P(TargetImplTest, Name, InitializeWhenAvailable,
                             InitializeWhenUnavailable, ReadyWhenWatcherUnavailable);
 using TargetImplTypes = ::testing::Types<ExpectableTargetImpl, ExpectableSharedTargetImpl>;
-INSTANTIATE_TYPED_TEST_SUITE_P(My, TargetImplTest, TargetImplTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(Init, TargetImplTest, TargetImplTypes);
 
 TYPED_TEST_SUITE(TargetImplTest, TargetImplTypes);
 
 // Below are the specialized tests for different implementations of Target
 
 // Initializing TargetHandle return false if initialized SharedTarget is destroyed.
-TEST(InitSharedTargetImplTest, ReInitializeWhenUnavailable) {
+TEST(SharedTargetImplTest, ReInitializeWhenUnavailable) {
   InSequence s;
   ExpectableWatcherImpl w;
   TargetHandlePtr handle;
@@ -103,7 +102,7 @@ TEST(InitSharedTargetImplTest, ReInitializeWhenUnavailable) {
 }
 
 // SharedTarget notifies multiple watchers.
-TEST(InitSharedTargetImplTest, NotifyAllWatcherWhenInitialization) {
+TEST(SharedTargetImplTest, NotifyAllWatcherWhenInitialization) {
   InSequence s;
   ExpectableWatcherImpl w1;
   ExpectableSharedTargetImpl target;
@@ -123,7 +122,7 @@ TEST(InitSharedTargetImplTest, NotifyAllWatcherWhenInitialization) {
 }
 
 // Initialized SharedTarget notifies further watcher immediately at second initialization attempt.
-TEST(InitSharedTargetImplTest, InitializedSharedTargetNotifyWatcherWhenAddedAgain) {
+TEST(SharedTargetImplTest, InitializedSharedTargetNotifyWatcherWhenAddedAgain) {
   InSequence s;
   ExpectableWatcherImpl w1;
   ExpectableSharedTargetImpl target;
@@ -144,7 +143,7 @@ TEST(InitSharedTargetImplTest, InitializedSharedTargetNotifyWatcherWhenAddedAgai
   EXPECT_TRUE(handle2->initialize(w2));
 }
 
-TEST(InitSharedTargetImplTest, EarlySharedTargetReadyNotifyWatchers) {
+TEST(SharedTargetImplTest, EarlySharedTargetReadyNotifyWatchers) {
   InSequence s;
 
   ExpectableSharedTargetImpl target;
