@@ -72,6 +72,8 @@ void UdpListenerImpl::handleReadCallback() {
       socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+    // TODO(mattklein123): When rate limited logging is implemented log this at error level
+    // on a periodic basis.
     ENVOY_UDP_LOG(debug, "recvmsg result {}: {}", static_cast<int>(result->getErrorCode()),
                   result->getErrorDetails());
     cb_.onReceiveError(result->getErrorCode());

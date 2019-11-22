@@ -111,6 +111,11 @@ private:
     UdpProxyFilter& parent_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     const Upstream::HostConstSharedPtr host_;
+    // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
+    // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,
+    // though it might not perform well for high volume traffic. Note that this is how TCP proxy
+    // idle timeouts work so we should consider unifying the implementation if we move to a time
+    // stamp and scan approach.
     const Event::TimerPtr idle_timer_;
     // The IO handle is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
