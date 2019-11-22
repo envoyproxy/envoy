@@ -24,7 +24,6 @@ fi
 # Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
-echo "=========== ${COVERAGE_TARGETS}\n============ ${BAZEL_BUILD_OPTIONS}"
 
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
