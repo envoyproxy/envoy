@@ -340,21 +340,14 @@ public:
   class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
   public:
     MOCK_CONST_METHOD0(createEnvironmentCredentialsProvider, CredentialsProviderSharedPtr());
-    MOCK_CONST_METHOD4(createTaskRoleCredentialsProviderMock,
+    MOCK_CONST_METHOD4(createTaskRoleCredentialsProvider,
                        CredentialsProviderSharedPtr(
                            Api::Api&, const MetadataCredentialsProviderBase::MetadataFetcher&,
-                           const std::string&, const std::string&));
+                           absl::string_view, absl::string_view));
     MOCK_CONST_METHOD2(createInstanceProfileCredentialsProvider,
                        CredentialsProviderSharedPtr(
                            Api::Api&,
                            const MetadataCredentialsProviderBase::MetadataFetcher& fetcher));
-
-    CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
-        Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
-        const std::string& credential_uri, const std::string& authorization_token) const override {
-      return createTaskRoleCredentialsProviderMock(api, metadata_fetcher, credential_uri,
-                                                   authorization_token);
-    }
   };
 
   Event::SimulatedTimeSystem time_system_;
@@ -381,22 +374,22 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
-  EXPECT_CALL(factories_, createTaskRoleCredentialsProviderMock(
-                              Ref(*api_), _, "169.254.170.2:80/path/to/creds", ""));
+  EXPECT_CALL(factories_, createTaskRoleCredentialsProvider(Ref(*api_), _,
+                                                            "169.254.170.2:80/path/to/creds", ""));
   DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
-  EXPECT_CALL(factories_, createTaskRoleCredentialsProviderMock(Ref(*api_), _,
-                                                                "http://host/path/to/creds", ""));
+  EXPECT_CALL(factories_,
+              createTaskRoleCredentialsProvider(Ref(*api_), _, "http://host/path/to/creds", ""));
   DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
-  EXPECT_CALL(factories_, createTaskRoleCredentialsProviderMock(
+  EXPECT_CALL(factories_, createTaskRoleCredentialsProvider(
                               Ref(*api_), _, "http://host/path/to/creds", "auth_token"));
   DefaultCredentialsProviderChain chain(*api_, DummyMetadataFetcher(), factories_);
 }
