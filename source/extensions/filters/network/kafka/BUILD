@@ -12,10 +12,12 @@ load(
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "kafka_broker_config_lib",
     srcs = ["broker/config.cc"],
     hdrs = ["broker/config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "wip",
     deps = [
         ":kafka_broker_filter_lib",
         "//source/extensions/filters/network:well_known_names",
@@ -54,14 +56,12 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "kafka_request_codec_lib",
     srcs = ["request_codec.cc"],
     hdrs = [
         "request_codec.h",
     ],
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "wip",
     deps = [
         ":abstract_codec_lib",
         ":kafka_request_parser_lib",
