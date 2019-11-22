@@ -792,8 +792,8 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
       const auto port_str = Network::Utility::portFromIpAddress(authority);
       uint64_t port64 = 0;
 
-      // This section should be false if authority is like example.com:abc, we can't regard as abc as
-      // port so that must regard example.com:abc as host and return them
+      // This section should be false if authority is like example.com:abc, we can't regard as abc
+      // as port so that must regard example.com:abc as host and return them
       if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
         auth_attr.host = authority.data();
         auth_attr.port = default_port;
