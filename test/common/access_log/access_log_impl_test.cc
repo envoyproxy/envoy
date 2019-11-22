@@ -1307,10 +1307,11 @@ public:
                          Runtime::Loader&, Runtime::RandomGenerator&) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(*factory_config);
+
+    ProtobufWkt::Struct struct_config =
+        *dynamic_cast<const ProtobufWkt::Struct*>(factory_config.get());
     return std::make_unique<SampleExtensionFilter>(
-        static_cast<uint32_t>(filter_config->getInteger("rate")));
+        static_cast<uint32_t>(struct_config.fields().at("rate").number_value()));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

@@ -617,12 +617,12 @@ public:
                          Buffer::Instance& response, absl::string_view method,
                          absl::string_view body = absl::string_view()) {
     if (!body.empty()) {
-      request_headers_.insertContentType().value(
+      request_headers_.setReferenceContentType(
           Http::Headers::get().ContentTypeValues.FormUrlEncoded);
       callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
     }
 
-    request_headers_.insertMethod().value(method.data(), method.size());
+    request_headers_.setMethod(method);
     admin_filter_.decodeHeaders(request_headers_, false);
 
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
@@ -725,7 +725,7 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                                    server_);
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
-  request_headers_.insertMethod().value(post.data(), post.size());
+  request_headers_.setMethod(post);
   admin_filter_.decodeHeaders(request_headers_, false);
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
                            admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
