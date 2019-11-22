@@ -89,7 +89,7 @@ which is why the incremental protocol variant was introduced. The incremental ap
 indicate only deltas relative to their previous state -- i.e., the client can say that it wants to add or remove its subscription
 to a particular resource name without resending those that have not changed, and the server can send updates only for those
 resources that have changed. The incremental protocol also provides a mechanism for lazy loading of resources. For details on the
-incremental protocol, see :ref:`Incremental xDS <xds_protocol_incremental_xds>` below.
+incremental protocol, see :ref:`Incremental xDS <xds_protocol_delta>` below.
 
 The second dimension is using a separate gRPC stream for each resource type vs. aggregating all resource types onto a
 single gRPC stream. The former approach was the original mechanism used by xDS, and it offers an eventual consistency
@@ -274,6 +274,8 @@ Within a stream, new :ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>` s
 the management server only needs to respond to the latest
 :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` on each stream for any given resource type.
 
+.. _xds_protocol_resource_hints:
+
 How the client specifies what resources to return
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -368,9 +370,9 @@ being unsubscribed to. For example, if the client had previously been subscribed
 unsubscribe from B, it must send a new request containing only resource A.
 
 Note that for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types where the
-stream is in "wildcard" mode (see :ref:`How the client specifies what resources to return
-<xds_protocol_How_the_client_specifies_what_resources_to_return>` for details), the set of resources being subscribed to is
-determined by the server instead of the client, so there is no mechanism for the client to unsubscribe from resources.
+stream is in "wildcard" mode (see :ref:`How the client specifies what resources to return <xds_protocol_resource_hints>` for
+details), the set of resources being subscribed to is determined by the server instead of the client, so there is no mechanism
+for the client to unsubscribe from resources.
 
 Requesting Multiple Resources on a Single Stream
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
