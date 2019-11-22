@@ -25,13 +25,12 @@ namespace Http {
 #define DEFINE_INLINE_HEADER_FUNCS(name)                                                           \
 public:                                                                                            \
   const HeaderEntry* name() const override { return inline_headers_.name##_; }                     \
-  HeaderEntry* name() override {                                                                   \
-    cached_byte_size_.reset();                                                                     \
-    return inline_headers_.name##_;                                                                \
-  }                                                                                                \
-  HeaderEntry& insert##name() override {                                                           \
-    cached_byte_size_.reset();                                                                     \
+  const HeaderEntry& insert##name() override {                                                     \
     return maybeCreateInline(&inline_headers_.name##_, Headers::get().name);                       \
+  }                                                                                                \
+  void append##name(absl::string_view data, absl::string_view delimiter) override {                \
+    HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
+    addSize(HeaderMapImpl::appendToHeader(entry.value(), data, delimiter));                        \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
@@ -62,14 +61,6 @@ public:                                                                         
  */
 class HeaderMapImpl : public HeaderMap, NonCopyable {
 public:
-  /**
-   * Appends data to header. If header already has a value, the string ',' is added between the
-   * existing value and data.
-   * @param header the header to append to.
-   * @param data to append to the header.
-   */
-  static uint64_t appendToHeader(HeaderString& header, absl::string_view data);
-
   HeaderMapImpl();
   explicit HeaderMapImpl(
       const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
@@ -94,13 +85,14 @@ public:
   void addReferenceKey(const LowerCaseString& key, const std::string& value) override;
   void addCopy(const LowerCaseString& key, uint64_t value) override;
   void addCopy(const LowerCaseString& key, const std::string& value) override;
+  void appendToHeader(const LowerCaseString& key, const std::string& value) override;
   void setReference(const LowerCaseString& key, const std::string& value) override;
   void setReferenceKey(const LowerCaseString& key, const std::string& value) override;
+  void setCopy(const LowerCaseString& key, const std::string& value) override;
   absl::optional<uint64_t> byteSize() const override;
   uint64_t refreshByteSize() override;
   uint64_t byteSizeInternal() const override;
   const HeaderEntry* get(const LowerCaseString& key) const override;
-  HeaderEntry* get(const LowerCaseString& key) override;
   void iterate(ConstIterateCb cb, void* context) const override;
   void iterateReverse(ConstIterateCb cb, void* context) const override;
   Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
@@ -216,6 +208,8 @@ protected:
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);
+  static uint64_t appendToHeader(HeaderString& header, absl::string_view data,
+                                 absl::string_view delimiter = ",");
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);

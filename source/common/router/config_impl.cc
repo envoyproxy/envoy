@@ -424,13 +424,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 
   if (!host_rewrite_.empty()) {
-    headers.Host()->value(host_rewrite_);
+    headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
-    Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
+    const Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
     if (header != nullptr) {
       absl::string_view header_value = header->value().getStringView();
       if (!header_value.empty()) {
-        headers.Host()->value(header_value);
+        headers.setHost(header_value);
       }
     }
   }

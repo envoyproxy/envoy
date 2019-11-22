@@ -524,7 +524,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
         if (new_value.empty()) {
           current_header_map_->removeConnection();
         } else {
-          current_header_map_->Connection()->value(new_value);
+          current_header_map_->setConnection(new_value);
         }
       }
       current_header_map_->remove(Headers::get().Http2Settings);

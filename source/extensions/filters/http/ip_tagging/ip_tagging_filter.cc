@@ -78,7 +78,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& header
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");
-    Http::HeaderMapImpl::appendToHeader(headers.insertEnvoyIpTags().value(), tags_join);
+    headers.appendEnvoyIpTags(tags_join);
 
     // We must clear the route cache or else we can't match on x-envoy-ip-tags.
     // TODO(rgs): this should either be configurable, because it's expensive, or optimized.

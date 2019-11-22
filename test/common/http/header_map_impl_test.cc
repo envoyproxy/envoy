@@ -362,20 +362,6 @@ TEST(HeaderStringTest, All) {
   }
 }
 
-TEST(HeaderMapImplTest, InlineInsert) {
-  HeaderMapImpl headers;
-  EXPECT_TRUE(headers.empty());
-  EXPECT_EQ(0, headers.size());
-  EXPECT_EQ(headers.byteSize().value(), 0);
-  EXPECT_EQ(nullptr, headers.Host());
-  headers.insertHost().value(std::string("hello"));
-  EXPECT_FALSE(headers.empty());
-  EXPECT_EQ(1, headers.size());
-  EXPECT_EQ(":authority", headers.Host()->key().getStringView());
-  EXPECT_EQ("hello", headers.Host()->value().getStringView());
-  EXPECT_EQ("hello", headers.get(Headers::get().Host)->value().getStringView());
-}
-
 // Utility function for testing byteSize() against a manual byte count.
 uint64_t countBytesForTest(const HeaderMapImpl& headers) {
   uint64_t byte_size = 0;
@@ -387,6 +373,78 @@ uint64_t countBytesForTest(const HeaderMapImpl& headers) {
       },
       &byte_size);
   return byte_size;
+}
+
+TEST(HeaderMapImplTest, InlineInsert) {
+  HeaderMapImpl headers;
+  EXPECT_TRUE(headers.empty());
+  EXPECT_EQ(0, headers.size());
+  EXPECT_EQ(headers.byteSize().value(), 0);
+  EXPECT_EQ(nullptr, headers.Host());
+  headers.setHost("hello");
+  EXPECT_FALSE(headers.empty());
+  EXPECT_EQ(1, headers.size());
+  EXPECT_EQ(":authority", headers.Host()->key().getStringView());
+  EXPECT_EQ("hello", headers.Host()->value().getStringView());
+  EXPECT_EQ("hello", headers.get(Headers::get().Host)->value().getStringView());
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
+}
+
+TEST(HeaderMapImplTest, InlineAppend) {
+  {
+    HeaderMapImpl headers;
+    // Create via header and append.
+    headers.insertVia();
+    EXPECT_EQ(headers.byteSize().value(), Headers::get().Via.get().size());
+    headers.appendVia("1.0 fred", ",");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
+    EXPECT_EQ(headers.byteSize().value(), 11);
+    headers.appendVia("1.1 nowhere.com", ",");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 nowhere.com");
+    EXPECT_EQ(headers.byteSize().value(), 27);
+  }
+  {
+    // Append to via header without explicitly creating first.
+    HeaderMapImpl headers;
+    headers.appendVia("1.0 fred", ",");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
+    EXPECT_EQ(headers.byteSize().value(), 11);
+    headers.appendVia("1.1 nowhere.com", ",");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 nowhere.com");
+    EXPECT_EQ(headers.byteSize().value(), 27);
+  }
+  {
+    // Custom delimeter.
+    HeaderMapImpl headers;
+    headers.insertVia();
+    EXPECT_EQ(headers.byteSize().value(), Headers::get().Via.get().size());
+    headers.appendVia("1.0 fred", ", ");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
+    EXPECT_EQ(headers.byteSize().value(), 11);
+    headers.appendVia("1.1 nowhere.com", ", ");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred, 1.1 nowhere.com");
+    EXPECT_EQ(headers.byteSize().value(), 28);
+  }
+  {
+    // Append and then later set.
+    HeaderMapImpl headers;
+    headers.appendVia("1.0 fred", ",");
+    headers.appendVia("1.1 nowhere.com", ",");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 nowhere.com");
+    headers.setVia("2.0 override");
+    EXPECT_EQ(headers.Via()->value().getStringView(), "2.0 override");
+  }
+  {
+    // Set and then append. This mimics how GrpcTimeout is set.
+    HeaderMapImpl headers;
+    uint64_t grpcTimeoutSize = Headers::get().GrpcTimeout.get().size();
+    headers.setGrpcTimeout(42);
+    EXPECT_EQ(headers.GrpcTimeout()->value().getStringView(), "42");
+    EXPECT_EQ(headers.byteSize().value(), grpcTimeoutSize + 2);
+    headers.appendGrpcTimeout("s", "");
+    EXPECT_EQ(headers.GrpcTimeout()->value().getStringView(), "42s");
+    EXPECT_EQ(headers.byteSize().value(), grpcTimeoutSize + 3);
+  }
 }
 
 TEST(HeaderMapImplTest, MoveIntoInline) {
@@ -406,7 +464,7 @@ TEST(HeaderMapImplTest, MoveIntoInline) {
   headers.addViaMove(std::move(key2), std::move(value2));
   EXPECT_EQ("cache-control", headers.CacheControl()->key().getStringView());
   EXPECT_EQ("hello,there", headers.CacheControl()->value().getStringView());
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
 }
 
 TEST(HeaderMapImplTest, Remove) {
@@ -425,11 +483,11 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(nullptr, headers.get(static_key));
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
-  EXPECT_EQ(headers.refreshByteSize(), 0);
+  EXPECT_EQ(headers.byteSize().value(), 0);
 
   // Add and remove by inline.
-  headers.insertContentLength().value(5);
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  headers.setContentLength(5);
+  // EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
@@ -437,19 +495,19 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(nullptr, headers.ContentLength());
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  // EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
 
   // Add inline and remove by name.
-  headers.insertContentLength().value(5);
+  headers.setContentLength(5);
   EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   headers.remove(Headers::get().ContentLength);
   EXPECT_EQ(nullptr, headers.ContentLength());
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
-  EXPECT_EQ(headers.refreshByteSize(), 0);
+  EXPECT_EQ(headers.byteSize().value(), 0);
 }
 
 TEST(HeaderMapImplTest, RemoveRegex) {
@@ -479,21 +537,20 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(nullptr, headers.get(key5));
 
   // Remove all headers.
-  headers.refreshByteSize();
   headers.removePrefix(LowerCaseString(""));
   EXPECT_EQ(headers.byteSize().value(), 0);
   EXPECT_EQ(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key4));
 
   // Add inline and remove by regex
-  headers.insertContentLength().value(5);
+  headers.setContentLength(5);
   EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   headers.removePrefix(LowerCaseString("content"));
   EXPECT_EQ(nullptr, headers.ContentLength());
-  EXPECT_EQ(headers.refreshByteSize(), 0);
+  EXPECT_EQ(headers.byteSize().value(), 0);
 }
 
 TEST(HeaderMapImplTest, SetRemovesAllValues) {
@@ -634,12 +691,57 @@ TEST(HeaderMapImplTest, SetReferenceKey) {
   EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   EXPECT_NE("world", headers.get(foo)->value().getStringView().data());
   EXPECT_EQ("world", headers.get(foo)->value().getStringView());
-  headers.refreshByteSize();
 
   headers.setReferenceKey(foo, "monde");
   EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   EXPECT_NE("monde", headers.get(foo)->value().getStringView().data());
   EXPECT_EQ("monde", headers.get(foo)->value().getStringView());
+}
+
+TEST(HeaderMapImplTest, SetCopy) {
+  HeaderMapImpl headers;
+  LowerCaseString foo("hello");
+  headers.setCopy(foo, "world");
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
+  EXPECT_EQ("world", headers.get(foo)->value().getStringView());
+
+  // Overwrite value.
+  headers.setCopy(foo, "monde");
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
+  EXPECT_EQ("monde", headers.get(foo)->value().getStringView());
+
+  // Add another foo header.
+  headers.addCopy(foo, "monde2");
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
+  EXPECT_EQ(headers.size(), 2);
+
+  // Make sure all foo headers are overridden.
+  headers.setCopy(foo, "override-monde");
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
+  EXPECT_EQ(headers.size(), 2);
+
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
+  MockCb cb;
+
+  InSequence seq;
+  EXPECT_CALL(cb, Call("hello", "override-monde"));
+  EXPECT_CALL(cb, Call("hello", "override-monde"));
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+        static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
+                                         std::string(header.value().getStringView()));
+        return HeaderMap::Iterate::Continue;
+      },
+      &cb);
+
+  // Test setting an empty string and then overriding.
+  headers.remove(foo);
+  EXPECT_EQ(headers.size(), 0);
+  const std::string empty;
+  headers.setCopy(foo, empty);
+  EXPECT_EQ(headers.size(), 1);
+  headers.setCopy(foo, "not-empty");
+  EXPECT_EQ(headers.get(foo)->value().getStringView(), "not-empty");
 }
 
 TEST(HeaderMapImplTest, AddCopy) {
@@ -669,7 +771,6 @@ TEST(HeaderMapImplTest, AddCopy) {
   // addReferenceKey and addCopy can both add multiple instances of a
   // given header, so we need to delete the old "hello" header.
   // Test that removing will return 0 byte size.
-  headers.refreshByteSize();
   headers.remove(LowerCaseString("hello"));
   EXPECT_EQ(headers.byteSize().value(), 0);
 
@@ -678,7 +779,6 @@ TEST(HeaderMapImplTest, AddCopy) {
   lcKeyPtr = std::make_unique<LowerCaseString>(std::string("he") + "llo");
   EXPECT_STREQ("hello", lcKeyPtr->get().c_str());
 
-  headers.refreshByteSize();
   headers.addCopy(*lcKeyPtr, 42);
   EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
 
@@ -706,20 +806,20 @@ TEST(HeaderMapImplTest, AddCopy) {
   headers.addCopy(cache_control, "max-age=1345");
   EXPECT_EQ("max-age=1345", headers.get(cache_control)->value().getStringView());
   EXPECT_EQ("max-age=1345", headers.CacheControl()->value().getStringView());
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   headers.addCopy(cache_control, "public");
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   EXPECT_EQ("max-age=1345,public", headers.get(cache_control)->value().getStringView());
   headers.addCopy(cache_control, "");
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   EXPECT_EQ("max-age=1345,public", headers.get(cache_control)->value().getStringView());
   headers.addCopy(cache_control, 123);
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
   EXPECT_EQ("max-age=1345,public,123", headers.get(cache_control)->value().getStringView());
   headers.addCopy(cache_control, std::numeric_limits<uint64_t>::max());
   EXPECT_EQ("max-age=1345,public,123,18446744073709551615",
             headers.get(cache_control)->value().getStringView());
-  EXPECT_EQ(headers.refreshByteSize(), countBytesForTest(headers));
+  EXPECT_EQ(headers.byteSize().value(), countBytesForTest(headers));
 }
 
 TEST(HeaderMapImplTest, Equality) {
@@ -797,7 +897,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
 TEST(HeaderMapImplTest, Lookup) {
   TestHeaderMapImpl headers;
   headers.addCopy("hello", "world");
-  headers.insertContentLength().value(5);
+  headers.setContentLength(5);
 
   // Lookup is not supported for non predefined inline headers.
   {
@@ -831,9 +931,10 @@ TEST(HeaderMapImplTest, Get) {
 
   {
     TestHeaderMapImpl headers{{":path", "/"}, {"hello", "world"}};
-    headers.get(LowerCaseString(":path"))->value(std::string("/new_path"));
+    // There is not HeaderMap method to set a header and copy both the key and value.
+    headers.setReferenceKey(LowerCaseString(":path"), "/new_path");
     EXPECT_EQ("/new_path", headers.get(LowerCaseString(":path"))->value().getStringView());
-    headers.get(LowerCaseString("hello"))->value(std::string("world2"));
+    headers.setReferenceKey(LowerCaseString("hello"), "world2");
     EXPECT_EQ("world2", headers.get(LowerCaseString("hello"))->value().getStringView());
     EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
   }
@@ -842,35 +943,40 @@ TEST(HeaderMapImplTest, Get) {
 TEST(HeaderMapImplTest, TestAppendHeader) {
   // Test appending to a string with a value.
   {
-    HeaderString value1;
-    value1.setCopy("some;", 5);
-    HeaderMapImpl::appendToHeader(value1, "test");
-    EXPECT_EQ(value1, "some;,test");
+    TestHeaderMapImpl headers;
+    LowerCaseString foo("key1");
+    headers.addCopy(foo, "some;");
+    headers.appendToHeader(foo, "test");
+    EXPECT_EQ(headers.get(foo)->value().getStringView(), "some;,test");
   }
 
   // Test appending to an empty string.
   {
-    HeaderString value2;
-    HeaderMapImpl::appendToHeader(value2, "my tag data");
-    EXPECT_EQ(value2, "my tag data");
+    TestHeaderMapImpl headers;
+    LowerCaseString key2("key2");
+    headers.appendToHeader(key2, "my tag data");
+    EXPECT_EQ(headers.get(key2)->value().getStringView(), "my tag data");
   }
 
   // Test empty data case.
   {
-    HeaderString value3;
-    value3.setCopy("empty", 5);
-    HeaderMapImpl::appendToHeader(value3, "");
-    EXPECT_EQ(value3, "empty");
+    TestHeaderMapImpl headers;
+    LowerCaseString key3("key3");
+    headers.addCopy(key3, "empty");
+    headers.appendToHeader(key3, "");
+    EXPECT_EQ(headers.get(key3)->value().getStringView(), "empty");
   }
   // Regression test for appending to an empty string with a short string, then
   // setting integer.
   {
+    TestHeaderMapImpl headers;
     const std::string empty;
-    HeaderString value4(empty);
-    HeaderMapImpl::appendToHeader(value4, " ");
-    value4.setInteger(0);
-    EXPECT_EQ("0", value4.getStringView());
-    EXPECT_EQ(1U, value4.size());
+    headers.setPath(empty);
+    // Append with default delimeter.
+    headers.appendPath(" ", ",");
+    headers.setPath(0);
+    EXPECT_EQ("0", headers.Path()->value().getStringView());
+    EXPECT_EQ(1U, headers.Path()->value().size());
   }
 }
 
@@ -894,7 +1000,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
   {
     LowerCaseString foo("hello");
     Http::TestHeaderMapImpl headers{};
-    EXPECT_EQ(headers.refreshByteSize(), 0);
+    EXPECT_EQ(headers.byteSize().value(), 0);
     EXPECT_EQ(0UL, headers.size());
     EXPECT_TRUE(headers.empty());
 
@@ -1130,7 +1236,7 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
     EXPECT_EQ(headers.byteSize().value(), foo.size() + hostKeySize);
   }
   {
-    // Overwrite an inline headers.
+    // Overwrite an inline headers with set.
     HeaderMapImpl headers;
     std::string foo = "foo";
     EXPECT_EQ(headers.byteSize().value(), 0);
@@ -1141,7 +1247,7 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
     EXPECT_EQ(headers.byteSize().value(), big_foo.size() + hostKeySize);
   }
   {
-    // Overwrite an inline headers with reference value and clear.
+    // Overwrite an inline headers with setReference and clear.
     HeaderMapImpl headers;
     std::string foo = "foo";
     EXPECT_EQ(headers.byteSize().value(), 0);
@@ -1154,12 +1260,27 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
     EXPECT_EQ(headers.byteSize().value(), 0);
   }
   {
-    // Overwrite an inline headers with integer value.
+    // Overwrite an inline headers with set integer value.
     HeaderMapImpl headers;
     uint64_t status = 200;
     EXPECT_EQ(headers.byteSize().value(), 0);
     headers.setStatus(status);
     EXPECT_EQ(headers.byteSize().value(), 3 + statusKeySize);
+    uint64_t newStatus = 500;
+    headers.setStatus(newStatus);
+    EXPECT_EQ(headers.byteSize().value(), 3 + statusKeySize);
+    headers.removeStatus();
+    EXPECT_EQ(headers.byteSize().value(), 0);
+  }
+  {
+    // Set an inline header, remove, and rewrite.
+    HeaderMapImpl headers;
+    uint64_t status = 200;
+    EXPECT_EQ(headers.byteSize().value(), 0);
+    headers.setStatus(status);
+    EXPECT_EQ(headers.byteSize().value(), 3 + statusKeySize);
+    headers.removeStatus();
+    EXPECT_EQ(headers.byteSize().value(), 0);
     uint64_t newStatus = 500;
     headers.setStatus(newStatus);
     EXPECT_EQ(headers.byteSize().value(), 3 + statusKeySize);

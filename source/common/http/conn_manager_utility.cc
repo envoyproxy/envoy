@@ -283,7 +283,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 
-  request_headers.RequestId()->value(x_request_id);
+  request_headers.setRequestId(x_request_id);
 }
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_headers,
@@ -364,8 +364,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
-    HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
-                                  client_cert_details_str);
+    request_headers.appendForwardedClientCert(client_cert_details_str);
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.setForwardedClientCert(client_cert_details_str);
   } else {
@@ -411,11 +410,11 @@ bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
   ASSERT(request_headers.Path());
   bool is_valid_path = true;
   if (config.shouldNormalizePath()) {
-    is_valid_path = PathUtil::canonicalPath(*request_headers.Path());
+    is_valid_path = PathUtil::canonicalPath(request_headers);
   }
   // Merge slashes after path normalization to catch potential edge cases with percent encoding.
   if (is_valid_path && config.shouldMergeSlashes()) {
-    PathUtil::mergeSlashes(*request_headers.Path());
+    PathUtil::mergeSlashes(request_headers);
   }
   return is_valid_path;
 }

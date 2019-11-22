@@ -295,14 +295,15 @@ struct HeaderMapImpl::StaticLookupTable : public TrieLookupTable<EntryCb> {
   }
 };
 
-uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data) {
+uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
+                                       absl::string_view delimiter) {
   if (data.empty()) {
     return 0;
   }
   uint64_t byte_size = 0;
   if (!header.empty()) {
-    header.append(",", 1);
-    byte_size += 1;
+    header.append(delimiter.data(), delimiter.size());
+    byte_size += delimiter.size();
   }
   header.append(data.data(), data.size());
   return data.size() + byte_size;
@@ -467,6 +468,21 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
+void HeaderMapImpl::appendToHeader(const LowerCaseString& key, const std::string& value) {
+  bool found = false;
+  for (HeaderEntryImpl& header : headers_) {
+    if (header.key().getStringView() == key.get()) {
+      const uint64_t added_size = appendToHeader(header.value(), value);
+      addSize(added_size);
+      found = true;
+    }
+  }
+
+  if (!found) {
+    addCopy(key, value);
+  }
+}
+
 void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& value) {
   HeaderString ref_key(key);
   HeaderString ref_value(value);
@@ -481,6 +497,22 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::strin
   remove(key);
   insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+}
+
+void HeaderMapImpl::setCopy(const LowerCaseString& key, const std::string& value) {
+  // Replaces a header if it exists, otherwise adds by copy.
+  bool found = false;
+  for (HeaderEntryImpl& header : headers_) {
+    if (header.key().getStringView() == key.get()) {
+      updateSize(header.value().size(), value.size());
+      header.value(value.data(), value.size());
+      found = true;
+    }
+  }
+
+  if (!found) {
+    addCopy(key, value);
+  }
 }
 
 absl::optional<uint64_t> HeaderMapImpl::byteSize() const { return cached_byte_size_; }
@@ -507,17 +539,6 @@ uint64_t HeaderMapImpl::byteSizeInternal() const {
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
   for (const HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
-      return &header;
-    }
-  }
-
-  return nullptr;
-}
-
-HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) {
-  for (HeaderEntryImpl& header : headers_) {
-    if (header.key() == key.get().c_str()) {
-      cached_byte_size_.reset();
       return &header;
     }
   }

@@ -74,7 +74,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();
     if (!host_rewrite.empty()) {
-      headers.Host()->value(host_rewrite);
+      headers.setHost(host_rewrite);
     }
 
     const auto& host_rewrite_header = config->hostRewriteHeader();
@@ -82,7 +82,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
       const auto* header = headers.get(host_rewrite_header);
       if (header != nullptr) {
         const auto& header_value = header->value().getStringView();
-        headers.Host()->value(header_value);
+        headers.setHost(header_value);
       }
     }
   }

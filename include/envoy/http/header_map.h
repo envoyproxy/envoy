@@ -127,7 +127,7 @@ public:
   /**
    * @return the modifiable backing buffer (either inline or heap allocated).
    */
-  char* buffer() { return buffer_.dynamic_; }
+  char* buffer() const { return buffer_.dynamic_; }
 
   /**
    * Get an absl::string_view. It will NOT be NUL terminated!
@@ -352,8 +352,8 @@ private:
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
-  virtual HeaderEntry* name() PURE;                                                                \
-  virtual HeaderEntry& insert##name() PURE;                                                        \
+  virtual const HeaderEntry& insert##name() PURE;                                                  \
+  virtual void append##name(absl::string_view data, absl::string_view delimiter = ",") PURE;       \
   virtual void setReference##name(absl::string_view value) PURE;                                   \
   virtual void set##name(absl::string_view value) PURE;                                            \
   virtual void set##name(uint64_t value) PURE;                                                     \
@@ -437,6 +437,15 @@ public:
   virtual void addCopy(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
+   * Appends data to header. If header already has a value, the string ',' is added between the
+   * existing value and data.
+   * @param key specifies the name of the header to append.
+   * @param value specifies the value of the header to add. If the string is a reference string the
+   * reference data is not copied. This uses the underlying HeaderString::append method.
+   */
+  virtual void appendToHeader(const LowerCaseString& key, const std::string& value) PURE;
+
+  /**
    * Set a reference header in the map. Both key and value MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). Nothing will be copied.
@@ -462,6 +471,17 @@ public:
    * @param value specifies the value of the header to set; it WILL be copied.
    */
   virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
+
+  /**
+   * Replaces a header value by copying the value. Copies the key if the key does not exist.
+   *
+   * Calling setCopy multiple times for the same header will result in only the last header
+   * being present in the HeaderMap.
+   *
+   * @param key specifies the name of the header to set; it WILL be copied.
+   * @param value specifies the value of the header to set; it WILL be copied.
+   */
+  virtual void setCopy(const LowerCaseString& key, const std::string& value) PURE;
 
   /**
    * HeaderMap contains an internal byte size count, updated as entries are added, removed, or
@@ -506,7 +526,6 @@ public:
    * @return the header entry if it exists otherwise nullptr.
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
-  virtual HeaderEntry* get(const LowerCaseString& key) PURE;
 
   // aliases to make iterate() and iterateReverse() callbacks easier to read
   enum class Iterate { Continue, Break };

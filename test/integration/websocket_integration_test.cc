@@ -100,7 +100,7 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
       original_headers.Connection()->value() == "keep-alive, upgrade") {
     // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
     // header when converting from HTTP/1.1 to H2
-    proxied_headers.Connection()->value().setCopy("keep-alive, upgrade", 19);
+    proxied_headers.setConnection("keep-alive, upgrade");
   }
 }
 
