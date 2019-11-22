@@ -164,6 +164,7 @@ public:
   MockListenerFilter();
   ~MockListenerFilter() override;
 
+  MOCK_METHOD0(destroy_, void());
   MOCK_METHOD1(onAccept, Network::FilterStatus(ListenerFilterCallbacks&));
 };
 
@@ -206,7 +207,7 @@ public:
                     const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
   MOCK_METHOD2(createUdpListenerFilterChain,
-               bool(UdpListenerFilterManager& listener, UdpReadFilterCallbacks& callbacks));
+               void(UdpListenerFilterManager& listener, UdpReadFilterCallbacks& callbacks));
 };
 
 class MockListenSocket : public Socket {
@@ -223,6 +224,7 @@ public:
   MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
+  MOCK_CONST_METHOD0(isOpen, bool());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
@@ -230,6 +232,7 @@ public:
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
+  bool socket_is_open_ = true;
 };
 
 class MockSocketOption : public Socket::Option {
@@ -272,10 +275,12 @@ public:
   MOCK_CONST_METHOD0(ioHandle, const IoHandle&());
   MOCK_CONST_METHOD0(socketType, Address::SocketType());
   MOCK_METHOD0(close, void());
+  MOCK_CONST_METHOD0(isOpen, bool());
 
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
+  bool is_closed_;
 };
 
 class MockListenerFilterCallbacks : public ListenerFilterCallbacks {
@@ -290,6 +295,16 @@ public:
   NiceMock<MockConnectionSocket> socket_;
 };
 
+class MockListenSocketFactory : public ListenSocketFactory {
+public:
+  MockListenSocketFactory() = default;
+
+  MOCK_CONST_METHOD0(socketType, Network::Address::SocketType());
+  MOCK_CONST_METHOD0(localAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD0(getListenSocket, Network::SocketSharedPtr());
+  MOCK_CONST_METHOD0(sharedSocket, absl::optional<std::reference_wrapper<Socket>>());
+};
+
 class MockListenerConfig : public ListenerConfig {
 public:
   MockListenerConfig();
@@ -297,8 +312,7 @@ public:
 
   MOCK_METHOD0(filterChainManager, FilterChainManager&());
   MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
-  MOCK_METHOD0(socket, Socket&());
-  MOCK_CONST_METHOD0(socket, const Socket&());
+  MOCK_METHOD0(listenSocketFactory, ListenSocketFactory&());
   MOCK_METHOD0(bindToPort, bool());
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
@@ -310,8 +324,13 @@ public:
   MOCK_METHOD0(udpListenerFactory, const Network::ActiveUdpListenerFactory*());
   MOCK_METHOD0(connectionBalancer, ConnectionBalancer&());
 
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
-  testing::NiceMock<MockListenSocket> socket_;
+  MockListenSocketFactory socket_factory_;
+  SocketSharedPtr socket_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
 };

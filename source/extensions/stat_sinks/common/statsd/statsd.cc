@@ -5,15 +5,19 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/stats/symbol_table_impl.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -67,7 +71,12 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
-  // For statsd histograms are all timers.
+  // For statsd histograms are all timers in milliseconds, Envoy histograms are however
+  // not necessarily timers in milliseconds, for Envoy histograms suffixed with their corresponding
+  // SI unit symbol this is acceptable, but for histograms without a suffix, especially those which
+  // are timers but record in units other than milliseconds, it may make sense to scale the value to
+  // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
+  // backwards compatibility).
   const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, getName(histogram),
                                         std::chrono::milliseconds(value).count(),
                                         buildTagStr(histogram.tags())));
@@ -92,7 +101,7 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   for (const Stats::Tag& tag : tags) {
     tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
   }
-  return "|#" + StringUtil::join(tag_strings, ",");
+  return "|#" + absl::StrJoin(tag_strings, ",");
 }
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
@@ -206,6 +215,7 @@ void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
                                                 std::chrono::milliseconds ms) {
   // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
   // also currently not possible that this interleaves with any counter/gauge flushing.
+  // See the comment at UdpStatsdSink::onHistogramComplete with respect to unit suffixes.
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
       fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));

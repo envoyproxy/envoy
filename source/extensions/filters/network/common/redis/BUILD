@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
-    deps = ["//include/envoy/buffer:buffer_interface"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -60,7 +63,7 @@ envoy_cc_library(
         ":codec_lib",
         ":utility_lib",
         "//include/envoy/router:router_interface",
-        "//include/envoy/stats:timespan",
+        "//include/envoy/stats:timespan_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
@@ -79,6 +82,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":codec_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -90,9 +94,10 @@ envoy_cc_library(
         ":codec_interface",
         ":supported_commands_lib",
         "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:timespan",
+        "//include/envoy/stats:timespan_interface",
         "//source/common/common:to_lower_table_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:timespan_lib",
     ],
 )

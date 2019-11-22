@@ -12,9 +12,8 @@ import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/api/v3alpha/lds.proto";
-import "envoy/config/bootstrap/v2/bootstrap.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
-import "envoy/config/overload/v2alpha/overload.proto";
+import "envoy/config/overload/v3alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
 
 import "google/protobuf/duration.proto";
@@ -29,6 +28,7 @@ import "validate/validate.proto";
 // <config_overview_v2_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
+// [#next-free-field: 20]
 message Bootstrap {
   message StaticResources {
     // Static :ref:`Listeners <envoy_api_msg_api.v3alpha.Listener>`. These listeners are
@@ -126,7 +126,7 @@ message Bootstrap {
   Admin admin = 12;
 
   // Optional overload manager configuration.
-  overload.v2alpha.OverloadManager overload_manager = 15;
+  overload.v3alpha.OverloadManager overload_manager = 15;
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
@@ -149,7 +149,7 @@ message Bootstrap {
 
   // Optional proxy version which will be used to set the value of :ref:`server.version statistic
   // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
-  // :ref:<stats sinks <envoy_api_msg_config.metrics.v3alpha.StatsSink>.
+  // :ref:`stats sinks <envoy_api_msg_config.metrics.v3alpha.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 }
 
@@ -260,6 +260,7 @@ message Runtime {
   google.protobuf.Struct base = 4;
 }
 
+// [#next-free-field: 6]
 message RuntimeLayer {
   // :ref:`Disk runtime <config_runtime_local_disk>` layer.
   message DiskLayer {

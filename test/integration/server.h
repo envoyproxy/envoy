@@ -91,9 +91,9 @@ public:
     return wrapped_scope_->gaugeFromStatName(name, import_mode);
   }
 
-  Histogram& histogramFromStatName(StatName name) override {
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatName(name);
+    return wrapped_scope_->histogramFromStatName(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
@@ -107,9 +107,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName(), import_mode);
   }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName());
+    return histogramFromStatName(storage.statName(), unit);
   }
 
   OptionalCounter findCounter(StatName name) const override {
@@ -163,14 +163,14 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name) override {
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatName(name);
+    return store_.histogramFromStatName(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogram(const std::string& name) override {
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogram(name);
+    return store_.histogram(name, unit);
   }
   OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
@@ -233,6 +233,7 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
 public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
          std::function<void()> on_server_init_function, bool deterministic,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
@@ -251,6 +252,9 @@ public:
   }
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
     on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
+  }
+  void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
+    on_server_ready_cb_ = std::move(on_server_ready);
   }
   void onRuntimeCreated() override;
 
@@ -354,6 +358,7 @@ private:
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
   TcpDumpPtr tcp_dump_;
+  std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
 };
 
 // Default implementation of IntegrationTestServer

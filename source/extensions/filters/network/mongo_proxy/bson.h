@@ -30,20 +30,20 @@ public:
    * Raw field type.
    */
   enum class Type : uint8_t {
-    DOUBLE = 0x01,
-    STRING = 0x02,
-    DOCUMENT = 0x03,
-    ARRAY = 0x04,
-    BINARY = 0x05,
-    OBJECT_ID = 0x07,
-    BOOLEAN = 0x08,
-    DATETIME = 0x09,
-    NULL_VALUE = 0x0A,
-    REGEX = 0x0B,
-    SYMBOL = 0x0E,
-    INT32 = 0x10,
-    TIMESTAMP = 0x11,
-    INT64 = 0x12
+    Double = 0x01,
+    String = 0x02,
+    Document = 0x03,
+    Array = 0x04,
+    Binary = 0x05,
+    ObjectId = 0x07,
+    Boolean = 0x08,
+    Datetime = 0x09,
+    NullValue = 0x0A,
+    Regex = 0x0B,
+    Symbol = 0x0E,
+    Int32 = 0x10,
+    Timestamp = 0x11,
+    Int64 = 0x12
   };
 
   /**

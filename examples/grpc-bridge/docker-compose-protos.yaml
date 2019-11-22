@@ -1,0 +1,21 @@
+version: "3"
+
+# This is the conversion from a script to a dockerized version of the script
+# https://github.com/envoyproxy/envoy/blob/master/examples/grpc-bridge/service/script/gen
+services:
+
+  # $ docker run -ti -v $(pwd):/protos -v $(pwd)/stubs:/stubs grpc/go protoc --go_out=plugins=grpc:/stubs -I/protos /protos/kv.proto
+  stubs_go:
+    image: grpc/go
+    command: protoc --go_out=plugins=grpc:/stubs -I/protos /protos/kv.proto
+    volumes:
+      - ./protos:/protos
+      - ./server/kv:/stubs
+
+  # $ docker run -ti -v $(pwd):/protos -v $(pwd)/stubs:/stubs grpc/python python -m grpc.tools.protoc --python_out=/stubs --grpc_python_out=/stubs -I/protos /protos/kv.proto
+  stubs_python:
+    image: grpc/python
+    command: python -m grpc.tools.protoc --python_out=/stubs --grpc_python_out=/stubs -I/protos /protos/kv.proto
+    volumes:
+      - ./protos:/protos
+      - ./client/kv:/stubs

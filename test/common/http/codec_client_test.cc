@@ -55,8 +55,8 @@ public:
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(std::move(connection), codec_, nullptr, host_,
-                                                   dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
+                                                   codec_, nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   }
 
@@ -74,6 +74,20 @@ public:
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
+
+TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
+  auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+
+  EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
+  EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection, connect());
+  EXPECT_CALL(*connection, addReadFilter(_));
+  auto codec = new Http::MockClientConnection();
+
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  auto client = std::make_unique<CodecClientForTest>(
+      CodecClient::Type::HTTP3, std::move(connection), codec, nullptr, host_, dispatcher_);
+}
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   Http::StreamDecoder* inner_decoder;
@@ -275,15 +289,18 @@ class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersi
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()) {
     dispatcher_ = api_->allocateDispatcher();
-    upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
+    auto socket = std::make_shared<Network::TcpListenSocket>(
+        Network::Test::getAnyAddress(GetParam()), nullptr, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+        socket->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_ = std::make_unique<CodecClientForTest>(std::move(client_connection), codec_, nullptr,
-                                                   host_, *dispatcher_);
+    client_ =
+        std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
+                                             codec_, nullptr, host_, *dispatcher_);
 
     int expected_callbacks = 2;
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
@@ -339,7 +356,6 @@ protected:
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
-  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};

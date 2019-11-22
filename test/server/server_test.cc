@@ -43,7 +43,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
-  store.histogram("histogram");
+  store.histogram("histogram", Stats::Histogram::Unit::Unspecified);
 
   std::list<Stats::SinkPtr> sinks;
   InstanceUtil::flushMetricsToSinks(sinks, store);
@@ -306,7 +306,9 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
-  EXPECT_TRUE(stats_store_.histogram("server.initialization_time").used());
+  EXPECT_TRUE(
+      stats_store_.histogram("server.initialization_time_ms", Stats::Histogram::Unit::Milliseconds)
+          .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
@@ -355,6 +357,8 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   started.WaitForNotification();
   EXPECT_TRUE(startup);
   EXPECT_FALSE(shutdown);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 
   post_init_fired.WaitForNotification();
   EXPECT_TRUE(post_init);
@@ -599,6 +603,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+  EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
 // Validate that a runtime absent an admin layer will fail mutating operations

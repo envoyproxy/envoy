@@ -47,7 +47,7 @@ public:
           common_config->set_log_name("foo");
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
-          TestUtility::jsonConvert(config, *access_log->mutable_config());
+          access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();

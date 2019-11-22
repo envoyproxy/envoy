@@ -27,7 +27,7 @@ $PERSON (on behalf of the Envoy maintainers)
 ## Upcoming security release to cncf-envoy-distributors-announce@lists.cncf.io
 
 ```
-Subject: [CONFIDENTIAL] Further details on security release of Envoy $VERSION
+Subject: [CONFIDENTIAL] Upcoming security release of Envoy $VERSION
 To: cncf-envoy-distributors-announce@lists.cncf.io
 Cc: envoy-security@googlegroups.com
 
@@ -58,6 +58,43 @@ distributions.
 
 Please direct further communication amongst private distributors to this list
 or to envoy-security@googlegroups.com for direct communication with the Envoy
+security team.
+
+Thanks,
+$PERSON (on behalf of the Envoy security team)
+```
+
+## Candidate release patches to cncf-envoy-distributors-announce@lists.cncf.io
+
+```
+Subject: [CONFIDENTIAL] Further details on security release of Envoy $VERSION
+To: cncf-envoy-distributors-announce@lists.cncf.io
+Cc: envoy-security@googlegroups.com
+
+Hello Envoy Distributors,
+
+Please find attached candidate patches for CVE-YEAR-ABCDEF. You may use the
+attached patches for testing and preparing your distributions. The patches can
+be applied with "git am".
+
+Patches starting with "$VERSION" should be applied against the $OLDVERSION release.
+
+Patches starting with "master-" should be applied against commit $COMMIT.
+
+As a reminder, these patches are under embargo until $ORDINALDAY of $MONTH $YEAR
+at $PDTHOUR PDT ($GMTHOUR GMT). The information below should be treated as
+confidential and shared only on a need-to-know basis. The rules outline in our
+embargo policy
+(https://github.com/envoyproxy/envoy/blob/master/SECURITY.md#embargo-policy)
+still apply, and it is extremely important that any communication related to
+these CVEs are not forwarded further.
+
+No fixes should be made publicly available, either in binary or source form,
+before the aforementioned disclosure date.
+
+We would appreciate any feedback on these patches. Please direct further
+communication amongst private distributors to this list or to
+envoy-security@googlegroups.com for direct communication with the Envoy
 security team.
 
 Thanks,

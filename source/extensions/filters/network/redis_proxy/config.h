@@ -56,11 +56,6 @@ class RedisProxyFilterConfigFactory
 public:
   RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RedisProxy, true) {}
 
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,

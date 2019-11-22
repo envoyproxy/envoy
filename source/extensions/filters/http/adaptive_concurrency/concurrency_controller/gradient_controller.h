@@ -27,9 +27,10 @@ namespace ConcurrencyController {
  */
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                              \
   COUNTER(rq_blocked)                                                                              \
+  GAUGE(burst_queue_size, NeverImport)                                                             \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
-  GAUGE(burst_queue_size, NeverImport)                                                             \
+  GAUGE(min_rtt_calculation_active, Accumulate)                                                    \
   GAUGE(min_rtt_msecs, NeverImport)                                                                \
   GAUGE(sample_rtt_msecs, NeverImport)
 
@@ -70,36 +71,45 @@ public:
   }
 
   double maxGradient() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_);
+    return std::max(
+        1.0, runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_));
   }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double sampleAggregatePercentile() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().SampleAggregatePercentileKey,
-                                         sample_aggregate_percentile_) /
-           100.0;
+    const double val = runtime_.snapshot().getDouble(
+        RuntimeKeys::get().SampleAggregatePercentileKey, sample_aggregate_percentile_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
-  // The percentage is normalized to the range [0.0, 1.0].
+  // The percentage is normalized and clamped to the range [0.0, 1.0].
   double jitterPercent() const {
-    return runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_) / 100.0;
+    const double val =
+        runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
+  }
+
+  uint32_t minConcurrency() const {
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
   }
 
 private:
   class RuntimeKeyValues {
   public:
     const std::string MinRTTCalcIntervalKey =
-        "http.adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms";
+        "adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms";
     const std::string SampleRTTCalcIntervalKey =
-        "http.adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms";
+        "adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms";
     const std::string MaxConcurrencyLimitKey =
-        "http.adaptive_concurrency.gradient_controller.max_concurrency_limit";
+        "adaptive_concurrency.gradient_controller.max_concurrency_limit";
     const std::string MinRTTAggregateRequestCountKey =
-        "http.adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
-    const std::string MaxGradientKey = "http.adaptive_concurrency.gradient_controller.max_gradient";
+        "adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
+    const std::string MaxGradientKey = "adaptive_concurrency.gradient_controller.max_gradient";
     const std::string SampleAggregatePercentileKey =
-        "http.adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
-    const std::string JitterPercentKey = "http.adaptive_concurrency.gradient_controller.jitter";
+        "adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
+    const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
+    const std::string MinConcurrencyKey =
+        "adaptive_concurrency.gradient_controller.min_concurrency";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
@@ -126,6 +136,9 @@ private:
 
   // The percentile value considered when processing samples.
   const double sample_aggregate_percentile_;
+
+  // The concurrency limit set while measuring the minRTT.
+  const uint32_t min_concurrency_;
 };
 using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 
@@ -139,10 +152,10 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  *
  * The algorithm:
  * ==============
- * An ideal round-trip time (minRTT) is measured periodically by only allowing a single outstanding
- * request at a time and measuring the round-trip time to the upstream. This information is then
- * used in the calculation of a number called the gradient, using time-sampled latencies
- * (sampleRTT):
+ * An ideal round-trip time (minRTT) is measured periodically by only allowing a small number of
+ * outstanding requests at a time and measuring the round-trip time to the upstream. This
+ * information is then used in the calculation of a number called the gradient, using time-sampled
+ * latencies (sampleRTT):
  *
  *     gradient = minRTT / sampleRTT
  *
@@ -167,14 +180,14 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  * concept of mutually exclusive sampling windows.
  *
  * When the gradient controller is instantiated, it starts inside of a minRTT calculation window
- * (indicated by inMinRTTSamplingWindow() returning true) and the concurrency limit is pinned to 1.
- * This window lasts until the configured number of requests is received, the minRTT value is
- * updated, and the minRTT value is set by a single worker thread. To prevent sampleRTT calculations
- * from triggering during this window, the update window mutex is held. Since it's necessary for a
- * worker thread to know which update window update window mutex is held for, they check the state
- * of inMinRTTSamplingWindow() after each sample. When the minRTT calculation is complete, a timer
- * is set to trigger the next minRTT sampling window by the worker thread who updates the minRTT
- * value.
+ * (indicated by inMinRTTSamplingWindow() returning true) and the concurrency limit is pinned to the
+ * configured min_concurrency. This window lasts until the configured number of requests is
+ * received, the minRTT value is updated, and the minRTT value is set by a single worker thread. To
+ * prevent sampleRTT calculations from triggering during this window, the update window mutex is
+ * held. Since it's necessary for a worker thread to know which update window update window mutex is
+ * held for, they check the state of inMinRTTSamplingWindow() after each sample. When the minRTT
+ * calculation is complete, a timer is set to trigger the next minRTT sampling window by the worker
+ * thread who updates the minRTT value.
  *
  * If the controller is not in a minRTT sampling window, it's possible that the controller is in a
  * sampleRTT calculation window. In this, all of the latency samples are consolidated into a

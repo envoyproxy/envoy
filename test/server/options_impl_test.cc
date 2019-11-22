@@ -93,7 +93,6 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_TRUE(options->hotRestartDisabled());
-  EXPECT_FALSE(options->libeventBufferEnabled());
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
@@ -247,11 +246,10 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
-  // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
-  // 5. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
-  // 6. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
-  // 7. hot restart version - print the hot restart version and exit.
-  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
+  // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
+  // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
+  // 6. hot restart version - print the hot restart version and exit.
+  EXPECT_EQ(options->count() - 6, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {

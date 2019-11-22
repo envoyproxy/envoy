@@ -12,7 +12,6 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
-#include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/date_provider_impl.h"
@@ -20,7 +19,6 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
@@ -116,13 +114,6 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
-  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
-}
-
 /**
  * Static registration for the HTTP connection manager filter.
  */
@@ -159,6 +150,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
                                                   Http::DEFAULT_MAX_HEADERS_COUNT))),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
+      max_connection_duration_(
+          PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
@@ -170,22 +163,30 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
+#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
-                                                      100
+                                                      100))),
 #else
-                                                      0
+      normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, normalize_path,
+          // TODO(htuch): we should have a boolean variant of featureEnabled() here.
+          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
+                                                      0))),
 #endif
-                                                      ))),
       merge_slashes_(config.merge_slashes()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
   if (!idle_timeout_) {
     idle_timeout_ = PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout);
+  }
+  if (!idle_timeout_) {
+    idle_timeout_ = std::chrono::hours(1);
+  } else if (idle_timeout_.value().count() == 0) {
+    idle_timeout_ = absl::nullopt;
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
@@ -195,8 +196,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_, stats_prefix_, route_config_provider_manager_,
-        context_.clusterManager().xdsIsDelta());
+        config, context_, stats_prefix_, route_config_provider_manager_);
     break;
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kScopedRoutes:
@@ -336,6 +336,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP2:
     codec_type_ = CodecType::HTTP2;
     break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP3:
+    codec_type_ = CodecType::HTTP3;
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -383,24 +386,17 @@ void HttpConnectionManagerConfig::processFilter(
 
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", string_name);
-
-  const Json::ObjectSharedPtr filter_config =
-      MessageUtil::getJsonObjectFromMessage(proto_config.config());
-  ENVOY_LOG(debug, "    config: {}", filter_config->asJsonString());
+  ENVOY_LOG(debug, "    config: {}",
+            MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
   // Now see if there is a factory that will accept the config.
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           string_name);
-  Http::FilterFactoryCb callback;
-  if (Config::Utility::allowDeprecatedV1Config(context_.runtime(), *filter_config)) {
-    callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
-                                           context_);
-  } else {
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        proto_config, context_.messageValidationVisitor(), factory);
-    callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  }
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      proto_config, context_.messageValidationVisitor(), factory);
+  Http::FilterFactoryCb callback =
+      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   is_terminal = factory.isTerminalFilter();
   filter_factories.push_back(callback);
 }
@@ -418,6 +414,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
+  case CodecType::HTTP3:
+    // TODO(danzh) create QUIC specific codec.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,

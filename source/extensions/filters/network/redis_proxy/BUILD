@@ -6,6 +6,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -56,15 +57,18 @@ envoy_cc_library(
     hdrs = ["command_splitter_impl.h"],
     deps = [
         ":command_splitter_interface",
+        ":conn_pool_lib",
         ":router_interface",
         "//include/envoy/stats:stats_macros",
-        "//include/envoy/stats:timespan",
+        "//include/envoy/stats:timespan_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:to_lower_table_lib",
         "//source/common/common:utility_lib",
+        "//source/common/stats:timespan_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/filters/network/common/redis:utility_lib",
     ],
 )
 
@@ -86,6 +90,7 @@ envoy_cc_library(
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster_lb",
+        "//source/extensions/common/redis:redirection_mgr_interface",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
@@ -110,14 +115,14 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
-        "//include/envoy/registry",
         "//include/envoy/upstream:upstream_interface",
-        "//source/common/config:filter_json_lib",
+        "//source/extensions/common/redis:redirection_mgr_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
@@ -126,6 +131,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
 )
 
@@ -138,7 +144,9 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:to_lower_table_lib",
+        "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],

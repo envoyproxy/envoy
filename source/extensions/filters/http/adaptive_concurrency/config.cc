@@ -3,8 +3,6 @@
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
-
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/gradient_controller.h"
 

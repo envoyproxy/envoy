@@ -111,8 +111,8 @@ TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -257,8 +257,8 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
@@ -355,8 +355,8 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1");
-  Stats::Histogram& h2 = store_->histogram("h2");
+  Stats::Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -455,9 +455,12 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Stats::Histogram& h1 = store_->histogram("h1_matches"); // Will match, be used, and print
-  Stats::Histogram& h2 = store_->histogram("h2_matches"); // Will match but not be used
-  Stats::Histogram& h3 = store_->histogram("h3_not");     // Will be used but not match
+  Stats::Histogram& h1 = store_->histogram(
+      "h1_matches", Stats::Histogram::Unit::Unspecified); // Will match, be used, and print
+  Stats::Histogram& h2 = store_->histogram(
+      "h2_matches", Stats::Histogram::Unit::Unspecified); // Will match but not be used
+  Stats::Histogram& h3 = store_->histogram(
+      "h3_not", Stats::Histogram::Unit::Unspecified); // Will be used but not match
 
   EXPECT_EQ("h1_matches", h1.name());
   EXPECT_EQ("h2_matches", h2.name());
@@ -614,12 +617,12 @@ public:
                          Buffer::Instance& response, absl::string_view method,
                          absl::string_view body = absl::string_view()) {
     if (!body.empty()) {
-      request_headers_.insertContentType().value(
+      request_headers_.setReferenceContentType(
           Http::Headers::get().ContentTypeValues.FormUrlEncoded);
       callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
     }
 
-    request_headers_.insertMethod().value(method.data(), method.size());
+    request_headers_.setMethod(method);
     admin_filter_.decodeHeaders(request_headers_, false);
 
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
@@ -722,7 +725,7 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                                    server_);
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
-  request_headers_.insertMethod().value(post.data(), post.size());
+  request_headers_.setMethod(post);
   admin_filter_.decodeHeaders(request_headers_, false);
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
                            admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
@@ -1664,6 +1667,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1724,6 +1728,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = true;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1771,6 +1776,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->used_ = false;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
@@ -1810,6 +1816,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
 
   auto histogram1 = makeHistogram();
   histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
 

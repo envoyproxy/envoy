@@ -1,15 +1,9 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-
 #include <iostream>
 #include <memory>
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -334,6 +328,29 @@ TEST(PipeInstanceTest, BadAddress) {
   std::string long_address(1000, 'X');
   EXPECT_THROW_WITH_REGEX(PipeInstance address(long_address), EnvoyException,
                           "exceeds maximum UNIX domain socket path size");
+}
+
+// Validate that embedded nulls in abstract socket addresses are included and represented with '@'.
+TEST(PipeInstanceTest, EmbeddedNullAbstractNamespace) {
+  std::string embedded_null("@/foo/bar");
+  embedded_null[5] = '\0'; // Set embedded null.
+#if defined(__linux__)
+  PipeInstance address(embedded_null);
+  EXPECT_EQ("@/foo@bar", address.asString());
+  EXPECT_EQ("@/foo@bar", address.asStringView());
+  EXPECT_EQ(Type::Pipe, address.type());
+  EXPECT_EQ(nullptr, address.ip());
+#else
+  EXPECT_THROW(PipeInstance address(embedded_null), EnvoyException);
+#endif
+}
+
+// Reject embedded nulls in filesystem pathname addresses.
+TEST(PipeInstanceTest, EmbeddedNullPathError) {
+  std::string embedded_null("/foo/bar");
+  embedded_null[4] = '\0'; // Set embedded null.
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(embedded_null), EnvoyException,
+                          "contains embedded null characters");
 }
 
 TEST(PipeInstanceTest, UnlinksExistingFile) {

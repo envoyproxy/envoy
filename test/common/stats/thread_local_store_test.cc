@@ -202,8 +202,8 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   g1.set(0);
   EXPECT_EQ(0, found_gauge->get().value());
 
-  Histogram& h1 = store_->histogram("h1");
-  EXPECT_EQ(&h1, &store_->histogram("h1"));
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  EXPECT_EQ(&h1, &store_->histogram("h1", Stats::Histogram::Unit::Unspecified));
   StatNameManagedStorage h1_name("h1", *symbol_table_);
   auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
@@ -250,8 +250,8 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   g1.set(0);
   EXPECT_EQ(0, found_gauge->get().value());
 
-  Histogram& h1 = store_->histogram("h1");
-  EXPECT_EQ(&h1, &store_->histogram("h1"));
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  EXPECT_EQ(&h1, &store_->histogram("h1", Stats::Histogram::Unit::Unspecified));
   StatNameManagedStorage h1_name("h1", *symbol_table_);
   auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
@@ -306,8 +306,8 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_gauge2.has_value());
   EXPECT_EQ(&g2, &found_gauge2->get());
 
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = scope1->histogram("h2");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = scope1->histogram("h2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
@@ -488,8 +488,10 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g1.tags().size());
 
-  Histogram& h1 = store_.histogramFromStatName(makeStatName("h1"));
-  Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"));
+  Histogram& h1 =
+      store_.histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 =
+      scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
@@ -544,7 +546,9 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_counter.value(), 0);
   Counter& noop_counter_2 = store_->counter("noop_counter_2");
   EXPECT_EQ(&noop_counter, &noop_counter_2);
-  EXPECT_FALSE(noop_counter.used()); // hardcoded to return false in NullMetricImpl.
+  EXPECT_FALSE(noop_counter.used());      // hardcoded to return false in NullMetricImpl.
+  EXPECT_EQ(0, noop_counter.latch());     // hardcoded to 0.
+  EXPECT_EQ(0, noop_counter.use_count()); // null counter is contained in ThreadLocalStoreImpl.
 
   // Gauge
   Gauge& noop_gauge = store_->gauge("noop_gauge", Gauge::ImportMode::Accumulate);
@@ -560,13 +564,20 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_gauge.value(), 0);
   noop_gauge.sub(2);
   EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, noop_gauge.importMode());
+  EXPECT_FALSE(noop_gauge.used());      // null gauge is contained in ThreadLocalStoreImpl.
+  EXPECT_EQ(0, noop_gauge.use_count()); // null gauge is contained in ThreadLocalStoreImpl.
+
   Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&noop_gauge, &noop_gauge_2);
 
   // Histogram
-  Histogram& noop_histogram = store_->histogram("noop_histogram");
+  Histogram& noop_histogram =
+      store_->histogram("noop_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(noop_histogram.name(), "");
-  Histogram& noop_histogram_2 = store_->histogram("noop_histogram_2");
+  EXPECT_FALSE(noop_histogram.used());
+  Histogram& noop_histogram_2 =
+      store_->histogram("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
 
   store_->shutdownThreading();
@@ -589,7 +600,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
   Gauge& lowercase_gauge = store_->gauge("lowercase_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
-  Histogram& lowercase_histogram = store_->histogram("lowercase_histogram");
+  Histogram& lowercase_histogram =
+      store_->histogram("lowercase_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(lowercase_histogram.name(), "lowercase_histogram");
 
   // And the creation of counters/gauges/histograms which have uppercase letters should fail.
@@ -609,7 +621,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 
   // Histograms are harder to query and test, so we resort to testing that name() returns the empty
   // string.
-  Histogram& uppercase_histogram = store_->histogram("upperCASE_histogram");
+  Histogram& uppercase_histogram =
+      store_->histogram("upperCASE_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(uppercase_histogram.name(), "");
 
   // Adding another exclusion rule -- now we reject not just uppercase stats but those starting with
@@ -644,13 +657,16 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   invalid_gauge_2.inc();
   EXPECT_EQ(invalid_gauge_2.value(), 0);
 
-  Histogram& valid_histogram = store_->histogram("valid_histogram");
+  Histogram& valid_histogram =
+      store_->histogram("valid_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(valid_histogram.name(), "valid_histogram");
 
-  Histogram& invalid_histogram_1 = store_->histogram("invalid_histogram");
+  Histogram& invalid_histogram_1 =
+      store_->histogram("invalid_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(invalid_histogram_1.name(), "");
 
-  Histogram& invalid_histogram_2 = store_->histogram("also_INVALID_histogram");
+  Histogram& invalid_histogram_2 =
+      store_->histogram("also_INVALID_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(invalid_histogram_2.name(), "");
 
   // Expected to free lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
@@ -754,7 +770,7 @@ public:
 
   LookupStatFn lookupHistogramFn() {
     return [this](const std::string& stat_name) -> std::string {
-      return scope_->histogram(stat_name).name();
+      return scope_->histogram(stat_name, Stats::Histogram::Unit::Unspecified).name();
     };
   }
 
@@ -803,7 +819,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
   Counter& counter = store_->counter("c1");
   Gauge& gauge = store_->gauge("g1", Gauge::ImportMode::Accumulate);
-  Histogram& histogram = store_->histogram("h1");
+  Histogram& histogram = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
   ASSERT_EQ(1, store_->counters().size()); // "c1".
   EXPECT_TRUE(&counter == store_->counters()[0].get() ||
               &counter == store_->counters()[1].get()); // counters() order is non-deterministic.
@@ -953,7 +969,7 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  Histogram& h1 = store_->histogram("h1");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
@@ -985,7 +1001,7 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
 
 // Histogram tests
 TEST_F(HistogramTest, BasicSingleHistogramMerge) {
-  Histogram& h1 = store_->histogram("h1");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());
 
   expectCallAndAccumulate(h1, 0);
@@ -1001,8 +1017,8 @@ TEST_F(HistogramTest, BasicSingleHistogramMerge) {
 }
 
 TEST_F(HistogramTest, BasicMultiHistogramMerge) {
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = store_->histogram("h2");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
 
@@ -1014,8 +1030,8 @@ TEST_F(HistogramTest, BasicMultiHistogramMerge) {
 }
 
 TEST_F(HistogramTest, MultiHistogramMultipleMerges) {
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = store_->histogram("h2");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
 
@@ -1045,8 +1061,8 @@ TEST_F(HistogramTest, MultiHistogramMultipleMerges) {
 TEST_F(HistogramTest, BasicScopeHistogramMerge) {
   ScopePtr scope1 = store_->createScope("scope1.");
 
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = scope1->histogram("h2");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = scope1->histogram("h2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
 
@@ -1056,8 +1072,8 @@ TEST_F(HistogramTest, BasicScopeHistogramMerge) {
 }
 
 TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = store_->histogram("h2");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = store_->histogram("h2", Stats::Histogram::Unit::Unspecified);
 
   expectCallAndAccumulate(h1, 1);
 
@@ -1096,7 +1112,7 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
 
 // Validates the summary after known value merge in to same histogram.
 TEST_F(HistogramTest, BasicHistogramMergeSummary) {
-  Histogram& h1 = store_->histogram("h1");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
 
   for (size_t i = 0; i < 50; ++i) {
     expectCallAndAccumulate(h1, i);
@@ -1124,8 +1140,8 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
 TEST_F(HistogramTest, BasicHistogramUsed) {
   ScopePtr scope1 = store_->createScope("scope1.");
 
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = scope1->histogram("h2");
+  Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = scope1->histogram("h2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
 
@@ -1150,6 +1166,24 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
+}
+
+TEST_F(HistogramTest, ParentHistogramBucketSummary) {
+  ScopePtr scope1 = store_->createScope("scope1.");
+  Histogram& histogram = store_->histogram("histogram", Stats::Histogram::Unit::Unspecified);
+  store_->mergeHistograms([]() -> void {});
+  ASSERT_EQ(1, store_->histograms().size());
+  ParentHistogramSharedPtr parent_histogram = store_->histograms()[0];
+  EXPECT_EQ("No recorded values", parent_histogram->bucketSummary());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 10));
+  histogram.recordValue(10);
+  store_->mergeHistograms([]() -> void {});
+  EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(1,1) B50(1,1) B100(1,1) "
+            "B250(1,1) B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) "
+            "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
+            "B3.6e+06(1,1)",
+            parent_histogram->bucketSummary());
 }
 
 } // namespace Stats

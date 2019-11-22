@@ -35,7 +35,8 @@ message TlsParameters {
     TLSv1_3 = 4;
   }
 
-  // Minimum TLS protocol version. By default, it's ``TLSv1_0``.
+  // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_0`` for
+  // servers.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maximum TLS protocol version. By default, it's ``TLSv1_3`` for servers in non-FIPS builds, and
@@ -110,12 +111,13 @@ message PrivateKeyProvider {
 
   // Private key method provider specific configuration.
   oneof config_type {
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
     google.protobuf.Any typed_config = 3;
   }
 }
 
+// [#next-free-field: 7]
 message TlsCertificate {
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
@@ -170,6 +172,7 @@ message TlsSessionTicketKeys {
   repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
+// [#next-free-field: 9]
 message CertificateValidationContext {
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
@@ -282,6 +285,7 @@ message CertificateValidationContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
+// [#next-free-field: 9]
 message CommonTlsContext {
   message CombinedCertificateValidationContext {
     // How to validate peer certificates.
@@ -342,6 +346,12 @@ message CommonTlsContext {
 
 message UpstreamTlsContext {
   // Common TLS context settings.
+  //
+  // .. attention::
+  //
+  //   Server certificate verification is not enabled by default. Configure
+  //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
+  //   verification.
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
@@ -361,6 +371,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
+// [#next-free-field: 6]
 message DownstreamTlsContext {
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
@@ -377,7 +388,7 @@ message DownstreamTlsContext {
     // TLS session ticket key settings.
     TlsSessionTicketKeys session_ticket_keys = 4;
 
-    // [#not-implemented-hide:]
+    // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
   }
 }

@@ -4,7 +4,8 @@ namespace Envoy {
 namespace {
 const std::string CSRF_ENABLED_CONFIG = R"EOF(
 name: envoy.csrf
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 100
@@ -17,7 +18,8 @@ config:
 
 const std::string CSRF_FILTER_ENABLED_CONFIG = R"EOF(
 name: envoy.csrf
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 100
@@ -26,7 +28,8 @@ config:
 
 const std::string CSRF_SHADOW_ENABLED_CONFIG = R"EOF(
 name: envoy.csrf
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 0
@@ -39,7 +42,8 @@ config:
 
 const std::string CSRF_DISABLED_CONFIG = R"EOF(
 name: envoy.csrf
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.csrf.v2.CsrfPolicy
   filter_enabled:
     default_value:
       numerator: 0

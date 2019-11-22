@@ -67,7 +67,8 @@ public:
 
   const std::string full_config{R"EOF(
       name: envoy.gzip
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.gzip.v2.Gzip
         memory_level: 3
         window_bits: 10
         compression_level: best

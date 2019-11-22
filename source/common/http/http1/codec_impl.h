@@ -18,6 +18,7 @@
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http1/header_formatter.h"
 
 namespace Envoy {
 namespace Http {
@@ -26,10 +27,7 @@ namespace Http1 {
 /**
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
-// clang-format off
-#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
-  COUNTER(metadata_not_supported_error)                                                            \
-// clang-format on
+#define ALL_HTTP1_CODEC_STATS(COUNTER) COUNTER(metadata_not_supported_error)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -66,7 +64,7 @@ public:
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
 
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection);
+  StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
 
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
@@ -96,10 +94,13 @@ private:
    */
   void endEncode();
 
+  void encodeFormattedHeader(absl::string_view key, absl::string_view value);
+
   bool chunk_encoding_{true};
   bool processing_100_continue_{false};
   bool is_response_to_head_request_{false};
   bool is_content_length_allowed_{true};
+  const HeaderKeyFormatter* const header_key_formatter_;
 };
 
 /**
@@ -107,7 +108,8 @@ private:
  */
 class ResponseStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  ResponseStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
+  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -123,7 +125,8 @@ private:
  */
 class RequestStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
+  RequestStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+      : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
 
   // Http::StreamEncoder
@@ -191,7 +194,8 @@ public:
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
-                 uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 HeaderKeyFormatterPtr&& header_key_formatter);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -201,6 +205,7 @@ protected:
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   bool handling_upgrade_{};
+  const HeaderKeyFormatterPtr header_key_formatter_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -303,7 +308,8 @@ private:
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
 
-  bool strict_header_validation_;
+  const bool strict_header_validation_;
+  const bool connection_header_sanitization_;
 };
 
 /**
@@ -322,7 +328,8 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection) : response_encoder_(connection) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
     StreamDecoder* request_decoder_{};
@@ -364,7 +371,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       ConnectionCallbacks& callbacks, const uint32_t max_response_headers_count);
+                       ConnectionCallbacks& callbacks, const Http1Settings& settings,
+                       const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
