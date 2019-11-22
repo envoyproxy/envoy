@@ -22,3 +22,6 @@ sudo update-alternatives --remove-all clang
 sudo update-alternatives --remove-all clang++
 sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-8 100
 sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-8 100
+
+sudo apt-get install gnupg2
+gpg --version
