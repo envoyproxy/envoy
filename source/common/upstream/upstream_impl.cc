@@ -120,7 +120,6 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           name);
-
   if (factory == nullptr) {
     factory =
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
