@@ -93,7 +93,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
 
   const auto host_attributes = Http::Utility::parseAuthority(host, default_port);
   bool is_ip_address = host_attributes.is_ip_address;
-  std::string host_to_resolve = host_attributes.host;
+  std::string host_to_resolve = std::string(host_attributes.host);
 
   if (host_attributes.port != default_port) {
     default_port = host_attributes.port;

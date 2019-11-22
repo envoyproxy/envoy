@@ -410,7 +410,7 @@ struct AuthorityAttributes {
   bool is_ip_address{false};
 
   // if parsed authority has host in authority, that is stored here
-  std::string host;
+  absl::string_view host;
 
   // if parsed authority has port in authority, that is stored here
   // this value is stored default_port value if passed authority has no port

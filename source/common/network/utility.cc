@@ -109,44 +109,36 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
   return portFromUrl(url, UDP_SCHEME, "UDP");
 }
 
-std::string Utility::hostFromIpAddress(const absl::string_view& authority) {
-  std::string host;
+absl::string_view Utility::hostFromIpAddress(const absl::string_view& authority) {
   bool ipv6_flag = false;
   size_t pos = authority.rfind(":");
 
   if (pos == absl::string_view::npos) {
-    return std::string(authority.data());
+    return authority;
   }
 
   if (authority[0] == '[') {
     ipv6_flag = true;
     pos = authority.rfind("]");
   } else if (pos != authority.find(":")) {
-    return std::string(authority.data());
+    return authority;
   } else {
     pos = authority.rfind(":");
   }
 
   size_t start = !ipv6_flag ? 0 : 1;
 
-  for (size_t i = start; i < pos; ++i) {
-    host += authority[i];
-  }
-
-  return host;
+  return authority.substr(start, pos - start);
 }
 
-std::string Utility::portFromIpAddress(const absl::string_view& authority, uint32_t default_port) {
-  std::string port_str;
+absl::string_view Utility::portFromIpAddress(const absl::string_view& authority,
+                                             uint32_t default_port) {
   const auto pos = authority.rfind(":");
   if (pos == absl::string_view::npos) {
     return std::to_string(default_port);
   }
 
-  for (size_t i = pos + 1; i < authority.size(); ++i) {
-    port_str += authority[i];
-  }
-  return port_str;
+  return authority.substr(pos + 1);
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddress(const absl::string_view& ip_address,
@@ -156,7 +148,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const absl::string
   }
   sockaddr_in6 sa6;
   memset(&sa6, 0, sizeof(sa6));
-  if (inet_pton(AF_INET6, ip_address.data(), &sa6.sin6_addr) == 1) {
+  if (inet_pton(AF_INET6, std::string(ip_address).c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port);
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
@@ -190,7 +182,7 @@ Utility::parseInternetAddressAndPort(const absl::string_view& ip_address, bool v
     }
     sockaddr_in6 sa6;
     memset(&sa6, 0, sizeof(sa6));
-    if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
+    if (ip_str.empty() || inet_pton(AF_INET6, std::string(ip_str).c_str(), &sa6.sin6_addr) != 1) {
       throwWithMalformedIp(ip_address);
     }
     sa6.sin6_family = AF_INET6;
@@ -209,7 +201,7 @@ Utility::parseInternetAddressAndPort(const absl::string_view& ip_address, bool v
     throwWithMalformedIp(ip_address);
   }
   sockaddr_in sa4;
-  if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
+  if (ip_str.empty() || inet_pton(AF_INET, std::string(ip_str).c_str(), &sa4.sin_addr) != 1) {
     throwWithMalformedIp(ip_address);
   }
   sa4.sin_family = AF_INET;

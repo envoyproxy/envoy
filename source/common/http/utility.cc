@@ -753,7 +753,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
                                                            uint32_t default_port) {
   Utility::AuthorityAttributes auth_attr;
   auth_attr.port = default_port;
-  auth_attr.host = authority.data();
+  auth_attr.host = authority;
 
   const auto colon_pos = authority.rfind(":");
 
@@ -795,7 +795,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
       // This section should be false if authority is like example.com:abc, we can't regard as abc
       // as port so that must regard example.com:abc as host and return them
       if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-        auth_attr.host = authority.data();
+        auth_attr.host = authority;
         auth_attr.port = default_port;
         return auth_attr;
       }
@@ -813,7 +813,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
                                     : auth_attr.host;
     const Network::Address::InstanceConstSharedPtr instance =
         Network::Utility::parseInternetAddress(extracted_host, default_port);
-    auth_attr.host = instance->ip()->addressAsString();
+    auth_attr.host = extracted_host;
     auth_attr.is_ip_address = true;
   } catch (const EnvoyException&) {
   }
