@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/common/time.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
@@ -11,6 +10,8 @@
 #include "extensions/filters/network/kafka/parser.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 #include "extensions/filters/network/kafka/response_codec.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +48,7 @@ public:
    * Decoder will not be able to capable of decoding the response, but at least we will not break
    * the communication between client and broker.
    */
-  void onFailedParse(RequestParseFailureSharedPtr) override;
+  void onFailedParse(RequestParseFailureSharedPtr parse_failure) override;
 
 private:
   ResponseDecoder& response_decoder_;
@@ -107,12 +108,12 @@ public:
   /**
    * If request could not be recognized, increase unknown request count.
    */
-  void onFailedParse(RequestParseFailureSharedPtr) override;
+  void onFailedParse(RequestParseFailureSharedPtr parse_failure) override;
 
   /**
    * If response could not be recognized, increase unknown response count.
    */
-  void onFailedParse(ResponseMetadataSharedPtr) override;
+  void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
 
   /**
    * If exceptions occurred while deserializing request, increase request failure count.
@@ -124,11 +125,11 @@ public:
    */
   void onResponseException() override;
 
-  std::map<int32_t, MonotonicTime>& getRequestArrivalsForTest();
+  absl::flat_hash_map<int32_t, MonotonicTime>& getRequestArrivalsForTest();
 
 private:
   TimeSource& time_source_;
-  std::map<int32_t, MonotonicTime> request_arrivals_;
+  absl::flat_hash_map<int32_t, MonotonicTime> request_arrivals_;
   RichRequestMetricsSharedPtr request_metrics_;
   RichResponseMetricsSharedPtr response_metrics_;
 };

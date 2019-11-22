@@ -225,7 +225,7 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, shouldRegisterRequest) {
   testee_.onMessage(request);
 
   // then
-  const std::map<int32_t, MonotonicTime>& request_arrivals = testee_.getRequestArrivalsForTest();
+  const auto& request_arrivals = testee_.getRequestArrivalsForTest();
   ASSERT_EQ(request_arrivals.at(correlation_id), time_point);
 }
 
@@ -260,7 +260,7 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, shouldRegisterResponse) {
   testee_.onMessage(response);
 
   // then
-  const std::map<int32_t, MonotonicTime>& request_arrivals = testee_.getRequestArrivalsForTest();
+  const auto& request_arrivals = testee_.getRequestArrivalsForTest();
   ASSERT_EQ(request_arrivals.find(correlation_id), request_arrivals.end());
 }
 

@@ -62,7 +62,7 @@ void KafkaMetricsFacadeImpl::onRequestException() {}
 
 void KafkaMetricsFacadeImpl::onResponseException() {}
 
-std::map<int32_t, MonotonicTime>& KafkaMetricsFacadeImpl::getRequestArrivalsForTest() {
+absl::flat_hash_map<int32_t, MonotonicTime>& KafkaMetricsFacadeImpl::getRequestArrivalsForTest() {
   return request_arrivals_;
 }
 
@@ -93,7 +93,7 @@ Network::FilterStatus KafkaBrokerFilter::onData(Buffer::Instance& data, bool) {
     request_decoder_->onData(data);
     return Network::FilterStatus::Continue;
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(info, "could not process data from Kafka client: {}", e.what());
+    ENVOY_LOG(debug, "could not process data from Kafka client: {}", e.what());
     metrics_->onRequestException();
     request_decoder_->reset();
     return Network::FilterStatus::StopIteration;
@@ -106,7 +106,7 @@ Network::FilterStatus KafkaBrokerFilter::onWrite(Buffer::Instance& data, bool) {
     response_decoder_->onData(data);
     return Network::FilterStatus::Continue;
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(info, "could not process data from Kafka broker: {}", e.what());
+    ENVOY_LOG(debug, "could not process data from Kafka broker: {}", e.what());
     metrics_->onResponseException();
     response_decoder_->reset();
     return Network::FilterStatus::StopIteration;
