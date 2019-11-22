@@ -302,16 +302,16 @@ resources without having been asked for them and the resources have not changed 
 Grouping Resources into Responses
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In the SotW protocol variants, the :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource
-types are treated specially. The server must include the complete state of the world, meaning that all resources of the relevant
-type that are needed by the client must be included, even if they did not change since the last response. This means that if the
-server has previously sent 100 resources and only one of them has changed, it must resend all 100 of them, even the 99 that were
-not modified. However, all other resource types may be handled incrementally in the SotW protocol variants, meaning that resources
-may be grouped into responses the same way as they would be in the incremental protocol variants.
-
 In the incremental protocol variants, the server sends each resource in its own response. This means that if the server has
 previously sent 100 resources and only one of them has changed, it may send a response containing only the changed resource; it
 does not need to resend the 99 resources that have not changed, and the client must not delete the unchanged resources.
+
+In the SotW protocol variants, all resource types except for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster
+<envoy_api_msg_Cluster>` are grouped into responses in the same way as in the incremental protocol variants. However,
+:ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types are handled differently:
+the server must include the complete state of the world, meaning that all resources of the relevant type that are needed by the
+client must be included, even if they did not change since the last response. This means that if the server has previously sent
+100 resources and only one of them has changed, it must resend all 100 of them, even the 99 that were not modified.
 
 Deleting Resources
 ^^^^^^^^^^^^^^^^^^
