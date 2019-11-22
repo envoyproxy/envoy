@@ -777,7 +777,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     try {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddressAndPort(authority);
-      auth_attr.host = instance->ip()->addressAsString();
+      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
       auth_attr.port = instance->ip()->port();
       auth_attr.is_ip_address = true;
 
