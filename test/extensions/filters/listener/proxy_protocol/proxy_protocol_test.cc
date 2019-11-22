@@ -93,7 +93,7 @@ public:
   }
 
   void connect(bool read = true) {
-    int expected_callbacks = read ? 3 : 2;
+    int expected_callbacks = 2;
     auto maybeExitDispatcher = [&]() -> void {
       expected_callbacks--;
       if (expected_callbacks == 0) {
@@ -117,7 +117,6 @@ public:
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
-            maybeExitDispatcher();
             return true;
           }));
     }
