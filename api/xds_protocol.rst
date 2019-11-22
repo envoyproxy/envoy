@@ -285,19 +285,23 @@ is interested in. In the SotW protocol variants, this is done via the :ref:`reso
 :ref:`resource_names_unsubscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_unsubscribe>` fields in the
 :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`.
 
-For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, Envoy will always set
-the resource hints to empty, in which case the server should use site-specific business logic to determine the full set of
-resources that the client is interested in, typically based on the client's :ref:`node <envoy_api_msg_Core.Node>` identification.
-However, other xDS clients (such as gRPC clients that use xDS) may specify explicit LDS/CDS resources as resource hints, for
-example if they only have a singleton listener and already know its name from some out-of-band configuration.
+Normally (see below for exceptions), requests must specify the set of resource names that the client is interested in. The
+management server must supply the requested resources if they exist. The client will silently ignore any supplied resources that
+were not explicitly requested. When the client sends a new request that changes the set of resources being requested, the server
+must resend any newly requested resources, even if it previously sent those resources without having been asked for them and the
+resources have not changed since that time. If the list of resource names becomes empty, that means that the client is no longer
+interested in any resources of the specified type.
 
-For other resource types, the resource hints are required. If the field is empty, that means that the client is not
-interested in any resources of the relevant type.
+For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, there is also a
+"wildcard" mode, which is triggered when the initial request on the stream for that resource type contains no resource names.
+In this case, the server should use site-specific business logic to determine the full set of resources that the client is
+interested in, typically based on the client's :ref:`node <envoy_api_msg_Core.Node>` identification. Note that once a
+stream has entered wildcard mode for a given resource type, there is no way to change the stream out of wildcard mode;
+resource names specified in any subsequent request on the stream will be ignored.
 
-When the resource hints are specified, the management server must supply the requested resources if they exist. The client will
-silently ignore any supplied resources that were not explicitly requested. When the client sends a new request that changes
-the set of resources being requested, the server must resend any newly requested resources, even if it previously sent those
-resources without having been asked for them and the resources have not changed since that time.
+Envoy will always use wildcard mode for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>`
+resources. However, other xDS clients (such as gRPC clients that use xDS) may specify explicit resource names for these
+resource types, for example if they only have a singleton listener and already know its name from some out-of-band configuration.
 
 Grouping Resources into Responses
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -357,18 +361,16 @@ Unsubscribing From Resources
 In the incremental protocol variants, resources can be unsubscribed to via the :ref:`resource_names_unsubscribe
 <envoy_api_field_DeltaDiscoveryRequest.resource_names_unsubscribe>` field.
 
-In the SotW protocol variants, unsubscriptions are more complicated. For any request where the :ref:`resource_names
-<envoy_api_field_DiscoveryRequest.resource_names>` field is specified, a resource may be unsubscribed to by sending a new
-request without the resource name that the client wishes to unsubscribe from. For example, if the client had previously been
-subscribed to resources A and B but then sends a new request where the resource_names field contains only resource A, that will
-unsubscribe from B.
+In the SotW protocol variants, each request must contain the full list of resource names being subscribed to in the
+:ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` field, so unsubscribing to a set of resources is done
+by sending a new request containing all resource names that are still being subscribed to but not containing the resource names
+being unsubscribed to. For example, if the client had previously been subscribed to resources A and B but wishes to
+unsubscribe from B, it must send a new request containing only resource A.
 
-For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, if the initial
-request did not specify any resources to subscribe to, the management server uses site-specific wildcard behavior, as
-described above. However, if the initial request contains at least one resource name, then the management server knows that
-the client is not using the wildcard behavior. If a future request on the same stream sets the list of resource names to be
-empty, then the server must interpret this as unsubscribing from all resources of the specified type, rather than reverting
-back to the wildcard behavior.
+Note that for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types where the
+stream is in "wildcard" mode (see :ref:`How the client specifies what resources to return
+<xds_protocol_How_the_client_specifies_what_resources_to_return>` for details), the set of resources being subscribed to is
+determined by the server instead of the client, so there is no mechanism for the client to unsubscribe from resources.
 
 Requesting Multiple Resources on a Single Stream
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
