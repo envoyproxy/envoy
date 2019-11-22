@@ -41,7 +41,6 @@ Ssl::ContextManagerPtr createContextManager(const std::string& factory_name,
                                             TimeSource& time_source) {
   Ssl::ContextManagerFactory* factory =
       Registry::FactoryRegistry<Ssl::ContextManagerFactory>::getFactory(factory_name);
-
   if (factory != nullptr) {
     return factory->createContextManager(time_source);
   }

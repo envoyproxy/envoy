@@ -147,8 +147,7 @@ public:
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
-
-    if (instead_value.size() != 0) {
+    if (!instead_value.empty()) {
       deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
     }
   }
@@ -158,7 +157,6 @@ public:
    */
   static Base* getFactory(absl::string_view name) {
     checkDeprecated(name);
-
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;
@@ -170,8 +168,7 @@ public:
     auto it = deprecatedFactoryNames().find(name);
     const bool status = it != deprecatedFactoryNames().end();
     if (status) {
-      const auto factory_name = getFactory(name)->name();
-      ENVOY_LOG(warn, "{} {} is deprecated, use {} instead.", factory_name, it->first, it->second);
+      ENVOY_LOG(warn, "{} is deprecated, use {} instead.", it->first, it->second);
     }
   }
 
