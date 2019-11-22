@@ -112,8 +112,11 @@ public:
   void
   addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
                  FilterChainFactoryBuilder& b);
+
+                   
   static bool isWildcardServerName(const std::string& name);
 
+  List<FilterChainHelper> pending_filter_chains;
 private:
   void convertIPsToTries();
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
