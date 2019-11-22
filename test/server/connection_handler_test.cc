@@ -69,7 +69,6 @@ public:
     Network::FilterChainFactory& filterChainFactory() override { return parent_.factory_; }
     Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
     bool bindToPort() override { return bind_to_port_; }
-    bool reusePort() override { return reuse_port_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }
@@ -96,7 +95,6 @@ public:
     Network::ListenSocketFactorySharedPtr socket_factory_;
     uint64_t tag_;
     bool bind_to_port_;
-    bool reuse_port_;
     const bool hand_off_restored_destination_connections_;
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;

@@ -72,7 +72,6 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
   bool bindToPort() override { return true; }
-  bool reusePort() override { return false; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
@@ -928,7 +927,6 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
   bool bindToPort() override { return true; }
-  bool reusePort() override { return false; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override {

@@ -83,12 +83,6 @@ public:
   virtual bool bindToPort() PURE;
 
   /**
-   * @return bool if 'true', the listener creates one socket with SO_REUSEPORT for each
-   * worker thread; otherwise, all worker threads share one socket.
-   */
-  virtual bool reusePort() PURE;
-
-  /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
    *         configuration is set, false otherwise. Note that this flag is deprecated and will be
