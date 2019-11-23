@@ -106,7 +106,7 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
     EXPECT_EQ(stats.counter_deltas().end(),
               stats.counter_deltas().find("c1")); // c1 should not be there.
     EXPECT_EQ(1, stats.counter_deltas().at("c2"));
-    EXPECT_EQ(stats.gauges().end(), stats.gauges().at("g1")); // g1 should not be there.
+    EXPECT_EQ(stats.gauges().end(), stats.counter_deltas().find("g1")); // g1 should not be there.
     EXPECT_EQ(1, stats.gauges().at("g2"));
   }
 }
