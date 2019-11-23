@@ -77,7 +77,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "hot_restart_impl_test",
-    srcs = ["hot_restart_impl_test.cc"],
+    srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/stats:stats_lib",
