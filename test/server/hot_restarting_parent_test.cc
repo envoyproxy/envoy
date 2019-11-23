@@ -95,6 +95,28 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
   }
 }
 
+TEST_F(HotRestartingParentTest, exportStatsToChildUsedOnly) {
+  std::cout << "ddd"
+            << "\n" Stats::IsolatedStoreImpl store;
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
+  EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(store));
+
+  // When a counter and gauge are not used, it should not be included in the message.
+  store.counter("c1").inc();
+  store.counter("c2").inc();
+  store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).add(1);
+  store.gauge("g2", Stats::Gauge::ImportMode::Accumulate).add(3);
+  HotRestartMessage::Reply::Stats stats;
+  hot_restarting_parent_.exportStatsToChild(&stats);
+  EXPECT_EQ(stats.counter_deltas().end(),
+            stats.counter_deltas().find("c1")); // c1 should not be there.
+  EXPECT_EQ(1, stats.counter_deltas().at("c2"));
+  EXPECT_EQ(stats.gauges().end(), stats.gauges().at("g1")); // g1 should not be there.
+  EXPECT_EQ(1, stats.gauges().at("g2"));
+}
+
 TEST_F(HotRestartingParentTest, drainListeners) {
   EXPECT_CALL(server_, drainListeners());
   hot_restarting_parent_.drainListeners();
