@@ -28,7 +28,6 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/squash/v2:pkg_cc_proto",
     ],
 )
 

@@ -48,7 +48,5 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )

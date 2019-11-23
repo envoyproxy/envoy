@@ -19,13 +19,13 @@ HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
-  socket_event_ =
-      dispatcher.createFileEvent(myDomainSocket(),
-                                 [this](uint32_t events) -> void {
-                                   ASSERT(events == Event::FileReadyType::Read);
-                                   onSocketEvent();
-                                 },
-                                 Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  socket_event_ = dispatcher.createFileEvent(
+      myDomainSocket(),
+      [this](uint32_t events) -> void {
+        ASSERT(events == Event::FileReadyType::Read);
+        onSocketEvent();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   internal_ = std::make_unique<Internal>(&server);
 }
 
@@ -115,12 +115,10 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 // magnitude of memory usage that they are meant to avoid, since this map holds full-string
 // names. The problem can be solved by splitting the export up over many chunks.
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
-  std::cout << "export stats"
-            << "\n";
   for (const auto& gauge : server_->stats().gauges()) {
-      if (gauge->used()) {
-    (*stats->mutable_gauges())[gauge->name()] = gauge->value();
-    //  }
+    if (gauge->used()) {
+      (*stats->mutable_gauges())[gauge->name()] = gauge->value();
+    }
   }
 
   for (const auto& counter : server_->stats().counters()) {
