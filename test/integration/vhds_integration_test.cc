@@ -72,6 +72,7 @@ static_resources:
                     cluster_name: xds_cluster
 )EOF";
 
+// TODO (dmitri-d) move config yaml into ConfigHelper
 const char RdsWithoutVhdsConfig[] = R"EOF(
 name: my_route
 virtual_hosts:
