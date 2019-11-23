@@ -11,7 +11,7 @@ The filter attempts not to influence the communication between client and broker
 that could not be decoded (due to Kafka client or broker running a newer version than supported by
 this filter) are forwarded as-is.
 
-* :ref:`v2 API reference <envoy_api_msg_config.filter.network.kafka_broker.v2alpha.KafkaBroker>`
+* :ref:`v2 API reference <envoy_api_msg_config.filter.network.kafka_broker.v2alpha1.KafkaBroker>`
 * This filter should be configured with the name *envoy.filters.network.kafka_broker*.
 
 .. attention::
