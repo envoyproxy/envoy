@@ -97,17 +97,16 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
 
   // When a counter and gauge are not used, it should not be included in the message.
   {
-    store.counter("c1");
-    store.counter("c2").inc();
-    store.gauge("g1", Stats::Gauge::ImportMode::Accumulate);
-    store.gauge("g2", Stats::Gauge::ImportMode::Accumulate).add(3);
+    store.counter("unused_counter");
+    store.counter("used_counter").inc();
+    store.gauge("unused_gauge", Stats::Gauge::ImportMode::Accumulate);
+    store.gauge("used_gauge", Stats::Gauge::ImportMode::Accumulate).add(1);
     HotRestartMessage::Reply::Stats stats;
     hot_restarting_parent_.exportStatsToChild(&stats);
-    EXPECT_EQ(stats.counter_deltas().end(),
-              stats.counter_deltas().find("c1")); // c1 should not be there.
-    EXPECT_EQ(1, stats.counter_deltas().at("c2"));
-    EXPECT_EQ(stats.gauges().end(), stats.counter_deltas().find("g1")); // g1 should not be there.
-    EXPECT_EQ(1, stats.gauges().at("g2"));
+    EXPECT_EQ(stats.counter_deltas().end(), stats.counter_deltas().find("unused_counter"));
+    EXPECT_EQ(1, stats.counter_deltas().at("used_counter"));
+    EXPECT_EQ(stats.gauges().end(), stats.counter_deltas().find("unused_gauge"));
+    EXPECT_EQ(1, stats.gauges().at("used_gauge"));
   }
 }
 
