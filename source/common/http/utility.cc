@@ -787,19 +787,17 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
       // Network::Utility::parseInternetAddressAndPort should be failed so that we must parse
       // authority on here
 
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
-
       const auto port_str = Network::Utility::portFromIpAddress(authority);
       uint64_t port64 = 0;
 
       // This section should be false if authority is like example.com:abc, we can't regard as abc
       // as port so that must regard example.com:abc as host and return them
       if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-        auth_attr.host = authority;
         auth_attr.port = default_port;
         return auth_attr;
       }
 
+      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
       auth_attr.port = static_cast<uint32_t>(port64);
     }
   }
@@ -811,8 +809,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     const auto extracted_host = !have_port_ipv6 && is_ipv6
                                     ? Network::Utility::hostFromIpAddress(authority)
                                     : auth_attr.host;
-    const Network::Address::InstanceConstSharedPtr instance =
-        Network::Utility::parseInternetAddress(extracted_host, default_port);
+    Network::Utility::parseInternetAddress(extracted_host, default_port);
     auth_attr.host = extracted_host;
     auth_attr.is_ip_address = true;
   } catch (const EnvoyException&) {
