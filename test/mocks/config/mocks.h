@@ -62,21 +62,53 @@ public:
   SubscriptionCallbacks* callbacks_{};
 };
 
+class MockGrpcMuxWatch : public GrpcMuxWatch {
+public:
+  MockGrpcMuxWatch();
+  ~MockGrpcMuxWatch() override;
+
+  MOCK_METHOD0(cancel, void());
+};
+
 class MockGrpcMux : public GrpcMux {
 public:
   MockGrpcMux();
   ~MockGrpcMux() override;
 
   MOCK_METHOD0(start, void());
+  MOCK_METHOD3(subscribe_,
+               GrpcMuxWatch*(const std::string& type_url, const std::set<std::string>& resources,
+                             GrpcMuxCallbacks& callbacks));
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
+                            GrpcMuxCallbacks& callbacks) override;
+  MOCK_METHOD1(pause, void(const std::string& type_url));
+  MOCK_METHOD1(resume, void(const std::string& type_url));
+  MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
+
+  MOCK_METHOD5(addSubscription,
+               void(const std::set<std::string>& resources, const std::string& type_url,
+                    SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
+                    std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD2(updateResourceInterest,
+               void(const std::set<std::string>& resources, const std::string& type_url));
+
   MOCK_METHOD5(addOrUpdateWatch,
                Watch*(const std::string& type_url, Watch* watch,
                       const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
                       std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
-  MOCK_METHOD1(pause, void(const std::string& type_url));
-  MOCK_METHOD1(resume, void(const std::string& type_url));
-  MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
-  MOCK_METHOD0(disableInitFetchTimeoutTimer, void());
+};
+
+class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
+public:
+  MockGrpcMuxCallbacks();
+  ~MockGrpcMuxCallbacks() override;
+
+  MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                    const std::string& version_info));
+  MOCK_METHOD2(onConfigUpdateFailed,
+               void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+  MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
 class MockGrpcStreamCallbacks : public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
