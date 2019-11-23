@@ -895,6 +895,7 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
                                           address_list = getAddressList(results);
                                           dispatcher_->exit();
                                         }));
+  ares_destroy_options(&opts);
 }
 
 class DnsImplAresFlagsForUdpTest : public DnsImplTest {
@@ -924,6 +925,7 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
                                           address_list = getAddressList(results);
                                           dispatcher_->exit();
                                         }));
+  ares_destroy_options(&opts);
 }
 
 } // namespace Network
