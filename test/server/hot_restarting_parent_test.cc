@@ -95,7 +95,7 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
     EXPECT_EQ(455, stats.gauges().at("g2"));
   }
 
-  // When a counter and gauge are not used, it should not be included in the message.
+  // When a counter and gauge are not used, they should not be included in the message.
   {
     store.counter("unused_counter");
     store.counter("used_counter").inc();
