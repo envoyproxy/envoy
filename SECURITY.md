@@ -270,7 +270,7 @@ use of Envoy should:
    3. An end user of Envoy that satisfies the following requirements:
        1. Is "well known" to the Envoy community. Being "well known" is fully subjective and
           determined by the Envoy maintainers and security team. Becoming "well known" would
-          generally be acheived by activities such as: PR contributions, either code or
+          generally be achieved by activities such as: PR contributions, either code or
           documentation; helping other end users on Slack, GitHub, and the mailing lists; speaking
           about use of Envoy at conferences; writing about use of Envoy in blog posts; sponsoring
           Envoy conferences, meetups, and other activities; etc. This is a more strict variant of
@@ -281,7 +281,7 @@ use of Envoy should:
           discussed further in this document.
        3. You *must* smoke test and then widely deploy security patches promptly and report back
           any issues ASAP. Furthermore, the Envoy maintainers may occasionally ask you to smoke test
-          especially risky public PRs before they are merged. Not peforming these asks in a
+          especially risky public PRs before they are merged. Not performing these asks in a
           reasonably prompt timeframe will result in removal from the list. This is a more strict
           variant of item 7 below.
 2. Have a user or customer base not limited to your own organization (except for option 3 above).
@@ -336,7 +336,7 @@ this since 1999 before proxies were even cool.
 OR
 
 We use Envoy for our #1 rated cat video service and have 40 billion MAU, proxying 40 trillion^2 RPS
-though Envoy at the edge. Secure cat videos are our top priority. We also contribute a lot to the Envoy
+through Envoy at the edge. Secure cat videos are our top priority. We also contribute a lot to the Envoy
 community by implementing features, not making Matt ask for documentation or tests, and writing blog
 posts about efficient Envoy cat video serving.
 
