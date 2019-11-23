@@ -15,11 +15,22 @@ envoy_package()
 envoy_extension_cc_test(
     name = "xray_test",
     srcs = [
+        "localized_sampling_test.cc",
         "util_test.cc",
+        "xray_tracer_impl_test.cc",
     ],
     extension_name = "envoy.tracers.xray",
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 

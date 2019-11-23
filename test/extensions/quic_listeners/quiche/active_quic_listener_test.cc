@@ -55,15 +55,13 @@ public:
         connection_handler_(*dispatcher_, "test_thread") {}
 
   void SetUp() override {
-    listen_socket_ = std::make_unique<Network::NetworkListenSocket<
-        Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
+    listen_socket_ = std::make_shared<Network::UdpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
     client_socket_ = std::make_unique<Network::NetworkListenSocket<
         Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ false);
-    EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
     ON_CALL(listener_config_, filterChainManager()).WillByDefault(ReturnRef(filter_chain_manager_));
     ON_CALL(filter_chain_manager_, findFilterChain(_)).WillByDefault(Return(&filter_chain_));
     ON_CALL(filter_chain_, networkFilterFactories()).WillByDefault(ReturnRef(filter_factory_));
@@ -75,8 +73,8 @@ public:
           return true;
         }));
 
-    quic_listener_ = std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
-                                                          listener_config_, quic_config_);
+    quic_listener_ = std::make_unique<ActiveQuicListener>(
+        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_);
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -91,7 +89,7 @@ protected:
   Event::SimulatedTimeSystemHelper simulated_time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Network::SocketPtr listen_socket_;
+  Network::SocketSharedPtr listen_socket_;
   Network::SocketPtr client_socket_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
@@ -139,8 +137,8 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
   Buffer::RawSlice first_slice{reinterpret_cast<void*>(const_cast<char*>(encrypted_packet->data())),
                                encrypted_packet->length()};
   // Send a full CHLO to finish 0-RTT handshake.
-  auto send_rc =
-      client_socket_->ioHandle().sendto(first_slice, /*flags=*/0, *listen_socket_->localAddress());
+  auto send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &first_slice, 1,
+                                                 nullptr, *listen_socket_->localAddress());
   ASSERT_EQ(encrypted_packet->length(), send_rc.rc_);
 
   EXPECT_CALL(listener_config_, filterChainManager());

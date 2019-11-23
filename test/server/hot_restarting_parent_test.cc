@@ -50,7 +50,8 @@ TEST_F(HotRestartingParentTest, getListenSocketsForChildNotBindPort) {
   listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, listeners()).WillOnce(Return(listeners));
-  EXPECT_CALL(listener_config, socket()).Times(1);
+  EXPECT_CALL(listener_config, listenSocketFactory());
+  EXPECT_CALL(listener_config.socket_factory_, localAddress());
   EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(false));
 
   HotRestartMessage::Request request;

@@ -117,10 +117,14 @@ def CreateIssues(access_token, runtime_and_pr):
       try:
         repo.create_issue(title, body=body, assignees=[user.login], labels=labels)
       except github.GithubException as e:
-        print(('GithubException while creating issue. This is typically because'
-               ' a user is not a member of envoyproxy org. Check that %s is in '
-               'the org.') % user.login)
-        raise
+        try:
+          body += '\ncc @' + user.login
+          repo.create_issue(title, body=body, labels=labels)
+          print(('unable to assign issue %s to %s. Add them to the Envoy proxy org'
+                 'and assign it their way.') % (title, user.login))
+        except github.GithubException as e:
+          print('GithubException while creating issue.')
+          raise
 
 
 def GetRuntimeAlreadyTrue():
@@ -158,6 +162,7 @@ def GetRuntimeAndPr():
       # If this runtime guard isn't true, ignore it for this release.
       if not runtime_guard in runtime_already_true:
         continue
+
       # For true runtime guards, walk the blame of the file they were added to,
       # to find the pr the feature was added.
       for commit, lines in repo.blame('HEAD', filename):
@@ -166,6 +171,8 @@ def GetRuntimeAndPr():
             pr = (int(re.search('\(#(\d+)\)', commit.message).group(1)))
             # Add the runtime guard and PR to the list to file issues about.
             features_to_flip.append((runtime_guard, pr))
+            # Make sure if grep finds multiple spots we only do the work one time.
+            runtime_already_true.remove(runtime_guard)
 
     else:
       print('no match in ' + str(line) + ' please address manually!')
@@ -178,7 +185,8 @@ if __name__ == '__main__':
 
   access_token = os.getenv('GH_ACCESS_TOKEN')
   if not access_token:
-    print('Missing GH_ACCESS_TOKEN')
+    print(
+        'Missing GH_ACCESS_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py')
     sys.exit(1)
 
   CreateIssues(access_token, runtime_and_pr)
