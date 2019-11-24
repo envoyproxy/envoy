@@ -21,14 +21,14 @@ namespace ExtAuthz {
 /**
  * Constant values used for tracing metadata.
  */
-struct TracingContantValues {
+struct TracingConstantValues {
   const std::string TraceStatus = "ext_authz_status";
   const std::string TraceUnauthz = "ext_authz_unauthorized";
   const std::string TraceOk = "ext_authz_ok";
   const std::string HttpStatus = "ext_authz_http_status";
 };
 
-using TracingConstants = ConstSingleton<TracingContantValues>;
+using TracingConstants = ConstSingleton<TracingConstantValues>;
 
 /**
  * Possible async results for a check call.

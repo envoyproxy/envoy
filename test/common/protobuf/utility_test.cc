@@ -357,6 +357,12 @@ TEST_F(ProtobufUtilityTest, ValueUtilHash) {
   EXPECT_NE(ValueUtil::hash(v), 0);
 }
 
+TEST_F(ProtobufUtilityTest, MessageUtilLoadYamlDouble) {
+  ProtobufWkt::DoubleValue v;
+  MessageUtil::loadFromYaml("value: 1.0", v, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_DOUBLE_EQ(1.0, v.value());
+}
+
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
   EXPECT_EQ(ValueUtil::loadFromYaml("null").ShortDebugString(), "null_value: NULL_VALUE");
   EXPECT_EQ(ValueUtil::loadFromYaml("true").ShortDebugString(), "bool_value: true");
@@ -365,10 +371,6 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
             "string_value: \"9223372036854775807\"");
   EXPECT_EQ(ValueUtil::loadFromYaml("\"foo\"").ShortDebugString(), "string_value: \"foo\"");
   EXPECT_EQ(ValueUtil::loadFromYaml("foo").ShortDebugString(), "string_value: \"foo\"");
-  {
-    ProtobufWkt::Value v = ValueUtil::loadFromYaml("1.0");
-    EXPECT_DOUBLE_EQ(1.0, v.number_value());
-  }
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
