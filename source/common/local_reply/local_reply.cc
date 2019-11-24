@@ -37,8 +37,12 @@ void LocalReply::matchAndRewrite(const Http::HeaderMap* request_headers,
                                  const Http::HeaderMap* response_headers,
                                  const Http::HeaderMap* response_trailers,
                                  const StreamInfo::StreamInfo& stream_info, Http::Code& code) {
+
   for (auto& mapper : mappers_) {
-    if (mapper->match(request_headers, response_headers, response_trailers, stream_info)) {
+    if (mapper->match(request_headers == nullptr ? empty_headers_ : request_headers,
+                      response_headers == nullptr ? empty_headers_ : response_headers,
+                      response_trailers == nullptr ? empty_headers_ : response_trailers,
+                      stream_info)) {
       mapper->rewrite(code);
       break;
     }
@@ -50,8 +54,10 @@ std::string LocalReply::format(const Http::HeaderMap* request_headers,
                                const Http::HeaderMap* response_trailers,
                                const StreamInfo::StreamInfo& stream_info,
                                const absl::string_view& body) {
-  return formatter_->format(*request_headers, *response_headers, *response_trailers, stream_info,
-                            body);
+  return formatter_->format(request_headers == nullptr ? *empty_headers_ : *request_headers,
+                            response_headers == nullptr ? *empty_headers_ : *response_headers,
+                            response_trailers == nullptr ? *empty_headers_ : *response_trailers,
+                            stream_info, body);
 }
 
 void LocalReply::insertContentHeaders(const absl::string_view& body, Http::HeaderMap* headers) {

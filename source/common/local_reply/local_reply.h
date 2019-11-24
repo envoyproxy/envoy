@@ -108,6 +108,7 @@ private:
   std::list<ResponseMapperPtr> mappers_;
   AccessLog::FormatterPtr formatter_;
   std::string content_type_;
+  const Http::HeaderMap* empty_headers_{};
 };
 
 using LocalReplyPtr = std::unique_ptr<LocalReply>;

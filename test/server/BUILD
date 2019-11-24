@@ -348,7 +348,6 @@ envoy_cc_test_library(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
