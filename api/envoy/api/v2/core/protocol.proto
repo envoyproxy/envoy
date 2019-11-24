@@ -85,7 +85,7 @@ message Http1ProtocolOptions {
   // are lower cased.
   HeaderKeyFormat header_key_format = 4;
 
-  // Enables trailers for HTTP1.
+  // Enables trailers for HTTP1. By default the HTTP/1 codec drops proxied trailers.
   bool enable_trailers = 5;
 }
 

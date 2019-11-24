@@ -636,7 +636,8 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings, uint32_t max_request_headers_kb,
+                                           const Http1Settings& settings,
+                                           uint32_t max_request_headers_kb,
                                            const uint32_t max_request_headers_count)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
                      max_request_headers_count, formatter(settings), settings.enable_trailers_),

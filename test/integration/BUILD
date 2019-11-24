@@ -508,7 +508,6 @@ envoy_cc_test(
         "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
-        "//source/extensions/filters/http/grpc_web:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:process_context_lib",
