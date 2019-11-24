@@ -220,7 +220,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     }
   }
 
-  // We need to know whether we're zone aware  early on, so make sure we do this lookup
+  // We need to know whether we're zone aware early on, so make sure we do this lookup
   // before we load any clusters.
   if (!cm_config.local_cluster_name().empty()) {
     local_cluster_name_ = cm_config.local_cluster_name();
