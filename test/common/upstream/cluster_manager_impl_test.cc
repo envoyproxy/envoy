@@ -3690,6 +3690,83 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
       hosts_added, {}, 100);
 }
 
+TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStatic) {
+  std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: new_cluster
+    connect_timeout: 4s
+    type: STATIC
+    load_assignment:
+      cluster_name: "domains"
+      endpoints:
+        - priority: 10
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.2
+                  port_value: 11001
+cluster_manager:
+  local_cluster_name: new_cluster
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "Unexpected non-zero priority for local cluster 'new_cluster'.");
+}
+
+TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStrictDns) {
+  std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: new_cluster
+    connect_timeout: 4s
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: "domains"
+      endpoints:
+        - priority: 10
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.2
+                  port_value: 11001
+cluster_manager:
+  local_cluster_name: new_cluster
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "Unexpected non-zero priority for local cluster 'new_cluster'.");
+}
+
+TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameLogicalDns) {
+  std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: new_cluster
+    connect_timeout: 4s
+    type: LOGICAL_DNS
+    load_assignment:
+      cluster_name: "domains"
+      endpoints:
+        - priority: 10
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.2
+                  port_value: 11001
+cluster_manager:
+  local_cluster_name: new_cluster
+)EOF";
+
+  // The priority for LOGICAL_DNS endpoints are written, so we just verify that there is only a
+  // single priority even if the endpoint was configured to be priority 10.
+  create(parseBootstrapFromV2Yaml(yaml));
+  const auto cluster = cluster_manager_->get("new_cluster");
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
