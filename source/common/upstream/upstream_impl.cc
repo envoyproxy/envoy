@@ -753,7 +753,7 @@ ClusterInfoImpl::ClusterInfoImpl(
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(string_name);
     auto message = factory.createEmptyConfigProto();
     if (!proto_config.typed_config().value().empty()) {
-      proto_config.typed_config().UnpackTo(message.get());
+      MessageUtil::unpackTo(proto_config.typed_config(), *message);
     }
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
