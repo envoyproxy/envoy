@@ -885,6 +885,7 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   struct ares_options opts;
+  memset(&opts, 0, sizeof(opts));
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   std::bitset<sizeof(int)> flags_bits(opts.flags);
@@ -915,6 +916,7 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
   struct ares_options opts;
+  memset(&opts, 0, sizeof(opts));
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   std::bitset<sizeof(int)> flags_bits(opts.flags);
