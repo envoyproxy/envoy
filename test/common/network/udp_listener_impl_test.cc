@@ -411,8 +411,6 @@ TEST_P(UdpListenerImplTest, SendData) {
         client_socket_->ioHandle(), *client_socket_->localAddress(), data);
 
     bytes_read = result.rc_;
-    EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
-
     if (bytes_read >= bytes_to_read || retry == 10 ||
         result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       break;
@@ -423,6 +421,7 @@ TEST_P(UdpListenerImplTest, SendData) {
     ASSERT(bytes_read == 0);
   } while (true);
   EXPECT_EQ(bytes_to_read, bytes_read);
+  EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
   EXPECT_EQ(data.buffer_->toString(), payload);
 }
 

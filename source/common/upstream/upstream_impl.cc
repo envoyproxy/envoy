@@ -817,6 +817,8 @@ ClusterImplBase::ClusterImplBase(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
+                     cluster.name()),
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
@@ -1013,6 +1015,14 @@ ClusterImplBase::resolveProtoAddress(const envoy::api::v2::core::Address& addres
                                        e.what()));
     }
     throw e;
+  }
+}
+
+void ClusterImplBase::validateEndpointsForZoneAwareRouting(
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& endpoints) const {
+  if (local_cluster_ && endpoints.priority() > 0) {
+    throw EnvoyException(
+        fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
   }
 }
 
