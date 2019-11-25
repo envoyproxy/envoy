@@ -47,7 +47,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message CommandLineOptions {
   enum IpVersion {
     v4 = 0;

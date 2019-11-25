@@ -161,8 +161,8 @@ public:
   }
 
   /**
-   * Permanently disables the named factory by nulling the corresponding
-   * factory pointer.
+   * Permanently disables the named factory by setting the corresponding
+   * factory pointer to null.
    */
   static bool disableFactory(absl::string_view name) {
     auto it = factories().find(name);
