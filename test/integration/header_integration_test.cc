@@ -4,6 +4,7 @@
 
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
+#include "common/http/exception.h"
 #include "common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
@@ -1065,6 +1066,75 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
           {"server", "envoy"},
           {"x-unmodified", "response"},
           {":status", "200"},
+      });
+}
+
+// Validates TE header is forwarded if it contains a supported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, close"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+          {"te", "trailers"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+      });
+}
+
+// Validates TE header is stripped if it contains an unsupported value
+TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstram"},
+          {"connection", "te, mike, sam, will, close"},
+          {"te", "gzip"},
+          {"mike", "foo"},
+          {"sam", "bar"},
+          {"will", "baz"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {":path", "/"},
+          {":method", "GET"},
+          {"x-request-foo", "downstram"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
+          {":status", "200"},
+          {"connection", "close"},
       });
 }
 } // namespace Envoy
