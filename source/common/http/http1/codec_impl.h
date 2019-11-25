@@ -192,7 +192,7 @@ public:
 
   CodecStats& stats() { return stats_; }
 
-  const bool enable_trailers_;
+  const bool enable_trailers_ : 1;
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
