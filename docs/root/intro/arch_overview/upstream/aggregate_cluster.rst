@@ -108,17 +108,19 @@ The example shows how the aggregate cluster level load balancer selects the clus
 of {{20, 20, 10}, {25, 25}} would result in a priority load of {{28%, 28%, 14%}, {30%, 0%}} of 
 traffic. When normalized total health drops below 100, traffic is distributed after normalizing the 
 levels' health scores to that sub-100 total. E.g. healths of {{20, 0, 0}, {20, 0}} (yielding a 
-normalized total health of 56) would be normalized, and result in a priority load of {{50%, 0%, 0%},
-{50%, 0%, 0%}} of traffic.
+normalized total health of 56) would be normalized and each cluster will receive 20 * 1.4 / 56 = 50%
+of the traffic which results in a priority load of {{50%, 0%, 0%}, {50%, 0%, 0%}} of traffic.
 
 The load balancer reuses priority level logic to help with the cluster selection. The priority level
 logic works with integer health scores. The health score of a level is (percent of healthy hosts in 
-the level) * (overprovisioning factor), capped at 100%. P=0 endpoints receive (level 0's health 
-score) percent of the traffic, with the rest flowing to P=1 (assuming P=1 is 100% healthy - more on 
+the level) * (overprovisioning factor), capped at 100%. P=0 endpoints receive level 0's health 
+score percent of the traffic, with the rest flowing to P=1 (assuming P=1 is 100% healthy - more on 
 that later). The integer percents of traffic that each cluster receives are collectively called the 
 system's "cluster priority load". For instance, for primary cluster, when 20% of P=0 endpoints are 
-healthy, 20% of P=1 endpoints are healthy, and 10% of P=2 endpoints are healthy, the primary cluster
-will receive 20% * 1.4 + 20% * 1.4 + 10% * 1.4 = 70% of the traffic.
+healthy, 20% of P=1 endpoints are healthy, and 10% of P=2 endpoints are healthy; for secondary, when
+25% of P=0 endpoints are healthy and 25% of P=1 endpoints are healthy. The primary cluster will 
+receive 20% * 1.4 + 20% * 1.4 + 10% * 1.4 = 70% of the traffic. The secondary cluster will receive 
+min(100 - 70, 25% * 1.4 + 25% * 1.4) = 30% of the traffic.
 
 To sum this up in pseudo algorithms:
 
@@ -138,4 +140,4 @@ To sum this up in pseudo algorithms:
     cluster C_0        cluster C_X
 
 The second tier is delegating the load balancing to the cluster selected in the first step and the 
-scluster could use any load balancing algorithms specified by :ref:`load balancer type <arch_overview_load_balancing_types>`.
+cluster could use any load balancing algorithms specified by :ref:`load balancer type <arch_overview_load_balancing_types>`.
