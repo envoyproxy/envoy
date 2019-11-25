@@ -14,8 +14,10 @@ namespace Kafka {
  * Payload-related test utilities.
  * This class is intended to be an entry point for all generated methods.
  *
- * The methods declared here are implemented in generated message_utils.cc, as they are derived
- * from Kafka protocol specification.
+ * The methods declared here are implemented in generated files:
+ * - request_utilities.cc (from request_utilities_cc.j2) - for requests,
+ * - response_utilities.cc (from response_utilities_cc.j2) - for responses,
+ * as they are derived from Kafka protocol specification.
  */
 class MessageUtilities {
 private:

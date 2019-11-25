@@ -15,8 +15,6 @@ py_test(
     ],
     data = [
         "//source/exe:envoy-static",
-        "//bazel:remote_jdk",
-        "//bazel:remote_jdk10",
         "//bazel:remote_jdk11",
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),

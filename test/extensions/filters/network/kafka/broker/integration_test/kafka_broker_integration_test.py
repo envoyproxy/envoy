@@ -15,6 +15,13 @@ import urllib.request
 
 
 class KafkaBrokerIntegrationTest(unittest.TestCase):
+  """
+  All tests in this class depend on Envoy/Zookeeper/Kafka running.
+  For each of these tests we are going to create Kafka consumers/producers/admins and point them
+  to Envoy (that proxies Kafka).
+  We expect every operation to succeed (as they should reach Kafka) and the corresponding metrics
+  to increase on Envoy side (to show that messages were received and forwarded successfully).
+  """
 
   services = None
 
@@ -40,6 +47,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     """
     This test verifies that consumer sends fetches correctly, and receives nothing.
     """
+
     consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092', fetch_max_wait_ms=500)
     consumer.assign([TopicPartition('test_kafka_consumer_with_no_messages_received', 0)])
     for _ in range(10):
@@ -59,6 +67,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     """
     This test verifies that producer can send messages, and consumer can receive them.
     """
+
     messages_to_send = 100
     partition = TopicPartition('test_kafka_producer_and_consumer', 0)
 
@@ -93,6 +102,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     """
     This test verifies that multiple consumers can form a Kafka consumer group.
     """
+
     consumer_count = 10
     consumers = []
     for id in range(consumer_count):
@@ -127,6 +137,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     Worker thread for Kafka consumer.
     Multiple poll-s are done here, so that the group can safely form.
     """
+
     poll_operations = 10
     for i in range(poll_operations):
       consumer.poll(timeout_ms=1000)
@@ -135,6 +146,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     """
     This test verifies that Kafka Admin Client can still be used to manage Kafka.
     """
+
     admin_client = KafkaAdminClient(bootstrap_servers='127.0.0.1:19092')
 
     # Create a topic with 3 partitions.
@@ -237,6 +249,10 @@ class ServicesHolder:
     self.kafka_handle = None
 
   def start(self):
+    """
+    Starts all the services we need for integration tests.
+    """
+
     # Find java installation that we are going to use to start Zookeeper & Kafka.
     java_directory = ServicesHolder.find_java()
 
@@ -331,6 +347,7 @@ class ServicesHolder:
     We cannot hardcode the name, as the dirname changes as per:
     https://github.com/bazelbuild/bazel/blob/master/tools/jdk/BUILD#L491
     """
+
     external_dir = os.path.join('.', 'external')
     for directory in os.listdir(external_dir):
       if 'remotejdk11' in directory:
@@ -346,6 +363,7 @@ class ServicesHolder:
     It's present at ./source/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
     or at ./external/envoy/source/exe/envoy-static (for bazel-compile_time_options).
     """
+
     candidate = os.path.join('.', 'source', 'exe', 'envoy-static')
     if os.path.isfile(candidate):
       return candidate
@@ -356,6 +374,11 @@ class ServicesHolder:
 
   @staticmethod
   def start_pipe_dumper(process_handle, name):
+    """
+    Starts a parallel thread that's going to dump service's output to stdout (this might be useful
+    in case of build failure).
+    """
+
     thread = Thread(target=ServicesHolder.pipe_dumper, args=(process_handle.stdout, name, 'out'))
     thread.start()
     thread = Thread(target=ServicesHolder.pipe_dumper, args=(process_handle.stderr, name, 'err'))

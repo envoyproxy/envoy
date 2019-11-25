@@ -1,3 +1,8 @@
+/**
+ * Tests in this file verify whether Kafka broker filter instance is capable of processing protocol
+ * messages properly.
+ */
+
 #include "common/common/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -23,9 +28,9 @@ using ResponseB = MessageBasedTest<ResponseEncoder>;
 // Message size for all kind of broken messages (we are not going to process all the bytes).
 constexpr static int32_t BROKEN_MESSAGE_SIZE = std::numeric_limits<int32_t>::max();
 
-class KafkaBrokerFilterIntegrationTest : public testing::Test,
-                                         protected RequestB,
-                                         protected ResponseB {
+class KafkaBrokerFilterProtocolTest : public testing::Test,
+                                      protected RequestB,
+                                      protected ResponseB {
 protected:
   Stats::IsolatedStoreImpl scope_;
   Event::TestRealTimeSystem time_source_;
@@ -40,7 +45,7 @@ protected:
   }
 };
 
-TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleUnknownRequestAndResponseWithoutBreaking) {
+TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleUnknownRequestAndResponseWithoutBreaking) {
   // given
   const int16_t unknown_api_key = std::numeric_limits<int16_t>::max();
 
@@ -65,7 +70,7 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleUnknownRequestAndResponseWi
   ASSERT_EQ(scope_.counter("kafka.prefix.response.unknown").value(), 1);
 }
 
-TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenRequestPayload) {
+TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleBrokenRequestPayload) {
   // given
 
   // Encode broken request into buffer.
@@ -84,7 +89,7 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenRequestPayload) {
   ASSERT_EQ(testee_.getRequestDecoderForTest()->getCurrentParserForTest(), nullptr);
 }
 
-TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenResponsePayload) {
+TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleBrokenResponsePayload) {
   // given
 
   const int32_t correlation_id = 42;
@@ -105,7 +110,7 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenResponsePayload) {
   ASSERT_EQ(testee_.getResponseDecoderForTest()->getCurrentParserForTest(), nullptr);
 }
 
-TEST_F(KafkaBrokerFilterIntegrationTest, shouldAbortOnUnregisteredResponse) {
+TEST_F(KafkaBrokerFilterProtocolTest, shouldAbortOnUnregisteredResponse) {
   // given
   const ResponseMetadata response_metadata = {0, 0, 0};
   const ProduceResponse response_data = {{}};
@@ -119,7 +124,7 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldAbortOnUnregisteredResponse) {
   ASSERT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
-TEST_F(KafkaBrokerFilterIntegrationTest, shouldProcessMessages) {
+TEST_F(KafkaBrokerFilterProtocolTest, shouldProcessMessages) {
   // given
   // For every request/response type & version, put a corresponding request into the buffer.
   for (const AbstractRequestSharedPtr& message : MessageUtilities::makeAllRequests()) {

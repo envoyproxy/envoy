@@ -367,16 +367,6 @@ alias(
 )
 
 alias(
-    name = "remote_jdk",
-    actual = "@bazel_tools//tools/jdk:remote_jdk",
-)
-
-alias(
-    name = "remote_jdk10",
-    actual = "@bazel_tools//tools/jdk:remote_jdk10",
-)
-
-alias(
     name = "remote_jdk11",
     actual = "@bazel_tools//tools/jdk:remote_jdk11",
 )
