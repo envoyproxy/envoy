@@ -391,7 +391,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
         [this, direct_response,
          &request_headers = headers](Http::HeaderMap& response_headers) -> void {
           const auto new_path = direct_response->newPath(request_headers);
-          if (!new_path.empty()) {
+          // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
+          const auto add_location =
+              direct_response->responseCode() == Http::Code::Created ||
+              Http::CodeUtility::is3xx(enumToInt(direct_response->responseCode()));
+          if (!new_path.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
