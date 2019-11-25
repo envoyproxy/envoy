@@ -143,8 +143,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
     auto& config_factory = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
         udp_config.udp_listener_name());
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        udp_config.udp_listener_name(), udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
   }
 

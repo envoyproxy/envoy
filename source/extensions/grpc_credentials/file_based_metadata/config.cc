@@ -32,7 +32,8 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
         // https://github.com/envoyproxy/envoy/issues/8010.
         const Envoy::ProtobufTypes::MessagePtr file_based_metadata_config_message =
             Envoy::Config::Utility::translateToFactoryConfig(
-                credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
+                credential.from_plugin().name(), credential.from_plugin(),
+                ProtobufMessage::getNullValidationVisitor(),
                 file_based_metadata_credentials_factory);
         const auto& file_based_metadata_config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig&>(

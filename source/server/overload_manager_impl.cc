@@ -109,7 +109,8 @@ OverloadManagerImpl::OverloadManagerImpl(
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(name);
-    auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
+    auto config =
+        Config::Utility::translateToFactoryConfig(name, resource, validation_visitor, factory);
     auto monitor = factory.createResourceMonitor(*config, context);
 
     auto result =

@@ -137,7 +137,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
+  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validation_visitor,
                                                 *proto_config);
 
   return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
@@ -791,7 +791,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, factory_context.messageValidationVisitor(), config_factory);
+      transport_socket.name(), transport_socket, factory_context.messageValidationVisitor(),
+      config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
