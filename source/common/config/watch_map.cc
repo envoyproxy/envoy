@@ -54,7 +54,25 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
 void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) {
   if (watches_.empty()) {
-    return;
+    if (resources.empty()) {
+      // We have no watches, and the update contained no resources. This can happen when Envoy
+      // unregisters from a resource that's removed from the server as well. For example,
+      // a deleted cluster triggers un-watching the ClusterLoadAssignment watch, and at the
+      // same time the xDS server sends an empty list of ClusterLoadAssignment resources.
+      return;
+    } else {
+      // TODO(htuch) this rejection matches the behavior of the old (pre-WatchMap) SotW
+      // GrpcMuxImpl. We had changed this to silently accept (just like the resources.empty()
+      // case), but this caused Envoy to fail to fully receive config for at least one user.
+      // So: we believe that simply `if(watches_.empty()) {return;}` is the correct behavior,
+      // but it appears to interact poorly with some server implementations. Presumably, the
+      // issue is that the server thinks Envoy has accepted the resources it sent, and so never
+      // sends them again, even when Envoy requests them.
+      //
+      // We have no watches, but the update contained resources. This should not happen.
+      ENVOY_LOG(warn, "Rejecting non-empty update for unwatched type URL");
+      throw EnvoyException("Rejecting non-empty update for unwatched type URL");
+    }
   }
   SubscriptionCallbacks& name_getter = (*watches_.begin())->callbacks_;
 
