@@ -281,4 +281,4 @@ if __name__ == "__main__":
   if errors != 0:
     logging.error("%d FAILURES" % errors)
     exit(1)
-  logging.warn("PASS")
+  logging.warning("PASS")

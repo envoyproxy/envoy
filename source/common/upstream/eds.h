@@ -69,7 +69,6 @@ private:
     const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
-  const ClusterManager& cm_;
   std::unique_ptr<Config::Subscription> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
