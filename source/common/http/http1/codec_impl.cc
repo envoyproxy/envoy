@@ -45,6 +45,10 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), header_key_formatter_(header_key_formatter) {
+  chunk_encoding_ = true;
+  processing_100_continue_ = false;
+  is_response_to_head_request_ = false;
+  is_content_length_allowed_ = true;
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -356,13 +360,13 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                                HeaderKeyFormatterPtr&& header_key_formatter)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
       header_key_formatter_(std::move(header_key_formatter)),
-      output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                     [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
       strict_header_validation_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.connection_header_sanitization")) {
+          "envoy.reloadable_features.connection_header_sanitization")),
+      output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
+                     [&]() -> void { this->onAboveHighWatermark(); }),
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
