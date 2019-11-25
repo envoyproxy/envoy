@@ -15,6 +15,7 @@ namespace Registry {
 template <class Base> class InjectFactory {
 public:
   InjectFactory(Base& instance) : instance_(instance) {
+    EXPECT_TRUE(FactoryCategoryRegistry::isRegistered(Base::category()));
     displaced_ = Registry::FactoryRegistry<Base>::replaceFactoryForTest(instance_);
   }
 

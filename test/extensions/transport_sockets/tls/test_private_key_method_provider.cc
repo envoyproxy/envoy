@@ -382,6 +382,8 @@ TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
   pkey_ = std::move(pkey);
 }
 
+REGISTER_FACTORY(TestPrivateKeyMethodFactory, Ssl::PrivateKeyMethodProviderInstanceFactory);
+
 } // namespace PrivateKeyMethodProvider
 } // namespace Extensions
 } // namespace Envoy
