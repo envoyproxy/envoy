@@ -201,8 +201,6 @@ struct UdpSendData {
  */
 class UdpListenerCallbacks {
 public:
-  enum class ErrorCode { SyscallError, UnknownError };
-
   virtual ~UdpListenerCallbacks() = default;
 
   /**
@@ -225,10 +223,9 @@ public:
    * Called when there is an error event in the receive data path.
    * The send side error is a return type on the send method.
    *
-   * @param error_code ErrorCode for the error event.
-   * @param error_number System error number.
+   * @param error_code supplies the received error on the listener.
    */
-  virtual void onReceiveError(const ErrorCode& error_code, Api::IoError::IoErrorCode err) PURE;
+  virtual void onReceiveError(Api::IoError::IoErrorCode error_code) PURE;
 };
 
 /**
