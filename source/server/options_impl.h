@@ -124,6 +124,9 @@ public:
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
+  const std::vector<std::string>& disabledExtensions() const override {
+    return disabled_extensions_;
+  }
   uint32_t count() const;
 
 private:
@@ -157,6 +160,7 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   bool fake_symbol_table_enabled_;
+  std::vector<std::string> disabled_extensions_;
   uint32_t count_;
 };
 

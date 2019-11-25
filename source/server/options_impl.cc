@@ -116,6 +116,11 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
                                               "Use fake symbol table implementation", false, true,
                                               "bool", cmd);
+
+  TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
+                                                  "Comma-separated list of extensions to disable",
+                                                  false, "", "string", cmd);
+
   cmd.setExceptionHandling(false);
   try {
     cmd.parse(argc, argv);
@@ -213,6 +218,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
     throw NoServingException();
   }
+
+  disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ",");
 }
 
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
@@ -294,6 +301,9 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
   command_line_options->set_cpuset_threads(cpusetThreadsEnabled());
   command_line_options->set_restart_epoch(restartEpoch());
+  for (const auto& e : disabledExtensions()) {
+    command_line_options->add_disabled_extensions(e);
+  }
   return command_line_options;
 }
 

@@ -140,4 +140,7 @@ message CommandLineOptions {
 
   // See :option:`--cpuset-threads` for details.
   bool cpuset_threads = 25;
+
+  // See :option:`--disable-extensions` for details.
+  repeated string disabled_extensions = 28;
 }

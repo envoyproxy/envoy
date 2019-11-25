@@ -957,6 +957,79 @@ TEST_P(StaticValidationTest, ClusterUnknownField) {
   EXPECT_TRUE(validate("cluster_unknown_field.yaml"));
 }
 
+class TestFactory {
+public:
+  virtual ~TestFactory() = default;
+  virtual std::string name() PURE;
+  static std::string category() { return "test"; }
+};
+
+class TestTestFactory : public TestFactory {
+public:
+  std::string name() override { return "test"; }
+};
+
+class TestingFactory {
+public:
+  virtual ~TestingFactory() = default;
+  virtual std::string name() PURE;
+  static std::string category() { return "testing"; }
+};
+
+class TestTestingFactory : public TestingFactory {
+public:
+  std::string name() override { return "test"; }
+};
+
+// This factory is used only for testing that extensions can be
+// disabled. If we used to to test CrackNames, then the results
+// of that test would depend on whether this was disabled or not.
+class DisabledTestingFactory : public TestingFactory {
+public:
+  std::string name() override { return "disabled"; }
+};
+
+REGISTER_FACTORY(TestTestFactory, TestFactory);
+REGISTER_FACTORY(TestTestingFactory, TestingFactory);
+REGISTER_FACTORY(DisabledTestingFactory, TestingFactory);
+
+TEST(DisableExtensions, CrackNames) {
+  using ReturnType = std::map<std::string, std::pair<std::string, std::string>>;
+
+  // Empty extension names, empty cracked names.
+  EXPECT_EQ(CrackExtensionNames({}), ReturnType{});
+
+  // Unmatched extension name, no cracked names.
+  EXPECT_EQ(CrackExtensionNames({"foo"}), ReturnType{});
+
+  auto wanted = ReturnType{
+      {"testing.test", std::make_pair("testing", "test")},
+  };
+
+  EXPECT_EQ(CrackExtensionNames({"testing.test"}), wanted);
+
+  wanted = ReturnType{
+      {"test.test", std::make_pair("test", "test")},
+  };
+
+  EXPECT_EQ(CrackExtensionNames({"test.test"}), wanted);
+
+  wanted = ReturnType{
+      {"testing.test", std::make_pair("testing", "test")},
+      {"test.test", std::make_pair("test", "test")},
+  };
+
+  EXPECT_EQ(CrackExtensionNames({"test.test", "testing.test", "foo.not.present"}), wanted);
+}
+
+TEST(DisableExtensions, IsDisabled) {
+  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled"), nullptr);
+
+  DisableExtensions({"testing.disabled"});
+
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled"), nullptr);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -22,27 +23,37 @@ template <class Base> class FactoryRegistry;
 template <class T, class Base> class RegisterFactory;
 
 /**
- * Helper class to call `registeredNames` for a specialized
- * FactoryRegistry.
+ * FactoryRegistryProxy is a proxy object that provides access to the
+ * static methods of a strongly-typed factory registry.
  */
-class BaseFactoryCategoryNames {
+class FactoryRegistryProxy {
 public:
-  virtual ~BaseFactoryCategoryNames() = default;
+  virtual ~FactoryRegistryProxy() = default;
   virtual std::vector<absl::string_view> registeredNames() const PURE;
+  virtual bool disableFactory(absl::string_view) PURE;
 };
 
-template <class Base> class FactoryCategoryNames : public BaseFactoryCategoryNames {
+template <class Base> class FactoryRegistryProxyImpl : public FactoryRegistryProxy {
 public:
   using FactoryRegistry = Envoy::Registry::FactoryRegistry<Base>;
 
   std::vector<absl::string_view> registeredNames() const override {
     return FactoryRegistry::registeredNames();
   }
+
+  bool disableFactory(absl::string_view name) override {
+    return FactoryRegistry::disableFactory(name);
+  }
 };
 
+/**
+ * BaseFactoryCategoryRegistry holds the static factory map for
+ * FactoryCategoryRegistry, ensuring that friends of that class
+ * cannot get non-const access to it.
+ */
 class BaseFactoryCategoryRegistry {
 protected:
-  using MapType = std::map<std::string, BaseFactoryCategoryNames*>;
+  using MapType = std::map<std::string, FactoryRegistryProxy*, std::less<>>;
 
   static MapType& factories() {
     static auto* factories = new MapType();
@@ -59,8 +70,6 @@ protected:
  */
 class FactoryCategoryRegistry : public BaseFactoryCategoryRegistry {
 public:
-  using MapType = BaseFactoryCategoryRegistry::MapType;
-
   /**
    * @return a read-only reference to the map of registered factory
    * registries.
@@ -70,8 +79,18 @@ public:
   /**
    * @return whether the given category name is already registered.
    */
-  static bool isRegistered(const std::string& category) {
+  static bool isRegistered(absl::string_view category) {
     return factories().find(category) != factories().end();
+  }
+
+  static bool disableFactory(absl::string_view category, absl::string_view name) {
+    auto registry = factories().find(category);
+
+    if (registry != factories().end()) {
+      return registry->second->disableFactory(name);
+    }
+
+    return false;
   }
 
 private:
@@ -79,8 +98,7 @@ private:
   // This enforces correct use of the registration machinery.
   template <class T, class Base> friend class RegisterFactory;
 
-  static void registerCategory(const std::string& category,
-                               BaseFactoryCategoryNames* factoryNames) {
+  static void registerCategory(const std::string& category, FactoryRegistryProxy* factoryNames) {
     auto result = factories().emplace(std::make_pair(category, factoryNames));
     RELEASE_ASSERT(result.second == true,
                    fmt::format("Double registration for category: '{}'", category));
@@ -116,7 +134,10 @@ public:
     ret.reserve(factories().size());
 
     for (const auto& factory : factories()) {
-      ret.push_back(factory.first);
+      // Only publish the name of factories that have not been disabled.
+      if (factory.second) {
+        ret.push_back(factory.first);
+      }
     }
 
     std::sort(ret.begin(), ret.end());
@@ -137,6 +158,19 @@ public:
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
+  }
+
+  /**
+   * Permanently disables the named factory by nulling the corresponding
+   * factory pointer.
+   */
+  static bool disableFactory(absl::string_view name) {
+    auto it = factories().find(name);
+    if (it == factories().end()) {
+      return false;
+    }
+    it->second = nullptr;
+    return true;
   }
 
   /**
@@ -210,7 +244,8 @@ public:
     // multiple attempts to register the same category and can't detect
     // duplicate categories.
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+      FactoryCategoryRegistry::registerCategory(Base::category(),
+                                                new FactoryRegistryProxyImpl<Base>());
     }
   }
 
@@ -231,7 +266,8 @@ public:
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+      FactoryCategoryRegistry::registerCategory(Base::category(),
+                                                new FactoryRegistryProxyImpl<Base>());
     }
   }
 
