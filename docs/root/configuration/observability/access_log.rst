@@ -65,9 +65,9 @@ a structured format such as JSON. Similar to format strings, command operators a
 their values inserted into the format dictionary to construct the log output.
 
 The ``typed_json_format`` differs from ``json_format`` in that values are rendered as JSON numbers
-where applicable.
+and nested objects where applicable.
 
-For example, with the following format provided in the configuration:
+For example, with the following format provided in the configuration as ``json_format``:
 
 .. code-block:: json
 
@@ -93,10 +93,15 @@ Format dictionaries have the following restrictions:
 
 * The dictionary must map strings to strings (specifically, strings to command operators). Nesting
   is not currently supported.
-* When using the ``typed_json_format`` command operators will only produce numeric output if the
+* When using the ``typed_json_format`` command operators will only produce typed output if the
   command operator is the only string that appears in the dictionary value. For example,
   ``"%DURATION%"`` will log a numeric duration value, but ``"%DURATION%.0"`` will log a string
   value.
+
+.. note::
+
+  When using the ``typed_json_format``, integer values that exceed :math:`2^{53}` will be
+  represented with reduced precision as they must be converted to floating point numbers.
 
 Command Operators
 -----------------

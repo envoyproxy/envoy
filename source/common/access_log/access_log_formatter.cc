@@ -27,9 +27,9 @@ static const std::string EmptyString = "";
 namespace {
 
 const ProtobufWkt::Value& unspecifiedValue() {
-  static const ProtobufWkt::Value* v = []() -> ProtobufWkt::Value* {
+  static const auto* v = []() -> ProtobufWkt::Value* {
     auto* vv = new ProtobufWkt::Value();
-    vv->set_null_value(ProtobufWkt::NullValue());
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
     return vv;
   }();
   return *v;
@@ -115,18 +115,7 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
   const auto output_struct =
       toStruct(request_headers, response_headers, response_trailers, stream_info);
 
-  std::string log_line;
-  log_line.reserve(256);
-
-  auto print_options = Protobuf::util::JsonPrintOptions();
-  print_options.always_print_primitive_fields = true;
-  const auto conversion_status =
-      Protobuf::util::MessageToJsonString(output_struct, &log_line, print_options);
-  if (!conversion_status.ok()) {
-    log_line =
-        fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());
-  }
-
+  std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
@@ -858,9 +847,7 @@ MetadataFormatter::formatMetadata(const envoy::api::v2::core::Metadata& metadata
     return UnspecifiedValueString;
   }
 
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(value, &json);
-  RELEASE_ASSERT(status.ok(), "");
+  std::string json = MessageUtil::getJsonStringFromMessage(value, false, true);
   truncate(json, max_length_);
   return json;
 }
