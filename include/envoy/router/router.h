@@ -169,7 +169,7 @@ public:
    */
   struct RetryBudget {
     // The percentage of active requests that are allowed to be retries.
-    double budget_pct;
+    double budget_percent;
 
     // The minimum number of active requests before enforcing the retry budget.
     uint32_t min_concurrency;

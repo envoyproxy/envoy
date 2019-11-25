@@ -894,16 +894,22 @@ message RetryPolicy {
   }
 
   message RetryBudget {
-    // Specifies the limit on concurrent retries as a percentage of outstanding requests. This
-    // parameter is optional.
+    // Specifies the limit on concurrent retries as a percentage of the sum of active requests,
+    // active connections, and active pending requests.
     //
-    // Defaults to 20%.
+    // .. note::
+    //
+    //    The approach of summing active requests and connections works because the active request
+    //    count for HTTP/1.1 and HTTP/2 uses either active connection or active request counts
+    //    respectively. However, Envoy does not reclaim HTTP/1.1 connections until it is required,
+    //    so the use of active connections is imperfect.
+    //
+    // This parameter is optional. Defaults to 20%.
     type.Percent percent_budget = 1;
 
-    // Specifies the minimum retry concurrency allowed for the retry budget. This parameter is
-    // optional.
+    // Specifies the minimum retry concurrency allowed for the retry budget.
     //
-    // Defaults to 10.
+    // This parameter is optional. Defaults to 10.
     google.protobuf.UInt32Value min_concurrency = 2;
   }
 

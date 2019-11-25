@@ -261,8 +261,8 @@ bool RetryStateImpl::retryBudgetExceeded() {
     return false;
   }
 
-  const double normalized_pct = retry_budget_->budget_pct / 100.0;
-  return cluster_.resourceManager(priority_).retries().count() >= normalized_pct * current_active;
+  const double budget = current_active * retry_budget_->budget_percent / 100.0;
+  return cluster_.resourceManager(priority_).retries().count() >= budget;
 }
 
 RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,

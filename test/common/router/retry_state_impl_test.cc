@@ -938,7 +938,7 @@ TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
 // Test percentage-based retry budgets configured to allow retries.
 TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceCxAllow) {
   policy_.retry_budget_ = RetryPolicy::RetryBudget();
-  policy_.retry_budget_->budget_pct = 20.0;
+  policy_.retry_budget_->budget_percent = 20.0;
   policy_.retry_budget_->min_concurrency = 5;
   cluster_.resetResourceManager(10 /* cx */, 10 /* rq_pending */, 10 /* rq */, 10 /* rq_retry */,
                                 10 /* conn_pool */);
@@ -964,7 +964,7 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceCxAllow) {
 // the budget will not be enforced.
 TEST_F(RouterRetryStateImplTest, RetryBudgetMinimumConcurrency) {
   policy_.retry_budget_ = RetryPolicy::RetryBudget();
-  policy_.retry_budget_->budget_pct = 20.0;
+  policy_.retry_budget_->budget_percent = 20.0;
   policy_.retry_budget_->min_concurrency = 5;
   cluster_.resetResourceManager(10 /* cx */, 10 /* rq_pending */, 10 /* rq */, 11 /* rq_retry */,
                                 10 /* conn_pool */);
@@ -990,7 +990,7 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetMinimumConcurrency) {
 // Test percentage-based retry budgets configured to disallow retries.
 TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceDisallow) {
   policy_.retry_budget_ = RetryPolicy::RetryBudget();
-  policy_.retry_budget_->budget_pct = 20.0;
+  policy_.retry_budget_->budget_percent = 20.0;
   policy_.retry_budget_->min_concurrency = 5;
   cluster_.resetResourceManager(50 /* cx */, 10 /* rq_pending */, 10 /* rq */, 11 /* rq_retry */,
                                 10 /* conn_pool */);
