@@ -1,12 +1,17 @@
 #include "extensions/filters/http/cors/cors_filter.h"
 
+#include "envoy/config/filter/http/cors/v2/cors.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/matchers.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
+
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,8 +21,7 @@ namespace Cors {
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(generateStats(stats_prefix + "cors.", scope)) {}
 
-CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
-    : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
+CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 // This handles the CORS preflight request as described in
 // https://www.w3.org/TR/cors/#resource-preflight-requests
@@ -27,10 +31,16 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  policies_ = {{
-      decoder_callbacks_->route()->routeEntry()->corsPolicy(),
-      decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
-  }};
+  policies_ = Http::Utility::resolveAllPerFilterConfigGeneric<const Envoy::Router::CorsPolicy>(
+      HttpFilterNames::get().Cors, decoder_callbacks_->route());
+
+  // If no per-route configs are found, check for use of the deprecated CorsPolicy.
+  if (policies_.empty()) {
+    policies_ = {{
+        decoder_callbacks_->route()->routeEntry()->corsPolicy(),
+        decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
+    }};
+  }
 
   if (!enabled() && !shadowEnabled()) {
     return Http::FilterHeadersStatus::Continue;

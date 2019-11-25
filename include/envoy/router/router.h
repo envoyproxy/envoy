@@ -96,9 +96,20 @@ public:
 };
 
 /**
+ * All route specific config returned by the method at
+ *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
+ * should be derived from this class.
+ */
+class RouteSpecificFilterConfig {
+public:
+  virtual ~RouteSpecificFilterConfig() = default;
+};
+using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
+
+/**
  * CorsPolicy for Route and VirtualHost.
  */
-class CorsPolicy {
+class CorsPolicy : public RouteSpecificFilterConfig {
 public:
   virtual ~CorsPolicy() = default;
 
@@ -378,17 +389,6 @@ public:
 
 class RateLimitPolicy;
 class Config;
-
-/**
- * All route specific config returned by the method at
- *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
- * should be derived from this class.
- */
-class RouteSpecificFilterConfig {
-public:
-  virtual ~RouteSpecificFilterConfig() = default;
-};
-using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
 
 /**
  * Virtual host definition.

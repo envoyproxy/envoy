@@ -3,6 +3,8 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <type_traits>
+#include <vector>
 
 #include "envoy/api/v2/core/http_uri.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
@@ -341,6 +343,27 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
   const Router::RouteSpecificFilterConfig* generic_config =
       resolveMostSpecificPerFilterConfigGeneric(filter_name, route);
   return dynamic_cast<const ConfigType*>(generic_config);
+}
+
+std::vector<const Router::RouteSpecificFilterConfig*>
+resolveAllPerFilterConfigGeneric(const std::string& filter_name,
+                                 const Router::RouteConstSharedPtr& route);
+
+template <class ConfigType>
+std::vector<const ConfigType*>
+resolveAllPerFilterConfigGeneric(const std::string& filter_name,
+                                 const Router::RouteConstSharedPtr& route) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+  std::vector<const Router::RouteSpecificFilterConfig*> generic_configs =
+      resolveAllPerFilterConfigGeneric(filter_name, route);
+
+  std::vector<const ConfigType*> typed_configs;
+  typed_configs.reserve(generic_configs.size());
+  for (const auto& generic_config : generic_configs) {
+    typed_configs.push_back(dynamic_cast<const ConfigType*>(generic_config));
+  }
+  return typed_configs;
 }
 
 /**

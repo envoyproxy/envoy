@@ -116,9 +116,6 @@ message VirtualHost {
   // handled by this virtual host.
   repeated string response_headers_to_remove = 11;
 
-  // Indicates that the virtual host has a CORS policy.
-  CorsPolicy cors = 8;
-
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
@@ -821,9 +818,6 @@ message RouteAction {
   // there is already a hash generated, the hash is returned immediately,
   // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
-
-  // Indicates that the route has a CORS policy.
-  CorsPolicy cors = 17;
 
   // If present, and the request is a gRPC request, use the
   // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,

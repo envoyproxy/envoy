@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.cors.v2;
+
+option java_outer_classname = "CorsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.cors.v2";
+
+import "envoy/api/v2/core/base.proto";
+import "envoy/type/percent.proto";
+import "envoy/type/matcher/string.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Cors]
+// Cors :ref:`configuration overview <config_http_filters_cors>`.
+// [#extension: envoy.filters.http.cors]
+
+message PerRouteCorsPolicy {
+
+  // Specifies string patterns that match allowed origins. An origin is allowed if any of the
+  // string matchers match.
+  repeated type.matcher.StringMatcher allow_origin_string_match = 1;
+
+  // Specifies the content for the *access-control-allow-methods* header.
+  string allow_methods = 2;
+
+  // Specifies the content for the *access-control-allow-headers* header.
+  string allow_headers = 3;
+
+  // Specifies the content for the *access-control-expose-headers* header.
+  string expose_headers = 4;
+
+  // Specifies the content for the *access-control-max-age* header.
+  string max_age = 5;
+
+  // Specifies whether the resource allows credentials.
+  google.protobuf.BoolValue allow_credentials = 6;
+
+  // Specifies the % of requests for which the CORS filter is enabled.
+  //
+  // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
+  // filter will be enabled for 100% of the requests.
+  //
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
+  // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
+  api.v2.core.RuntimeFractionalPercent filter_enabled = 7;
+
+  // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
+  // enforced.
+  //
+  // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
+  // fields have to explicitly disable the filter in order for this setting to take effect.
+  //
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
+  // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
+  api.v2.core.RuntimeFractionalPercent shadow_enabled = 8;
+}

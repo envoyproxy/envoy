@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/filter/http/cors/v2/cors.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -92,7 +93,7 @@ private:
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  std::array<const Envoy::Router::CorsPolicy*, 2> policies_;
+  std::vector<const Envoy::Router::CorsPolicy*> policies_;
   bool is_cors_request_{};
   const Http::HeaderEntry* origin_{};
 

@@ -112,7 +112,12 @@ message VirtualHost {
   repeated string response_headers_to_remove = 11;
 
   // Indicates that the virtual host has a CORS policy.
-  CorsPolicy cors = 8;
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use `typed_per_filter_config` to configure
+  //   the CORS HTTP filter.
+  CorsPolicy cors = 8 [deprecated = true];
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -840,7 +845,12 @@ message RouteAction {
   repeated HashPolicy hash_policy = 15;
 
   // Indicates that the route has a CORS policy.
-  CorsPolicy cors = 17;
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use `typed_per_filter_config` to configure
+  //   the CORS HTTP filter.
+  CorsPolicy cors = 17 [deprecated = true];
 
   // If present, and the request is a gRPC request, use the
   // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,

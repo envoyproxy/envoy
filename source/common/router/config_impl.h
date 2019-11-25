@@ -12,6 +12,7 @@
 
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/http/cors/v2/cors.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -102,10 +103,15 @@ private:
 
 /**
  * Implementation of CorsPolicy that reads from the proto route and virtual host config.
+ *
+ * TODO(dereka) once the router CORS config is deprecated, moved this into the CORS extension
+ * and out of source/common/.
  */
 class CorsPolicyImpl : public CorsPolicy {
 public:
   CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config, Runtime::Loader& loader);
+  CorsPolicyImpl(const envoy::config::filter::http::cors::v2::PerRouteCorsPolicy& config,
+                 Runtime::Loader& loader);
 
   // Router::CorsPolicy
   const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
@@ -117,24 +123,23 @@ public:
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override {
-    if (config_.has_filter_enabled()) {
-      const auto& filter_enabled = config_.filter_enabled();
-      return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
-                                               filter_enabled.default_value());
+    if (has_shadow_enabled_) {
+      return loader_.snapshot().featureEnabled(filter_enabled_.runtime_key(),
+                                               filter_enabled_.default_value());
     }
     return legacy_enabled_;
   };
   bool shadowEnabled() const override {
-    if (config_.has_shadow_enabled()) {
-      const auto& shadow_enabled = config_.shadow_enabled();
-      return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
-                                               shadow_enabled.default_value());
+    if (has_shadow_enabled_) {
+      return loader_.snapshot().featureEnabled(shadow_enabled_.runtime_key(),
+                                               shadow_enabled_.default_value());
     }
     return false;
   };
 
 private:
-  const envoy::api::v2::route::CorsPolicy config_;
+  const envoy::api::v2::core::RuntimeFractionalPercent filter_enabled_;
+  const envoy::api::v2::core::RuntimeFractionalPercent shadow_enabled_;
   Runtime::Loader& loader_;
   std::vector<Matchers::StringMatcherPtr> allow_origins_;
   const std::string allow_methods_;
@@ -143,6 +148,8 @@ private:
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
   const bool legacy_enabled_;
+  const bool has_filter_enabled_;
+  const bool has_shadow_enabled_;
 };
 
 class ConfigImpl;

@@ -25,6 +25,19 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "cors_config_test",
+    srcs = ["cors_config_test.cc"],
+    extension_name = "envoy.filters.http.cors",
+    deps = [
+        "//source/extensions/filters/http/cors:cors_filter_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/cors/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+    ]
+)
+
+envoy_extension_cc_test(
     name = "cors_filter_integration_test",
     srcs = ["cors_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.cors",

@@ -151,10 +151,13 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
                                Runtime::Loader& loader)
-    : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
+    : filter_enabled_(config.filter_enabled()), shadow_enabled_(config.shadow_enabled()),
+      loader_(loader), allow_methods_(config.allow_methods()),
       allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
       max_age_(config.max_age()),
-      legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)) {
+      legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)),
+      has_filter_enabled_(config.has_filter_enabled()),
+      has_shadow_enabled_(config.has_shadow_enabled()) {
   for (const auto& origin : config.allow_origin()) {
     envoy::type::matcher::StringMatcher matcher_config;
     matcher_config.set_exact(origin);
@@ -165,6 +168,23 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
     matcher_config.set_regex(regex);
     allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
   }
+  for (const auto& string_match : config.allow_origin_string_match()) {
+    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
+  }
+  if (config.has_allow_credentials()) {
+    allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
+  }
+}
+
+CorsPolicyImpl::CorsPolicyImpl(
+    const envoy::config::filter::http::cors::v2::PerRouteCorsPolicy& config,
+    Runtime::Loader& loader)
+    : filter_enabled_(config.filter_enabled()), shadow_enabled_(config.shadow_enabled()),
+      loader_(loader), allow_methods_(config.allow_methods()),
+      allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
+      max_age_(config.max_age()), legacy_enabled_(false),
+      has_filter_enabled_(config.has_filter_enabled()),
+      has_shadow_enabled_(config.has_shadow_enabled()) {
   for (const auto& string_match : config.allow_origin_string_match()) {
     allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
   }

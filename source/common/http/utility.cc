@@ -654,6 +654,16 @@ Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_nam
   return maybe_filter_config;
 }
 
+std::vector<const Router::RouteSpecificFilterConfig*>
+Utility::resolveAllPerFilterConfigGeneric(const std::string& filter_name,
+                                          const Router::RouteConstSharedPtr& route) {
+  std::vector<const Router::RouteSpecificFilterConfig*> configs{};
+  traversePerFilterConfigGeneric(
+      filter_name, route,
+      [&configs](const Router::RouteSpecificFilterConfig& cfg) { configs.push_back(&cfg); });
+  return configs;
+}
+
 void Utility::traversePerFilterConfigGeneric(
     const std::string& filter_name, const Router::RouteConstSharedPtr& route,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {

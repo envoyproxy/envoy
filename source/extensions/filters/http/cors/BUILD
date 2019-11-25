@@ -22,8 +22,13 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:matchers_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/router:config_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/config/filter/http/cors/v2:pkg_cc_proto",
     ],
 )
 
@@ -36,7 +41,8 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/cors:cors_filter_lib",
+        "@envoy_api//envoy/config/filter/http/cors/v2:pkg_cc_proto",
     ],
 )
