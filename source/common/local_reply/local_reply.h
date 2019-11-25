@@ -77,9 +77,9 @@ public:
    * @param stream_info supplies the information about streams required by filters.
    * @param code local reply status code.
    */
-  void matchAndRewrite(const Http::HeaderMap* request_headers,
-                       const Http::HeaderMap* response_headers,
-                       const Http::HeaderMap* response_trailers,
+  void matchAndRewrite(const Http::HeaderMap& request_headers,
+                       const Http::HeaderMap& response_headers,
+                       const Http::HeaderMap& response_trailers,
                        const StreamInfo::StreamInfo& stream_info, Http::Code& code);
 
   /**
@@ -92,9 +92,9 @@ public:
    * @param body original response body.
    * @return std::string formatted response body.
    */
-  std::string format(const Http::HeaderMap* request_headers,
-                     const Http::HeaderMap* response_headers,
-                     const Http::HeaderMap* response_trailers,
+  std::string format(const Http::HeaderMap& request_headers,
+                     const Http::HeaderMap& response_headers,
+                     const Http::HeaderMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info, const absl::string_view& body);
 
   /**

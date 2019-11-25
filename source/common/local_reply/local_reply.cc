@@ -33,25 +33,25 @@ LocalReply::LocalReply(std::list<ResponseMapperPtr> mappers, AccessLog::Formatte
                        std::string content_type)
     : mappers_(std::move(mappers)), formatter_(std::move(formatter)), content_type_(content_type) {}
 
-void LocalReply::matchAndRewrite(const Http::HeaderMap* request_headers,
-                                 const Http::HeaderMap* response_headers,
-                                 const Http::HeaderMap* response_trailers,
+void LocalReply::matchAndRewrite(const Http::HeaderMap& request_headers,
+                                 const Http::HeaderMap& response_headers,
+                                 const Http::HeaderMap& response_trailers,
                                  const StreamInfo::StreamInfo& stream_info, Http::Code& code) {
 
   for (auto& mapper : mappers_) {
-    if (mapper->match(request_headers, response_headers, response_trailers, stream_info)) {
+    if (mapper->match(&request_headers, &response_headers, &response_trailers, stream_info)) {
       mapper->rewrite(code);
       break;
     }
   }
 }
 
-std::string LocalReply::format(const Http::HeaderMap* request_headers,
-                               const Http::HeaderMap* response_headers,
-                               const Http::HeaderMap* response_trailers,
+std::string LocalReply::format(const Http::HeaderMap& request_headers,
+                               const Http::HeaderMap& response_headers,
+                               const Http::HeaderMap& response_trailers,
                                const StreamInfo::StreamInfo& stream_info,
                                const absl::string_view& body) {
-  return formatter_->format(*request_headers, *response_headers, *response_trailers, stream_info,
+  return formatter_->format(request_headers, response_headers, response_trailers, stream_info,
                             body);
 }
 
