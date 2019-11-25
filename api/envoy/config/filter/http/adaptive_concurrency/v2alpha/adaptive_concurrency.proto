@@ -62,7 +62,7 @@ message GradientControllerConfig {
     // variability in latency. This is expressed as a percentage of the measured value and can be
     // adjusted to allow more or less tolerance to the sampled latency values.
     //
-    // Defaults to 10.
+    // Defaults to 25%.
     type.Percent buffer = 5;
   }
 

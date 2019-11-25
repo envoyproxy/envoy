@@ -149,7 +149,9 @@ std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
 uint32_t GradientController::calculateNewLimit() {
   ASSERT(sample_rtt_.count() > 0);
 
-  // Calculate the gradient value, ensuring it remains below the configured maximum.
+  // Calculate the gradient value, ensuring it's clamped between 0.5 and 2.0.
+  // This prevents extreme changes in the concurrency limit between each sample
+  // window.
   const auto buffered_min_rtt = min_rtt_.count() + min_rtt_.count() * config_.minRTTBufferPercent();
   const double raw_gradient = static_cast<double>(buffered_min_rtt) / sample_rtt_.count();
   const double gradient = std::max<double>(0.5, std::min<double>(2.0, raw_gradient));
