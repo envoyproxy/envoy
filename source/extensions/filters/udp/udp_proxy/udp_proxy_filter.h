@@ -18,7 +18,7 @@ namespace UdpFilters {
 namespace UdpProxy {
 
 /**
- * All UDP proxy downtream stats. @see stats_macros.h
+ * All UDP proxy downstream stats. @see stats_macros.h
  */
 #define ALL_UDP_PROXY_DOWNSTREAM_STATS(COUNTER, GAUGE)                                             \
   COUNTER(downstream_sess_no_route)                                                                \
