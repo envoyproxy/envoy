@@ -168,8 +168,5 @@ envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     data = ["//test/config/integration/certs"],
-    deps = [
-        "//test/test_common:environment_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-    ],
+    deps = ["//test/test_common:environment_lib"],
 )

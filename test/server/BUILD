@@ -179,7 +179,6 @@ envoy_cc_test_library(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -348,6 +347,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
