@@ -225,8 +225,6 @@ ClusterManagerImpl::ClusterManagerImpl(
     local_cluster_name_ = cm_config.local_cluster_name();
   }
 
-  const auto& dyn_resources = bootstrap.dynamic_resources();
-
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which
   // load endpoint definition from file are primary and
