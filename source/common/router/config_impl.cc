@@ -486,7 +486,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     if (insert_envoy_original_path) {
         headers.setEnvoyOriginalPath(path);
     }
-    headers.setPath()->value(path_rewriter->rewrite(path, matched_path, case_sensitive_));
+    headers.setPath(path_rewriter->rewrite(path, matched_path, case_sensitive_));
   }
 }
 
