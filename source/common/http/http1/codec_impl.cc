@@ -44,11 +44,9 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
-    : connection_(connection), header_key_formatter_(header_key_formatter) {
-  chunk_encoding_ = true;
-  processing_100_continue_ = false;
-  is_response_to_head_request_ = false;
-  is_content_length_allowed_ = true;
+    : connection_(connection), header_key_formatter_(header_key_formatter), chunk_encoding_(true),
+      processing_100_continue_(false), is_response_to_head_request_(false),
+      is_content_length_allowed_(true) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }

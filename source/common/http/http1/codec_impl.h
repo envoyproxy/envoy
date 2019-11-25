@@ -96,11 +96,11 @@ private:
 
   void encodeFormattedHeader(absl::string_view key, absl::string_view value);
 
+  const HeaderKeyFormatter* const header_key_formatter_;
   bool chunk_encoding_ : 1;
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_content_length_allowed_ : 1;
-  const HeaderKeyFormatter* const header_key_formatter_;
 };
 
 /**
