@@ -366,6 +366,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
+  handling_upgrade_ = false;
+  reset_stream_called_ = false;
 }
 
 void ConnectionImpl::completeLastHeader() {

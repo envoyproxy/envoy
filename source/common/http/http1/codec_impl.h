@@ -204,7 +204,7 @@ protected:
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
-  bool handling_upgrade_{};
+  bool handling_upgrade_ : 1;
   const HeaderKeyFormatterPtr header_key_formatter_;
 
 private:
@@ -300,7 +300,7 @@ private:
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
-  bool reset_stream_called_{};
+  bool reset_stream_called_ : 1;
   Buffer::WatermarkBuffer output_buffer_;
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
@@ -308,8 +308,8 @@ private:
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
 
-  const bool strict_header_validation_;
-  const bool connection_header_sanitization_;
+  const bool strict_header_validation_ : 1;
+  const bool connection_header_sanitization_ : 1;
 };
 
 /**
