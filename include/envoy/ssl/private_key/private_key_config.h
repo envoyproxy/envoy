@@ -34,7 +34,7 @@ public:
    * @return std::string the identifying category name for objects created by this factory.
    * Used for automatic registration with FactoryCategoryRegistry.
    */
-  static std::string category() { return "private_key_providers"; };
+  static std::string category() { return "tls.key_providers"; };
 };
 
 } // namespace Ssl
