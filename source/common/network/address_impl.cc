@@ -351,8 +351,8 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t 
   }
   address_ = *address;
   if (abstract_namespace_) {
-    if(mode != 0){
-        throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
+    if (mode != 0) {
+      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
     }
     // Replace all null characters with '@' in friendly_name_.
     friendly_name_ =
@@ -380,8 +380,8 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode) : Instance
 #if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
-    if(mode != 0){
-        throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
+    if (mode != 0) {
+      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
     }
     abstract_namespace_ = true;
     address_length_ = pipe_path.size();
