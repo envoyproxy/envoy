@@ -1352,7 +1352,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     createFilterChain();
   }
   stream_info_.setResponseCodeDetails(details);
-
+  HeaderMap* empty_headers{};
   Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
@@ -1371,14 +1371,19 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
             encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
           }},
       Utility::RewriteReplyFunctions{
-          [this](Code& code) -> void {
+          [this, empty_headers](Code& code) -> void {
             connection_manager_.config_.localReply()->matchAndRewrite(
-                request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+                request_headers_ == nullptr ? empty_headers : request_headers_.get(),
+                response_headers_ == nullptr ? empty_headers : response_headers_.get(),
+                response_trailers_ == nullptr ? empty_headers : response_trailers_.get(),
                 stream_info_, code);
           },
-          [this](HeaderMapPtr&& headers, absl::string_view& body_text) -> std::string {
+          [this, empty_headers](HeaderMapPtr&& headers,
+                                absl::string_view& body_text) -> std::string {
             std::string formatted_body = connection_manager_.config_.localReply()->format(
-                request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+                request_headers_ == nullptr ? empty_headers : request_headers_.get(),
+                response_headers_ == nullptr ? empty_headers : response_headers_.get(),
+                response_trailers_ == nullptr ? empty_headers : response_trailers_.get(),
                 stream_info_, body_text);
 
             connection_manager_.config_.localReply()->insertContentHeaders(formatted_body,
@@ -2308,6 +2313,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
 
       parent_.stream_info_.setResponseCodeDetails(
           StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
+      HeaderMap* empty_headers{};
       Http::Utility::sendLocalReply(
           parent_.state_.destroyed_,
           Utility::EncodeFunctions{[&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
@@ -2322,16 +2328,27 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
                                      parent_.state_.local_complete_ = end_stream;
                                    }},
           Utility::RewriteReplyFunctions{
-              [&](Code& code) -> void {
+              [&, empty_headers](Code& code) -> void {
                 parent_.connection_manager_.config_.localReply()->matchAndRewrite(
-                    parent_.request_headers_.get(), parent_.response_headers_.get(),
-                    parent_.response_trailers_.get(), parent_.stream_info_, code);
+                    parent_.request_headers_ == nullptr ? empty_headers
+                                                        : parent_.request_headers_.get(),
+                    parent_.response_headers_ == nullptr ? empty_headers
+                                                         : parent_.response_headers_.get(),
+                    parent_.response_trailers_ == nullptr ? empty_headers
+                                                          : parent_.response_trailers_.get(),
+                    parent_.stream_info_, code);
               },
-              [&](HeaderMapPtr&& headers, absl::string_view body_text) -> std::string {
+              [&, empty_headers](HeaderMapPtr&& headers,
+                                 absl::string_view body_text) -> std::string {
                 std::string formatted_body =
                     parent_.connection_manager_.config_.localReply()->format(
-                        parent_.request_headers_.get(), parent_.response_headers_.get(),
-                        parent_.response_trailers_.get(), parent_.stream_info_, body_text);
+                        parent_.request_headers_ == nullptr ? empty_headers
+                                                            : parent_.request_headers_.get(),
+                        parent_.response_headers_ == nullptr ? empty_headers
+                                                             : parent_.response_headers_.get(),
+                        parent_.response_trailers_ == nullptr ? empty_headers
+                                                              : parent_.response_trailers_.get(),
+                        parent_.stream_info_, body_text);
 
                 parent_.connection_manager_.config_.localReply()->insertContentHeaders(
                     formatted_body, headers.get());
