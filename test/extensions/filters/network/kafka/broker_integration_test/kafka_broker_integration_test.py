@@ -238,7 +238,7 @@ class ServicesHolder:
 
   def start(self):
     # Find java installation that we are going to use to start Zookeeper & Kafka.
-    java_directory = self.find_java()
+    java_directory = ServicesHolder.find_java()
 
     launcher_environment = os.environ.copy()
     # Make `java` visible to build script:
@@ -294,11 +294,10 @@ class ServicesHolder:
     # Config files have been rendered, start the services now.
 
     # Start Envoy in the background, pointing to rendered config file.
-    envoy_binary = self.find_envoy()
+    envoy_binary = ServicesHolder.find_envoy()
     envoy_args = [os.path.abspath(envoy_binary), '-c', envoy_config_file]
-    self.envoy_handle = subprocess.Popen(envoy_args,
-                                         stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.DEVNULL)
+    self.envoy_handle = subprocess.Popen(envoy_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ServicesHolder.start_pipe_dumper(self.envoy_handle, 'Envoy')
     print('Envoy started')
 
     # Find the Kafka server 'bin' directory.
@@ -309,8 +308,9 @@ class ServicesHolder:
     zk_args = [os.path.abspath(zk_binary), zookeeper_config_file]
     self.zk_handle = subprocess.Popen(zk_args,
                                       env=launcher_environment,
-                                      stdout=subprocess.DEVNULL,
-                                      stderr=subprocess.DEVNULL)
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+    ServicesHolder.start_pipe_dumper(self.zk_handle, 'Zookeeper')
     print('Zookeeper server started')
 
     # Start Kafka in background, pointing to rendered config file.
@@ -318,12 +318,14 @@ class ServicesHolder:
     kafka_args = [os.path.abspath(kafka_binary), kafka_config_file]
     self.kafka_handle = subprocess.Popen(kafka_args,
                                          env=launcher_environment,
-                                         stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.DEVNULL)
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE)
+    ServicesHolder.start_pipe_dumper(self.kafka_handle, 'Kafka')
     print('Kafka server started')
     time.sleep(30)
 
-  def find_java(self):
+  @staticmethod
+  def find_java():
     """
     This method just locates the Java installation in current directory.
     We cannot hardcode the name, as the dirname changes as per:
@@ -337,7 +339,8 @@ class ServicesHolder:
         return result
     raise Exception('Could not find Java in: ' + external_dir)
 
-  def find_envoy(self):
+  @staticmethod
+  def find_envoy():
     """
     This method locates envoy binary.
     It's present at ./source/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
@@ -350,6 +353,21 @@ class ServicesHolder:
     if os.path.isfile(candidate):
       return candidate
     raise Exception("Could not find Envoy")
+
+  @staticmethod
+  def start_pipe_dumper(process_handle, name):
+    thread = Thread(target=ServicesHolder.pipe_dumper, args=(process_handle.stdout, name, 'out'))
+    thread.start()
+    thread = Thread(target=ServicesHolder.pipe_dumper, args=(process_handle.stderr, name, 'err'))
+    thread.start()
+
+  @staticmethod
+  def pipe_dumper(pipe, name, pipe_name):
+    try:
+      for line in pipe:
+        print('%s(%s):' % (name, pipe_name), line.decode().rstrip())
+    finally:
+      pipe.close()
 
   def shut_down(self):
     # Teardown - kill Kafka, Zookeeper, and Envoy. Then delete their data directory.
