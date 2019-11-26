@@ -289,13 +289,7 @@ public:
    *
    * @throw EnvoyException if the message does not unpack.
    */
-  static inline void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-    if (!any_message.UnpackTo(&message)) {
-      throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                       message.GetDescriptor()->full_name(),
-                                       any_message.DebugString()));
-    }
-  }
+  static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to a typed message.
