@@ -36,8 +36,6 @@ public:
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-
-  uint64_t id() const override { return id_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
