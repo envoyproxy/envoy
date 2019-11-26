@@ -92,6 +92,7 @@ build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+build:clang-msan --copt -O1
 
 # Clang with libc++
 build:libc++ --config=clang
@@ -124,6 +125,10 @@ build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ 
 build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
+
+build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
+build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
+build:rbe-toolchain-msan --config=clang-msan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
@@ -165,6 +170,10 @@ build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=rbe-toolchain-gcc
+
+build:docker-msan --config=docker-sandbox
+build:docker-msan --config=rbe-toolchain-clang-libc++
+build:docker-msan --config=rbe-toolchain-msan
 
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
