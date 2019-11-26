@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 
 ENVOY_SRCDIR=${ENVOY_SRCDIR:-$(cd $(dirname $0)/.. && pwd)}
 
