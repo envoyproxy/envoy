@@ -334,16 +334,19 @@ private:
     }
 
     Network::SocketSharedPtr getListenSocket() override {
-      // AdminListener only has one socket
+      // This is only supposed to be called once.
+      RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");
+      socket_create_ = true;
       return socket_;
     }
 
     absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-      return *socket_;
+      return absl::nullopt;
     }
 
   private:
     Network::SocketSharedPtr socket_;
+    bool socket_create_{false};
   };
 
   class AdminListener : public Network::ListenerConfig {

@@ -224,10 +224,11 @@ message Listener {
   // worker threads.
   ConnectionBalanceConfig connection_balance_config = 20;
 
-  // When this flag is set to true, listeners sets *SO_REUSEPORT* socket option and
-  // create one socket for each worker thread, this makes inbound connections
-  // distributed among worker threads evenly. When this flag is set to false,
-  // all worker threads shares one socket.
+  // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
+  // create one socket for each worker thread. This makes inbound connections
+  // distribute among worker threads roughly evenly in cases where there are a high number
+  // of connections. When this flag is set to false, all worker threads share one socket.
   // For UDP this flag is set to true forcibly.
-  google.protobuf.BoolValue reuse_port = 21;
+  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart.
+  bool reuse_port = 21;
 }

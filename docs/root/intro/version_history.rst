@@ -23,6 +23,7 @@ Version history
 * thrift_proxy: added support for cluster header based routing.
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
+* listeners: added :ref:`reuse_port<envoy_api_field_Listener.reuse_port>` option.
 
 1.12.0 (October 31, 2019)
 =========================
