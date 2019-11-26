@@ -363,8 +363,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
-      session_ticket_keys_provider_(
-          getTlsSessionTicketKeysConfigProvider(factory_context, config)) {
+      session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
+      session_timeout_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, session_timeout, 0)) {
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
     stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(

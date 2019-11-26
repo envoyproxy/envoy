@@ -957,6 +957,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           });
     }
 
+    if (config.sessionTimeout()) {
+      SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), config.sessionTimeout());
+    }
+
     int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf,
                                             session_context_len);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
