@@ -3179,7 +3179,7 @@ virtual_hosts:
       hedge_policy: {hedge_on_per_try_timeout: true}
   - match: {prefix: /bar}
     route:
-      hedge_policy: {additional_request_chance: {numerator: 30.0, denominator: HUNDRED}}
+      hedge_policy: {additional_request_chance: {numerator: 30, denominator: HUNDRED}}
       cluster: www
   - match: {prefix: /}
     route: {cluster: www}
