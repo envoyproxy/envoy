@@ -120,7 +120,9 @@ system's "cluster priority load". For instance, for primary cluster, when 20% of
 healthy, 20% of P=1 endpoints are healthy, and 10% of P=2 endpoints are healthy; for secondary, when
 25% of P=0 endpoints are healthy and 25% of P=1 endpoints are healthy. The primary cluster will 
 receive 20% * 1.4 + 20% * 1.4 + 10% * 1.4 = 70% of the traffic. The secondary cluster will receive 
-min(100 - 70, 25% * 1.4 + 25% * 1.4) = 30% of the traffic.
+min(100 - 70, 25% * 1.4 + 25% * 1.4) = 30% of the traffic. The traffic to all clusters sum up to 
+100. The normalized health score and priority load are pre-computed before selecting the cluster and 
+priority. 
 
 To sum this up in pseudo algorithms:
 
