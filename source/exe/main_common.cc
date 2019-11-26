@@ -10,8 +10,6 @@
 #include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
-#include "exe/platform_checks.h"
-
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
@@ -92,8 +90,6 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                           restarter_->logLock(), options_.logFormatEscaped());
     break;
   }
-
-  Platform::checkPlatformSettings(file_system);
 }
 
 void MainCommonBase::configureComponentLogLevels() {
