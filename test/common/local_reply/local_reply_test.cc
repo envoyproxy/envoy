@@ -107,7 +107,7 @@ TEST_F(LocalReplyTest, ShouldMatchFirstFilterAndReturn) {
       std::move(mappers), std::move(formatter_), Http::Headers::get().ContentTypeValues.Text});
 
   // when
-  local_reply->matchAndRewrite(&headers_, &headers_, &headers_, stream_info_, code_);
+  local_reply->matchAndRewrite(headers_, headers_, headers_, stream_info_, code_);
 
   // then
   EXPECT_EQ(code_, Http::Code::GatewayTimeout);
@@ -139,7 +139,7 @@ TEST_F(LocalReplyTest, ShouldMatchSecondFilterAndReturn) {
       std::move(mappers), std::move(formatter_), Http::Headers::get().ContentTypeValues.Text});
 
   // when
-  local_reply->matchAndRewrite(&headers_, &headers_, &headers_, stream_info_, code_);
+  local_reply->matchAndRewrite(headers_, headers_, headers_, stream_info_, code_);
 
   // then
   EXPECT_EQ(code_, Http::Code::HTTPVersionNotSupported);
@@ -170,7 +170,7 @@ TEST_F(LocalReplyTest, ShuldNotMatchAnyFilter) {
       std::move(mappers), std::move(formatter_), Http::Headers::get().ContentTypeValues.Text});
 
   // when
-  local_reply->matchAndRewrite(&headers_, &headers_, &headers_, stream_info_, code_);
+  local_reply->matchAndRewrite(headers_, headers_, headers_, stream_info_, code_);
 
   // then
   EXPECT_EQ(code_, Http::Code::OK);
