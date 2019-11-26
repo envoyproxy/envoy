@@ -1339,23 +1339,22 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 
-  if (connection_manager_.config_.tracingConfig()) {
-    refreshCachedTracingCustomTags();
-  }
+  refreshCachedTracingCustomTags();
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return;
+  }
   Tracing::CustomTagMap& customTagMap = getOrMakeTracingCustomTagMap();
   if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
     const Tracing::CustomTagMap& route_tags =
         cached_route_.value()->tracingConfig()->getCustomTags();
     customTagMap.insert(route_tags.begin(), route_tags.end());
   }
-  if (connection_manager_.config_.tracingConfig()) {
-    const Tracing::CustomTagMap& conn_manager_tags =
-        connection_manager_.config_.tracingConfig()->custom_tags_;
-    customTagMap.insert(conn_manager_tags.begin(), conn_manager_tags.end());
-  }
+  const Tracing::CustomTagMap& conn_manager_tags =
+      connection_manager_.config_.tracingConfig()->custom_tags_;
+  customTagMap.insert(conn_manager_tags.begin(), conn_manager_tags.end());
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(

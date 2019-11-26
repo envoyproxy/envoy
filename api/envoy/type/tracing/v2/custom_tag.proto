@@ -46,7 +46,7 @@ message CustomTag {
   // Metadata type custom tag using
   // :ref:`MetadataKey <envoy_api_msg_type.metadata.v2.MetadataKey>` to retrieve the protobuf value
   // from :ref:`Metadata <envoy_api_msg_core.Metadata>`, and populate the tag value with
-  // `the canonical JSON <https://developers.google.com/protocol-buffers/docs/proto3#json>`
+  // `the canonical JSON <https://developers.google.com/protocol-buffers/docs/proto3#json>`_
   // representation of it.
   message Metadata {
     // Specify what kind of metadata to obtain tag value from.
