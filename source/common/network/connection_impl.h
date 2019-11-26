@@ -160,7 +160,7 @@ private:
   bool bothSidesHalfClosed();
 
   static std::atomic<uint64_t> next_global_id_;
-  
+
   std::list<BytesSentCb> bytes_sent_callbacks_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
