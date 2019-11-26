@@ -49,8 +49,8 @@ HeaderString::HeaderString(const LowerCaseString& ref_value) : type_(Type::Refer
   ASSERT(valid());
 }
 
-HeaderString::HeaderString(const std::string& ref_value) : type_(Type::Reference) {
-  buffer_.ref_ = ref_value.c_str();
+HeaderString::HeaderString(absl::string_view ref_value) : type_(Type::Reference) {
+  buffer_.ref_ = ref_value.data();
   string_length_ = ref_value.size();
   ASSERT(valid());
 }
@@ -261,13 +261,7 @@ HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key, Head
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(HeaderString&& key, HeaderString&& value)
     : key_(std::move(key)), value_(std::move(value)) {}
 
-void HeaderMapImpl::HeaderEntryImpl::value(const char* value, uint32_t size) {
-  value_.setCopy(value, size);
-}
-
-void HeaderMapImpl::HeaderEntryImpl::value(absl::string_view value) {
-  this->value(value.data(), static_cast<uint32_t>(value.size()));
-}
+void HeaderMapImpl::HeaderEntryImpl::value(absl::string_view value) { value_.setCopy(value); }
 
 void HeaderMapImpl::HeaderEntryImpl::value(uint64_t value) { value_.setInteger(value); }
 
@@ -325,28 +319,24 @@ HeaderMapImpl::HeaderMapImpl(
 
 void HeaderMapImpl::updateSize(uint64_t from_size, uint64_t to_size) {
   // Removes from_size from cached_byte_size_ and adds to_size.
-  if (cached_byte_size_.has_value()) {
-    ASSERT(cached_byte_size_ >= from_size);
-    cached_byte_size_.value() -= from_size;
-    cached_byte_size_.value() += to_size;
-  }
+  ASSERT(cached_byte_size_ >= from_size);
+  cached_byte_size_ -= from_size;
+  cached_byte_size_ += to_size;
 }
 
 void HeaderMapImpl::addSize(uint64_t size) {
-  // Adds size to cached_byte_size_ if it exists.
-  if (cached_byte_size_.has_value()) {
-    cached_byte_size_.value() += size;
-  }
+  // Adds size to cached_byte_size_.
+  cached_byte_size_ += size;
 }
 
 void HeaderMapImpl::subtractSize(uint64_t size) {
-  if (cached_byte_size_.has_value()) {
-    ASSERT(cached_byte_size_ >= size);
-    cached_byte_size_.value() -= size;
-  }
+  ASSERT(cached_byte_size_ >= size);
+  cached_byte_size_ -= size;
 }
 
 void HeaderMapImpl::copyFrom(const HeaderMap& header_map) {
+  // Clear the HeaderMap before copying the headers.
+  clear();
   header_map.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         // TODO(mattklein123) PERF: Avoid copying here if not necessary.
@@ -412,7 +402,7 @@ void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   }
 }
 
-void HeaderMapImpl::addReference(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::addReference(const LowerCaseString& key, absl::string_view value) {
   HeaderString ref_key(key);
   HeaderString ref_value(value);
   addViaMove(std::move(ref_key), std::move(ref_value));
@@ -426,10 +416,10 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) 
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
-void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, absl::string_view value) {
   HeaderString ref_key(key);
   HeaderString new_value;
-  new_value.setCopy(value.c_str(), value.size());
+  new_value.setCopy(value);
   insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
@@ -444,7 +434,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
     return;
   }
   HeaderString new_key;
-  new_key.setCopy(key.get().c_str(), key.get().size());
+  new_key.setCopy(key.get());
   HeaderString new_value;
   new_value.setInteger(value);
   insertByKey(std::move(new_key), std::move(new_value));
@@ -452,7 +442,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
-void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value) {
   auto* entry = getExistingInline(key.get());
   if (entry != nullptr) {
     const uint64_t added_size = appendToHeader(entry->value(), value);
@@ -460,15 +450,15 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
     return;
   }
   HeaderString new_key;
-  new_key.setCopy(key.get().c_str(), key.get().size());
+  new_key.setCopy(key.get());
   HeaderString new_value;
-  new_value.setCopy(value.c_str(), value.size());
+  new_value.setCopy(value);
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
-void HeaderMapImpl::appendToHeader(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::append(const LowerCaseString& key, absl::string_view value) {
   bool found = false;
   for (HeaderEntryImpl& header : headers_) {
     if (header.key().getStringView() == key.get()) {
@@ -483,29 +473,29 @@ void HeaderMapImpl::appendToHeader(const LowerCaseString& key, const std::string
   }
 }
 
-void HeaderMapImpl::setReference(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::setReference(const LowerCaseString& key, absl::string_view value) {
   HeaderString ref_key(key);
   HeaderString ref_value(value);
   remove(key);
   insertByKey(std::move(ref_key), std::move(ref_value));
 }
 
-void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_view value) {
   HeaderString ref_key(key);
   HeaderString new_value;
-  new_value.setCopy(value.c_str(), value.size());
+  new_value.setCopy(value);
   remove(key);
   insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
 }
 
-void HeaderMapImpl::setCopy(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
   // Replaces a header if it exists, otherwise adds by copy.
   bool found = false;
   for (HeaderEntryImpl& header : headers_) {
     if (header.key().getStringView() == key.get()) {
       updateSize(header.value().size(), value.size());
-      header.value(value.data(), value.size());
+      header.value(value);
       found = true;
     }
   }
@@ -515,16 +505,7 @@ void HeaderMapImpl::setCopy(const LowerCaseString& key, const std::string& value
   }
 }
 
-absl::optional<uint64_t> HeaderMapImpl::byteSize() const { return cached_byte_size_; }
-
-uint64_t HeaderMapImpl::refreshByteSize() {
-  if (!cached_byte_size_.has_value()) {
-    // In this case, the cached byte size is not valid, and the byte size is computed via an
-    // iteration over the HeaderMap. The cached byte size is updated.
-    cached_byte_size_ = byteSizeInternal();
-  }
-  return cached_byte_size_.value();
-}
+uint64_t HeaderMapImpl::byteSize() const { return cached_byte_size_; }
 
 uint64_t HeaderMapImpl::byteSizeInternal() const {
   // Computes the total byte size by summing the byte size of the keys and values.

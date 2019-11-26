@@ -74,7 +74,7 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
   }
 
   const std::string& address_as_string = remote_address.ip()->addressAsString();
-  headers.appendForwardedFor(address_as_string.c_str());
+  headers.appendForwardedFor(address_as_string.c_str(), ",");
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {

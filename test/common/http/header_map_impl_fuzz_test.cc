@@ -12,19 +12,6 @@ using Envoy::Fuzz::replaceInvalidCharacters;
 
 namespace Envoy {
 
-// Utility function for testing byteSize() against a manual byte count.
-uint64_t countBytesForTest(const Http::HeaderMapImpl& headers) {
-  uint64_t byte_size = 0;
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto* byte_size = static_cast<uint64_t*>(context);
-        *byte_size += header.key().getStringView().size() + header.value().getStringView().size();
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &byte_size);
-  return byte_size;
-}
-
 // Fuzz the header map implementation.
 DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) {
   Http::HeaderMapImplPtr header_map = std::make_unique<Http::HeaderMapImpl>();
@@ -119,8 +106,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
                             mutate_and_move.append().size());
         break;
       case test::common::http::MutateAndMove::kSetCopy:
-        header_value.setCopy(replaceInvalidCharacters(mutate_and_move.set_copy()).c_str(),
-                             mutate_and_move.set_copy().size());
+        header_value.setCopy(replaceInvalidCharacters(mutate_and_move.set_copy()));
         break;
       case test::common::http::MutateAndMove::kSetInteger:
         header_value.setInteger(mutate_and_move.set_integer());
@@ -144,7 +130,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       lower_case_strings.emplace_back(
           std::make_unique<Http::LowerCaseString>(replaceInvalidCharacters(append.key())));
       strings.emplace_back(std::make_unique<std::string>(replaceInvalidCharacters(append.value())));
-      header_map->appendToHeader(*lower_case_strings.back(), *strings.back());
+      header_map->append(*lower_case_strings.back(), *strings.back());
       break;
     }
     case test::common::http::Action::kCopy: {
@@ -177,7 +163,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     }
     // Verify that the byte size is always set, and that it's values match a manual count over the
     // HeaderMap.
-    FUZZ_ASSERT(header_map->byteSize().value() == countBytesForTest(*header_map));
+    FUZZ_ASSERT(header_map->byteSize() == header_map->byteSizeInternal());
     // Exercise some read-only accessors.
     header_map->size();
     header_map->iterate(

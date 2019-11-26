@@ -511,8 +511,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   case NGHTTP2_HEADERS: {
     // Verify that the final HeaderMap's byte size is under the limit before decoding headers.
     // This assert iterates over the HeaderMap.
-    ASSERT(stream->headers_->byteSize().has_value() &&
-           stream->headers_->byteSize().value() == stream->headers_->byteSizeInternal());
+    ASSERT(stream->headers_->byteSize() == stream->headers_->byteSizeInternal());
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     if (!stream->cookies_.empty()) {
       HeaderString key(Headers::get().Cookie);
@@ -627,8 +626,7 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
     if (stream->headers_) {
       // Verify that the final HeaderMap's byte size is under the limit before sending frames.
       // This assert iterates over the HeaderMap.
-      ASSERT(stream->headers_->byteSize().has_value() &&
-             stream->headers_->byteSize().value() == stream->headers_->byteSizeInternal());
+      ASSERT(stream->headers_->byteSize() == stream->headers_->byteSizeInternal());
     }
     stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     break;
@@ -820,9 +818,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
   }
   stream->saveHeader(std::move(name), std::move(value));
 
-  // Verify that the cached value in byte size exists.
-  ASSERT(stream->headers_->byteSize().has_value());
-  if (stream->headers_->byteSize().value() > max_headers_kb_ * 1024 ||
+  if (stream->headers_->byteSize() > max_headers_kb_ * 1024 ||
       stream->headers_->size() > max_headers_count_) {
     // This will cause the library to reset/close the stream.
     stats_.header_overflow_.inc();
