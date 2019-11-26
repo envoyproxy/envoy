@@ -315,6 +315,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
