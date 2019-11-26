@@ -220,6 +220,12 @@ ClusterManagerImpl::ClusterManagerImpl(
     }
   }
 
+  // We need to know whether we're zone aware early on, so make sure we do this lookup
+  // before we load any clusters.
+  if (!cm_config.local_cluster_name().empty()) {
+    local_cluster_name_ = cm_config.local_cluster_name();
+  }
+
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
@@ -288,19 +294,15 @@ ClusterManagerImpl::ClusterManagerImpl(
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateClusterCounts();
 
-  absl::optional<std::string> local_cluster_name;
-  if (!cm_config.local_cluster_name().empty()) {
-    local_cluster_name_ = cm_config.local_cluster_name();
-    local_cluster_name = cm_config.local_cluster_name();
-    if (active_clusters_.find(local_cluster_name.value()) == active_clusters_.end()) {
-      throw EnvoyException(
-          fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
-    }
+  if (local_cluster_name_ &&
+      (active_clusters_.find(local_cluster_name_.value()) == active_clusters_.end())) {
+    throw EnvoyException(
+        fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
   }
 
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
   // we can instantiate the thread local cluster manager.
-  tls_->set([this, local_cluster_name](
+  tls_->set([this, local_cluster_name = local_cluster_name_](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
@@ -1060,7 +1062,6 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls, uint64_t overprovisioning_factor) {
-
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
