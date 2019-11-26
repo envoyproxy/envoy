@@ -1211,6 +1211,37 @@ TEST(HeaderMapImplTest, TestInlineHeaderAdd) {
   EXPECT_TRUE(foo.Path() != nullptr);
 }
 
+TEST(HeaderMapImplTest, ClearHeaderMap) {
+  HeaderMapImpl headers;
+
+  // Add random header and then clear.
+  LowerCaseString static_key("hello");
+  std::string ref_value("value");
+  headers.addReference(static_key, ref_value);
+  EXPECT_EQ(headers.byteSize(), headers.byteSizeInternal());
+  EXPECT_EQ("value", headers.get(static_key)->value().getStringView());
+  EXPECT_EQ(HeaderString::Type::Reference, headers.get(static_key)->value().type());
+  EXPECT_EQ(1UL, headers.size());
+  EXPECT_FALSE(headers.empty());
+  headers.clear();
+  EXPECT_EQ(nullptr, headers.get(static_key));
+  EXPECT_EQ(0UL, headers.size());
+  EXPECT_TRUE(headers.empty());
+  EXPECT_EQ(headers.byteSize(), 0);
+
+  // Add inline and clear.
+  headers.setContentLength(5);
+  EXPECT_EQ(headers.byteSize(), headers.byteSizeInternal());
+  EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
+  EXPECT_EQ(1UL, headers.size());
+  EXPECT_FALSE(headers.empty());
+  headers.clear();
+  EXPECT_EQ(nullptr, headers.ContentLength());
+  EXPECT_EQ(0UL, headers.size());
+  EXPECT_TRUE(headers.empty());
+  EXPECT_EQ(headers.byteSize(), headers.byteSizeInternal());
+}
+
 // Validates byte size is properly accounted for in different inline header setting scenarios.
 TEST(HeaderMapImplTest, InlineHeaderByteSize) {
   uint64_t hostKeySize = Headers::get().Host.get().size();

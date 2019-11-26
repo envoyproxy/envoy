@@ -566,6 +566,26 @@ HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
   }
 }
 
+void HeaderMapImpl::clear() {
+  for (auto i = headers_.begin(); i != headers_.end();) {
+    EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(i->key().getStringView());
+    if (cb) {
+      StaticLookupResponse ref_lookup_response = cb(*this);
+      if (ref_lookup_response.entry_) {
+        const uint32_t key_value_size = (*ref_lookup_response.entry_)->key().size() +
+                                        (*ref_lookup_response.entry_)->value().size();
+        subtractSize(key_value_size);
+        *ref_lookup_response.entry_ = nullptr;
+        i = headers_.erase(i);
+      }
+      ++i;
+    } else {
+      subtractSize(i->key().size() + i->value().size());
+      i = headers_.erase(i);
+    }
+  }
+}
+
 void HeaderMapImpl::remove(const LowerCaseString& key) {
   EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get());
   if (cb) {

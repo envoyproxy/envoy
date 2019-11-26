@@ -527,6 +527,11 @@ public:
   virtual Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const PURE;
 
   /**
+   * Clears the headers in the map.
+   */
+  virtual void clear() PURE;
+
+  /**
    * Remove all instances of a header by key.
    * @param key supplies the header key to remove.
    */
