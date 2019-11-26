@@ -481,7 +481,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
-// Test the jsonConvertValue happy path. Failure modes are coverted by jsonConvert tests.
+// Test the jsonConvertValue happy path. Failure modes are converted by jsonConvert tests.
 TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
   {
     envoy::config::bootstrap::v2::Bootstrap source;
