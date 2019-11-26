@@ -540,7 +540,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
-  ENVOY_CONN_LOG(trace, "onHeadersCompleteBase complete", connection_);
+  const std::string header_type = processing_trailers_ ? "trailers" : "headers";
+  ENVOY_CONN_LOG(trace, "onHeadersCompleteBase complete for {}", connection_, header_type);
   completeLastHeader();
 
   // Validate that the completed HeaderMap's cached byte size exists and is correct.
@@ -765,9 +766,7 @@ void ServerConnectionImpl::onBody(const char* data, size_t length) {
 
 void ServerConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
   if (active_request_) {
-    Buffer::OwnedImpl buffer;
     active_request_->remote_complete_ = true;
-
     if (deferred_end_stream_headers_) {
       active_request_->request_decoder_->decodeHeaders(std::move(deferred_end_stream_headers_),
                                                        true);
@@ -775,6 +774,7 @@ void ServerConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
     } else if (processing_trailers_) {
       active_request_->request_decoder_->decodeTrailers(std::move(trailers));
     } else {
+      Buffer::OwnedImpl buffer;
       active_request_->request_decoder_->decodeData(buffer, true);
     }
   }
