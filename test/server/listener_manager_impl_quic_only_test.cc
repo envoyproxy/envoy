@@ -49,7 +49,7 @@ udp_listener_config:
 #else
                            /* expected_num_options */ 2,
 #endif
-                           /* exected_creation_params */ {true, false});
+                           /* expected_creation_params */ {true, false});
 
   expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ IPPROTO_IP,

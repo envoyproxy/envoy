@@ -66,9 +66,9 @@ public:
                         const envoy::api::v2::core::SocketOption::SocketState& expected_state,
                         const Network::SocketOptionName& expected_option, int expected_value,
                         uint32_t expected_num_options = 1,
-                        ListenSocketCreationParams exected_creation_params={true, true}) {
+                        ListenSocketCreationParams expected_creation_params={true, true}) {
     if (expected_option.has_value()) {
-      expectCreateListenSocket(expected_state, expected_num_options, exected_creation_params);
+      expectCreateListenSocket(expected_state, expected_num_options, expected_creation_params);
       expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),
                        expected_value, expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
@@ -3321,7 +3321,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForTcp) {
   testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_SO_REUSEPORT, /* expected_value */ 1,
                    /* expected_num_options */ 1,
-                   /* exected_creation_params */ {true, false});
+                   /* expected_creation_params */ {true, false});
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
@@ -3343,7 +3343,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
 #else
                            /* expected_num_options */ 2,
 #endif
-                           /* exected_creation_params */ {true, false});
+                           /* expected_creation_params */ {true, false});
 
   expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ IPPROTO_IP,
