@@ -749,73 +749,48 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_view& authority,
+const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_view& host,
                                                            uint32_t default_port) {
-  Utility::AuthorityAttributes auth_attr;
-  auth_attr.port = default_port;
-  auth_attr.host = authority;
-
-  const auto colon_pos = authority.rfind(":");
-
-  bool is_ipv6 = false;
-  bool have_port_ipv4 = false;
-  bool have_port_ipv6 = false;
-
-  if (colon_pos != absl::string_view::npos && colon_pos != authority.find(":")) {
-    is_ipv6 = true;
-  }
-
-  if (authority.rfind("]:") != absl::string_view::npos) {
-    have_port_ipv6 = true;
-  }
-
-  if (colon_pos != absl::string_view::npos && colon_pos == authority.find(":")) {
-    have_port_ipv4 = true;
-  }
-
-  if (have_port_ipv4 || have_port_ipv6) {
-    try {
-      const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddressAndPort(authority);
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
-      auth_attr.port = instance->ip()->port();
-      auth_attr.is_ip_address = true;
-
-      return auth_attr;
-    } catch (const EnvoyException&) {
-      // If authority has FQDN and port like localhost:8000,
-      // Network::Utility::parseInternetAddressAndPort should be failed so that we must parse
-      // authority on here
-
-      const auto port_str = Network::Utility::portFromIpAddress(authority);
-      uint64_t port64 = 0;
-
-      // This section should be false if authority is like example.com:abc, we can't regard as abc
-      // as port so that must regard example.com:abc as host and return them
-      if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-        auth_attr.port = default_port;
-        return auth_attr;
-      }
-
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
-      auth_attr.port = static_cast<uint32_t>(port64);
+  // First try to see if there is a port included. This also checks to see that there is not a ']'
+  // as the last character which is indicative of an IPv6 address without a port. This is a best
+  // effort attempt.
+  const auto colon_pos = host.rfind(':');
+  absl::string_view host_to_resolve = host;
+  if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
+    const absl::string_view string_view_host = host;
+    host_to_resolve = string_view_host.substr(0, colon_pos);
+    const auto port_str = string_view_host.substr(colon_pos + 1);
+    uint64_t port64;
+    if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+      // Just attempt to resolve whatever we were given. This will very likely fail.
+      host_to_resolve = host;
+    } else {
+      default_port = port64;
     }
   }
 
+  // Now see if this is an IP address. We need to know this because some things (such as setting
+  // SNI) are special cased if this is an IP address. Either way, we still go through the normal
+  // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
+  // so is not worth it since the DNS resolver should handle it for us.
+  bool is_ip_address = false;
   try {
-    // if authority is like ipv6 address with brackets without port like [::], we should extract ::
-    // as host because parse it validly on parseInternetAddress() because this function can't
-    // receive host with bracket but return exception
-    const auto extracted_host = !have_port_ipv6 && is_ipv6
-                                    ? Network::Utility::hostFromIpAddress(authority)
-                                    : auth_attr.host;
-    Network::Utility::parseInternetAddress(extracted_host, default_port);
-    auth_attr.host = extracted_host;
-    auth_attr.is_ip_address = true;
+    absl::string_view potential_ip_address = host_to_resolve;
+    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+    // now, just do all the trimming here, but in the future we should consider whether we can
+    // have unified [] handling as low as possible in the stack.
+    if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
+      potential_ip_address.remove_prefix(1);
+      potential_ip_address.remove_suffix(1);
+    }
+    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
+    is_ip_address = true;
+    host_to_resolve = potential_ip_address;
   } catch (const EnvoyException&) {
   }
 
-  return auth_attr;
+  return {is_ip_address, host_to_resolve, default_port};
 }
 
 } // namespace Http
