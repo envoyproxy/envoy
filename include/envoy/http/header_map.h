@@ -343,7 +343,7 @@ private:
  *
  * ContentLength() -> returns the header entry if it exists or nullptr.
  * appendContentLength(foo, ",") -> append the string foo using a comma as a delimiter.
- * setReferenceContentlength(foo) -> sets the header value to the reference string foo.
+ * setReferenceContentLength(foo) -> sets the header value to the reference string foo.
  * setContentLength(bar) -> sets the header value to the string bar by copying the data.
  * setContentLength(5) -> sets the header value to the integer 5.
  * removeContentLength() -> removes the header if it exists.
