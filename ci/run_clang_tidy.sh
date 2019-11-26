@@ -70,7 +70,7 @@ elif [[ "${BUILD_REASON}" != "PullRequest" ]]; then
 else
   echo "Running clang-tidy-diff against master branch..."
   git fetch https://github.com/envoyproxy/envoy.git master
-  git diff "${SYSTEM_PULLREQUEST_TARGETBRANCH:-refs/heads/master}..HEAD" | filter_excludes | \
+  git diff "$(git merge-base HEAD FETCH_HEAD)..HEAD" | filter_excludes | \
     "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
       -clang-tidy-binary=${CLANG_TIDY} \
       -p 1
