@@ -382,7 +382,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message DownstreamTlsContext {
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
