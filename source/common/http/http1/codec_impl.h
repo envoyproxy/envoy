@@ -207,7 +207,7 @@ protected:
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
-  bool processing_trailers_{};
+  bool processing_trailers_ : 1;
   bool handling_upgrade_ : 1;
   bool reset_stream_called_ : 1;
   const bool strict_header_validation_ : 1;

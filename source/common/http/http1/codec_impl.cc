@@ -384,9 +384,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                                HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
     : enable_trailers_(enable_trailers),
       connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
-      header_key_formatter_(std::move(header_key_formatter)), handling_upgrade_(false),
-      reset_stream_called_(false), strict_header_validation_(Runtime::runtimeFeatureEnabled(
-                                       "envoy.reloadable_features.strict_header_validation")),
+      header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
+      handling_upgrade_(false), reset_stream_called_(false),
+      strict_header_validation_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
