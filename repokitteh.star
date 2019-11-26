@@ -6,7 +6,7 @@ use(
   "github.com/repokitteh/modules/ownerscheck.star#oc",
   paths=[
     {
-      "owner": "envoyproxy/api-shepherds!",
+      "owner": "rktest2!",
       "path": "api/",
       "label": "api",
     },
