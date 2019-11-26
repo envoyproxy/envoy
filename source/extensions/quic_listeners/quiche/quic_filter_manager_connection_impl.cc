@@ -8,10 +8,11 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection* connection,
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
-    : quic_connection_(connection), dispatcher_(dispatcher), filter_manager_(*this),
-      // QUIC connection id can be 18 bytes. It's easier to use hash value instead
-      // of trying to map it into a 64-bit space.
-      stream_info_(dispatcher.timeSource()), id_(quic_connection_->connection_id().Hash()),
+  // Using this for purpose other than logging is not safe. Because QUIC connection id can be
+  // 18 bytes, so there might be collision when it's hashed to 8 bytes.
+    : Network::ConnectionImplBase(dispatcher, /*id=*/connection->connection_id().Hash()),
+    quic_connection_(connection), filter_manager_(*this),
+      stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
@@ -34,10 +35,6 @@ bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_.initializeReadFilters();
 }
 
-void QuicFilterManagerConnectionImpl::addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
-  network_connection_callbacks_.push_back(&cb);
-}
-
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
@@ -54,22 +51,41 @@ bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
-  if (type != Network::ConnectionCloseType::NoFlush) {
-    // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
-  }
   if (quic_connection_ == nullptr) {
     // Already detached from quic connection.
     return;
   }
-  quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
-  quic_connection_ = nullptr;
-}
-
-void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
-  if (timeout != std::chrono::milliseconds::zero()) {
-    // TODO(danzh) support delayed close of connection.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  const bool delayed_close_timeout_configured = delayed_close_timeout_.count() > 0;
+  if (hasDataToWrite() && type != Network::ConnectionCloseType::NoFlush) {
+    // QUIC connection has unsent data and caller wants to flush them. Wait for flushing or timeout.
+    if (!inDelayedClose() && delayed_close_timeout_configured) {
+      // Only set alarm if not in delay close mode yet.
+      initializeDelayedCloseTimer();
+    }
+    // Update delay close state according to current call.
+    if (delayed_close_timeout_configured &&
+        type == Network::ConnectionCloseType::FlushWriteAndDelay) {
+      delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+    } else {
+      delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
+    }
+  } else {
+    if (hasDataToWrite()) {
+      // Quic connection has unsent data but caller wants to close right away.
+      ASSERT(type == Network::ConnectionCloseType::NoFlush);
+      quic_connection_->OnCanWrite();
+      closeConnectionImmediately();
+    } else {
+      // Quic connection doesn't have unsent data. It's upto caller and
+      // configuration whether to wait or not before closing.
+      if (delayed_close_timeout_configured &&
+          type == Network::ConnectionCloseType::FlushWriteAndDelay) {
+        initializeDelayedCloseTimer();
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+      } else {
+        closeConnectionImmediately();
+      }
+    }
   }
 }
 
@@ -114,28 +130,31 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
                                            " with details: ", frame.error_details);
   if (quic_connection_ != nullptr) {
     // Tell network callbacks about connection close if not detached yet.
-    raiseEvent(source == quic::ConnectionCloseSource::FROM_PEER
+    raiseConnectionEvent(source == quic::ConnectionCloseSource::FROM_PEER
                    ? Network::ConnectionEvent::RemoteClose
                    : Network::ConnectionEvent::LocalClose);
   }
 }
 
-void QuicFilterManagerConnectionImpl::raiseEvent(Network::ConnectionEvent event) {
-  for (auto callback : network_connection_callbacks_) {
-    callback->onEvent(event);
+void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
+  if  (quic_connection_ == nullptr) {
+    return;
   }
+  quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
+                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quic_connection_ = nullptr;
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
-  for (auto callback : network_connection_callbacks_) {
+  for (auto callback : callbacks_) {
     callback->onAboveWriteBufferHighWatermark();
   }
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
-  for (auto callback : network_connection_callbacks_) {
+  for (auto callback : callbacks_) {
     callback->onBelowWriteBufferLowWatermark();
   }
 }

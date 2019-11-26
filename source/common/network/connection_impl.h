@@ -135,6 +135,9 @@ protected:
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
+  // Obtain global next connection ID. This should only be used in tests.
+  static uint64_t nextGlobalIdForTest() { return next_global_id_; }
+
 protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
@@ -158,6 +161,8 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
+  static std::atomic<uint64_t> next_global_id_;
+  
   std::list<BytesSentCb> bytes_sent_callbacks_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)

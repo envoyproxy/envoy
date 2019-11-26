@@ -11,7 +11,7 @@ namespace Network {
 class ConnectionImplBase : public FilterManagerConnection,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
-  ConnectionImplBase(Event::Dispatcher& dispatcher);
+  ConnectionImplBase(Event::Dispatcher& dispatcher, uint64_t id);
   ~ConnectionImplBase() override {}
 
   // Network::Connection
@@ -21,14 +21,13 @@ public:
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
 
-  // Obtain global next connection ID. This should only be used in tests.
-  static uint64_t nextGlobalIdForTest() { return next_global_id_; }
-
 protected:
   void initializeDelayedCloseTimer();
 
   bool inDelayedClose() const { return delayed_close_state_ != DelayedCloseState::None; }
 
+  void raiseConnectionEvent(ConnectionEvent event);
+  
   virtual void closeConnectionImmediately() PURE;
 
   // States associated with delayed closing of the connection (i.e., when the underlying socket is
@@ -56,8 +55,6 @@ protected:
 private:
   // Callback issued when a delayed close timeout triggers.
   void onDelayedCloseTimeout();
-
-  static std::atomic<uint64_t> next_global_id_;
 };
 
 } // namespace Network

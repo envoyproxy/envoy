@@ -40,7 +40,7 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
-    : ConnectionImplBase(dispatcher), transport_socket_(std::move(transport_socket)),
+    : ConnectionImplBase(dispatcher, next_global_id_++), transport_socket_(std::move(transport_socket)),
       socket_(std::move(socket)), filter_manager_(*this), stream_info_(dispatcher.timeSource()),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
@@ -326,11 +326,7 @@ void ConnectionImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::raiseEvent(ConnectionEvent event) {
-  for (ConnectionCallbacks* callback : callbacks_) {
-    // TODO(mattklein123): If we close while raising a connected event we should not raise further
-    // connected events.
-    callback->onEvent(event);
-  }
+  ConnectionImplBase::raiseConnectionEvent(event);
   // We may have pending data in the write buffer on transport handshake
   // completion, which may also have completed in the context of onReadReady(),
   // where no check of the write buffer is made. Provide an opportunity to flush
@@ -699,5 +695,8 @@ void ClientConnectionImpl::connect() {
     socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
   }
 }
+
+std::atomic<uint64_t> ConnectionImpl::next_global_id_;
+
 } // namespace Network
 } // namespace Envoy

@@ -3,10 +3,8 @@
 namespace Envoy {
 namespace Network {
 
-ConnectionImplBase::ConnectionImplBase(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), id_(next_global_id_++) {}
-
-std::atomic<uint64_t> ConnectionImplBase::next_global_id_;
+ConnectionImplBase::ConnectionImplBase(Event::Dispatcher& dispatcher, uint64_t id)
+    : dispatcher_(dispatcher), id_(id) {}
 
 void ConnectionImplBase::addConnectionCallbacks(ConnectionCallbacks& cb) {
   callbacks_.push_back(&cb);
@@ -30,6 +28,14 @@ void ConnectionImplBase::initializeDelayedCloseTimer() {
   delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
   ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this, timeout);
   delayed_close_timer_->enableTimer(delayed_close_timeout_);
+}
+
+void ConnectionImplBase::raiseConnectionEvent(ConnectionEvent event) {
+  for (ConnectionCallbacks* callback : callbacks_) {
+    // TODO(mattklein123): If we close while raising a connected event we should not raise further
+    // connected events.
+    callback->onEvent(event);
+  }
 }
 
 void ConnectionImplBase::onDelayedCloseTimeout() {

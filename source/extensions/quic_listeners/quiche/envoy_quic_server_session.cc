@@ -92,11 +92,27 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
   }
 }
 
+void EnvoyQuicServerSession::OnCanWrite() {
+  quic::QuicServerSessionBase::OnCanWrite();
+  if (inDelayedClose() && !HasDataToWrite()) {
+    if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
+       ASSERT(delayed_close_timer_ != nullptr);
+      delayed_close_timer_->enableTimer(delayed_close_timeout_);
+    } else {
+      closeConnectionImmediately();
+    }
+  }
+}
+
 void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
-    raiseEvent(Network::ConnectionEvent::Connected);
+    raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
+}
+
+bool EnvoyQuicServerSession::hasDataToWrite() {
+  return HasDataToWrite();
 }
 
 } // namespace Quic
