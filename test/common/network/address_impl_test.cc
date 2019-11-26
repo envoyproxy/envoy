@@ -344,6 +344,14 @@ TEST(PipeInstanceTest, BasicPermission) {
       << (stat_buf.st_mode) << strerror(result.errno_);
 }
 
+TEST(PipeInstanceTest, AbstractNamespacePermission) {
+#if defined(__linux__)
+  const mode_t mode = 0777;
+  EXPECT_THROW_WITH_REGEX(PipeInstance address("@/foo", mode), EnvoyException,
+                          "Cannot set mode for Abstract AF_UNIX sockets");
+#endif
+}
+
 TEST(PipeInstanceTest, AbstractNamespace) {
 #if defined(__linux__)
   PipeInstance address("@/foo");
