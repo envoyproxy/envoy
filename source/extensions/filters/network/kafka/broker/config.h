@@ -22,6 +22,7 @@ public:
   KafkaConfigFactory() : FactoryBase(NetworkFilterNames::get().KafkaBroker) {}
 
 private:
+  // Common::FactoryBase<KafkaBrokerProtoConfig>
   Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const KafkaBrokerProtoConfig& proto_config,
                                     Server::Configuration::FactoryContext& context) override;

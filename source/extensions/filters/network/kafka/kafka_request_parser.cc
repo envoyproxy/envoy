@@ -22,6 +22,10 @@ RequestParseResponse RequestStartParser::parse(absl::string_view& data) {
 
 RequestParseResponse RequestHeaderParser::parse(absl::string_view& data) {
   context_->remaining_request_size_ -= deserializer_->feed(data);
+  // One of the two needs must have happened when feeding finishes:
+  // - deserializer has consumed all the bytes it needed,
+  // - or all the data has been consumed (but deserializer might still need data to be ready).
+  ASSERT(deserializer_->ready() || data.empty());
   if (deserializer_->ready()) {
     RequestHeader request_header = deserializer_->get();
     context_->request_header_ = request_header;

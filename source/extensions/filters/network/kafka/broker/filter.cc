@@ -29,6 +29,7 @@ KafkaMetricsFacadeImpl::KafkaMetricsFacadeImpl(TimeSource& time_source,
     : time_source_{time_source}, request_metrics_{request_metrics}, response_metrics_{
                                                                         response_metrics} {};
 
+// When request is successfully parsed, increase type count and store its arrival timestamp.
 void KafkaMetricsFacadeImpl::onMessage(AbstractRequestSharedPtr request) {
   const RequestHeader& header = request->request_header_;
   request_metrics_->onRequest(header.api_key_);
@@ -37,6 +38,14 @@ void KafkaMetricsFacadeImpl::onMessage(AbstractRequestSharedPtr request) {
   request_arrivals_[header.correlation_id_] = request_arrival_ts;
 }
 
+void KafkaMetricsFacadeImpl::onFailedParse(RequestParseFailureSharedPtr) {
+  request_metrics_->onUnknownRequest();
+}
+
+void KafkaMetricsFacadeImpl::onRequestException() { request_metrics_->onBrokenRequest(); }
+
+// When response is successfully parsed, compute processing time using its correlation id and
+// stored request arrival timestamp, then update metrics with the result.
 void KafkaMetricsFacadeImpl::onMessage(AbstractResponseSharedPtr response) {
   const ResponseMetadata& metadata = response->metadata_;
 
@@ -50,17 +59,11 @@ void KafkaMetricsFacadeImpl::onMessage(AbstractResponseSharedPtr response) {
   response_metrics_->onResponse(metadata.api_key_, ms.count());
 }
 
-void KafkaMetricsFacadeImpl::onFailedParse(RequestParseFailureSharedPtr) {
-  request_metrics_->onUnknownRequest();
-}
-
 void KafkaMetricsFacadeImpl::onFailedParse(ResponseMetadataSharedPtr) {
   response_metrics_->onUnknownResponse();
 }
 
-void KafkaMetricsFacadeImpl::onRequestException() {}
-
-void KafkaMetricsFacadeImpl::onResponseException() {}
+void KafkaMetricsFacadeImpl::onResponseException() { response_metrics_->onBrokenResponse(); }
 
 absl::flat_hash_map<int32_t, MonotonicTime>& KafkaMetricsFacadeImpl::getRequestArrivalsForTest() {
   return request_arrivals_;

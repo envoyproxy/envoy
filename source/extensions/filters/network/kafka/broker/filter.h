@@ -29,6 +29,9 @@ using KafkaCallbackSharedPtr = std::shared_ptr<KafkaCallback>;
 /**
  * Request callback responsible for updating state of related response decoder.
  * When a request gets successfully parsed, the response decoder registers a new incoming request.
+ * When request could not be recognized, we can extract the header, so we can register the
+ * expected response (decoder will not be able to capable of decoding the response, but at least we
+ * will not break the communication between client and broker).
  */
 class Forwarder : public RequestCallback {
 public:
@@ -37,17 +40,8 @@ public:
    */
   Forwarder(ResponseDecoder& response_decoder) : response_decoder_{response_decoder} {};
 
-  /**
-   * When request is successfully parsed, register expected response in request decoder.
-   */
+  // RequestCallback
   void onMessage(AbstractRequestSharedPtr request) override;
-
-  /**
-   * When request could not be recognized, we can extract the header, so we can register the
-   * expected response.
-   * Decoder will not be able to capable of decoding the response, but at least we will not break
-   * the communication between client and broker.
-   */
   void onFailedParse(RequestParseFailureSharedPtr parse_failure) override;
 
 private:
@@ -94,35 +88,16 @@ public:
   KafkaMetricsFacadeImpl(TimeSource& time_source, RichRequestMetricsSharedPtr request_metrics,
                          RichResponseMetricsSharedPtr response_metrics);
 
-  /**
-   * When request is successfully parsed, increase type count and store its arrival timestamp.
-   */
+  // RequestCallback
   void onMessage(AbstractRequestSharedPtr request) override;
-
-  /**
-   * When response is successfully parsed, compute processing time using its correlation id and
-   * stored request arrival timestamp, then update metrics with the result.
-   */
-  void onMessage(AbstractResponseSharedPtr response) override;
-
-  /**
-   * If request could not be recognized, increase unknown request count.
-   */
   void onFailedParse(RequestParseFailureSharedPtr parse_failure) override;
 
-  /**
-   * If response could not be recognized, increase unknown response count.
-   */
+  // ResponseCallback
+  void onMessage(AbstractResponseSharedPtr response) override;
   void onFailedParse(ResponseMetadataSharedPtr parse_failure) override;
 
-  /**
-   * If exceptions occurred while deserializing request, increase request failure count.
-   */
+  // KafkaMetricsFacade
   void onRequestException() override;
-
-  /**
-   * If exceptions occurred while deserializing response, increase response failure count.
-   */
   void onResponseException() override;
 
   absl::flat_hash_map<int32_t, MonotonicTime>& getRequestArrivalsForTest();
