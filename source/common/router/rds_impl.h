@@ -72,7 +72,7 @@ public:
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
   void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
-  void requestVirtualHostsUpdate(const std::string&, Http::StreamDecoderFilterSharedPtr) override {
+  void requestVirtualHostsUpdate(const std::string&, Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -170,8 +170,8 @@ private:
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
 
 struct UpdateOnDemandCallback {
-  const std::set<std::string> aliases_;
-  std::weak_ptr<Http::StreamDecoderFilter> to_notify;
+  const std::string alias_;
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
 };
 
 struct ThreadLocalCallbacks : public ThreadLocal::ThreadLocalObject {
@@ -197,7 +197,7 @@ public:
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
   void requestVirtualHostsUpdate(const std::string& for_domain,
-                                 Http::StreamDecoderFilterSharedPtr filter_to_notify) override;
+                                 Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
   void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
 private:

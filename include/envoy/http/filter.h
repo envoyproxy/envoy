@@ -11,7 +11,6 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
-#include "envoy/observer/notifiable.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
@@ -193,6 +192,9 @@ public:
    */
   virtual const ScopeTrackedObject& scope() PURE;
 };
+
+using RouteConfigUpdatedCallback = std::function<void()>;
+using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
 
 /**
  * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
@@ -443,7 +445,7 @@ public:
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to the worker thread.
    */
-  virtual void requestRouteConfigUpdate() PURE;
+  virtual void requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   /**
    *
@@ -481,7 +483,7 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase, public Observer::Notifiable {
+class StreamDecoderFilter : public StreamFilterBase {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -531,8 +533,6 @@ public:
    * Called at the end of the stream, when all data has been decoded.
    */
   virtual void decodeComplete() {}
-
-  void notify() override {}
 };
 
 using StreamDecoderFilterSharedPtr = std::shared_ptr<StreamDecoderFilter>;

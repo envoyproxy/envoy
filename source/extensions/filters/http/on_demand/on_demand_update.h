@@ -24,10 +24,9 @@ public:
 
   void onDestroy() override {}
 
-  void notify() override;
-
 private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_callback_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
 };
 

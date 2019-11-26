@@ -69,7 +69,7 @@ void RouteConfigUpdateReceiverImpl::updateVhosts(
     std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
   for (const auto& resource : added_resources) {
-    // the management server returns empty resources For aliases that it couldn't resolve.
+    // the management server returns empty resources for aliases that it couldn't resolve.
     if (aliasResolutionFailed(resource)) {
       continue;
     }

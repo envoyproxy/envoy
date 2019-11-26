@@ -229,24 +229,21 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   }
 
   // Notifies connections that RouteConfiguration update has been propagated.
-  // Callbacks processing is performed in FIFO order. The callback is skipped if alias(es) used in
+  // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
   config_update_callbacks_->runOnAllThreads(
       [aliases](ThreadLocal::ThreadLocalObjectSharedPtr previous)
           -> ThreadLocal::ThreadLocalObjectSharedPtr {
         auto callbacks = std::dynamic_pointer_cast<ThreadLocalCallbacks>(previous)->callbacks_;
-        std::vector<std::string> aliases_not_in_update;
         for (auto it = callbacks.begin(); it != callbacks.end();) {
-          std::set_difference(it->aliases_.begin(), it->aliases_.end(), aliases.begin(),
-                              aliases.end(), std::back_inserter(aliases_not_in_update));
-          if (aliases_not_in_update.empty()) {
-            if (auto to_notify = it->to_notify.lock()) {
-              to_notify->notify();
+          auto found = aliases.find(it->alias_);
+          if (found != aliases.end()) {
+            if (auto cb = it->cb_.lock()) {
+              (*cb)();
             }
             it = callbacks.erase(it);
           } else {
             it++;
-            aliases_not_in_update.clear();
           }
         }
         return previous;
@@ -262,11 +259,11 @@ void RdsRouteConfigProviderImpl::validateConfig(
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
-    const std::string& for_domain, Http::StreamDecoderFilterSharedPtr filter_to_notify) {
+    const std::string& for_domain, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   factory_context_.dispatcher().post(
       [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
   config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push_back(
-      {{for_domain}, filter_to_notify});
+      {for_domain, route_config_updated_cb});
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

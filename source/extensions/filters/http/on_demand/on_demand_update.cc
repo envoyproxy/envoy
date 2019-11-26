@@ -14,7 +14,8 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::HeaderMap&, b
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return filter_iteration_state_;
   }
-  callbacks_->requestRouteConfigUpdate();
+  route_config_updated_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback([this]() -> void { onRouteConfigUpdateCompletion(); }));
+  callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
   return filter_iteration_state_;
 }
@@ -36,7 +37,7 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
 // has been propagated to workers, at which point the request processing is restarted from the
 // beginning.
-void OnDemandRouteUpdate::notify() {
+void OnDemandRouteUpdate::onRouteConfigUpdateCompletion() {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
   if (callbacks_->canResolveRouteAfterConfigUpdate() && // route can be resolved after an on-demand

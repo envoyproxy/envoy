@@ -62,7 +62,7 @@ public:
    * propagated to worker threads
    */
   virtual void requestVirtualHostsUpdate(const std::string& for_domain,
-                                         Http::StreamDecoderFilterSharedPtr filter_to_notify) PURE;
+                                         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;

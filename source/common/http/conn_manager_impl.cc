@@ -482,10 +482,10 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    const HeaderString& host, StreamDecoderFilterSharedPtr filter_to_notify) {
+    const HeaderString& host, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   ASSERT(!host.empty());
   auto& host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
-  route_config_provider_->requestVirtualHostsUpdate(host_header, std::move(filter_to_notify));
+  route_config_provider_->requestVirtualHostsUpdate(host_header, std::move(route_config_updated_cb));
 }
 
 bool ConnectionManagerImpl::RdsRouteConfigUpdateRequester::canRequestRouteConfigUpdate() {
@@ -1359,10 +1359,9 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
-    StreamDecoderFilterSharedPtr decoder_filter_to_notify) {
+void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
-                                                           std::move(decoder_filter_to_notify));
+                                                           std::move(route_config_updated_cb));
 }
 
 bool ConnectionManagerImpl::ActiveStream::canRequestRouteConfigUpdate() {
@@ -2257,8 +2256,8 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   return true;
 }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate() {
-  parent_.requestRouteConfigUpdate(handle_);
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  parent_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canRequestRouteConfigUpdate() {
