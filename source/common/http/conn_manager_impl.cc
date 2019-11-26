@@ -1338,19 +1338,23 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
         connection_manager_.cluster_manager_.get(stream_info_.route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
-  refreshCachedTracingCustomTags();
+
+  if (connection_manager_.config_.tracingConfig()) {
+    refreshCachedTracingCustomTags();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
+  Tracing::CustomTagMap& customTagMap = getOrMakeTracingCustomTagMap();
   if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
     const Tracing::CustomTagMap& route_tags =
         cached_route_.value()->tracingConfig()->getCustomTags();
-    tracing_custom_tags_.insert(route_tags.begin(), route_tags.end());
+    customTagMap.insert(route_tags.begin(), route_tags.end());
   }
   if (connection_manager_.config_.tracingConfig()) {
     const Tracing::CustomTagMap& conn_manager_tags =
         connection_manager_.config_.tracingConfig()->custom_tags_;
-    tracing_custom_tags_.insert(conn_manager_tags.begin(), conn_manager_tags.end());
+    customTagMap.insert(conn_manager_tags.begin(), conn_manager_tags.end());
   }
 }
 
@@ -1815,7 +1819,8 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
 }
 
 const Tracing::CustomTagMap& ConnectionManagerImpl::ActiveStream::customTags() const {
-  return tracing_custom_tags_;
+  ASSERT(tracing_custom_tags_ != nullptr);
+  return *tracing_custom_tags_;
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2088,7 +2093,9 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   parent_.cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
-  parent_.tracing_custom_tags_.clear();
+  if (parent_.tracing_custom_tags_) {
+    parent_.tracing_custom_tags_->clear();
+  }
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {

@@ -44,17 +44,10 @@ message CustomTag {
   }
 
   // Metadata type custom tag using
-  // :ref:`MetadataKey <envoy_api_msg_type.metadata.v2.MetadataKey>` to retrieve tag value
-  // from :ref:`Metadata <envoy_api_msg_core.Metadata>`.
-  // The value will be formatted in the following way depending on the type:
-  //
-  // * `boolean`: populate with ``true`` or ``false`` string;
-  // * `number`: populate with number string;
-  // * `string`: populate with the string itself, an empty tag value
-  //   will be populated if it is empty;
-  // * `list`/`struct`: populate with the corresponding JSON string
-  //   converted from the protobuf message;
-  // * otherwise means that no valid metadata is found.
+  // :ref:`MetadataKey <envoy_api_msg_type.metadata.v2.MetadataKey>` to retrieve the protobuf value
+  // from :ref:`Metadata <envoy_api_msg_core.Metadata>`, and populate the tag value with
+  // `the canonical JSON <https://developers.google.com/protocol-buffers/docs/proto3#json>`
+  // representation of it.
   message Metadata {
     // Specify what kind of metadata to obtain tag value from.
     metadata.v2.MetadataKind kind = 1;
@@ -84,7 +77,7 @@ message CustomTag {
     // A request header custom tag.
     Header request_header = 4;
 
-    // A custom tag to obtain tag value from the metadata specified by source.
+    // A custom tag to obtain tag value from the metadata.
     Metadata metadata = 5;
   }
 }
