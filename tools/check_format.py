@@ -308,7 +308,9 @@ def whitelistedForGrpcInit(file_path):
 
 
 def whitelistedForUnpackTo(file_path):
-  return file_path.startswith("./test") or file_path == "./source/common/protobuf/utility.h"
+  return file_path.startswith("./test") or file_path in [
+      "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
+  ]
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
