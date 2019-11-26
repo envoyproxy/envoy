@@ -921,8 +921,9 @@ TEST(HeaderMapImplTest, Get) {
     // There is not HeaderMap method to set a header and copy both the key and value.
     headers.setReferenceKey(LowerCaseString(":path"), "/new_path");
     EXPECT_EQ("/new_path", headers.get(LowerCaseString(":path"))->value().getStringView());
-    headers.setReferenceKey(LowerCaseString("hello"), "world2");
-    EXPECT_EQ("world2", headers.get(LowerCaseString("hello"))->value().getStringView());
+    LowerCaseString foo("hello");
+    headers.setReferenceKey(foo, "world2");
+    EXPECT_EQ("world2", headers.get(foo)->value().getStringView());
     EXPECT_EQ(nullptr, headers.get(LowerCaseString("foo")));
   }
 }
