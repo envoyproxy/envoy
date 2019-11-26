@@ -35,12 +35,7 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 namespace {
-  /*
-bool operator==(const ListenSocketCreationParams& lhs, const ListenSocketCreationParams& rhs) {
-  return (lhs.bind_to_port == rhs.bind_to_port)
-      && (lhs.duplicate_parent_socket == rhs.duplicate_parent_socket);
-}
-  */
+
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
   /**
@@ -66,7 +61,7 @@ public:
                         const envoy::api::v2::core::SocketOption::SocketState& expected_state,
                         const Network::SocketOptionName& expected_option, int expected_value,
                         uint32_t expected_num_options = 1,
-                        ListenSocketCreationParams expected_creation_params={true, true}) {
+                        ListenSocketCreationParams expected_creation_params = {true, true}) {
     if (expected_option.has_value()) {
       expectCreateListenSocket(expected_state, expected_num_options, expected_creation_params);
       expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),

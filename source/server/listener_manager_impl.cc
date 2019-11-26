@@ -69,7 +69,8 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
 } // namespace
 
 bool ListenSocketCreationParams::operator==(const ListenSocketCreationParams& rhs) const {
-  return (bind_to_port == rhs.bind_to_port) && (duplicate_parent_socket == rhs.duplicate_parent_socket);
+  return (bind_to_port == rhs.bind_to_port) &&
+         (duplicate_parent_socket == rhs.duplicate_parent_socket);
 }
 
 bool ListenSocketCreationParams::operator!=(const ListenSocketCreationParams& rhs) const {
