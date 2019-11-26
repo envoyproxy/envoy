@@ -191,7 +191,7 @@ const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets()
 
 namespace {
 struct SyncPacketProcessor : public Network::UdpPacketProcessor {
-  SyncPacketProcessor(Network::UdpRecvData& data) : data_(data) {}
+  SyncPacketProcessor(Network::UdpRecvData& data) : data_(data) { ASSERT(data.buffer_ == nullptr); }
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,

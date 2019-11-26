@@ -64,9 +64,19 @@ The gradient is calculated using summarized sampled request latencies (sampleRTT
 
 .. math::
 
-    gradient = \frac{minRTT}{sampleRTT}
+    gradient = \frac{minRTT + B}{sampleRTT}
 
 This gradient value has a useful property, such that it decreases as the sampled latencies increase.
+Notice that *B*, the buffer value added to the minRTT, allows for normal variance in the sampled
+latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
+before decreasing the gradient value.
+
+The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_api_msg_config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+
+.. math::
+
+    B = minRTT * buffer_{pct}
+
 The gradient value is then used to update the concurrency limit via:
 
 .. math::
@@ -163,8 +173,8 @@ adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms
 adaptive_concurrency.gradient_controller.max_concurrency_limit
     Overrides the maximum allowed concurrency limit.
 
-adaptive_concurrency.gradient_controller.max_gradient
-    Overrides the maximum allowed gradient value.
+adaptive_concurrency.gradient_controller.min_rtt_buffer
+    Overrides the padding added to the minRTT when calculating the concurrency limit.
 
 adaptive_concurrency.gradient_controller.sample_aggregate_percentile
     Overrides the percentile value used to represent the collection of latency samples in
