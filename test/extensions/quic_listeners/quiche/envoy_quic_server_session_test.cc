@@ -155,11 +155,6 @@ public:
       EXPECT_CALL(*quic_connection_,
                   SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-       EXPECT_CALL(*quic_connection_, SendControlFrame(_))
-           .Times(testing::AtMost(1))
-        .WillOnce(Invoke([](const quic::QuicFrame&) {
-          return false;
-        }));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
   }
@@ -346,6 +341,7 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   // Not verifying dummy implementation, just to have coverage.
   EXPECT_DEATH(envoy_quic_session_.enableHalfClose(true), "");
   EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
+  EXPECT_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
   http_connection_->shutdownNotice();
 }
 

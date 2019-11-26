@@ -38,6 +38,8 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
   }
 }
 
+std::atomic<uint64_t> ConnectionImpl::next_global_id_;
+
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : ConnectionImplBase(dispatcher, next_global_id_++), transport_socket_(std::move(transport_socket)),
@@ -695,8 +697,5 @@ void ClientConnectionImpl::connect() {
     socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
   }
 }
-
-std::atomic<uint64_t> ConnectionImpl::next_global_id_;
-
 } // namespace Network
 } // namespace Envoy

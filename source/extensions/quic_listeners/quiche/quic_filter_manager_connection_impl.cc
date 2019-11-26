@@ -51,41 +51,20 @@ bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
+  if (type != Network::ConnectionCloseType::NoFlush) {	
+    // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.	
+  }
   if (quic_connection_ == nullptr) {
     // Already detached from quic connection.
     return;
   }
-  const bool delayed_close_timeout_configured = delayed_close_timeout_.count() > 0;
-  if (hasDataToWrite() && type != Network::ConnectionCloseType::NoFlush) {
-    // QUIC connection has unsent data and caller wants to flush them. Wait for flushing or timeout.
-    if (!inDelayedClose() && delayed_close_timeout_configured) {
-      // Only set alarm if not in delay close mode yet.
-      initializeDelayedCloseTimer();
-    }
-    // Update delay close state according to current call.
-    if (delayed_close_timeout_configured &&
-        type == Network::ConnectionCloseType::FlushWriteAndDelay) {
-      delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
-    } else {
-      delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
-    }
-  } else {
-    if (hasDataToWrite()) {
-      // Quic connection has unsent data but caller wants to close right away.
-      ASSERT(type == Network::ConnectionCloseType::NoFlush);
-      quic_connection_->OnCanWrite();
-      closeConnectionImmediately();
-    } else {
-      // Quic connection doesn't have unsent data. It's upto caller and
-      // configuration whether to wait or not before closing.
-      if (delayed_close_timeout_configured &&
-          type == Network::ConnectionCloseType::FlushWriteAndDelay) {
-        initializeDelayedCloseTimer();
-        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
-      } else {
-        closeConnectionImmediately();
-      }
-    }
+  closeConnectionImmediately();
+}
+
+void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
+  if (timeout != std::chrono::milliseconds::zero()) {
+    // TODO(danzh) support delayed close of connection.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -137,9 +116,6 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
 }
 
 void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
-  if  (quic_connection_ == nullptr) {
-    return;
-  }
   quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                     quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
   quic_connection_ = nullptr;

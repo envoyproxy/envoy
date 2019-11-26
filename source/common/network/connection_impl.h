@@ -59,9 +59,9 @@ public:
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
+  void close(ConnectionCloseType type) override;
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
-  void close(ConnectionCloseType type) override;
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
@@ -113,6 +113,9 @@ public:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
 
+  // Obtain global next connection ID. This should only be used in tests.
+  static uint64_t nextGlobalIdForTest() { return next_global_id_; }
+
 protected:
   // Network::ConnectionImplBase
   void closeConnectionImmediately() override;
@@ -134,11 +137,6 @@ protected:
   // write_buffer_ invokes during its clean up.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
-
-  // Obtain global next connection ID. This should only be used in tests.
-  static uint64_t nextGlobalIdForTest() { return next_global_id_; }
-
-protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
