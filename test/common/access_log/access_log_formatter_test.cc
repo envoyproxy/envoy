@@ -28,9 +28,9 @@ namespace AccessLog {
 namespace {
 
 const ProtobufWkt::Value& nullValue() {
-  static const ProtobufWkt::Value* v = []() -> ProtobufWkt::Value* {
+  static const auto* v = []() -> ProtobufWkt::Value* {
     auto* vv = new ProtobufWkt::Value();
-    vv->set_null_value(ProtobufWkt::NullValue());
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
     return vv;
   }();
   return *v;
@@ -60,20 +60,34 @@ public:
 
 class TestSerializedStructFilterState : public StreamInfo::FilterState::Object {
 public:
-  TestSerializedStructFilterState() {
+  TestSerializedStructFilterState() : use_struct_(true) {
     (*struct_.mutable_fields())["inner_key"] = stringValue("inner_value");
   }
 
-  TestSerializedStructFilterState(const ProtobufWkt::Struct& s) { struct_.CopyFrom(s); }
+  explicit TestSerializedStructFilterState(const ProtobufWkt::Struct& s) : use_struct_(true) {
+    struct_.CopyFrom(s);
+  }
+
+  explicit TestSerializedStructFilterState(std::chrono::seconds seconds) : use_struct_(false) {
+    duration_.set_seconds(seconds.count());
+  }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto s = std::make_unique<ProtobufWkt::Struct>();
-    s->CopyFrom(struct_);
-    return s;
+    if (use_struct_) {
+      auto s = std::make_unique<ProtobufWkt::Struct>();
+      s->CopyFrom(struct_);
+      return s;
+    }
+
+    auto d = std::make_unique<ProtobufWkt::Duration>();
+    d->CopyFrom(duration_);
+    return d;
   }
 
 private:
+  const bool use_struct_;
   ProtobufWkt::Struct struct_;
+  ProtobufWkt::Duration duration_;
 };
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
@@ -1005,6 +1019,10 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
   stream_info.filter_state_.setData("key-no-serialization",
                                     std::make_unique<StreamInfo::FilterState::Object>(),
                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData(
+      "key-serialization-error",
+      std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
+      StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   {
@@ -1034,9 +1052,17 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
   }
 
-  // unserializable case
+  // no serialization case
   {
     FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>());
+
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+  }
+
+  // serialization error case
+  {
+    FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>());
 
     EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));

@@ -936,20 +936,10 @@ FilterStateFormatter::formatValue(const Http::HeaderMap&, const Http::HeaderMap&
     return unspecifiedValue();
   }
 
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(*proto, &json);
-  if (!status.ok()) {
-    // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
-    // TODO(lizan): add support of unknown Any.
-    return unspecifiedValue();
-  }
-
-  // TODO(zuercher): find a way to perform this without converting to JSON and back.
   ProtobufWkt::Value val;
   try {
-    MessageUtil::loadFromJson(json, val, ProtobufMessage::getNullValidationVisitor());
+    MessageUtil::jsonConvertValue(*proto, val);
   } catch (EnvoyException& ex) {
-    // Unlikely since it was just generated.
     return unspecifiedValue();
   }
   return val;
