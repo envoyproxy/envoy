@@ -120,6 +120,12 @@ public:
    * are candidates for decrypting received tickets.
    */
   virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
+
+  /**
+   * @return timeout in seconds for the session.
+   * Session timeout is used to specify lifetime hint of tls tickets.
+   */
+  virtual uint32_t sessionTimeout() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

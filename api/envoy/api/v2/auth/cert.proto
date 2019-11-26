@@ -405,6 +405,9 @@ message DownstreamTlsContext {
     // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
   }
+
+  // If specified, session_timeout is used as a hint for tls tickets lifetime
+  google.protobuf.UInt32Value session_timeout = 6;
 }
 
 message SdsSecretConfig {
