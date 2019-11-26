@@ -47,7 +47,14 @@ public:
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
-  void updateOnDemand(const std::set<std::string>& aliases);
+  void updateOnDemand(const std::set<std::string>& domains);
+  static std::string domainNameToAlias(const std::string& route_config_name, const std::string& domain) {
+    return route_config_name + "/" + domain;
+  }
+  static std::string aliasToDomainName(const std::string& alias) {
+    const auto pos = alias.find_last_of("/");
+    return pos == std::string::npos ? alias : alias.substr(pos + 1);
+  }
 
 private:
   // Config::SubscriptionCallbacks

@@ -14,7 +14,7 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::HeaderMap&, b
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return filter_iteration_state_;
   }
-  route_config_updated_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback([this]() -> void { onRouteConfigUpdateCompletion(); }));
+  route_config_updated_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback([this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
   callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
   return filter_iteration_state_;
@@ -37,10 +37,10 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
 // has been propagated to workers, at which point the request processing is restarted from the
 // beginning.
-void OnDemandRouteUpdate::onRouteConfigUpdateCompletion() {
+void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
-  if (callbacks_->canResolveRouteAfterConfigUpdate() && // route can be resolved after an on-demand
+  if (route_exists && // route can be resolved after an on-demand
                                                         // VHDS update
       !callbacks_->decodingBuffer() &&                  // Redirects with body not yet supported.
       callbacks_->recreateStream()) {

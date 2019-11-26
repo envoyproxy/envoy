@@ -193,7 +193,7 @@ public:
   virtual const ScopeTrackedObject& scope() PURE;
 };
 
-using RouteConfigUpdatedCallback = std::function<void()>;
+using RouteConfigUpdatedCallback = std::function<void(bool)>;
 using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
 
 /**
@@ -453,12 +453,6 @@ public:
    * RouteConfigProvider doesn't support on-demand updates or VHDS hasn't been configured.
    */
   virtual bool canRequestRouteConfigUpdate() PURE;
-
-  /**
-   *
-   * @return true if a route can be resolved after a VHDS RouteConfig update.
-   */
-  virtual bool canResolveRouteAfterConfigUpdate() PURE;
 };
 
 /**

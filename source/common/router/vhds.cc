@@ -44,11 +44,11 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
           *scope_, *this);
 }
 
-void VhdsSubscription::updateOnDemand(const std::set<std::string>& aliases) {
+void VhdsSubscription::updateOnDemand(const std::set<std::string>& domains) {
   std::set<std::string> with_route_config_name_prefix;
-  // Prefix each of the aliases with route_config_name, management server expects this.
-  for (auto& alias : aliases) {
-    with_route_config_name_prefix.emplace(config_update_info_->routeConfigName() + "/" + alias);
+  // Prefix each of the domain names with route_config_name, management server expects this.
+  for (auto& domain : domains) {
+    with_route_config_name_prefix.emplace(VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), domain));
   }
   subscription_->requestAliasResolution(with_route_config_name_prefix);
 }
@@ -76,5 +76,6 @@ void VhdsSubscription::onConfigUpdate(
 
   init_target_.ready();
 }
+
 } // namespace Router
 } // namespace Envoy

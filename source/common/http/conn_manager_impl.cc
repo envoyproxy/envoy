@@ -1368,11 +1368,6 @@ bool ConnectionManagerImpl::ActiveStream::canRequestRouteConfigUpdate() {
   return route_config_update_requester_->canRequestRouteConfigUpdate();
 }
 
-bool ConnectionManagerImpl::ActiveStream::canResolveRouteAfterConfigUpdate() {
-  return route_config_provider_->config()->route(*request_headers_, stream_info_, stream_id_) !=
-         nullptr;
-}
-
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(HeaderMap& headers)>& modify_headers, bool is_head_request,
@@ -2262,10 +2257,6 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canRequestRouteConfigUpdate() {
   return parent_.canRequestRouteConfigUpdate();
-}
-
-bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canResolveRouteAfterConfigUpdate() {
-  return parent_.canResolveRouteAfterConfigUpdate();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

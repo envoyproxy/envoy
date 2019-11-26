@@ -14,6 +14,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
+#include "common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -232,14 +233,17 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
   config_update_callbacks_->runOnAllThreads(
-      [aliases](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+      [aliases, new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
           -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        const auto config = std::static_pointer_cast<const ConfigImpl>(new_config);
         auto callbacks = std::dynamic_pointer_cast<ThreadLocalCallbacks>(previous)->callbacks_;
         for (auto it = callbacks.begin(); it != callbacks.end();) {
           auto found = aliases.find(it->alias_);
           if (found != aliases.end()) {
             if (auto cb = it->cb_.lock()) {
-              (*cb)();
+              Http::HeaderMapImpl hostHeader;
+              hostHeader.setHost(VhdsSubscription::aliasToDomainName(it->alias_));
+              (*cb)(config->virtualHostExists(hostHeader));
             }
             it = callbacks.erase(it);
           } else {

@@ -83,7 +83,6 @@ public:
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   bool canRequestRouteConfigUpdate() override { return false; };
-  bool canResolveRouteAfterConfigUpdate() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; };
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;

@@ -11,7 +11,7 @@ class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
   OnDemandRouteUpdate() = default;
 
-  void onRouteConfigUpdateCompletion();
+  void onRouteConfigUpdateCompletion(bool route_exists);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
