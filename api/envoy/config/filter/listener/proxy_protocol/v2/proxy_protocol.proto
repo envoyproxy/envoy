@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.config.filter.listener.proxy_protocol.v2;
+
+option java_outer_classname = "ProxyProtocolProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.listener.proxy_protocol.v2";
+
+
+// [#protodoc-title: Proxy Protocol Filter]
+// TBD.
+// [#extension: envoy.filters.listener.proxy_protocol]
+
+message ProxyProtocol {
+}

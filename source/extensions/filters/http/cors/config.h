@@ -1,8 +1,9 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "envoy/config/filter/http/cors/v2/cors.pb.h"
+#include "envoy/config/filter/http/cors/v2/cors.pb.validate.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -13,12 +14,13 @@ namespace Cors {
 /**
  * Config registration for the cors filter. @see NamedHttpFilterConfigFactory.
  */
-class CorsFilterFactory : public Common::EmptyHttpFilterConfig {
+class CorsFilterFactory : public Common::FactoryBase<envoy::config::filter::http::cors::v2::Cors> {
 public:
-  CorsFilterFactory() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().Cors) {}
+  CorsFilterFactory() : FactoryBase(HttpFilterNames::get().Cors) {}
 
-  Http::FilterFactoryCb createFilter(const std::string& stats_prefix,
-                                     Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::cors::v2::Cors& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Cors

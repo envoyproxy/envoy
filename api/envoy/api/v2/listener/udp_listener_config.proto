@@ -28,3 +28,6 @@ message UdpListenerConfig {
     google.protobuf.Any typed_config = 3;
   }
 }
+
+message ActiveRawUdpListenerConfig {
+}

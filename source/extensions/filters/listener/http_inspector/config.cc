@@ -1,3 +1,4 @@
+#include "envoy/config/filter/listener/http_inspector/v2/http_inspector.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -25,7 +26,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    return std::make_unique<envoy::config::filter::listener::http_inspector::v2::HttpInspector>();
   }
 
   std::string name() override { return ListenerFilterNames::get().HttpInspector; }

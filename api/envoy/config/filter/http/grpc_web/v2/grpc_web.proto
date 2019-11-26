@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.grpc_web.v2;
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.grpc_web.v2";
+option java_outer_classname = "GrpcWebProto";
+option java_multiple_files = true;
+
+// [#protodoc-title: gRPC Web]
+// gRPC Web :ref:`configuration overview <config_http_filters_grpc_web>`.
+// [#extension: envoy.filters.http.dynamo]
+
+// gRPC Web filter config.
+message GrpcWeb {
+
+}

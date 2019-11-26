@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package envoy.config.retry.omit_canary_hosts;
+
+option java_outer_classname = "OmitCanaryHostsPredicateProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.retry.omit_canary_hosts";
+
+// [#protodoc-title: Omit Canary Hosts Predicate]
+// [#extension: envoy.retry_priorities.omit_canary_hosts]
+message OmitCanaryHostsPredicate {
+}

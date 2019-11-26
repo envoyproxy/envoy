@@ -1,5 +1,8 @@
 #include "common/config/utility.h"
 
+#include <chrono>
+#include <iostream>
+#include <string>
 #include <unordered_set>
 
 #include "envoy/api/v2/cds.pb.h"
@@ -253,6 +256,7 @@ void Utility::translateOpaqueConfig(absl::string_view extension_name,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
+  std::cout << extension_name << std::endl;
   const Protobuf::Descriptor* earlier_version_desc = ApiTypeOracle::inferEarlierVersionDescriptor(
       extension_name, typed_config, out_proto.GetDescriptor()->full_name());
 
@@ -274,6 +278,7 @@ void Utility::translateOpaqueConfig(absl::string_view extension_name,
       udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
   if (!typed_config.value().empty()) {
+    std::cout << "value is empty" << std::endl;
 
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
@@ -284,6 +289,7 @@ void Utility::translateOpaqueConfig(absl::string_view extension_name,
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetDescriptor()->full_name() == struct_type) {
+        std::cout << "hit this conditional" << std::endl;
         out_proto.CopyFrom(typed_struct.value());
       } else {
         type = TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url());

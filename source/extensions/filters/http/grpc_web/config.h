@@ -1,8 +1,9 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "envoy/config/filter/http/grpc_web/v2/grpc_web.pb.h"
+#include "envoy/config/filter/http/grpc_web/v2/grpc_web.pb.validate.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -10,12 +11,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
-class GrpcWebFilterConfig : public Common::EmptyHttpFilterConfig {
+class GrpcWebFilterConfig : public Common::FactoryBase<envoy::config::filter::http::grpc_web::v2::GrpcWeb> {
 public:
-  GrpcWebFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcWeb) {}
+  GrpcWebFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcWeb) {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override;
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::grpc_web::v2::GrpcWeb& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& factory_context) override;
 };
 
 } // namespace GrpcWeb

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.config.filter.listener.http_inspector.v2;
+
+option java_outer_classname = "HttpInspectorProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.listener.http_inspector.v2";
+
+
+// [#protodoc-title: HTTP Inspector Filter]
+// Detect whether the application protocol is HTTP.
+// [#extension: envoy.filters.listener.http_inspector]
+
+message HttpInspector {
+}

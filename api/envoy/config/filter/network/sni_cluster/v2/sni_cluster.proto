@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.sni_cluster.v2;
+
+option java_package = "io.envoyproxy.envoy.config.filter.network.sni_cluster.v2";
+option java_outer_classname = "SniClusterProto";
+option java_multiple_files = true;
+
+// [#protodoc-title: SNI Cluster Filter]
+// [#extension: envoy.filters.network.sni_cluster]
+
+message SniCluster {
+}

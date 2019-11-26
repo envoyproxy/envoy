@@ -3,6 +3,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "envoy/config/filter/network/sni_cluster/v2/sni_cluster.pb.h"
+#include "envoy/config/filter/network/sni_cluster/v2/sni_cluster.pb.validate.h"
+
 #include "extensions/filters/network/sni_cluster/sni_cluster.h"
 
 namespace Envoy {
@@ -18,7 +21,7 @@ Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFacto
 }
 
 ProtobufTypes::MessagePtr SniClusterNetworkFilterConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<ProtobufWkt::Empty>();
+  return std::make_unique<envoy::config::filter::network::sni_cluster::v2::SniCluster>();
 }
 
 /**

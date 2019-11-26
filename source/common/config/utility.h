@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 #include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/address.pb.h"
@@ -223,7 +225,16 @@ public:
   translateToFactoryConfig(const ProtoMessage& enclosing_message,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            Factory& factory) {
+    std::cout << "in translateToFactoryConfig" << std::endl;
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    /** TODO
+     * Possible fix is to have the list of names here, and if any of the named factories are here
+     * then swap in ProtobufWkt::Empty?
+     *
+     * or add a property on factory, something like useGoogleProtobufEmpty()
+     * yeah I actually like that...
+     */
 
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
@@ -284,7 +295,7 @@ public:
                                     Protobuf::Message& out_proto);
 
   /**
-   * Verify any any filter designed to be terminal is configured to be terminal, and vice versa.
+   * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
    * @param name the type of filter.
    * @param is_terminal_filter true if the filter is designed to be terminal.
