@@ -31,7 +31,7 @@ class RandomGenerator {
 public:
   virtual ~RandomGenerator() = default;
 
-  using result_type = uint64_t;
+  using result_type = uint64_t; // NOLINT(readability-identifier-naming)
 
   /**
    * @return uint64_t a new random number.
