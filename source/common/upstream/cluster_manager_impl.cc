@@ -119,7 +119,7 @@ void ClusterManagerInitHelper::initializeSecondaryClusters() {
 void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
-  ENVOY_LOG(debug, "maybe finish initialize state: {}", state_);
+  ENVOY_LOG(debug, "maybe finish initialize state: {}", enumToInt(state_));
   if (state_ == State::Loading || state_ == State::WaitingForCdsInitialize) {
     return;
   }
