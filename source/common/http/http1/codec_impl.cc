@@ -416,10 +416,10 @@ size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   return bytes_read;
 }
 
-int ConnectionImpl::onHeaderFieldBase(const char* data, size_t length) {
+void ConnectionImpl::onHeaderFieldBase(const char* data, size_t length) {
   if (header_parsing_state_ == HeaderParsingState::Done) {
     // Ignore trailers.
-    return 0;
+    return;
   }
 
   if (header_parsing_state_ == HeaderParsingState::Value) {
@@ -427,13 +427,12 @@ int ConnectionImpl::onHeaderFieldBase(const char* data, size_t length) {
   }
 
   current_header_field_.append(data, length);
-  return 0;
 }
 
-int ConnectionImpl::onHeaderValueBase(const char* data, size_t length) {
+void ConnectionImpl::onHeaderValueBase(const char* data, size_t length) {
   if (header_parsing_state_ == HeaderParsingState::Done) {
     // Ignore trailers.
-    return 0;
+    return;
   }
 
   const absl::string_view header_value = absl::string_view(data, length);
@@ -466,8 +465,6 @@ int ConnectionImpl::onHeaderValueBase(const char* data, size_t length) {
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");
   }
-
-  return 0;
 }
 
 void ConnectionImpl::onHeadersCompleteBase() {
@@ -686,11 +683,13 @@ int ServerConnectionImpl::onUrl(const char* data, size_t length) {
 }
 
 int ServerConnectionImpl::onHeaderField(const char* data, size_t length) {
-  return onHeaderFieldBase(data, length);
+  onHeaderFieldBase(data, length);
+  return 0;
 }
 
 int ServerConnectionImpl::onHeaderValue(const char* data, size_t length) {
-  return onHeaderValueBase(data, length);
+  onHeaderValueBase(data, length);
+  return 0;
 }
 
 int ServerConnectionImpl::onBody(const char* data, size_t length) {
@@ -805,11 +804,13 @@ int ClientConnectionImpl::onMessageBegin() {
 }
 
 int ClientConnectionImpl::onHeaderField(const char* data, size_t length) {
-  return onHeaderFieldBase(data, length);
+  onHeaderFieldBase(data, length);
+  return 0;
 }
 
 int ClientConnectionImpl::onHeaderValue(const char* data, size_t length) {
-  return onHeaderValueBase(data, length);
+  onHeaderValueBase(data, length);
+  return 0;
 }
 
 int ClientConnectionImpl::onHeadersComplete() {

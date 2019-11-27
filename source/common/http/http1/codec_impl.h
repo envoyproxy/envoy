@@ -192,9 +192,15 @@ public:
 
   CodecStats& stats() { return stats_; }
 
-  // ParserCallbacks?
-  int onHeaderFieldBase(const char* data, size_t length);
-  int onHeaderValueBase(const char* data, size_t length);
+  /**
+   * Common functionality for parsing a header field.
+   */
+  void onHeaderFieldBase(const char* data, size_t length);
+
+  /**
+   * Common functionality for parsing a header value.
+   */
+  void onHeaderValueBase(const char* data, size_t length);
 
   /**
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
@@ -210,7 +216,8 @@ public:
   void onMessageBeginBase();
 
   /**
-   * Called when the request/response is complete.
+   * Common functionality for when parsing an HTTP message is complete.
+   * @return 0 if not pausing, otherwise will return a library-specific non-zero code.
    */
   int onMessageCompleteBase();
 
@@ -249,8 +256,6 @@ private:
    * @len supplies the length of the span.
    */
   size_t dispatchSlice(const char* slice, size_t len);
-
-  // virtual int onHeadersComplete(HeaderMapImplPtr&& headers) PURE;
 
   /**
    * @see onResetStreamBase().

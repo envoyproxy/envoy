@@ -190,7 +190,7 @@ public:
   virtual bool fakeSymbolTableEnabled() const PURE;
 
   /**
-   * @return whether to use the fake symbol table implementation.
+   * @return whether to use the legacy HTTP/1.x parser.
    */
   virtual bool legacyHttpParserEnabled() const PURE;
 
