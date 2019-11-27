@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -16,6 +18,27 @@
 
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+envoy::api::v2::ClusterLoadAssignment
+convertPriority(const envoy::api::v2::ClusterLoadAssignment& load_assignment) {
+  envoy::api::v2::ClusterLoadAssignment converted;
+  converted.MergeFrom(load_assignment);
+
+  // We convert the priority set by the configuration back to zero. This helps
+  // ensure that we don't blow up later on when using zone aware routing due
+  // to a check that all priorities are zero.
+  //
+  // Since LOGICAL_DNS is limited to exactly one host declared per load_assignment
+  // (checked in the ctor in this file), we can safely just rewrite the priority
+  // to zero.
+  for (auto& endpoint : *converted.mutable_endpoints()) {
+    endpoint.set_priority(0);
+  }
+
+  return converted;
+}
+} // namespace
 
 LogicalDnsCluster::LogicalDnsCluster(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
@@ -31,7 +54,7 @@ LogicalDnsCluster::LogicalDnsCluster(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
       load_assignment_(cluster.has_load_assignment()
-                           ? cluster.load_assignment()
+                           ? convertPriority(cluster.load_assignment())
                            : Config::Utility::translateClusterHosts(cluster.hosts())) {
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       cluster, dns_refresh_rate_ms_.count(), factory_context.random());
