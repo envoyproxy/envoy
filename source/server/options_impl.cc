@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace {
-std::vector<std::string> ToArgsVector(int argc, const char* const* argv) {
+std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
   std::vector<std::string> args;
   for (int i = 0; i < argc; ++i) {
     args.emplace_back(argv[i]);
@@ -31,7 +31,7 @@ std::vector<std::string> ToArgsVector(int argc, const char* const* argv) {
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
-    : OptionsImpl(ToArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
+    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
 
 OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
