@@ -645,37 +645,32 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB) {
     cluster_type = "type: ORIGINAL_DST";
   } else if (GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
-    // This custom cluster type is registered by linking
-    test / integration / custom / static_cluster.cc.cluster_type =
-        "cluster_type: { name:
-        envoy.clusters.custom_static_with_lb
+    // This custom cluster type is registered by linking test/integration/custom/static_cluster.cc.
+    cluster_type = "cluster_type: { name: envoy.clusters.custom_static_with_lb }";
   }
-  ";
-}
+  const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
-const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
+  if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
+      GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+    EXPECT_THROW_WITH_MESSAGE(
+        create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+        fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                    envoy::api::v2::Cluster_LbPolicy_Name(GetParam())));
 
-if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
-    GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                  envoy::api::v2::Cluster_LbPolicy_Name(GetParam())));
+  } else {
+    create(parseBootstrapFromV2Yaml(yaml));
+    checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
-} else {
-  create(parseBootstrapFromV2Yaml(yaml));
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+    Upstream::ThreadLocalCluster* tlc = cluster_manager_->get("cluster_1");
+    EXPECT_NE(nullptr, tlc);
 
-  Upstream::ThreadLocalCluster* tlc = cluster_manager_->get("cluster_1");
-  EXPECT_NE(nullptr, tlc);
+    if (tlc) {
+      Upstream::LoadBalancer& lb = tlc->loadBalancer();
+      EXPECT_NE(nullptr, dynamic_cast<Upstream::SubsetLoadBalancer*>(&lb));
+    }
 
-  if (tlc) {
-    Upstream::LoadBalancer& lb = tlc->loadBalancer();
-    EXPECT_NE(nullptr, dynamic_cast<Upstream::SubsetLoadBalancer*>(&lb));
+    factory_.tls_.shutdownThread();
   }
-
-  factory_.tls_.shutdownThread();
-}
 } // namespace
 
 INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
@@ -2227,6 +2222,7 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
 }
 
 TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
@@ -2243,7 +2239,7 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  // false here stands for using udp
+  // `false` here stands for using udp
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, false)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2251,43 +2247,34 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
 }
 
-// TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
-// const std::string yaml = R"EOF(
-//  static_resources:
-//    clusters:
-//    - name: cluster_1
-//      connect_timeout: 0.250s
-//      type: STRICT_DNS
-//      dns_resolvers:
-//      - socket_address:
-//          address: 1.2.3.4
-//          port_value: 80
-//  )EOF";
-////	const std::string yaml = R"EOF(
-////  static_resources:
-////    clusters:
-////    - name: cluster_1
-////      connect_timeout: 0.250s
-////      type: STRICT_DNS
-////      dns_resolvers:
-////      - socket_address:
-////          address: 1.2.3.4
-////          port_value: 80
-////			common_lb_config:
-////				use_tcp_for_dns_lookups: true
-////		)EOF";
-//
-//	std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-//	EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
-//
-//	Network::DnsResolver::ResolveCb dns_callback;
-//	Network::MockActiveDnsQuery active_dns_query;
-//	EXPECT_CALL(*dns_resolver, resolve(_, _, _))
-//	.WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-//	create(parseBootstrapFromV2Yaml(yaml));
-//}
+TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      use_tcp_for_dns_lookups: true
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  // `true` here stands for using tcp
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, true)).WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
 
 // This is a regression test for a use-after-free in
 // ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(), where a removal at one
@@ -3776,6 +3763,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
       hosts_added, {}, 100);
 }
 
+} // namespace
 } // namespace Upstream
-} // namespace Envoy
 } // namespace Envoy
