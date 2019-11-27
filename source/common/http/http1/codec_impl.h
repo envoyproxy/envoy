@@ -138,6 +138,8 @@ private:
 
 /**
  * Base class for HTTP/1.1 client and server connections.
+ * Handles the callbacks of http_parser with its own base routine and then
+ * virtual dispatches to its subclasses.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http> {
 public:
@@ -258,7 +260,8 @@ private:
 
   /**
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
-   * invoked.
+   * invoked. Note that this only applies to headers and NOT trailers. End of
+   * trailers are signaled via onMessageCompleteBase().
    * @return 0 if no error, 1 if there should be no body.
    */
   int onHeadersCompleteBase();
