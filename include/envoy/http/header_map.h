@@ -127,7 +127,7 @@ public:
   /**
    * @return the modifiable backing buffer (either inline or heap allocated).
    */
-  char* buffer() const { return buffer_.dynamic_; }
+  char* buffer() { return buffer_.dynamic_; }
 
   /**
    * Get an absl::string_view. It will NOT be NUL terminated!
@@ -338,15 +338,18 @@ private:
   HEADER_FUNC(Via)
 
 /**
- * The following functions are defined for each inline header above. E.g., for ContentLength we
- * have:
+ * The following functions are defined for each inline header above.
+
+ * E.g., for path we have:
+ * Path() -> returns the header entry if it exists or nullptr.
+ * appendPath(path, "/") -> appends the string path with delimiter "/" to the header value.
+ * setReferencePath(PATH) -> sets header value to reference string PATH.
+ * setPath(path_string) -> sets the header value to the string path_string by copying the data.
+ * removePath() -> removes the header if it exists.
  *
- * ContentLength() -> returns the header entry if it exists or nullptr.
- * appendContentLength(foo, ",") -> append the string foo using a comma as a delimiter.
- * setReferenceContentLength(foo) -> sets the header value to the reference string foo.
- * setContentLength(bar) -> sets the header value to the string bar by copying the data.
+ * For inline headers that use integers, we have:
+ * // TODO(asraa): Remove this method for other inline headers.
  * setContentLength(5) -> sets the header value to the integer 5.
- * removeContentLength() -> removes the header if it exists.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \

@@ -73,12 +73,11 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  const std::string& address_as_string = remote_address.ip()->addressAsString();
-  headers.appendForwardedFor(address_as_string.c_str(), ",");
+  headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
-  headers.appendVia(absl::string_view(via.c_str(), via.size()), ", ");
+  headers.appendVia(via, ", ");
 }
 
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {

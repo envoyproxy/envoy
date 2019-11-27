@@ -88,7 +88,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
         // Do some read-only stuff.
         (void)strlen(std::string(header_entry->key().getStringView()).c_str());
         (void)strlen(std::string(header_entry->value().getStringView()).c_str());
-        (void)strlen(header_entry->value().buffer());
         header_entry->key().empty();
         header_entry->value().empty();
       }

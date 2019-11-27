@@ -509,9 +509,6 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   switch (frame->hd.type) {
   case NGHTTP2_HEADERS: {
-    // Verify that the final HeaderMap's byte size is under the limit before decoding headers.
-    // This assert iterates over the HeaderMap.
-    ASSERT(stream->headers_->byteSize() == stream->headers_->byteSizeInternal());
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     if (!stream->cookies_.empty()) {
       HeaderString key(Headers::get().Cookie);
@@ -623,11 +620,6 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
     StreamImpl* stream = getStream(frame->hd.stream_id);
-    if (stream->headers_) {
-      // Verify that the final HeaderMap's byte size is under the limit before sending frames.
-      // This assert iterates over the HeaderMap.
-      ASSERT(stream->headers_->byteSize() == stream->headers_->byteSizeInternal());
-    }
     stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     break;
   }

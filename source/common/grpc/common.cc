@@ -187,8 +187,7 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::Heade
       unit++;
     }
   }
-  headers.setGrpcTimeout(time);
-  headers.appendGrpcTimeout(absl::string_view(unit, 1), "");
+  headers.setGrpcTimeout(absl::StrCat(time, absl::string_view(unit, 1)));
 }
 
 Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,

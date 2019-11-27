@@ -71,8 +71,6 @@ public:
   bool operator==(const HeaderMapImpl& rhs) const;
   bool operator!=(const HeaderMapImpl& rhs) const;
 
-  uint64_t byteSizeInternal() const;
-
   // Http::HeaderMap
   void addReference(const LowerCaseString& key, absl::string_view value) override;
   void addReferenceKey(const LowerCaseString& key, uint64_t value) override;
@@ -98,6 +96,7 @@ public:
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
   void copyFrom(const HeaderMap& rhs);
+  uint64_t byteSizeInternal() const;
 
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
     HeaderEntryImpl(const LowerCaseString& key);
@@ -192,6 +191,10 @@ protected:
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
     size_t size() const { return headers_.size(); }
     bool empty() const { return headers_.empty(); }
+    void clear() {
+      headers_.clear();
+      pseudo_headers_end_ = headers_.end();
+    }
 
   private:
     std::list<HeaderEntryImpl> headers_;
