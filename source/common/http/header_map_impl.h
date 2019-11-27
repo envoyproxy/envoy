@@ -71,6 +71,11 @@ public:
   bool operator==(const HeaderMapImpl& rhs) const;
   bool operator!=(const HeaderMapImpl& rhs) const;
 
+  /**
+   * For testing. Performs a manual byte size count.
+   */
+  uint64_t byteSizeInternal() const;
+
   // Http::HeaderMap
   void addReference(const LowerCaseString& key, absl::string_view value) override;
   void addReferenceKey(const LowerCaseString& key, uint64_t value) override;
@@ -96,7 +101,6 @@ public:
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
   void copyFrom(const HeaderMap& rhs);
-  uint64_t byteSizeInternal() const;
 
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
     HeaderEntryImpl(const LowerCaseString& key);
