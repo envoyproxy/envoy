@@ -403,7 +403,8 @@ message DownstreamTlsContext {
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
   }
 
-  // If specified, session_timeout is used as a hint for tls tickets lifetime
+  // If specified, session_timeout will change maximum lifetime (in seconds) of ssl session
+  // Currently this value is used as a hint to TLS session ticket lifetime (for TLSv1.2)
   google.protobuf.UInt32Value session_timeout = 6;
 }
 

@@ -404,7 +404,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -427,6 +427,10 @@ message DownstreamTlsContext {
     // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
   }
+
+  // If specified, session_timeout will change maximum lifetime (in seconds) of ssl session
+  // Currently this value is used as a hint to TLS session ticket lifetime (for TLSv1.2)
+  google.protobuf.UInt32Value session_timeout = 6;
 }
 
 message SdsSecretConfig {
