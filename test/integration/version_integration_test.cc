@@ -25,7 +25,7 @@ const char ExampleIpTaggingConfig[] = R"EOF(
 )EOF";
 
 // envoy.ip_tagging from v2 Struct config.
-TEST_P(VersionIntegrationTest, IpTaggingV2StaticStructConfig) {
+TEST_P(VersionIntegrationTest, DEPRECATED_FEATURE_TEST(IpTaggingV2StaticStructConfig)) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
   name: envoy.ip_tagging
   config:
