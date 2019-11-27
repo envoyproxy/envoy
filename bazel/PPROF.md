@@ -39,13 +39,17 @@ There are several other environment variables that can be set to tweak the behav
 
 The profiler library is automatically linked into envoy_cc_test targets.
 
+Run a test with heap profiling enabled, like so:
+
+    $ bazel test --test_env=HEAPPROFILE=/tmp/heapprof <test target>
+
 Run a test with CPU profiling enabled, like so:
 
     $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof <test target>
 
-Run a test with heap profiling enabled, like so:
+Note that heap checks and heap profile collection in tests have noticiable performance implications.  Use the following command to collect a CPU profile from a test target with heap check and heap profile collection disabled:
 
-    $ bazel test --test_env=HEAPPROFILE=/tmp/heapprof <test target>
+    $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof --test_env=HEAPPROFILE= --test_env=HEAPCHECK= <test target>
 
 ## Starting and stopping profile programmatically
 
@@ -57,14 +61,14 @@ is controlled by `ProfilerStart()`/`ProfilerStop()`, and the
 [Gperftools Heap Profiler](https://gperftools.github.io/gperftools/heapprofile.html)
 is controlled by `HeapProfilerStart()`, `HeapProfilerStop()` and `HeapProfilerDump()`.
 
-These functions are wrapped by Envoy objects defined in source/common/profiler/profiler.h
+These functions are wrapped by Envoy objects defined in [`source/common/profiler/profiler.h`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.h)).
 
 To enable profiling programmatically:
 
 1. Add a library dependency on "//source/common/profiler:profiler_lib" to your envoy_cc_library build rule.
-2. Use the startProfiler/stopProfiler methods of Envoy::Profiler::Cpu or Envoy::Profiler::Heap to collect a profile.
+2. Use the `startProfiler`/`stopProfiler` methods of `Envoy::Profiler::Cpu` or `Envoy::Profiler::Heap` to collect a profile.
 
-Note that startProfiler should only be called if no other profile of that type is currently active (e.i. profilerEnabled() returns false).
+Note that `startProfiler` should only be called if no other profile of that type is currently active (e.i. `profilerEnabled()` returns false).
 
 Example:
 
