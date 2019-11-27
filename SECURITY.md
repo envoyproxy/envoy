@@ -392,19 +392,24 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
       e-mail updates. This e-mail address will be shared with the Envoy community.
 ```
 
+### Review of membership criteria
+
+In all cases, members of the distribution list will be reviewed on a yearly basis by the maintainers
+and security team to ensure they still qualify for inclusion on the list.
+
 ### Members
 
-| E-mail                                                | Organization  |
-|-------------------------------------------------------|:-------------:|
-| envoy-security-team@aspenmesh.io                      | Aspen Mesh    |
-| aws-app-mesh-security@amazon.com                      | AWS           |
-| security@cilium.io                                    | Cilium        |
-| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry |
-| secalert@datawire.io                                  | Datawire      |
-| google-internal-envoy-security@google.com             | Google        |
-| argoprod@us.ibm.com                                   | IBM           |
-| istio-security-vulnerability-reports@googlegroups.com | Istio         |
-| secalert@redhat.com                                   | Red Hat       |
-| envoy-security@solo.io                                | solo.io       |
-| envoy-security@tetrate.io                             | Tetrate       |
-| security@vmware.com                                   | VMware        |
+| E-mail                                                | Organization  | Last Review |
+|-------------------------------------------------------|:-------------:|:-----------:|
+| envoy-security-team@aspenmesh.io                      | Aspen Mesh    | 12/19       |
+| aws-app-mesh-security@amazon.com                      | AWS           | 12/19       |
+| security@cilium.io                                    | Cilium        | 12/19       |
+| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry | 12/19       |
+| secalert@datawire.io                                  | Datawire      | 12/19       |
+| google-internal-envoy-security@google.com             | Google        | 12/19       |
+| argoprod@us.ibm.com                                   | IBM           | 12/19       |
+| istio-security-vulnerability-reports@googlegroups.com | Istio         | 12/19       |
+| secalert@redhat.com                                   | Red Hat       | 12/19       |
+| envoy-security@solo.io                                | solo.io       | 12/19       |
+| envoy-security@tetrate.io                             | Tetrate       | 12/19       |
+| security@vmware.com                                   | VMware        | 12/19       |
