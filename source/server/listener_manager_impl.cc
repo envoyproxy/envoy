@@ -89,7 +89,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
                                              factory.isTerminalFilter(), i == filters.size() - 1);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        string_name, proto_config, context.messageValidationVisitor(), factory);
+        proto_config, context.messageValidationVisitor(), factory);
     Network::FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
     ret.push_back(callback);
   }
@@ -114,7 +114,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             string_name);
     auto message = Config::Utility::translateToFactoryConfig(
-        string_name, proto_config, context.messageValidationVisitor(), factory);
+        proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
@@ -139,7 +139,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
             string_name);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        string_name, proto_config, context.messageValidationVisitor(), factory);
+        proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
@@ -743,9 +743,8 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-  ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(transport_socket.name(), transport_socket,
-                                                parent_.messageValidationVisitor(), config_factory);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      transport_socket, parent_.messageValidationVisitor(), config_factory);
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());

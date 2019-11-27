@@ -34,8 +34,7 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
 
   DatadogTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
-      configuration.http().name(), configuration.http(),
-      ProtobufMessage::getStrictValidationVisitor(), factory);
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr datadog_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, datadog_tracer);
 }

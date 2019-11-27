@@ -26,8 +26,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
 
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
-      configuration.http().name(), configuration.http(),
-      ProtobufMessage::getStrictValidationVisitor(), factory);
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
 }
@@ -65,8 +64,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
 
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
-      configuration.http().name(), configuration.http(),
-      ProtobufMessage::getStrictValidationVisitor(), factory);
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
 

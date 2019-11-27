@@ -19,7 +19,7 @@ public:
    * @param typed_config opaque config packed in google.protobuf.Any.
    * @param target_type target type of conversion.
    * @return const Protobuf::Descriptor* descriptor for earlier message version
-   *         corresponding to config, if any, otherwise nulllptr.
+   *         corresponding to config, if any, otherwise nullptr.
    */
   static const Protobuf::Descriptor*
   inferEarlierVersionDescriptor(absl::string_view extension_name,

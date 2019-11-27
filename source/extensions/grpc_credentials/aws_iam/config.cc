@@ -38,8 +38,8 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         // https://github.com/envoyproxy/envoy/issues/8010.
         const Envoy::ProtobufTypes::MessagePtr config_message =
             Envoy::Config::Utility::translateToFactoryConfig(
-                credential.from_plugin().name(), credential.from_plugin(),
-                ProtobufMessage::getNullValidationVisitor(), credentials_factory);
+                credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
+                credentials_factory);
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v2alpha::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());

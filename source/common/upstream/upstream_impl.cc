@@ -791,8 +791,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket.name(), transport_socket, factory_context.messageValidationVisitor(),
-      config_factory);
+      transport_socket, factory_context.messageValidationVisitor(), config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 

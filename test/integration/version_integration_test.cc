@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace {
 
-// Integration test for ingestion of configuraiton across API versions.
+// Integration test for ingestion of configuration across API versions.
 // Currently we only have static tests, but there will also be xDS tests added
 // later.
 class VersionIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,

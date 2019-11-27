@@ -18,8 +18,7 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     auto& config_factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config.name());
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        socket_config.name(), socket_config, factory_context.messageValidationVisitor(),
-        config_factory);
+        socket_config, factory_context.messageValidationVisitor(), config_factory);
     FactoryMatch factory_match(
         socket_match.name(), config_factory.createTransportSocketFactory(*message, factory_context),
         generateStats(socket_match.name() + "."));

@@ -166,7 +166,7 @@ void ConfigImpl::processFilter(
           string_name);
 
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
-      string_name, proto_config, context_.messageValidationVisitor(), factory);
+      proto_config, context_.messageValidationVisitor(), factory);
   ThriftFilters::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
 

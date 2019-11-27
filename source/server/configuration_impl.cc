@@ -106,8 +106,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      configuration.http().name(), configuration.http(),
-      server.messageValidationContext().staticValidationVisitor(), factory);
+      configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
   http_tracer_ = factory.createHttpTracer(*message, server);
 }
 
@@ -119,8 +118,7 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
     // Generate factory and translate stats sink custom config
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        sink_object.name(), sink_object,
-        server.messageValidationContext().staticValidationVisitor(), factory);
+        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
     stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
   }

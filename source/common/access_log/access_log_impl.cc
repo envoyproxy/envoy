@@ -279,7 +279,7 @@ AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLo
       Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
           config.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      config.name(), config, context.messageValidationVisitor(), factory);
+      config, context.messageValidationVisitor(), factory);
 
   return factory.createAccessLogInstance(*message, std::move(filter), context);
 }

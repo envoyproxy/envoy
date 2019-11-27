@@ -218,7 +218,7 @@ public:
    */
   template <class ProtoMessage, class Factory>
   static ProtobufTypes::MessagePtr
-  translateToFactoryConfig(absl::string_view extension_name, const ProtoMessage& enclosing_message,
+  translateToFactoryConfig(const ProtoMessage& enclosing_message,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -226,7 +226,7 @@ public:
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    translateOpaqueConfig(extension_name, enclosing_message.typed_config(),
+    translateOpaqueConfig(factory.name(), enclosing_message.typed_config(),
                           enclosing_message.config(), validation_visitor, *config);
 
     return config;
