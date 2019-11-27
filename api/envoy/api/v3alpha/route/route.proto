@@ -739,7 +739,7 @@ message RouteAction {
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
 
-  // Indicates that the route has request mirroring policies. Each policy is independently applied.
+  // Indicates that the route has request mirroring policies.
   repeated RequestMirrorPolicy request_mirror_policies = 10;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
