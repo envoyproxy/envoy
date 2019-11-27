@@ -4,14 +4,6 @@
 
 #include "envoy/common/pure.h"
 
-/**
- * This is a temporary shim to easily allow switching between llhttp and http-parser at compile
- * time by providing a consistent interface, then adapting them to the respective implementations.
- *
- * When http-parser is ready to be removed, this shim should also disappear and the llhttp_* methods
- * moved into the codec implementation.
- */
-
 namespace Envoy {
 namespace Http {
 namespace Http1 {
