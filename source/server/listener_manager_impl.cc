@@ -557,13 +557,18 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
       // with addition. It's guaranteed that workers process remove after add so this should be
       // fine.
       if (!success && !listener.onListenerCreateFailure()) {
-        // TODO(mattklein123): In addition to a critical log and a stat, we should consider adding
-        //                     a startup option here to cause the server to exit. I think we
-        //                     probably want this at Lyft but I will do it in a follow up.
         ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
                   listener.name(), listener.listenSocketFactory().localAddress()->asString());
         stats_.listener_create_failure_.inc();
         removeListener(listener.name());
+
+        if (server_.options().serverExitOnBindFailure()) {
+
+          // Stop all workers and exit the server
+          ENVOY_LOG(critical, "Stopping server due to bind failure on addresss '{}'",
+                    listener.listenSocketFactory().localAddress()->asString());
+          server_.shutdown();
+        }
       }
       if (success) {
         stats_.listener_create_success_.inc();

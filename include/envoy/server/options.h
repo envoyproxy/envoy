@@ -96,6 +96,11 @@ public:
   virtual bool rejectUnknownDynamicFields() const PURE;
 
   /**
+   * @return bool exit the server if a listener socket bind fails?
+   */
+  virtual bool serverExitOnBindFailure() const PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;

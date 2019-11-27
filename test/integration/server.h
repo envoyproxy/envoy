@@ -35,7 +35,8 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
                                   Network::Address::IpVersion ip_version,
                                   bool allow_unknown_static_fields = false,
                                   bool reject_unknown_dynamic_fields = false,
-                                  uint32_t concurrency = 1);
+                                  uint32_t concurrency = 1,
+                                  bool server_exit_on_bind_failure = false);
 
 class TestDrainManager : public DrainManager {
 public:

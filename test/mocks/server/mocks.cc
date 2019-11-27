@@ -28,6 +28,9 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, rejectUnknownDynamicFields()).WillByDefault(Invoke([this] {
     return reject_unknown_dynamic_fields_;
   }));
+  ON_CALL(*this, serverExitOnBindFailure()).WillByDefault(Invoke([this] {
+    return server_exit_on_bind_failure_;
+  }));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
   ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));

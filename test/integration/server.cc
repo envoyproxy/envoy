@@ -32,7 +32,8 @@ namespace Server {
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
                                   bool allow_unknown_static_fields,
-                                  bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+                                  bool reject_unknown_dynamic_fields, uint32_t concurrency,
+                                  bool server_exit_on_bind_failure) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
@@ -44,6 +45,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setAllowUnkownFields(allow_unknown_static_fields);
   test_options.setRejectUnknownFieldsDynamic(reject_unknown_dynamic_fields);
   test_options.setConcurrency(concurrency);
+  test_options.setServerExitOnBindFailure(server_exit_on_bind_failure);
 
   return test_options;
 }

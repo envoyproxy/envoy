@@ -231,6 +231,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_FALSE(command_line_options->cpuset_threads());
   EXPECT_FALSE(command_line_options->allow_unknown_static_fields());
   EXPECT_FALSE(command_line_options->reject_unknown_dynamic_fields());
+  EXPECT_FALSE(command_line_options->server_exit_on_bind_failure());
 }
 
 // Validates that the server_info proto is in sync with the options.

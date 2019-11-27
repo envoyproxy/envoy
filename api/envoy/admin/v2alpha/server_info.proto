@@ -47,7 +47,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message CommandLineOptions {
   enum IpVersion {
     v4 = 0;
@@ -84,6 +84,9 @@ message CommandLineOptions {
 
   // See :option:`--reject-unknown-dynamic-fields` for details.
   bool reject_unknown_dynamic_fields = 26;
+
+  // See :option:`--server-exit-on-bind-failure` for details.
+  bool server_exit_on_bind_failure = 28;
 
   // See :option:`--admin-address-path` for details.
   string admin_address_path = 6;

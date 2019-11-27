@@ -260,6 +260,12 @@ following are the command line options that Envoy supports.
   and these occurrences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
   statistic.
 
+.. option:: --server--exit-on-bind-failure
+
+  *(optional)* This flag causes the server to exit if it cannot bind to an address and port for a given
+  listener. If this flag is not specified, and a bind failure occurs, the failed listener is essentially
+  ignored and the server continues to run.
+
 .. option:: --version
 
   *(optional)* This flag is used to display Envoy version and build information, e.g.

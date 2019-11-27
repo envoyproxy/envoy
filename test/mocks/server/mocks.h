@@ -70,6 +70,7 @@ public:
   MOCK_CONST_METHOD0(configYaml, const std::string&());
   MOCK_CONST_METHOD0(allowUnknownStaticFields, bool());
   MOCK_CONST_METHOD0(rejectUnknownDynamicFields, bool());
+  MOCK_CONST_METHOD0(serverExitOnBindFailure, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -98,6 +99,7 @@ public:
   std::string config_yaml_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
+  bool server_exit_on_bind_failure_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;

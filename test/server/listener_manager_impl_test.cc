@@ -28,8 +28,10 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
+using testing::Assign;
 using testing::AtLeast;
 using testing::InSequence;
+using testing::SaveArg;
 using testing::Throw;
 
 namespace Envoy {
@@ -1589,6 +1591,112 @@ filter_chains:
       "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_F(ListenerManagerImplTest, ServerExitOnBindFailure) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add localhost listener which we will simulate a bind failure
+  const std::string listener_localhost_yaml = R"EOF(
+name: localhost_1234
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  // Create and initialize the listener
+  ListenerHandle* listener_localhost = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_localhost->target_, initialize());
+
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_localhost_yaml), "", true));
+
+  // Setup the server options to return true for serverExitOnBindFailure
+  Envoy::Server::MockOptions options;
+  ON_CALL(options, serverExitOnBindFailure()).WillByDefault(Return(true));
+
+  // Define the behavior to signal the server will exit
+  bool server_shutdown = false;
+  ON_CALL(server_, options()).WillByDefault(ReturnRef(options));
+  ON_CALL(server_, shutdown()).WillByDefault(Assign(&server_shutdown, true));
+
+  // Save the completion callback so we can signal that the bind failed
+  Worker::AddListenerCompletion completion_cb;
+  EXPECT_CALL(*worker_, addListener(_, _)).WillOnce(SaveArg<1>(&completion_cb));
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_localhost->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(options, serverExitOnBindFailure());
+  EXPECT_CALL(*listener_localhost, onDestroy());
+
+  // Start the listener
+  listener_localhost->target_.ready();
+
+  // Signal that the bind failed
+  completion_cb(false);
+
+  // Validate that the server shutdown was called.
+  EXPECT_TRUE(server_shutdown);
+}
+
+TEST_F(ListenerManagerImplTest, ServerIgnoresBindFailure) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add localhost listener which we will simulate a bind failure
+  const std::string listener_localhost_yaml = R"EOF(
+name: localhost_1234
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  // Create and initialize the listener
+  ListenerHandle* listener_localhost = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+  EXPECT_CALL(listener_localhost->target_, initialize());
+
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_localhost_yaml), "", true));
+
+  // Setup the server options to return false for serverExitOnBindFailure
+  Envoy::Server::MockOptions options;
+  ON_CALL(options, serverExitOnBindFailure()).WillByDefault(Return(false));
+
+  // Instruct the server that it will not exit on a bind failure
+  bool server_shutdown = false;
+  ON_CALL(server_, options()).WillByDefault(ReturnRef(options));
+  ON_CALL(server_, shutdown()).WillByDefault(Assign(&server_shutdown, true));
+
+  // Save the completion callback so we can signal that the bind failed
+  Worker::AddListenerCompletion completion_cb;
+  EXPECT_CALL(*worker_, addListener(_, _)).WillOnce(SaveArg<1>(&completion_cb));
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_localhost->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(options, serverExitOnBindFailure());
+  EXPECT_CALL(*listener_localhost, onDestroy());
+
+  // Start the listener
+  listener_localhost->target_.ready();
+
+  // Signal that the bind failed
+  completion_cb(false);
+
+  // Validate that the server shutdown was not called.
+  EXPECT_FALSE(server_shutdown);
 }
 
 TEST_F(ListenerManagerImplTest, EarlyShutdown) {
