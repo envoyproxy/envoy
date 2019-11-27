@@ -13,11 +13,6 @@ namespace Http1 {
 
 class LegacyHttpParserImpl::Impl {
 public:
-  // Possible idea: have an overload that doesn't accept `data` which appears
-  // to just be used for callbacks? If no data, then leave settings as nullptrs?
-  // https://github.com/nodejs/http-parser/blob/master/http_parser.h#L320
-
-  // so far unused
   Impl(http_parser_type type) { http_parser_init(&parser_, type); }
 
   Impl(http_parser_type type, void* data) : Impl(type) {
