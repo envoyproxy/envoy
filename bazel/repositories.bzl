@@ -66,12 +66,8 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
     _repository_impl(
-        name = "six_archive",
-        build_file = "@com_google_protobuf//:six.BUILD",
-    )
-    native.bind(
         name = "six",
-        actual = "@six_archive//:six",
+        build_file = "@com_google_protobuf//third_party:six.BUILD",
     )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
@@ -120,7 +116,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
-    _com_github_eile_tclap()
+    _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
@@ -132,7 +128,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
-    _com_github_nanopb_nanopb()
     _com_github_nghttp2_nghttp2()
     _com_github_nodejs_http_parser()
     _com_github_nodejs_llhttp()
@@ -148,6 +143,7 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _upb()
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
@@ -235,9 +231,9 @@ def _com_github_envoyproxy_sqlparser():
         actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
     )
 
-def _com_github_eile_tclap():
+def _com_github_mirror_tclap():
     _repository_impl(
-        name = "com_github_eile_tclap",
+        name = "com_github_mirror_tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
         patch_args = ["-p1"],
         # If and when we pick up tclap 1.4 or later release,
@@ -248,7 +244,7 @@ def _com_github_eile_tclap():
     )
     native.bind(
         name = "tclap",
-        actual = "@com_github_eile_tclap//:tclap",
+        actual = "@com_github_mirror_tclap//:tclap",
     )
 
 def _com_github_fmtlib_fmt():
@@ -322,6 +318,7 @@ def _net_zlib():
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
+
     native.bind(
         name = "zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
@@ -525,27 +522,10 @@ def _com_google_absl():
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
-        # The patch includes
-        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
-        # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when protobuf 3.10 is released.
-        patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
+        patch_args = ["-p1"],
     )
 
-    # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
-    # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
-    # https://github.com/bazelbuild/bazel/issues/3219.
-    _repository_impl(
-        "com_google_protobuf_cc",
-        repository_key = "com_google_protobuf",
-        # The patch includes
-        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
-        # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when protobuf 3.10 is released.
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:protobuf.patch"],
-    )
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
@@ -560,7 +540,7 @@ def _com_google_protobuf():
     )
     native.bind(
         name = "protoc",
-        actual = "@com_google_protobuf_cc//:protoc",
+        actual = "@com_google_protobuf//:protoc",
     )
 
     # Needed for `bazel fetch` to work with @com_google_protobuf
@@ -682,19 +662,8 @@ def _fuzzit_linux():
     )
 
 def _com_github_grpc_grpc():
-    _repository_impl(
-        "com_github_grpc_grpc",
-        patches = [
-            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
-            "@envoy//bazel:grpc-protoinfo-1.patch",
-            "@envoy//bazel:grpc-protoinfo-2.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/19860
-            "@envoy//bazel:grpc-protoinfo-3.patch",
-            # Pre-integration of https://github.com/grpc/grpc/pull/18950
-            "@envoy//bazel:grpc-rename-gettid.patch",
-        ],
-        patch_args = ["-p1"],
-    )
+    _repository_impl("com_github_grpc_grpc")
+    _repository_impl("build_bazel_rules_apple")
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(
@@ -725,15 +694,16 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
-def _com_github_nanopb_nanopb():
+def _upb():
     _repository_impl(
-        name = "com_github_nanopb_nanopb",
-        build_file = "@com_github_grpc_grpc//third_party:nanopb.BUILD",
+        name = "upb",
+        patches = ["@envoy//bazel:upb.patch"],
+        patch_args = ["-p1"],
     )
 
     native.bind(
-        name = "nanopb",
-        actual = "@com_github_nanopb_nanopb//:nanopb",
+        name = "upb_lib",
+        actual = "@upb//:upb",
     )
 
 def _com_github_google_jwt_verify():
@@ -779,6 +749,7 @@ def _foreign_cc_dependencies():
 
 def _rules_proto_dependencies():
     _repository_impl("rules_proto")
+    _repository_impl("rules_python")
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

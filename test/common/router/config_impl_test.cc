@@ -3179,7 +3179,7 @@ virtual_hosts:
       hedge_policy: {hedge_on_per_try_timeout: true}
   - match: {prefix: /bar}
     route:
-      hedge_policy: {additional_request_chance: {numerator: 30.0, denominator: HUNDRED}}
+      hedge_policy: {additional_request_chance: {numerator: 30, denominator: HUNDRED}}
       cluster: www
   - match: {prefix: /}
     route: {cluster: www}
@@ -4502,8 +4502,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|path)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -4539,8 +4539,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|regex)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -4576,8 +4576,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(path|regex)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {

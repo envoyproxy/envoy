@@ -2214,6 +2214,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   HeaderMapPtr request_headers(std::move(parent_.request_headers_));
   StreamEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
+  response_encoder->getStream().removeCallbacks(parent_);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   parent_.connection_manager_.doEndStream(this->parent_);

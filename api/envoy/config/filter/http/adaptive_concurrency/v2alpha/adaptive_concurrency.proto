@@ -25,10 +25,6 @@ message GradientControllerConfig {
   // Parameters controlling the periodic recalculation of the concurrency limit from sampled request
   // latencies.
   message ConcurrencyLimitCalculationParams {
-    // The maximum value the gradient is allowed to take. This influences how aggressively the
-    // concurrency limit can increase. Defaults to 2.0.
-    google.protobuf.DoubleValue max_gradient = 1 [(validate.rules).double = {gt: 1.0}];
-
     // The allowed upper-bound on the calculated concurrency limit. Defaults to 1000.
     google.protobuf.UInt32Value max_concurrency_limit = 2 [(validate.rules).uint32 = {gt: 0}];
 
@@ -40,6 +36,7 @@ message GradientControllerConfig {
   }
 
   // Parameters controlling the periodic minRTT recalculation.
+  // [#next-free-field: 6]
   message MinimumRTTCalculationParams {
     // The time interval between recalculating the minimum request round-trip time.
     google.protobuf.Duration interval = 1 [(validate.rules).duration = {
@@ -60,6 +57,13 @@ message GradientControllerConfig {
 
     // The concurrency limit set while measuring the minRTT. Defaults to 3.
     google.protobuf.UInt32Value min_concurrency = 4 [(validate.rules).uint32 = {gt: 0}];
+
+    // Amount added to the measured minRTT to add stability to the concurrency limit during natural
+    // variability in latency. This is expressed as a percentage of the measured value and can be
+    // adjusted to allow more or less tolerance to the sampled latency values.
+    //
+    // Defaults to 25%.
+    type.Percent buffer = 5;
   }
 
   // The percentile to use when summarizing aggregated samples. Defaults to p50.
