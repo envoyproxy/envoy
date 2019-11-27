@@ -195,9 +195,10 @@ public:
   /**
    * Return the local cluster name, if it was configured.
    *
-   * @return std::string the local cluster name, or "" if no local cluster was configured.
+   * @return absl::optional<std::string> the local cluster name, or empty if no local cluster was
+   * configured.
    */
-  virtual const std::string& localClusterName() const PURE;
+  virtual const absl::optional<std::string>& localClusterName() const PURE;
 
   /**
    * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
@@ -212,6 +213,9 @@ public:
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 
+  /**
+   * Return the factory to use for creating cluster manager related objects.
+   */
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
   /**
@@ -221,10 +225,6 @@ public:
    * @return Config::SubscriptionFactory& the subscription factory.
    */
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
-
-  virtual std::size_t warmingClusterCount() const PURE;
-
-  virtual bool xdsIsDelta() const PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -298,7 +298,7 @@ public:
   /**
    * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
+  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                               ClusterManager& cm) PURE;
 
   /**

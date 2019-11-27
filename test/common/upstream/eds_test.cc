@@ -45,7 +45,8 @@ protected:
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+                 Cluster::InitializePhase::Secondary);
   }
 
   void resetClusterDrainOnHostRemoval() {
@@ -63,10 +64,24 @@ protected:
               cluster_names:
               - eds
               refresh_delay: 1s
-    )EOF");
+    )EOF",
+                 Cluster::InitializePhase::Secondary);
   }
 
-  void resetCluster(const std::string& yaml_config) {
+  void resetClusterLoadedFromFile() {
+    resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        eds_config:
+          path: "eds path"
+    )EOF",
+                 Cluster::InitializePhase::Primary);
+  }
+
+  void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV2Yaml(yaml_config);
     Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
@@ -75,9 +90,9 @@ protected:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_);
-    cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope),
-                                      false, false));
-    EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
+    cluster_.reset(
+        new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
+    EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 
@@ -168,7 +183,8 @@ protected:
             - eds
             refresh_delay: 1s
       )EOF";
-    EdsTest::resetCluster(fmt::format(config, drain_connections_on_host_removal));
+    EdsTest::resetCluster(fmt::format(config, drain_connections_on_host_removal),
+                          Cluster::InitializePhase::Secondary);
   }
 
   void addEndpoint(const uint32_t port) {
@@ -291,7 +307,18 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+               Cluster::InitializePhase::Secondary);
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("name");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+}
+
+// Validate that EDS cluster loaded from file as primary cluster
+TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
+  resetClusterLoadedFromFile();
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("name");
   initialize();
@@ -1015,7 +1042,8 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+               Cluster::InitializePhase::Secondary);
 
   {
     auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -1343,9 +1371,11 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
 
 // Make sure config updates with P!=0 are rejected for the local cluster.
 TEST_F(EdsTest, NoPriorityForLocalCluster) {
+  cm_.local_cluster_name_ = "name";
+  resetCluster();
+
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
-  cm_.local_cluster_name_ = "fare";
   uint32_t port = 1000;
   auto add_hosts_to_priority = [&cluster_load_assignment, &port](uint32_t priority, uint32_t n) {
     auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -1369,7 +1399,7 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(resources, ""), EnvoyException,
-                            "Unexpected non-zero priority for local cluster 'fare'.");
+                            "Unexpected non-zero priority for local cluster 'name'.");
 
   // Try an update which only has endpoints with P=0. This should go through.
   cluster_load_assignment.clear_endpoints();
@@ -1488,7 +1518,8 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF");
+    )EOF",
+               Cluster::InitializePhase::Secondary);
 
   uint32_t port = 1000;
   auto add_hosts_to_locality_and_priority =

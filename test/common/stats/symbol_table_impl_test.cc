@@ -11,6 +11,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
@@ -164,6 +165,13 @@ TEST_P(StatNameTest, TestSymbolConsistency) {
   SymbolVec vec_2 = getSymbols(stat_name_2);
   EXPECT_EQ(vec_1[0], vec_2[1]);
   EXPECT_EQ(vec_2[0], vec_1[1]);
+}
+
+TEST_P(StatNameTest, TestIgnoreTrailingDots) {
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar."));
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar..."));
+  EXPECT_EQ("", encodeDecode("."));
+  EXPECT_EQ("", encodeDecode(".."));
 }
 
 TEST_P(StatNameTest, TestSameValueOnPartialFree) {
@@ -573,6 +581,49 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_EQ("dynamic", table_->toString(dynamic2));
   EXPECT_EQ(dynamic2.data(), set2->getDynamic("dynamic").data());
   EXPECT_NE(dynamic2.data(), dynamic.data());
+}
+
+TEST_P(StatNameTest, StorageCopy) {
+  StatName a = pool_->add("stat.name");
+  StatNameStorage b_storage(a, *table_);
+  StatName b = b_storage.statName();
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a.data(), b.data());
+  b_storage.free(*table_);
+}
+
+TEST_P(StatNameTest, RecentLookups) {
+  if (GetParam() == SymbolTableType::Fake) {
+    // touch these cover coverage for fake symbol tables, but they'll have no effect.
+    table_->clearRecentLookups();
+    table_->setRecentLookupCapacity(0);
+    return;
+  }
+
+  StatNameSetPtr set1(table_->makeSet("set1"));
+  table_->setRecentLookupCapacity(10);
+  StatNameSetPtr set2(table_->makeSet("set2"));
+  set1->getDynamic("dynamic.stat1");
+  set2->getDynamic("dynamic.stat2");
+  encodeDecode("direct.stat");
+
+  std::vector<std::string> accum;
+  uint64_t total = table_->getRecentLookups([&accum](absl::string_view name, uint64_t count) {
+    accum.emplace_back(absl::StrCat(count, ": ", name));
+  });
+  EXPECT_EQ(5, total);
+  std::string recent_lookups_str = absl::StrJoin(accum, " ");
+
+  EXPECT_EQ("1: direct.stat "
+            "2: dynamic.stat1 " // Combines entries from set and symbol-table.
+            "2: dynamic.stat2",
+            recent_lookups_str);
+
+  table_->clearRecentLookups();
+  uint32_t num_calls = 0;
+  EXPECT_EQ(0,
+            table_->getRecentLookups([&num_calls](absl::string_view, uint64_t) { ++num_calls; }));
+  EXPECT_EQ(0, num_calls);
 }
 
 TEST_P(StatNameTest, StatNameEmptyEquivalent) {

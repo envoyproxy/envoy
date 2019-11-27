@@ -11,8 +11,8 @@ namespace Network {
  */
 class ListenerImpl : public BaseListenerImpl {
 public:
-  ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-               bool bind_to_port, bool hand_off_restored_destination_connections);
+  ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
+               bool bind_to_port);
 
   void disable() override;
   void enable() override;
@@ -21,7 +21,6 @@ protected:
   void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
 
   ListenerCallbacks& cb_;
-  const bool hand_off_restored_destination_connections_;
 
 private:
   static void listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,

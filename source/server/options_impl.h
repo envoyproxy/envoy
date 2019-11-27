@@ -106,6 +106,7 @@ public:
     return component_log_levels_;
   }
   const std::string& logFormat() const override { return log_format_; }
+  bool logFormatEscaped() const override { return log_format_escaped_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
@@ -119,7 +120,6 @@ public:
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
-  bool libeventBufferEnabled() const override { return libevent_buffer_enabled_; }
   bool fakeSymbolTableEnabled() const override { return fake_symbol_table_enabled_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
@@ -142,6 +142,7 @@ private:
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
   std::string log_format_;
+  bool log_format_escaped_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
@@ -155,7 +156,6 @@ private:
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
-  bool libevent_buffer_enabled_;
   bool fake_symbol_table_enabled_;
   uint32_t count_;
 };

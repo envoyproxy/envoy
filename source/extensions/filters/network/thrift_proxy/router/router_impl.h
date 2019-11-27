@@ -39,6 +39,8 @@ public:
     return metadata_match_criteria_.get();
   }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  bool stripServiceName() const override { return strip_service_name_; };
+  const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
@@ -47,7 +49,7 @@ public:
                                       uint64_t random_value) const PURE;
 
 protected:
-  RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
+  RouteConstSharedPtr clusterEntry(uint64_t random_value, const MessageMetadata& metadata) const;
   bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
@@ -70,6 +72,8 @@ private:
       return parent_.metadataMatchCriteria();
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
+    bool stripServiceName() const override { return parent_.stripServiceName(); }
+    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -82,12 +86,36 @@ private:
   };
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
+  class DynamicRouteEntry : public RouteEntry, public Route {
+  public:
+    DynamicRouteEntry(const RouteEntryImplBase& parent, absl::string_view cluster_name)
+        : parent_(parent), cluster_name_(std::string(cluster_name)) {}
+
+    // Router::RouteEntry
+    const std::string& clusterName() const override { return cluster_name_; }
+    const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+      return parent_.metadataMatchCriteria();
+    }
+    const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
+    bool stripServiceName() const override { return parent_.stripServiceName(); }
+    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+
+    // Router::Route
+    const RouteEntry* routeEntry() const override { return this; }
+
+  private:
+    const RouteEntryImplBase& parent_;
+    const std::string cluster_name_;
+  };
+
   const std::string cluster_name_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   const RateLimitPolicyImpl rate_limit_policy_;
+  const bool strip_service_name_;
+  const Http::LowerCaseString cluster_header_;
 };
 
 using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
@@ -178,6 +206,7 @@ private:
 
     FilterStatus start();
     void resetStream();
+    void releaseConnection(bool close);
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,

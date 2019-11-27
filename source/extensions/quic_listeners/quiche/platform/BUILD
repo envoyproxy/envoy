@@ -3,7 +3,6 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -73,8 +72,6 @@ envoy_cc_library(
         "http2_logging_impl.h",
         "http2_macros_impl.h",
         "http2_optional_impl.h",
-        "http2_ptr_util_impl.h",
-        "http2_string_impl.h",
         "http2_string_piece_impl.h",
         "http2_string_utils_impl.h",
     ],
@@ -208,7 +205,10 @@ envoy_cc_library(
     name = "quic_platform_mem_slice_span_impl_lib",
     srcs = ["quic_mem_slice_span_impl.cc"],
     hdrs = ["quic_mem_slice_span_impl.h"],
-    copts = ["-Wno-unused-parameter"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": ["-Wno-unused-parameter"],
+    }),
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -223,10 +223,13 @@ envoy_cc_library(
     name = "quic_platform_mem_slice_storage_impl_lib",
     srcs = ["quic_mem_slice_storage_impl.cc"],
     hdrs = ["quic_mem_slice_storage_impl.h"],
-    copts = [
-        "-Wno-error=invalid-offsetof",
-        "-Wno-unused-parameter",
-    ],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-Wno-error=invalid-offsetof",
+            "-Wno-unused-parameter",
+        ],
+    }),
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
@@ -288,7 +291,6 @@ envoy_cc_library(
         "spdy_map_util_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
-        "spdy_string_impl.h",
         "spdy_string_piece_impl.h",
         "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",

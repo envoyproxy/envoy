@@ -130,6 +130,10 @@ public:
     return StatNameSetPtr(new StatNameSet(*this, name));
   }
   void forgetSet(StatNameSet&) override {}
+  uint64_t getRecentLookups(const RecentLookupsFn&) const override { return 0; }
+  void clearRecentLookups() override {}
+  void setRecentLookupCapacity(uint64_t) override {}
+  uint64_t recentLookupCapacity() const override { return 0; }
 
 private:
   absl::string_view toStringView(const StatName& stat_name) const {
@@ -138,7 +142,7 @@ private:
   }
 
   StoragePtr encodeHelper(absl::string_view name) const {
-    ASSERT(!absl::EndsWith(name, "."));
+    name = StringUtil::removeTrailingCharacters(name, '.');
     auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
     uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());

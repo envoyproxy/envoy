@@ -19,6 +19,7 @@ using testing::_;
 using testing::An;
 using testing::ContainerEq;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +36,11 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
+  HttpConnectionManagerConfigTest() {
+    ON_CALL(context_, getServerFactoryContext()).WillByDefault(ReturnRef(server_context_));
+  }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
@@ -47,77 +52,6 @@ TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager(),
           context_),
       ProtoValidationException);
-}
-
-// Verify that the v1 JSON config path still works. This will be deleted when v1 is fully removed.
-TEST_F(HttpConnectionManagerConfigTest, V1Config) {
-  const std::string yaml_string = R"EOF(
-drain_timeout_ms: 5000
-route_config:
-  virtual_hosts:
-  - require_ssl: all
-    routes:
-    - cluster: cluster_1
-      prefix: "/"
-    domains:
-    - www.redirect.com
-    name: redirect
-  - routes:
-    - prefix: "/"
-      cluster: cluster_1
-      runtime:
-        key: some_key
-        default: 0
-    - prefix: "/test/long/url"
-      rate_limits:
-      - actions:
-        - type: destination_cluster
-      cluster: cluster_1
-    - prefix: "/test/"
-      cluster: cluster_2
-    - prefix: "/websocket/test"
-      prefix_rewrite: "/websocket"
-      cluster: cluster_1
-    domains:
-    - "*"
-    name: integration
-codec_type: http1
-stat_prefix: router
-filters:
-- name: health_check
-  config:
-    endpoint: "/healthcheck"
-    pass_through_mode: false
-- name: rate_limit
-  config:
-    domain: foo
-- name: router
-  config: {}
-access_log:
-- format: '[%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%
-    %PROTOCOL%" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT%
-    %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%"
-    "%REQ(USER-AGENT)%" "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"
-    "%REQUEST_DURATION%" "%RESPONSE_DURATION%"'
-  path: "/dev/null"
-  filter:
-    filters:
-    - type: status_code
-      op: ">="
-      value: 500
-    - type: duration
-      op: ">="
-      value: 1000000
-    type: logical_or
-- path: "/dev/null"
-  )EOF";
-
-  ON_CALL(context_.runtime_loader_.snapshot_,
-          deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
-      .WillByDefault(Return(true));
-
-  HttpConnectionManagerFilterConfigFactory().createFilterFactory(
-      *Json::Factory::loadFromYamlString(yaml_string), context_);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
@@ -518,6 +452,40 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
   EXPECT_EQ(1000, config.idleTimeout().value().count());
 }
 
+// Validate that idle_timeout defaults to 1h
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(std::chrono::hours(1), config.idleTimeout().value());
+}
+
+// Validate that idle_timeouts can be turned off
+TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    idle_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_FALSE(config.idleTimeout().has_value());
+}
+
 // Check that the default max request header count is 100.
 TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
   const std::string yaml_string = R"EOF(
@@ -808,7 +776,8 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
 - name: envoy.router
   )EOF";
 

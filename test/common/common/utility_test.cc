@@ -185,20 +185,6 @@ TEST(StringUtil, strlcpy) {
   }
 }
 
-TEST(StringUtil, join) {
-  EXPECT_EQ("hello,world", StringUtil::join({"hello", "world"}, ","));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ","));
-  EXPECT_EQ("", StringUtil::join({}, ","));
-
-  EXPECT_EQ("helloworld", StringUtil::join({"hello", "world"}, ""));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ""));
-  EXPECT_EQ("", StringUtil::join({}, ""));
-
-  EXPECT_EQ("hello,,world", StringUtil::join({"hello", "world"}, ",,"));
-  EXPECT_EQ("hello", StringUtil::join({"hello"}, ",,"));
-  EXPECT_EQ("", StringUtil::join({}, ",,"));
-}
-
 TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("hello world"), "hello world");
   EXPECT_EQ(StringUtil::escape("hello\nworld\n"), "hello\\nworld\\n");
@@ -235,6 +221,13 @@ TEST(StringUtil, StringViewRtrim) {
   EXPECT_EQ("\t\f\v\n\r a b", StringUtil::rtrim("\t\f\v\n\r a b \t\f\v\n\r"));
   EXPECT_EQ("", StringUtil::rtrim("\t\f\v\n\r"));
   EXPECT_EQ("", StringUtil::rtrim(""));
+}
+
+TEST(StringUtil, RemoveTrailingCharacters) {
+  EXPECT_EQ("", StringUtil::removeTrailingCharacters("......", '.'));
+  EXPECT_EQ("\t\f\v\n\rhello ", StringUtil::removeTrailingCharacters("\t\f\v\n\rhello ", '.'));
+  EXPECT_EQ("\t\f\v\n\r a b", StringUtil::removeTrailingCharacters("\t\f\v\n\r a b.......", '.'));
+  EXPECT_EQ("", StringUtil::removeTrailingCharacters("", '.'));
 }
 
 TEST(StringUtil, StringViewTrim) {

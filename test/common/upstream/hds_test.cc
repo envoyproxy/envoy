@@ -85,7 +85,8 @@ protected:
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
+    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
+        envoy::type::HTTP1);
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
     auto* socket_address = health_check->add_locality_endpoints()
@@ -206,7 +207,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
       hc->mutable_unhealthy_threshold()->set_value(j + 1);
       hc->mutable_healthy_threshold()->set_value(j + 1);
       hc->mutable_grpc_health_check();
-      hc->mutable_http_health_check()->set_use_http2(false);
+      hc->mutable_http_health_check()->set_codec_client_type(envoy::type::HTTP1);
       hc->mutable_http_health_check()->set_path("/healthcheck");
     }
   }
@@ -233,6 +234,22 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
 
   // Process message
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  hds_delegate_->onReceiveMessage(std::move(message));
+}
+
+// Tests OnReceiveMessage given a HealthCheckSpecifier message without interval field
+TEST_F(HdsTest, TestDefaultIntervalOnReceiveMessage) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  // notice that interval field is intentionally left undefined
+
+  // Process message
+  EXPECT_CALL(*server_response_timer_, enableTimer(std::chrono::milliseconds(1000), _))
+      .Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
 }
 

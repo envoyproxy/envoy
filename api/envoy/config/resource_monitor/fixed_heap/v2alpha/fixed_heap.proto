@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.resource_monitor.fixed_heap.v2
 import "validate/validate.proto";
 
 // [#protodoc-title: Fixed heap]
+// [#extension: envoy.resource_monitors.fixed_heap]
 
 // The fixed heap resource monitor reports the Envoy process memory pressure, computed as a
 // fraction of currently reserved heap memory divided by a statically configured maximum

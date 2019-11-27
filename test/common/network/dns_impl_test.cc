@@ -258,13 +258,9 @@ class TestDnsServer : public ListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), record_ttl_(0) {}
 
-  void onAccept(ConnectionSocketPtr&& socket, bool) override {
+  void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
         std::move(socket), Network::Test::createRawBufferSocket());
-    onNewConnection(std::move(new_connection));
-  }
-
-  void onNewConnection(ConnectionPtr&& new_connection) override {
     TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_a_,
                                                        hosts_aaaa_, cnames_, record_ttl_);
     queries_.emplace_back(query);
@@ -413,9 +409,9 @@ public:
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
-    socket_ = std::make_unique<Network::TcpListenSocket>(
+    socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(*socket_, *server_, true, false);
+    listener_ = dispatcher_->createListener(socket_, *server_, true);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
@@ -444,7 +440,7 @@ protected:
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
-  Network::TcpListenSocketPtr socket_;
+  std::shared_ptr<Network::TcpListenSocket> socket_;
   std::unique_ptr<Network::Listener> listener_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

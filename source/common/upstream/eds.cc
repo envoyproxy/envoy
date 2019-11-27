@@ -10,10 +10,10 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api, bool is_delta)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
-      cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
+      local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
@@ -21,12 +21,18 @@ EdsClusterImpl::EdsClusterImpl(
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
+  if (eds_config.config_source_specifier_case() ==
+      envoy::api::v2::core::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+    initialize_phase_ = InitializePhase::Primary;
+  } else {
+    initialize_phase_ = InitializePhase::Secondary;
+  }
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config,
           Grpc::Common::typeUrl(
               envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
-          info_->statsScope(), *this, is_delta);
+          info_->statsScope(), *this);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -35,13 +41,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   std::unordered_map<std::string, HostSharedPtr> updated_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
-    const uint32_t priority = locality_lb_endpoint.priority();
+    parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
 
-    if (priority > 0 && !parent_.cluster_name_.empty() &&
-        parent_.cluster_name_ == parent_.cm_.localClusterName()) {
-      throw EnvoyException(fmt::format("Unexpected non-zero priority for local cluster '{}'.",
-                                       parent_.cluster_name_));
-    }
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -269,8 +270,7 @@ EdsClusterFactory::createClusterImpl(
 
   return std::make_pair(
       std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                       std::move(stats_scope), context.addedViaApi(),
-                                       context.clusterManager().xdsIsDelta()),
+                                       std::move(stats_scope), context.addedViaApi()),
       nullptr);
 }
 

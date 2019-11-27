@@ -29,11 +29,11 @@ public:
   static Http::MessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
                                               const std::string& body = std::string{});
 
-  static CheckResponsePtr
-  makeCheckResponse(Grpc::Status::GrpcStatus response_status = Grpc::Status::GrpcStatus::Ok,
-                    envoy::type::StatusCode http_status_code = envoy::type::StatusCode::OK,
-                    const std::string& body = std::string{},
-                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+  static CheckResponsePtr makeCheckResponse(
+      Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+      envoy::type::StatusCode http_status_code = envoy::type::StatusCode::OK,
+      const std::string& body = std::string{},
+      const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
 
   static Response
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,

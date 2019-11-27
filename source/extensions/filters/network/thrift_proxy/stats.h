@@ -29,7 +29,7 @@ namespace ThriftProxy {
   COUNTER(response_reply)                                                                          \
   COUNTER(response_success)                                                                        \
   GAUGE(request_active, Accumulate)                                                                \
-  HISTOGRAM(request_time_ms)
+  HISTOGRAM(request_time_ms, Milliseconds)
 
 /**
  * Struct definition for all mongo proxy stats. @see stats_macros.h

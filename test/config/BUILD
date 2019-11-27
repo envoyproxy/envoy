@@ -2,11 +2,8 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_select_hot_restart",
-    "envoy_sh_test",
 )
 
 envoy_package()
@@ -30,6 +27,8 @@ envoy_cc_test_library(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
         "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",

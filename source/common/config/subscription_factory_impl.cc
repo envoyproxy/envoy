@@ -22,7 +22,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::api::v2::core::ConfigSource& config, absl::string_view type_url,
-    Stats::Scope& scope, SubscriptionCallbacks& callbacks, bool is_delta) {
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
@@ -78,7 +78,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     break;
   }
   case envoy::api::v2::core::ConfigSource::kAds: {
-    if (is_delta) {
+    if (cm_.adsMux()->isDelta()) {
       result = std::make_unique<DeltaSubscriptionImpl>(
           cm_.adsMux(), type_url, callbacks, stats,
           Utility::configSourceInitialFetchTimeout(config), true);

@@ -36,7 +36,7 @@ public:
     envoy::api::v2::core::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, init_manager_, store_,
-                                        listener_manager_, validation_visitor_, false);
+                                        listener_manager_, validation_visitor_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
@@ -67,9 +67,10 @@ public:
     for (const auto& name : listener_names) {
       listeners_.emplace_back();
       listeners_.back().name_ = name;
-      refs.push_back(listeners_.back());
+      refs.emplace_back(listeners_.back());
     }
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
+    EXPECT_CALL(listener_manager_, beginListenerUpdate());
   }
 
   void addListener(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& listeners,
@@ -109,6 +110,16 @@ TEST_F(LdsApiTest, ValidateFail) {
   listeners.Add()->PackFrom(listener);
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  // Validate that the error state is passed to the listener manager.
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_))
+      .WillOnce(Invoke([](ListenerManager::FailureStates&& state) {
+        EXPECT_EQ(1, state.size());
+        EXPECT_EQ("Proto constraint validation failed (ListenerValidationError.Address: "
+                  "[\"value is required\"]): ",
+                  state[0]->details());
+        EXPECT_TRUE(state[0]->has_failed_configuration());
+      }));
   EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_THROW(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException);
@@ -132,14 +143,16 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
       .WillOnce(Throw(EnvoyException("something is wrong")));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
 
   listeners.Add()->PackFrom(listener);
   EXPECT_THROW_WITH_MESSAGE(
       lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
-      "Error adding/updating listener(s) invalid-listener: something is wrong");
+      "Error adding/updating listener(s) invalid-listener: something is wrong\n");
 }
 
 TEST_F(LdsApiTest, EmptyListenersUpdate) {
@@ -151,6 +164,10 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_))
+      .WillOnce(Invoke([](ListenerManager::FailureStates&& state) { EXPECT_EQ(0, state.size()); }));
+  ;
   EXPECT_CALL(init_watcher_, ready());
 
   lds_callbacks_->onConfigUpdate(listeners, "");
@@ -172,17 +189,19 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
       .WillOnce(Return(true))
       .WillOnce(Throw(EnvoyException("something is wrong")))
       .WillOnce(Return(true))
       .WillOnce(Throw(EnvoyException("something else is wrong")));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
 
   EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener(s) invalid-listener-1: something is "
-                            "wrong, invalid-listener-2: something else is wrong");
+                            "wrong\ninvalid-listener-2: something else is wrong\n");
 }
 
 // Validate onConfigUpdate throws EnvoyException with duplicate listeners.
@@ -199,12 +218,14 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true)).WillOnce(Return(true));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener(s) duplicate_listener: duplicate "
-                            "listener duplicate_listener found");
+                            "listener duplicate_listener found\n");
 }
 
 TEST_F(LdsApiTest, Basic) {
@@ -236,6 +257,7 @@ TEST_F(LdsApiTest, Basic) {
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
   expectAdd("listener2", "0", true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
   lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
@@ -266,6 +288,7 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   expectAdd("listener1", "1", false);
   expectAdd("listener3", "1", true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
   EXPECT_EQ("1", lds_->versionInfo());
 }
@@ -294,6 +317,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
   lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
@@ -309,6 +333,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
 
   makeListenersAndExpectCall({"listener1"});
   EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
   EXPECT_EQ("1", lds_->versionInfo());
 }
@@ -320,47 +345,47 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
 
   setup();
 
-  std::string response1_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
-      "name": "listener0",
-      "address": { "socket_address": { "address": "tcp://0.0.0.1", "port_value": 61000 } },
-      "filter_chains": [ { "filters": null } ]
-    }
-  ]
-}
+  std::string response1_yaml = R"EOF(
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Listener
+  name: listener0
+  address:
+    socket_address:
+      address: tcp://0.0.0.1
+      port_value: 61000
+  filter_chains:
+  - filters: 
   )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
 
   makeListenersAndExpectCall({"listener0"});
   expectAdd("listener0", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
   lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
   std::string response2_basic = R"EOF(
-{{
-  "version_info": "1",
-  "resources": [
-    {{
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
-      "name": "listener-8080",
-      "address": {{ "socket_address": {{ "address": "tcp://0.0.0.0", "port_value": 61001 }} }},
-      "filter_chains": [ {{
-        "tls_context": {{
-           "common_tls_context": {{
-             "tls_certificates": [ {{
-               "certificate_chain": {{ "filename": "{}" }},
-               "private_key": {{ "filename": "{}" }}
-              }} ]
-            }}
-        }},
-        "filters": null }} ]
-    }}
-  ]
-}}
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Listener
+  name: listener-8080
+  address:
+    socket_address:
+      address: tcp://0.0.0.0
+      port_value: 61001
+  filter_chains:
+  - transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{}"
+            private_key:
+              filename: "{}"
+    filters:
   )EOF";
   std::string response2_json =
       fmt::format(response2_basic,
@@ -373,6 +398,7 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   });
   // Can't check version here because of bazel sandbox paths for the certs.
   expectAdd("listener-8080", {}, true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_NO_THROW(lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info()));
 }
 
@@ -399,6 +425,8 @@ TEST_F(LdsApiTest, FailureInvalidConfig) {
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW(lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
                EnvoyException);
@@ -445,6 +473,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
   expectAdd("listener2", "0", true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
   lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
 
@@ -475,6 +504,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   expectAdd("listener1", "1", false);
   expectAdd("listener3", "1", true);
+  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
 }
 

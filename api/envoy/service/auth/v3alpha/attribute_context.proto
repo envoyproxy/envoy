@@ -33,11 +33,13 @@ import "google/protobuf/timestamp.proto";
 // - field mask to send
 // - which return values from request_context are copied back
 // - which return values are copied into request_headers]
+// [#next-free-field: 12]
 message AttributeContext {
   // This message defines attributes for a node that handles a network request.
   // The node can be either a service or an application that sends, forwards,
   // or receives the request. Service peers should fill in the `service`,
   // `principal`, and `labels` as appropriate.
+  // [#next-free-field: 6]
   message Peer {
     // The address of the peer, this is typically the IP address.
     // It can also be UDS path, or others.
@@ -65,6 +67,10 @@ message AttributeContext {
     // *    SPIFFE format is `spiffe://trust-domain/path`
     // *    Google account format is `https://accounts.google.com/{userid}`
     string principal = 4;
+
+    // The X.509 certificate used to authenticate the identify of this peer.
+    // When present, the certificate contents are encoded in URL and PEM format.
+    string certificate = 5;
   }
 
   // Represents a network request, such as an HTTP request.
@@ -78,6 +84,7 @@ message AttributeContext {
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
+  // [#next-free-field: 12]
   message HttpRequest {
     // The unique ID for a request, which can be propagated to downstream
     // systems. The ID should have low probability of collision
@@ -90,7 +97,7 @@ message AttributeContext {
 
     // The HTTP request headers. If multiple headers share the same key, they
     // must be merged according to the HTTP spec. All header keys must be
-    // lowercased, because HTTP header keys are case-insensitive.
+    // lower-cased, because HTTP header keys are case-insensitive.
     map<string, string> headers = 3;
 
     // The request target, as it appears in the first line of the HTTP request. This includes

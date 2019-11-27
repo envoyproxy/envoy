@@ -39,6 +39,17 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     }
     break;
   }
+  case envoy::api::v2::auth::Secret::TypeCase::kSessionTicketKeys: {
+    auto secret_provider =
+        std::make_shared<TlsSessionTicketKeysConfigProviderImpl>(secret.session_ticket_keys());
+    if (!static_session_ticket_keys_providers_
+             .insert(std::make_pair(secret.name(), secret_provider))
+             .second) {
+      throw EnvoyException(
+          fmt::format("Duplicate static TlsSessionTicketKeys secret name {}", secret.name()));
+    }
+    break;
+  }
   default:
     throw EnvoyException("Secret type not implemented");
   }
@@ -57,6 +68,12 @@ SecretManagerImpl::findStaticCertificateValidationContextProvider(const std::str
                                                                             : nullptr;
 }
 
+TlsSessionTicketKeysConfigProviderSharedPtr
+SecretManagerImpl::findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const {
+  auto secret = static_session_ticket_keys_providers_.find(name);
+  return (secret != static_session_ticket_keys_providers_.end()) ? secret->second : nullptr;
+}
+
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertificateProvider(
     const envoy::api::v2::auth::TlsCertificate& tls_certificate) {
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
@@ -67,6 +84,12 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
     const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context) {
   return std::make_shared<CertificateValidationContextConfigProviderImpl>(
       certificate_validation_context);
+}
+
+TlsSessionTicketKeysConfigProviderSharedPtr
+SecretManagerImpl::createInlineTlsSessionTicketKeysProvider(
+    const envoy::api::v2::auth::TlsSessionTicketKeys& tls_session_ticket_keys) {
+  return std::make_shared<TlsSessionTicketKeysConfigProviderImpl>(tls_session_ticket_keys);
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
@@ -84,7 +107,15 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
                                                     secret_provider_context);
 }
 
-// We clear private key and password to avoid information leaking.
+TlsSessionTicketKeysConfigProviderSharedPtr
+SecretManagerImpl::findOrCreateTlsSessionTicketKeysContextProvider(
+    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  return session_ticket_keys_providers_.findOrCreate(sds_config_source, config_name,
+                                                     secret_provider_context);
+}
+
+// We clear private key, password, and session ticket encryption keys to avoid information leaking.
 // TODO(incfly): switch to more generic scrubbing mechanism once
 // https://github.com/envoyproxy/envoy/issues/4757 is resolved.
 void redactSecret(::envoy::api::v2::auth::Secret* secret) {
@@ -97,6 +128,13 @@ void redactSecret(::envoy::api::v2::auth::Secret* secret) {
     if (tls_certificate->has_password() && tls_certificate->password().specifier_case() !=
                                                envoy::api::v2::core::DataSource::kFilename) {
       tls_certificate->mutable_password()->set_inline_string("[redacted]");
+    }
+  }
+  if (secret && secret->type_case() == envoy::api::v2::auth::Secret::TypeCase::kSessionTicketKeys) {
+    for (auto& data_source : *secret->mutable_session_ticket_keys()->mutable_keys()) {
+      if (data_source.specifier_case() != envoy::api::v2::core::DataSource::kFilename) {
+        data_source.set_inline_string("[redacted]");
+      }
     }
   }
 }
@@ -124,6 +162,20 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     auto dump_secret = static_secret->mutable_secret();
     dump_secret->set_name(context_iter.first);
     dump_secret->mutable_validation_context()->MergeFrom(*validation_context->secret());
+  }
+
+  // Handle static session keys providers.
+  for (const auto& context_iter : static_session_ticket_keys_providers_) {
+    const auto& session_ticket_keys = context_iter.second;
+    auto static_secret = config_dump->mutable_static_secrets()->Add();
+    static_secret->set_name(context_iter.first);
+    ASSERT(session_ticket_keys != nullptr);
+    auto dump_secret = static_secret->mutable_secret();
+    dump_secret->set_name(context_iter.first);
+    for (const auto& key : session_ticket_keys->secret()->keys()) {
+      dump_secret->mutable_session_ticket_keys()->add_keys()->MergeFrom(key);
+    }
+    redactSecret(dump_secret);
   }
 
   // Handle dynamic tls_certificate providers.
@@ -174,6 +226,32 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     if (secret_ready) {
       secret->mutable_validation_context()->MergeFrom(*validation_context);
     }
+  }
+
+  // Handle dynamic session keys providers providers.
+  const auto stek_providers = session_ticket_keys_providers_.allSecretProviders();
+  for (const auto& stek_secrets : stek_providers) {
+    const auto& secret_data = stek_secrets->secretData();
+    const auto& tls_stek = stek_secrets->secret();
+    ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
+    const bool secret_ready = tls_stek != nullptr;
+    if (secret_ready) {
+      dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
+    } else {
+      dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
+    }
+    dump_secret->set_name(secret_data.resource_name_);
+    auto secret = dump_secret->mutable_secret();
+    secret->set_name(secret_data.resource_name_);
+    ProtobufWkt::Timestamp last_updated_ts;
+    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
+    dump_secret->set_version_info(secret_data.version_info_);
+    *dump_secret->mutable_last_updated() = last_updated_ts;
+    secret->set_name(secret_data.resource_name_);
+    if (secret_ready) {
+      secret->mutable_session_ticket_keys()->MergeFrom(*tls_stek);
+    }
+    redactSecret(secret);
   }
   return config_dump;
 }

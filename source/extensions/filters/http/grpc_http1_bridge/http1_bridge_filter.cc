@@ -31,7 +31,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& head
 
   const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
-  if (protocol.value() != Http::Protocol::Http2 && grpc_request) {
+  if (protocol.value() < Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;
   }
 
@@ -77,17 +77,17 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
           grpc_status_code != 0) {
         response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
       }
-      response_headers_->insertGrpcStatus().value(*grpc_status_header);
+      response_headers_->setGrpcStatus(grpc_status_header->value().getStringView());
     }
 
     const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
     if (grpc_message_header) {
-      response_headers_->insertGrpcMessage().value(*grpc_message_header);
+      response_headers_->setGrpcMessage(grpc_message_header->value().getStringView());
     }
 
     // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
     // if this is a complete response.
-    response_headers_->insertContentLength().value(
+    response_headers_->setContentLength(
         encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   }
 

@@ -19,16 +19,18 @@ public:
   }
 
   void createEnvoy() override {
+    createEnvoyServer({
+        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.cds.yaml",
+        "test/config/integration/server_xds.eds.yaml",
+        "test/config/integration/server_xds.lds.yaml",
+        "test/config/integration/server_xds.rds.yaml",
+    });
+  }
+
+  void createEnvoyServer(const ApiFilesystemConfig& api_filesystem_config) {
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer(
-        {
-            "test/config/integration/server_xds.bootstrap.yaml",
-            "test/config/integration/server_xds.cds.yaml",
-            "test/config/integration/server_xds.eds.yaml",
-            "test/config/integration/server_xds.lds.yaml",
-            "test/config/integration/server_xds.rds.yaml",
-        },
-        {"http"}, false, false, false);
+    createApiTestServer(api_filesystem_config, {"http"}, false, false, false);
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
     EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
@@ -41,6 +43,29 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, XdsIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(XdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
+class XdsIntegrationTestTypedStruct : public XdsIntegrationTest {
+public:
+  XdsIntegrationTestTypedStruct() = default;
+
+  void createEnvoy() override {
+    createEnvoyServer({
+        "test/config/integration/server_xds.bootstrap.yaml",
+        "test/config/integration/server_xds.cds.yaml",
+        "test/config/integration/server_xds.eds.yaml",
+        "test/config/integration/server_xds.lds.typed_struct.yaml",
+        "test/config/integration/server_xds.rds.yaml",
+    });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, XdsIntegrationTestTypedStruct,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(XdsIntegrationTestTypedStruct, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
@@ -83,6 +108,17 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   std::string response2;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, false);
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
+}
+
+// Sample test making sure our config framework informs on listener failure.
+TEST_P(LdsIntegrationTest, FailConfigLoad) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    filter_chain->mutable_filters(0)->set_name("grewgragra");
+  });
+  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
+                             "Didn't find a registered implementation for name: 'grewgragra'");
 }
 
 } // namespace

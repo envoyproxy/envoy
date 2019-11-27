@@ -3,6 +3,7 @@
 // This file defines platform dependent test utility functions which is declared
 // in quiche/quic/test_tools/crypto_test_utils.h.
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -13,6 +14,9 @@
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 
 #pragma GCC diagnostic pop
+#else
+#include "quiche/quic/test_tools/crypto_test_utils.h"
+#endif
 
 #include <memory>
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"

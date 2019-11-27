@@ -33,6 +33,7 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

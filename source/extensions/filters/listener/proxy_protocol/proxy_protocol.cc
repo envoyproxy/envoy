@@ -1,8 +1,5 @@
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
-#include <sys/ioctl.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <cstdint>
 #include <cstring>

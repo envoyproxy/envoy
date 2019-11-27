@@ -269,8 +269,8 @@ public:
                    const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
-  MOCK_METHOD3(createCds, CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
-                                    bool is_delta, ClusterManager& cm));
+  MOCK_METHOD2(createCds,
+               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
@@ -324,11 +324,9 @@ public:
   MOCK_METHOD0(adsMux, Config::GrpcMuxSharedPtr());
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
-  MOCK_CONST_METHOD0(localClusterName, const std::string&());
+  MOCK_CONST_METHOD0(localClusterName, const absl::optional<std::string>&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
                ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
-  MOCK_CONST_METHOD0(warmingClusterCount, std::size_t());
-  MOCK_CONST_METHOD0(xdsIsDelta, bool());
   MOCK_METHOD0(subscriptionFactory, Config::SubscriptionFactory&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
@@ -338,7 +336,7 @@ public:
   envoy::api::v2::core::BindConfig bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
-  std::string local_cluster_name_;
+  absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
 };

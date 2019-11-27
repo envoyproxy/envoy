@@ -2,6 +2,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/io_handle.h"
 
 #include "common/common/logger.h"
@@ -30,9 +31,6 @@ public:
                                 uint64_t num_slice) override;
 
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
-
-  Api::IoCallUint64Result sendto(const Buffer::RawSlice& slice, int flags,
-                                 const Address::Instance& address) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,

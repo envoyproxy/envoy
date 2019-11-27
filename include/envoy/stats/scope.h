@@ -81,16 +81,18 @@ public:
 
   /**
    * @param name The name of the stat, obtained from the SymbolTable.
+   * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName name) PURE;
+  virtual Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.
    * @param name The name, expressed as a string.
+   * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogram(const std::string& name) PURE;
+  virtual Histogram& histogram(const std::string& name, Histogram::Unit unit) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.

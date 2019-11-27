@@ -278,11 +278,11 @@ void testUtil(const TestUtilOptions& options) {
                                                    server_stats_store, std::vector<std::string>{});
 
   Event::DispatcherPtr dispatcher = server_api->allocateDispatcher();
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
-                                  nullptr, true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
@@ -299,19 +299,14 @@ void testUtil(const TestUtilOptions& options) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -563,11 +558,11 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
                                                    server_stats_store, server_names);
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher());
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(options.version()),
-                                  nullptr, true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true);
 
   Stats::IsolatedStoreImpl client_stats_store;
   Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
@@ -580,7 +575,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(options.transportSocketOptions()), nullptr);
 
   if (!options.clientSession().empty()) {
@@ -598,20 +593,15 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         std::string sni = options.transportSocketOptions() != nullptr &&
                                   options.transportSocketOptions()->serverNameOverride().has_value()
                               ? options.transportSocketOptions()->serverNameOverride().value()
                               : options.clientCtxProto().sni();
         socket->setRequestedServerName(sni);
-        Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
+        server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -2172,14 +2162,14 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -2187,15 +2177,10 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, false);
@@ -2232,12 +2217,11 @@ TEST_P(SslSocketTest, HalfClose) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, true);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -2252,7 +2236,7 @@ TEST_P(SslSocketTest, HalfClose) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->enableHalfClose(true);
   client_connection->addReadFilter(client_read_filter);
@@ -2262,15 +2246,10 @@ TEST_P(SslSocketTest, HalfClose) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(listener_callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        listener_callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(listener_callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2319,11 +2298,11 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
 
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -2340,7 +2319,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
@@ -2360,15 +2339,10 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -2417,15 +2391,15 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   ServerSslSocketFactory server_ssl_socket_factory2(std::move(server_cfg2), manager,
                                                     server_stats_store, server_names2);
 
-  Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
-                                   true);
-  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
-                                   true);
+  auto socket1 = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
+  auto socket2 = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher());
-  Network::ListenerPtr listener1 = dispatcher->createListener(socket1, callbacks, true, false);
-  Network::ListenerPtr listener2 = dispatcher->createListener(socket2, callbacks, true, false);
+  Network::ListenerPtr listener1 = dispatcher->createListener(socket1, callbacks, true);
+  Network::ListenerPtr listener2 = dispatcher->createListener(socket2, callbacks, true);
 
   envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
@@ -2440,7 +2414,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket1->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -2449,18 +2423,14 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::TransportSocketFactory& tsf = socket->localAddress() == socket1.localAddress()
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        Network::TransportSocketFactory& tsf = socket->localAddress() == socket1->localAddress()
                                                    ? server_ssl_socket_factory1
                                                    : server_ssl_socket_factory2;
-        Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
-            std::move(socket), tsf.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
+        server_connection = dispatcher->createServerConnection(std::move(socket),
+                                                               tsf.createTransportSocket(nullptr));
       }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke(
-          [&](Network::ConnectionPtr& conn) -> void { server_connection = std::move(conn); }));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -2480,7 +2450,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
 
   client_connection = dispatcher->createClientConnection(
-      socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket2->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslSocketInfo* ssl_socket =
@@ -2491,9 +2461,13 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   client_connection->connect();
 
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        Network::TransportSocketFactory& tsf = socket->localAddress() == socket1->localAddress()
+                                                   ? server_ssl_socket_factory1
+                                                   : server_ssl_socket_factory2;
+        server_connection = dispatcher->createServerConnection(std::move(socket),
+                                                               tsf.createTransportSocket(nullptr));
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -2835,14 +2809,14 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   ServerSslSocketFactory server2_ssl_socket_factory(std::move(server2_cfg), manager,
                                                     server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
-  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                   true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+  auto socket2 = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
-  Network::ListenerPtr listener2 = dispatcher_->createListener(socket2, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
+  Network::ListenerPtr listener2 = dispatcher_->createListener(socket2, callbacks, true);
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2859,7 +2833,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -2869,19 +2843,13 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket, bool) -> void {
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::TransportSocketFactory& tsf =
-            accepted_socket->localAddress() == socket.localAddress() ? server_ssl_socket_factory
-                                                                     : server2_ssl_socket_factory;
-
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
-            std::move(accepted_socket), tsf.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
+            accepted_socket->localAddress() == socket->localAddress() ? server_ssl_socket_factory
+                                                                      : server2_ssl_socket_factory;
+        server_connection = dispatcher_->createServerConnection(std::move(accepted_socket),
+                                                                tsf.createTransportSocket(nullptr));
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -2905,7 +2873,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_EQ(1UL, client_stats_store.counter("ssl.handshake").value());
 
   client_connection = dispatcher_->createClientConnection(
-      socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket2->localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslSocketInfo* ssl_socket =
@@ -2915,9 +2883,13 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   client_connection->connect();
 
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        Network::TransportSocketFactory& tsf =
+            accepted_socket->localAddress() == socket->localAddress() ? server_ssl_socket_factory
+                                                                      : server2_ssl_socket_factory;
+        server_connection = dispatcher_->createServerConnection(std::move(accepted_socket),
+                                                                tsf.createTransportSocket(nullptr));
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
@@ -2952,13 +2924,13 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher());
-  Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true);
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
@@ -2977,7 +2949,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -2999,15 +2971,10 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   };
 
   // WillRepeatedly doesn't work with InSequence.
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3043,21 +3010,16 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   close_count = 0;
 
   client_connection = dispatcher->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
   // WillRepeatedly doesn't work with InSequence.
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3222,14 +3184,14 @@ TEST_P(SslSocketTest, SslError) {
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                  true);
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true, false);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, callbacks, true);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
@@ -3237,15 +3199,10 @@ TEST_P(SslSocketTest, SslError) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  EXPECT_CALL(callbacks, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
-        callbacks.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(callbacks, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection = std::move(conn);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3371,17 +3328,21 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  // Connection using defaults (client) and TLSv1.0 (server) succeeds.
+  TestUtilOptionsV2 unsupported_protocol_test_options(listener, client, false, GetParam());
+  unsupported_protocol_test_options.setExpectedServerStats("ssl.connection_error")
+      .setExpectedTransportFailureReasonContains("UNSUPPORTED_PROTOCOL");
+
+  // Connection using defaults (client) and TLSv1.0 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  testUtilV2(tls_v1_test_options);
+  testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
-  // Connection using defaults (client) and TLSv1.1 (server) succeeds.
+  // Connection using defaults (client) and TLSv1.1 (server) fails.
   server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
   server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  testUtilV2(tls_v1_1_test_options);
+  testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
@@ -3907,7 +3868,9 @@ protected:
     server_ssl_socket_factory_ = std::make_unique<ServerSslSocketFactory>(
         std::move(server_cfg), *manager_, server_stats_store_, std::vector<std::string>{});
 
-    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
+    socket_ = std::make_shared<Network::TcpListenSocket>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
     auto client_cfg =
@@ -3918,7 +3881,7 @@ protected:
     auto transport_socket = client_ssl_socket_factory_->createTransportSocket(nullptr);
     client_transport_socket_ = transport_socket.get();
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, std::move(transport_socket), nullptr);
+        socket_->localAddress(), source_address_, std::move(transport_socket), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
@@ -3928,16 +3891,11 @@ protected:
                            uint32_t write_size, uint32_t num_writes, bool reserve_write_space) {
     initialize();
 
-    EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+    EXPECT_CALL(listener_callbacks_, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
-          new_connection->setBufferLimits(read_buffer_limit);
-          listener_callbacks_.onNewConnection(std::move(new_connection));
-        }));
-    EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
-        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-          server_connection_ = std::move(conn);
+          server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
@@ -4012,16 +3970,11 @@ protected:
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
-    EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-          Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+    EXPECT_CALL(listener_callbacks_, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
-          new_connection->setBufferLimits(read_buffer_limit);
-          listener_callbacks_.onNewConnection(std::move(new_connection));
-        }));
-    EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
-        .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-          server_connection_ = std::move(conn);
+          server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());
@@ -4061,8 +4014,7 @@ protected:
 
   Stats::IsolatedStoreImpl server_stats_store_;
   Stats::IsolatedStoreImpl client_stats_store_;
-  Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
-                                   true};
+  std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   const std::string server_ctx_yaml_ = R"EOF(
@@ -4137,16 +4089,10 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
 
   initialize();
 
-  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
-        new_connection->setBufferLimits(0);
-        listener_callbacks_.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection_ = std::move(conn);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
@@ -4172,16 +4118,11 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
 
   initialize();
 
-  EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr));
-        new_connection->setBufferLimits(read_buffer_limit);
-        listener_callbacks_.onNewConnection(std::move(new_connection));
-      }));
-  EXPECT_CALL(listener_callbacks_, onNewConnection_(_))
-      .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
-        server_connection_ = std::move(conn);
+        server_connection_->setBufferLimits(read_buffer_limit);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
@@ -4230,11 +4171,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4262,11 +4205,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            sync_mode: false
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4294,11 +4239,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4326,11 +4273,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          sync_mode: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            sync_mode: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4358,12 +4307,14 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          crypto_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            crypto_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4391,12 +4342,14 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: true
-          crypto_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: true
+            crypto_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4424,11 +4377,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4456,11 +4411,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4488,11 +4445,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          async_method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            async_method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4521,11 +4480,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: decrypt
-          async_method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: decrypt
+            async_method_error: true
+            mode: rsa
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -4567,11 +4528,13 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key:
@@ -4605,20 +4568,24 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
 )EOF";
 
   TestUtilOptions failing_test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
@@ -4646,10 +4613,12 @@ TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          mode: ecdsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            mode: ecdsa
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
@@ -4679,20 +4648,24 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          async_method_error: true
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            async_method_error: true
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          mode: ecdsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            mode: ecdsa
 )EOF";
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.setPrivateKeyMethodExpected(true));
@@ -4719,20 +4692,24 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
-          expected_operation: sign
-          sync_mode: false
-          mode: rsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+            expected_operation: sign
+            sync_mode: false
+            mode: rsa
     - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
       private_key_provider:
         provider_name: test
-        config:
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
-          expected_operation: sign
-          async_method_error: true
-          mode: ecdsa
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+            expected_operation: sign
+            async_method_error: true
+            mode: ecdsa
 )EOF";
   TestUtilOptions failing_test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
   testUtil(failing_test_options.setPrivateKeyMethodExpected(true)

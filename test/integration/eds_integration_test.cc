@@ -16,7 +16,9 @@ namespace {
 class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  EdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  EdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
+        codec_client_type_(envoy::type::HTTP1) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
@@ -56,7 +58,7 @@ public:
 
   void initializeTest(bool http_active_hc) {
     setUpstreamCount(4);
-    if (use_http2_hc_) {
+    if (codec_client_type_ == envoy::type::HTTP2) {
       setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -88,7 +90,7 @@ public:
       health_check->mutable_unhealthy_threshold()->set_value(1);
       health_check->mutable_healthy_threshold()->set_value(1);
       health_check->mutable_http_health_check()->set_path("/healthcheck");
-      health_check->mutable_http_health_check()->set_use_http2(use_http2_hc_);
+      health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type_);
     }
     setEndpoints(0, 0, 0, true, absl::nullopt, false);
     cds_helper_.setCds({cluster_});
@@ -96,7 +98,7 @@ public:
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
 
-  bool use_http2_hc_{};
+  envoy::type::CodecClientType codec_client_type_{};
   EdsHelper eds_helper_;
   CdsHelper cds_helper_;
   envoy::api::v2::Cluster cluster_;
@@ -108,7 +110,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
 // Verifies that a new cluster can we warmed when using HTTP/2 health checking. Regression test
 // of the issue detailed in issue #6951.
 TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
-  use_http2_hc_ = true;
+  codec_client_type_ = envoy::type::HTTP2;
   initializeTest(true);
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);
