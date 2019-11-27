@@ -328,10 +328,6 @@ TEST(TimerImplTest, TimerValueConversion) {
   TimerUtils::microsecondsToTimeval(usecs, tv);
   EXPECT_EQ(tv.tv_sec, usecs.count() / 1000000);
   EXPECT_EQ(tv.tv_usec, usecs.count() % tv.tv_sec);
-
-  // Check we're checked -- overflow/wrap-around should not go unnoticed.
-  msecs = std::chrono::milliseconds::duration::max();
-  ASSERT_DEATH(TimerUtils::microsecondsToTimeval(msecs, tv), "Negative duration");
 }
 
 } // namespace

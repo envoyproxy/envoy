@@ -10,8 +10,6 @@ namespace Envoy {
 namespace Event {
 
 void TimerUtils::microsecondsToTimeval(const std::chrono::microseconds& d, timeval& tv) {
-  // API abuse, possible wrap-around / overflow
-  ASSERT(d >= std::chrono::microseconds(0), "Negative duration passed to microsecondsToTimeval");
   std::chrono::seconds secs = std::chrono::duration_cast<std::chrono::seconds>(d);
   std::chrono::microseconds usecs = std::chrono::duration_cast<std::chrono::microseconds>(d - secs);
 
