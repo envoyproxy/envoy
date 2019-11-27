@@ -110,7 +110,8 @@ private:
     // Common::Redis::Client::ClientCallbacks
     void onResponse(Common::Redis::RespValuePtr&& response) override;
     void onFailure() override;
-    bool onRedirection(Common::Redis::RespValuePtr&& value) override;
+    bool onRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
+                       bool ask_redirection) override;
 
     // PoolRequest
     void cancel() override;

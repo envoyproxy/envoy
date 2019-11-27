@@ -376,19 +376,9 @@ void InstanceImpl::PendingRequest::onFailure() {
   parent_.onRequestCompleted();
 }
 
-bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value) {
-  std::vector<absl::string_view> err;
-  bool ask_redirection = false;
-  if (Common::Redis::Utility::redirectionArgsInvalid(&getRequest(incoming_request_), *value, err,
-                                                     ask_redirection)) {
-    onResponse(std::move(value));
-    return false;
-  }
-
-  // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash key
-  // slot (err[1]), and IP address and TCP port separated by a colon (err[2]).
-  const std::string host_address = std::string(err[2]);
-
+bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value,
+                                                 const std::string& host_address,
+                                                 bool ask_redirection) {
   // Prepend request with an asking command if redirected via an ASK error. The returned handle is
   // not important since there is no point in being able to cancel the request. The use of
   // null_pool_callbacks ensures the transparent filtering of the Redis server's response to the

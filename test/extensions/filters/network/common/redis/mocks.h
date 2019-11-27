@@ -99,11 +99,15 @@ public:
   ~MockClientCallbacks() override;
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
-  bool onRedirection(Common::Redis::RespValuePtr&& value) override { return onRedirection_(value); }
+  bool onRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
+                     bool ask_redirection) override {
+    return onRedirection_(value, host_address, ask_redirection);
+  }
 
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
   MOCK_METHOD0(onFailure, void());
-  MOCK_METHOD1(onRedirection_, bool(Common::Redis::RespValuePtr& value));
+  MOCK_METHOD3(onRedirection_, bool(Common::Redis::RespValuePtr& value,
+                                    const std::string& host_address, bool ask_redirection));
 };
 
 } // namespace Client

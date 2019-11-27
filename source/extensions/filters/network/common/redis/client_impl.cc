@@ -224,17 +224,26 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
     bool redirected = false;
+    bool redirect_succeeded = false;
     if (err.size() == 3) {
-      if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
-        redirected = callbacks.onRedirection(std::move(value));
-        if (redirected) {
-          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
-        } else {
-          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
-        }
+      // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash
+      // key slot (err[1]), and IP address and TCP port separated by a colon (err[2])
+      if (err[0] == RedirectionResponse::get().MOVED) {
+        redirected = true;
+        redirect_succeeded = callbacks.onRedirection(std::move(value), std::string(err[2]), false);
+      } else if (err[0] == RedirectionResponse::get().ASK) {
+        redirected = true;
+        redirect_succeeded = callbacks.onRedirection(std::move(value), std::string(err[2]), true);
       }
-    } else {
+    }
+    if (!redirected) {
       callbacks.onResponse(std::move(value));
+    } else {
+      if (redirect_succeeded) {
+        host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+      } else {
+        host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+      }
     }
   } else {
     callbacks.onResponse(std::move(value));

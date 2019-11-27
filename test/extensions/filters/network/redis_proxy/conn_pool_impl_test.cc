@@ -250,16 +250,17 @@ public:
   }
 
   void verifyInvalidMoveResponse(Common::Redis::Client::MockClient* client,
-                                 const std::string& move_response, bool create_client) {
+                                 const std::string& host_address, bool create_client) {
     Common::Redis::RespValueSharedPtr request_value = std::make_shared<Common::Redis::RespValue>();
     Common::Redis::Client::MockPoolRequest active_request;
     MockPoolCallbacks callbacks;
     makeRequest(client, request_value, callbacks, active_request, create_client);
     Common::Redis::RespValuePtr moved_response{new Common::Redis::RespValue()};
     moved_response->type(Common::Redis::RespType::Error);
-    moved_response->asString() = move_response;
+    moved_response->asString() = "MOVE 1111 " + host_address;
     EXPECT_CALL(callbacks, onResponse_(Ref(moved_response)));
-    EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response)));
+    EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response),
+                                                                 host_address, false));
   }
 
   MOCK_METHOD1(create_, Common::Redis::Client::Client*(Upstream::HostConstSharedPtr host));
@@ -1013,7 +1014,8 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccess) {
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client2)));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request_value), _)).WillOnce(Return(&active_request2));
-  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(moved_response)));
+  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(moved_response),
+                                                              "10.1.2.3:4000", false));
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
 
   respond(callbacks, client2);
@@ -1029,42 +1031,29 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailure) {
 
   Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
 
-  // Test a truncated MOVED error response that cannot be parsed properly.
-  verifyInvalidMoveResponse(client, "MOVED 1111", true);
-
   // Test with a badly specified host address (no colon, no address, no port).
-  verifyInvalidMoveResponse(client, "MOVED 1111 bad", false);
+  verifyInvalidMoveResponse(client, "bad", true);
 
   // Test with a badly specified IPv4 address.
-  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.bad:3000", false);
+  verifyInvalidMoveResponse(client, "10.0.bad:3000", false);
 
   // Test with a badly specified TCP port.
-  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.bad:3000", false);
+  verifyInvalidMoveResponse(client, "10.0.bad:3000", false);
 
   // Test with a TCP port outside of the acceptable range for a 32-bit integer.
-  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.0.1:4294967297", false); // 2^32 + 1
+  verifyInvalidMoveResponse(client, "10.0.0.1:4294967297", false); // 2^32 + 1
 
   // Test with a TCP port outside of the acceptable range for a TCP port (0 .. 65535).
-  verifyInvalidMoveResponse(client, "MOVED 1111 10.0.0.1:65536", false);
+  verifyInvalidMoveResponse(client, "10.0.0.1:65536", false);
 
   // Test with a badly specified IPv6-like address.
-  verifyInvalidMoveResponse(client, "MOVED 1111 bad:ipv6:3000", false);
+  verifyInvalidMoveResponse(client, "bad:ipv6:3000", false);
 
   // Test with a valid IPv6 address and a badly specified TCP port (out of range).
-  verifyInvalidMoveResponse(client, "MOVED 1111 2001:470:813b:::70000", false);
-
-  // Test a wrong response
-  MockPoolCallbacks callbacks;
-  Common::Redis::RespValueSharedPtr request2 = std::make_shared<Common::Redis::RespValue>();
-  Common::Redis::Client::MockPoolRequest active_request2;
-  makeRequest(client, request2, callbacks, active_request2, false);
-  Common::Redis::RespValuePtr moved_response2{new Common::Redis::RespValue()};
-  moved_response2->type(Common::Redis::RespType::Integer);
-  moved_response2->asInteger() = 1;
-  EXPECT_CALL(callbacks, onResponse_(Ref(moved_response2)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response2)));
+  verifyInvalidMoveResponse(client, "2001:470:813b:::70000", false);
 
   // Test an upstream error preventing the request from being sent.
+  MockPoolCallbacks callbacks;
   Common::Redis::RespValueSharedPtr request3 = std::make_shared<Common::Redis::RespValue>();
   Common::Redis::Client::MockPoolRequest active_request3;
   Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
@@ -1076,32 +1065,9 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailure) {
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client2)));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request3), _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks, onResponse_(Ref(moved_response3)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response3)));
+  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response3),
+                                                               "10.1.2.3:4000", false));
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
-
-  EXPECT_CALL(*client, close());
-  tls_.shutdownThread();
-}
-
-TEST_F(RedisConnPoolImplTest, RedirectionFailure) {
-  InSequence s;
-
-  setup();
-
-  Common::Redis::RespValueSharedPtr request = std::make_shared<Common::Redis::RespValue>();
-  Common::Redis::Client::MockPoolRequest active_request;
-  MockPoolCallbacks callbacks;
-  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
-
-  makeRequest(client, request, callbacks, active_request);
-
-  // Test an error that looks like it might be a MOVED or ASK redirection error except for the first
-  // non-whitespace substring.
-  Common::Redis::RespValuePtr moved_response{new Common::Redis::RespValue()};
-  moved_response->type(Common::Redis::RespType::Error);
-  moved_response->asString() = "NOTMOVEDORASK 1111 1.1.1.1:1";
-  EXPECT_CALL(callbacks, onResponse_(Ref(moved_response)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response)));
 
   EXPECT_CALL(*client, close());
   tls_.shutdownThread();
@@ -1130,7 +1096,8 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionSuccess) {
   EXPECT_CALL(*client2, makeRequest_(Ref(Common::Redis::Utility::AskingRequest::instance()), _))
       .WillOnce(Return(&ask_request));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request_value), _)).WillOnce(Return(&active_request2));
-  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(ask_response)));
+  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(ask_response),
+                                                              "10.1.2.3:4000", true));
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
 
   respond(callbacks, client2);
@@ -1144,35 +1111,15 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
 
   setup();
 
-  Common::Redis::RespValueSharedPtr request_value = std::make_shared<Common::Redis::RespValue>();
-  Common::Redis::Client::MockPoolRequest active_request;
   MockPoolCallbacks callbacks;
   Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
-  makeRequest(client, request_value, callbacks, active_request);
-
-  // Test a truncated ASK error response that cannot be parsed properly.
-  Common::Redis::Client::MockPoolRequest ask_request;
-  Common::Redis::RespValuePtr ask_response{new Common::Redis::RespValue()};
-  ask_response->type(Common::Redis::RespType::Error);
-  ask_response->asString() = "ASK 1111";
-  EXPECT_CALL(callbacks, onResponse_(Ref(ask_response)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response)));
-
-  Common::Redis::Client::MockPoolRequest active_request2;
-  Common::Redis::RespValueSharedPtr request2 = std::make_shared<Common::Redis::RespValue>();
-  makeRequest(client, request2, callbacks, active_request2, false);
-  Common::Redis::RespValuePtr ask_response2{new Common::Redis::RespValue()};
-  ask_response2->type(Common::Redis::RespType::Integer);
-  ask_response2->asInteger() = 1;
-  EXPECT_CALL(callbacks, onResponse_(Ref(ask_response2)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response2)));
 
   // Test an upstream error from trying to send an "asking" command upstream.
   Common::Redis::Client::MockPoolRequest active_request3;
   Common::Redis::RespValueSharedPtr request3 = std::make_shared<Common::Redis::RespValue>();
   Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
   Upstream::HostConstSharedPtr host1;
-  makeRequest(client, request3, callbacks, active_request3, false);
+  makeRequest(client, request3, callbacks, active_request3);
   Common::Redis::RespValuePtr ask_response3{new Common::Redis::RespValue()};
   ask_response3->type(Common::Redis::RespType::Error);
   ask_response3->asString() = "ASK 1111 10.1.2.3:4000";
@@ -1180,7 +1127,8 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
   EXPECT_CALL(*client2, makeRequest_(Ref(Common::Redis::Utility::AskingRequest::instance()), _))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks, onResponse_(Ref(ask_response3)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response3)));
+  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response3),
+                                                               "10.1.2.3:4000", true));
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
 
   // Test an upstream error from trying to send the original request after the "asking" command is
@@ -1195,7 +1143,8 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
       .WillOnce(Return(&active_request5));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request4), _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks, onResponse_(Ref(ask_response4)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response4)));
+  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response4),
+                                                               "10.1.2.3:4000", true));
 
   EXPECT_CALL(*client, close());
   tls_.shutdownThread();

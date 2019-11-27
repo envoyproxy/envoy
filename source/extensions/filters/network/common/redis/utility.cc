@@ -19,29 +19,6 @@ AuthRequest::AuthRequest(const std::string& password) {
   asArray().swap(values);
 }
 
-bool redirectionArgsInvalid(const Common::Redis::RespValue* original_request,
-                            const Common::Redis::RespValue& error_response,
-                            std::vector<absl::string_view>& error_substrings,
-                            bool& ask_redirection) {
-  if ((original_request == nullptr) || (error_response.type() != Common::Redis::RespType::Error)) {
-    return true;
-  }
-  error_substrings = StringUtil::splitToken(error_response.asString(), " ", false);
-  if (error_substrings.size() != 3) {
-    return true;
-  }
-  if (error_substrings[0] == "ASK") {
-    ask_redirection = true;
-  } else if (error_substrings[0] == "MOVED") {
-    ask_redirection = false;
-  } else {
-    // The first substring must be MOVED or ASK.
-    return true;
-  }
-  // Other validation done later to avoid duplicate processing.
-  return false;
-}
-
 RespValuePtr makeError(const std::string& error) {
   Common::Redis::RespValuePtr response(new RespValue());
   response->type(Common::Redis::RespType::Error);
