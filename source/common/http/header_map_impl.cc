@@ -332,8 +332,6 @@ void HeaderMapImpl::subtractSize(uint64_t size) {
 }
 
 void HeaderMapImpl::copyFrom(const HeaderMap& header_map) {
-  // Clear the HeaderMap before copying the headers.
-  clear();
   header_map.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         // TODO(mattklein123) PERF: Avoid copying here if not necessary.

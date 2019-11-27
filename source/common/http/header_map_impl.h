@@ -23,7 +23,7 @@ public:                                                                         
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     addSize(HeaderMapImpl::appendToHeader(entry.value(), data, delimiter));                        \
-    verifyByteSize();                                                                               \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
