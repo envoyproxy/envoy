@@ -290,11 +290,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (!route.route().request_mirror_policies().empty()) {
     if (route.route().has_request_mirror_policy()) {
-      // proto does not allow `oneof` to contain a field labeled `repeated`, so we do our own
+      // protobuf does not allow `oneof` to contain a field labeled `repeated`, so we do our own
       // xor-like check.
       // https://github.com/protocolbuffers/protobuf/issues/2592
       // The alternative solution suggested (wrapping the oneof in a repeated message) would still
-      // break wire compatibility
+      // break wire compatibility.
+      // (see https://github.com/envoyproxy/envoy/issues/439#issuecomment-383622723)
       throw EnvoyException("Cannot specify both request_mirror_policy and request_mirror_policies");
     }
     for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {

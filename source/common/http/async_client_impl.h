@@ -219,7 +219,7 @@ private:
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
-    const std::vector<std::unique_ptr<Router::ShadowPolicy>>& shadowPolicies() const override {
+    const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
       return shadow_policies_;
     }
     std::chrono::milliseconds timeout() const override {
@@ -268,7 +268,7 @@ private:
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
-    static const std::vector<std::unique_ptr<Router::ShadowPolicy>> shadow_policies_;
+    static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
     static const envoy::api::v2::core::Metadata metadata_;

@@ -550,7 +550,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                        config_.random_, callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
-  // runtime values.
+  // runtime keys.
   for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
     if (FilterUtility::shouldShadow(shadow_policy, config_.runtime_, callbacks_->streamId())) {
       active_shadow_policies_.push_back(std::cref<ShadowPolicyPtr>(shadow_policy));
@@ -598,7 +598,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // try timeout timer is not started until onUpstreamComplete().
   ASSERT(upstream_requests_.size() == 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) || active_shadow_policies_.size() > 0;
+  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty();
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
