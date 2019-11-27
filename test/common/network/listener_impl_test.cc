@@ -219,6 +219,7 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   auto socket =
       std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
   MockListenerCallbacks listener_callbacks;
+  MockConnectionCallbacks connection_callbacks;
   TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 
   // When listener is disabled, the timer should fire before any connection is accepted.
@@ -227,15 +228,15 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   ClientConnectionPtr client_connection =
       dispatcher_->createClientConnection(socket->localAddress(), Address::InstanceConstSharedPtr(),
                                           Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
-  Event::TimerPtr timer = dispatcher_->createTimer([&] {
-    client_connection->close(ConnectionCloseType::NoFlush);
-    dispatcher_->exit();
-  });
-  timer->enableTimer(std::chrono::milliseconds(2000));
 
   EXPECT_CALL(listener_callbacks, onAccept_(_)).Times(0);
-  time_system_.sleep(std::chrono::milliseconds(2000));
+  EXPECT_CALL(connection_callbacks, onEvent(_))
+      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+        EXPECT_EQ(event, Network::ConnectionEvent::Connected);
+        dispatcher_->exit();
+      }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // When the listener is re-enabled, the pending connection should be accepted.
@@ -246,8 +247,12 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
           [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
   EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
     client_connection->close(ConnectionCloseType::NoFlush);
-    dispatcher_->exit();
   }));
+  EXPECT_CALL(connection_callbacks, onEvent(_))
+      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+        EXPECT_NE(event, Network::ConnectionEvent::Connected);
+        dispatcher_->exit();
+      }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

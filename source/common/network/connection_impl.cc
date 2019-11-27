@@ -40,8 +40,9 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
-    : ConnectionImplBase(dispatcher, next_global_id_++), transport_socket_(std::move(transport_socket)),
-      socket_(std::move(socket)), filter_manager_(*this), stream_info_(dispatcher.timeSource()),
+    : ConnectionImplBase(dispatcher, next_global_id_++),
+      transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
+      filter_manager_(*this), stream_info_(dispatcher.timeSource()),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),

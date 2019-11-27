@@ -8,11 +8,10 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection* connection,
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
-  // Using this for purpose other than logging is not safe. Because QUIC connection id can be
-  // 18 bytes, so there might be collision when it's hashed to 8 bytes.
+    // Using this for purpose other than logging is not safe. Because QUIC connection id can be
+    // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection->connection_id().Hash()),
-    quic_connection_(connection), filter_manager_(*this),
-      stream_info_(dispatcher.timeSource()),
+      quic_connection_(connection), filter_manager_(*this), stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
@@ -131,8 +130,8 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
   if (quic_connection_ != nullptr) {
     // Tell network callbacks about connection close if not detached yet.
     raiseConnectionEvent(source == quic::ConnectionCloseSource::FROM_PEER
-                   ? Network::ConnectionEvent::RemoteClose
-                   : Network::ConnectionEvent::LocalClose);
+                             ? Network::ConnectionEvent::RemoteClose
+                             : Network::ConnectionEvent::LocalClose);
   }
 }
 

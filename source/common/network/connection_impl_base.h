@@ -27,7 +27,7 @@ protected:
   bool inDelayedClose() const { return delayed_close_state_ != DelayedCloseState::None; }
 
   void raiseConnectionEvent(ConnectionEvent event);
-  
+
   virtual void closeConnectionImmediately() PURE;
 
   // States associated with delayed closing of the connection (i.e., when the underlying socket is

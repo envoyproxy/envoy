@@ -70,11 +70,6 @@ public:
                                           min_rtt_aggregate_request_count_);
   }
 
-  double maxGradient() const {
-    return std::max(
-        1.0, runtime_.snapshot().getDouble(RuntimeKeys::get().MaxGradientKey, max_gradient_));
-  }
-
   // The percentage is normalized to the range [0.0, 1.0].
   double sampleAggregatePercentile() const {
     const double val = runtime_.snapshot().getDouble(
@@ -82,7 +77,7 @@ public:
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
-  // The percentage is normalized and clamped to the range [0.0, 1.0].
+  // The percentage is normalized to the range [0.0, 1.0].
   double jitterPercent() const {
     const double val =
         runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
@@ -91,6 +86,13 @@ public:
 
   uint32_t minConcurrency() const {
     return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
+  }
+
+  // The percentage is normalized to the range [0.0, 1.0].
+  double minRTTBufferPercent() const {
+    const double val = runtime_.snapshot().getDouble(RuntimeKeys::get().MinRTTBufferPercentKey,
+                                                     min_rtt_buffer_pct_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
 private:
@@ -104,12 +106,13 @@ private:
         "adaptive_concurrency.gradient_controller.max_concurrency_limit";
     const std::string MinRTTAggregateRequestCountKey =
         "adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count";
-    const std::string MaxGradientKey = "adaptive_concurrency.gradient_controller.max_gradient";
     const std::string SampleAggregatePercentileKey =
         "adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
     const std::string JitterPercentKey = "adaptive_concurrency.gradient_controller.jitter";
     const std::string MinConcurrencyKey =
         "adaptive_concurrency.gradient_controller.min_concurrency";
+    const std::string MinRTTBufferPercentKey =
+        "adaptive_concurrency.gradient_controller.min_rtt_buffer";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
@@ -131,14 +134,14 @@ private:
   // The number of requests to aggregate/sample during the minRTT recalculation.
   const uint32_t min_rtt_aggregate_request_count_;
 
-  // The maximum value the gradient may take.
-  const double max_gradient_;
-
   // The percentile value considered when processing samples.
   const double sample_aggregate_percentile_;
 
   // The concurrency limit set while measuring the minRTT.
   const uint32_t min_concurrency_;
+
+  // The amount added to the measured minRTT as a hedge against natural variability in latency.
+  const double min_rtt_buffer_pct_;
 };
 using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 
@@ -248,9 +251,11 @@ private:
   // is non-zero, then we are actively in the minRTT sampling window.
   std::atomic<uint32_t> deferred_limit_value_;
 
-  // Stores the expected upstream latency value under ideal conditions. This is the numerator in the
-  // gradient value explained above.
+  // Stores the expected upstream latency value under ideal conditions with the added buffer to
+  // account for variable latencies. This is the numerator in the gradient value.
   std::chrono::nanoseconds min_rtt_;
+
+  // Stores the aggregated sampled latencies for use in the gradient calculation.
   std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(sample_mutation_mtx_);
 
   // Tracks the count of requests that have been forwarded whose replies have
