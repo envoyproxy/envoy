@@ -260,7 +260,7 @@ TEST_F(OptionsImplTest, OptionsFromArgv) {
 TEST_F(OptionsImplTest, OptionsFromArgvPrefix) {
   const std::array<const char*, 5> args{"envoy", "-c", "hello", "--admin-address-path", "goodbye"};
   std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
-      args.size() - 2, // Pass in only a prefix of the args, cutting off the '--concurrency' part
+      args.size() - 2, // Pass in only a prefix of the args
       args.data(), [](bool) { return "1"; }, spdlog::level::warn);
   EXPECT_EQ("hello", options->configPath());
   // This should still have the default value since the extra arguments are
