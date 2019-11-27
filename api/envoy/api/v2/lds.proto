@@ -244,6 +244,11 @@ message Listener {
   // distribute among worker threads roughly evenly in cases where there are a high number
   // of connections. When this flag is set to false, all worker threads share one socket.
   // For UDP this flag is set to true forcibly.
-  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart.
+  //
+  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart
+  // (see `3rd paragraph in 'soreuseport' commit message
+  // <https://github.com/torvalds/linux/commit/c617f398edd4db2b8567a28e89>`_).
+  // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
+  // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
   bool reuse_port = 21;
 }

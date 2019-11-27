@@ -99,8 +99,13 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
     Network::SocketSharedPtr socket;
     absl::call_once(steal_once_, [this, &socket]() {
       if (socket_) {
-        // the socket_ created for reserving port number is handed over to first
-        // worker thread got here.
+        // If a listener's port is set to 0, socket_ should be created for reserving a port
+        // number, it is handed over to the first worker thread came here.
+        // There are several reasons for doing this:
+        // - for UDP, once a socket being bound, it begins to receive packets, it can't be
+        //   left unused, and closing it will lost packets received by it.
+        // - port number should be reserved before adding listener to active_listeners_ list,
+        //   otherwise admin API /listeners might return 0 as listener's port.
         socket = std::move(socket_);
       }
     });

@@ -45,7 +45,8 @@ public:
     if (!reuse_port_ && socket_) {
       return *socket_;
     }
-
+    // If reuse_port is true, always return null, even socket_ is created for reserving
+    // port number.
     return absl::nullopt;
   }
 

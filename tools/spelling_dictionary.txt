@@ -966,6 +966,7 @@ superset
 symlink
 symlinked
 symlinks
+syncookie
 sys
 syscall
 syscalls
