@@ -267,7 +267,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 
     if (type == typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      typed_config.UnpackTo(&typed_struct);
+      MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetDescriptor()->full_name() == struct_type) {
         out_proto.CopyFrom(typed_struct.value());
@@ -282,10 +282,10 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
-      typed_config.UnpackTo(&out_proto);
+      MessageUtil::unpackTo(typed_config, out_proto);
     } else {
       ProtobufWkt::Struct struct_config;
-      typed_config.UnpackTo(&struct_config);
+      MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
     }
   }

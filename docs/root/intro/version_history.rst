@@ -7,6 +7,7 @@ Version history
 * api: remove all support for v1
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
+* cluster: added :ref: `aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * http: added the ability to sanitize headers nominated by the Connection header. This new behavior is guarded by envoy.reloadable_features.connection_header_sanitization which defaults to true.
