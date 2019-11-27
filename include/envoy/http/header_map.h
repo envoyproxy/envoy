@@ -481,7 +481,8 @@ public:
   virtual void setCopy(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
-   * @return uint64_t the approximate size of the header map in bytes if valid.
+   * @return uint64_t the size of the header map in bytes. This is the sum of the header keys and
+   * values and does not account for data structure overhead.
    */
   virtual uint64_t byteSize() const PURE;
 

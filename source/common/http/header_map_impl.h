@@ -23,22 +23,26 @@ public:                                                                         
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     addSize(HeaderMapImpl::appendToHeader(entry.value(), data, delimiter));                        \
+    checkByteSize();                                                                               \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     updateSize(entry.value().size(), value.size());                                                \
     entry.value().setReference(value);                                                             \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void set##name(absl::string_view value) override {                                               \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     updateSize(entry.value().size(), value.size());                                                \
     entry.value().setCopy(value);                                                                  \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void set##name(uint64_t value) override {                                                        \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     subtractSize(inline_headers_.name##_->value().size());                                         \
     entry.value().setInteger(value);                                                               \
     addSize(inline_headers_.name##_->value().size());                                              \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void remove##name() override { removeInline(&inline_headers_.name##_); }
 
@@ -70,11 +74,6 @@ public:
    */
   bool operator==(const HeaderMapImpl& rhs) const;
   bool operator!=(const HeaderMapImpl& rhs) const;
-
-  /**
-   * For testing. Performs a manual byte size count.
-   */
-  uint64_t byteSizeInternal() const;
 
   // Http::HeaderMap
   void addReference(const LowerCaseString& key, absl::string_view value) override;
@@ -134,6 +133,8 @@ protected:
   struct StaticLookupTable; // Defined in header_map_impl.cc.
 
   struct AllInlineHeaders {
+    void clear() { memset(this, 0, sizeof(*this)); }
+
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)
   };
 
@@ -223,6 +224,9 @@ protected:
 
   // This holds the internal byte size of the HeaderMap.
   uint64_t cached_byte_size_ = 0;
+  // Performs a manual byte size count.
+  uint64_t byteSizeInternal() const;
+  void verifyByteSize() { ASSERT(cached_byte_size_ == byteSizeInternal()); }
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };

@@ -160,11 +160,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       // Maybe nothing is set?
       break;
     }
-    // Verify that the byte size is always set, and that it's values match a manual count over the
-    // HeaderMap.
-    FUZZ_ASSERT(header_map->byteSize() == header_map->byteSizeInternal());
     // Exercise some read-only accessors.
     header_map->size();
+    header_map->byteSize();
     header_map->iterate(
         [](const Http::HeaderEntry& header, void * /*context*/) -> Http::HeaderMap::Iterate {
           header.key();

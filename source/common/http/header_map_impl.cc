@@ -315,19 +315,16 @@ HeaderMapImpl::HeaderMapImpl(
     value_string.setCopy(value.second.c_str(), value.second.size());
     addViaMove(std::move(key_string), std::move(value_string));
   }
+  verifyByteSize();
 }
 
 void HeaderMapImpl::updateSize(uint64_t from_size, uint64_t to_size) {
-  // Removes from_size from cached_byte_size_ and adds to_size.
   ASSERT(cached_byte_size_ >= from_size);
   cached_byte_size_ -= from_size;
   cached_byte_size_ += to_size;
 }
 
-void HeaderMapImpl::addSize(uint64_t size) {
-  // Adds size to cached_byte_size_.
-  cached_byte_size_ += size;
-}
+void HeaderMapImpl::addSize(uint64_t size) { cached_byte_size_ += size; }
 
 void HeaderMapImpl::subtractSize(uint64_t size) {
   ASSERT(cached_byte_size_ >= size);
@@ -350,6 +347,7 @@ void HeaderMapImpl::copyFrom(const HeaderMap& header_map) {
         return HeaderMap::Iterate::Continue;
       },
       this);
+  verifyByteSize();
 }
 
 bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
@@ -400,12 +398,14 @@ void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   } else {
     insertByKey(std::move(key), std::move(value));
   }
+  verifyByteSize();
 }
 
 void HeaderMapImpl::addReference(const LowerCaseString& key, absl::string_view value) {
   HeaderString ref_key(key);
   HeaderString ref_value(value);
   addViaMove(std::move(ref_key), std::move(ref_value));
+  verifyByteSize();
 }
 
 void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) {
@@ -414,6 +414,7 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, uint64_t value) 
   new_value.setInteger(value);
   insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  verifyByteSize();
 }
 
 void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, absl::string_view value) {
@@ -422,6 +423,7 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, absl::string_vie
   new_value.setCopy(value);
   insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  verifyByteSize();
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
@@ -440,6 +442,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  verifyByteSize();
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value) {
@@ -456,6 +459,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  verifyByteSize();
 }
 
 void HeaderMapImpl::append(const LowerCaseString& key, absl::string_view value) {
@@ -471,6 +475,7 @@ void HeaderMapImpl::append(const LowerCaseString& key, absl::string_view value) 
   if (!found) {
     addCopy(key, value);
   }
+  verifyByteSize();
 }
 
 void HeaderMapImpl::setReference(const LowerCaseString& key, absl::string_view value) {
@@ -478,6 +483,7 @@ void HeaderMapImpl::setReference(const LowerCaseString& key, absl::string_view v
   HeaderString ref_value(value);
   remove(key);
   insertByKey(std::move(ref_key), std::move(ref_value));
+  verifyByteSize();
 }
 
 void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_view value) {
@@ -487,6 +493,7 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_vie
   remove(key);
   insertByKey(std::move(ref_key), std::move(new_value));
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
+  verifyByteSize();
 }
 
 void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
@@ -503,6 +510,7 @@ void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value)
   if (!found) {
     addCopy(key, value);
   }
+  verifyByteSize();
 }
 
 uint64_t HeaderMapImpl::byteSize() const { return cached_byte_size_; }
@@ -567,7 +575,7 @@ HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
 }
 
 void HeaderMapImpl::clear() {
-  memset(&inline_headers_, 0, sizeof(inline_headers_));
+  inline_headers_.clear();
   headers_.clear();
   cached_byte_size_ = 0;
 }
@@ -587,6 +595,7 @@ void HeaderMapImpl::remove(const LowerCaseString& key) {
       }
     }
   }
+  verifyByteSize();
 }
 
 void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
@@ -610,6 +619,7 @@ void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     }
     return to_remove;
   });
+  verifyByteSize();
 }
 
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
@@ -673,6 +683,7 @@ void HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   subtractSize(size_to_subtract);
   *ptr_to_entry = nullptr;
   headers_.erase(entry->entry_);
+  verifyByteSize();
 }
 
 } // namespace Http
