@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package versioning;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MessageOptions {
+  // Magic number derived from 0x78 ('x') 0x44 ('D') 0x53 ('S')
+  Annotation annotation = 7881811;
+}
+
+message Annotation {
+  // Track the previous message type. E.g. this message might be
+  // envoy.foo.v3alpha.Foo and it was previously envoy.bar.v2.Bar. This
+  // information is consumed by Envoy via proto descriptors.
+  string previous_message_type = 1;
+}

@@ -9,7 +9,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
-#include "common/config/api_type_db.h"
+#include "common/config/api_type_oracle.h"
 #include "common/config/resources.h"
 #include "common/config/version_converter.h"
 #include "common/config/well_known_names.h"
@@ -247,7 +247,7 @@ void Utility::translateOpaqueConfig(absl::string_view extension_name,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
-  const Protobuf::Descriptor* earlier_version_desc = ApiTypeDb::inferEarlierVersionDescriptor(
+  const Protobuf::Descriptor* earlier_version_desc = ApiTypeOracle::inferEarlierVersionDescriptor(
       extension_name, typed_config, out_proto.GetDescriptor()->full_name());
 
   if (earlier_version_desc != nullptr) {

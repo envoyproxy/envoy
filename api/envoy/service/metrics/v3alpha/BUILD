@@ -8,6 +8,7 @@ api_proto_package(
     has_services = True,
     deps = [
         "//envoy/api/v3alpha/core:pkg",
+        "//versioning:pkg",
         "@prometheus_metrics_model//:client_model",
     ],
 )

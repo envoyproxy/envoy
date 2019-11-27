@@ -11,6 +11,8 @@ import "envoy/api/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
+import "versioning/versioning.proto";
+
 service SecretDiscoveryService {
   rpc DeltaSecrets(stream api.v3alpha.DeltaDiscoveryRequest)
       returns (stream api.v3alpha.DeltaDiscoveryResponse) {
@@ -31,4 +33,5 @@ service SecretDiscoveryService {
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
 // services: https://github.com/google/protobuf/issues/4221
 message SdsDummy {
+  option (versioning.annotation).previous_message_type = "envoy.service.discovery.v2.SdsDummy";
 }

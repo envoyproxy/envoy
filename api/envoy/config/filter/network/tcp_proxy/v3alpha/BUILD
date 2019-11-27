@@ -9,5 +9,6 @@ api_proto_package(
         "//envoy/api/v3alpha/core:pkg",
         "//envoy/config/filter/accesslog/v3alpha:pkg",
         "//envoy/type/v3alpha:pkg",
+        "//versioning:pkg",
     ],
 )

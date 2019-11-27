@@ -11,10 +11,10 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "api_type_db_test",
-    srcs = ["api_type_db_test.cc"],
+    name = "api_type_oracle_test",
+    srcs = ["api_type_oracle_test.cc"],
     deps = [
-        "//source/common/config:api_type_db_lib",
+        "//source/common/config:api_type_oracle_lib",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
     ],

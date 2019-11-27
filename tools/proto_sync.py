@@ -147,6 +147,10 @@ def GetImportDeps(proto_path):
         # We can ignore imports provided implicitly by api_proto_package().
         if any(import_path.startswith(p) for p in API_BUILD_SYSTEM_IMPORT_PREFIXES):
           continue
+        # Special case handling for in-built versioning annotations.
+        if import_path == 'versioning/versioning.proto':
+          imports.append('//versioning:pkg')
+          continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
           imports.append(external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP[import_path])
@@ -213,6 +217,9 @@ def SyncBuildFiles(cmd):
     cmd: 'check' or 'fix'.
   """
   for root, dirs, files in os.walk('api/'):
+    # Skip support files.
+    if root == 'api/versioning':
+      continue
     is_proto_dir = any(f.endswith('.proto') for f in files)
     if not is_proto_dir:
       continue
