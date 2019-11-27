@@ -100,19 +100,19 @@ void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_
   }
 }
 
-bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
-                                 uint64_t stable_random) {
-  if (policy.cluster().empty()) {
+bool FilterUtility::shouldShadow(const std::unique_ptr<ShadowPolicy>& policy,
+                                 Runtime::Loader& runtime, uint64_t stable_random) {
+  if (policy->cluster().empty()) {
     return false;
   }
 
-  if (policy.defaultValue().numerator() > 0) {
-    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
+  if (policy->defaultValue().numerator() > 0) {
+    return runtime.snapshot().featureEnabled(policy->runtimeKey(), policy->defaultValue(),
                                              stable_random);
   }
 
-  if (!policy.runtimeKey().empty() &&
-      !runtime.snapshot().featureEnabled(policy.runtimeKey(), 0, stable_random, 10000UL)) {
+  if (!policy->runtimeKey().empty() &&
+      !runtime.snapshot().featureEnabled(policy->runtimeKey(), 0, stable_random, 10000UL)) {
     return false;
   }
 
@@ -547,8 +547,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                        config_.random_, callbacks_->dispatcher(), route_entry_->priority());
-  do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
-                                              callbacks_->streamId());
+
+  // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
+  // runtime values.
+  for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+    if (FilterUtility::shouldShadow(shadow_policy, config_.runtime_, callbacks_->streamId())) {
+      active_shadow_policies_.push_back(std::cref<std::unique_ptr<ShadowPolicy>>(shadow_policy));
+    }
+  }
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
@@ -591,14 +597,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // try timeout timer is not started until onUpstreamComplete().
   ASSERT(upstream_requests_.size() == 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
+  bool buffering = (retry_state_ && retry_state_->enabled()) || active_shadow_policies_.size() > 0;
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
-    do_shadowing_ = false;
+    active_shadow_policies_.clear();
   }
 
   if (buffering) {
@@ -673,22 +679,21 @@ void Filter::cleanup() {
 }
 
 void Filter::maybeDoShadowing() {
-  if (!do_shadowing_) {
-    return;
-  }
+  for (const auto& shadow_policy : active_shadow_policies_) {
+    const auto& ptr = shadow_policy.get();
 
-  ASSERT(!route_entry_->shadowPolicy().cluster().empty());
-  Http::MessagePtr request(new Http::RequestMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
-  if (callbacks_->decodingBuffer()) {
-    request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
-  }
-  if (downstream_trailers_) {
-    request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
-  }
+    ASSERT(!ptr->cluster().empty());
+    Http::MessagePtr request(new Http::RequestMessageImpl(
+        Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
+    if (callbacks_->decodingBuffer()) {
+      request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
+    }
+    if (downstream_trailers_) {
+      request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
+    }
 
-  config_.shadowWriter().shadow(route_entry_->shadowPolicy().cluster(), std::move(request),
-                                timeout_.global_timeout_);
+    config_.shadowWriter().shadow(ptr->cluster(), std::move(request), timeout_.global_timeout_);
+  }
 }
 
 void Filter::onRequestComplete() {

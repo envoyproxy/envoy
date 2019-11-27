@@ -3234,8 +3234,8 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 }
 
 TEST_F(RouterTest, Shadow) {
-  callbacks_.route_->route_entry_.shadow_policy_.cluster_ = "foo";
-  callbacks_.route_->route_entry_.shadow_policy_.runtime_key_ = "bar";
+  std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("foo", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -4121,43 +4121,36 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
 
 TEST(RouterFilterUtilityTest, ShouldShadow) {
   {
-    TestShadowPolicy policy;
+    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>();
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
     EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy;
-    policy.cluster_ = "cluster";
+    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("cluster");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy;
-    policy.cluster_ = "cluster";
-    policy.runtime_key_ = "foo";
+    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(false));
     EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy;
-    policy.cluster_ = "cluster";
-    policy.runtime_key_ = "foo";
+    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   // Use default value instead of runtime key.
   {
-    TestShadowPolicy policy;
     envoy::type::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
     fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-    policy.cluster_ = "cluster";
-    policy.runtime_key_ = "foo";
-    policy.default_value_ = fractional_percent;
+    std::unique_ptr<ShadowPolicy> policy =
+        std::make_unique<TestShadowPolicy>("cluster", "foo", fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_,
                 featureEnabled("foo", Matcher<const envoy::type::FractionalPercent&>(_), 3))

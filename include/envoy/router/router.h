@@ -644,7 +644,7 @@ public:
    * @return const ShadowPolicy& the shadow policy for the route. All routes have a shadow policy
    *         even if no shadowing takes place.
    */
-  virtual const ShadowPolicy& shadowPolicy() const PURE;
+  virtual const std::vector<std::unique_ptr<ShadowPolicy>>& shadowPolicies() const PURE;
 
   /**
    * @return std::chrono::milliseconds the route's timeout.

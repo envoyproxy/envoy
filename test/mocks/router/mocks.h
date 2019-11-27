@@ -182,6 +182,9 @@ public:
 
 class TestShadowPolicy : public ShadowPolicy {
 public:
+  TestShadowPolicy(const std::string& cluster = "", const std::string& runtime_key = "",
+                   envoy::type::FractionalPercent default_value = {})
+      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value) {}
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
@@ -312,7 +315,7 @@ public:
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
   MOCK_CONST_METHOD0(retryShadowBufferLimit, uint32_t());
-  MOCK_CONST_METHOD0(shadowPolicy, const ShadowPolicy&());
+  MOCK_CONST_METHOD0(shadowPolicies, const std::vector<std::unique_ptr<ShadowPolicy>>&());
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(maxGrpcTimeout, absl::optional<std::chrono::milliseconds>());
@@ -340,7 +343,7 @@ public:
   TestRetryPolicy retry_policy_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
-  TestShadowPolicy shadow_policy_;
+  std::vector<std::unique_ptr<ShadowPolicy>> shadow_policies_;
   testing::NiceMock<MockVirtualHost> virtual_host_;
   MockHashPolicy hash_policy_;
   MockMetadataMatchCriteria metadata_matches_criteria_;
