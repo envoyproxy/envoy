@@ -196,7 +196,7 @@ public:
   int onHeaderFieldBase(const char* data, size_t length);
   int onHeaderValueBase(const char* data, size_t length);
 
-    /**
+  /**
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked.
    * @return 0 if no error, 1 if there should be no body.
@@ -238,7 +238,6 @@ protected:
   const bool connection_header_sanitization_ : 1;
 
 private:
-
   /**
    * Called in order to complete an in progress header decode.
    */
@@ -295,7 +294,9 @@ private:
 /**
  * Implementation of Http::ServerConnection for HTTP/1.1.
  */
-class ServerConnectionImpl : public ServerConnection, public ConnectionImpl, public ParserCallbacks {
+class ServerConnectionImpl : public ServerConnection,
+                             public ConnectionImpl,
+                             public ParserCallbacks {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, Http1Settings settings,
@@ -356,7 +357,9 @@ private:
 /**
  * Implementation of Http::ClientConnection for HTTP/1.1.
  */
-class ClientConnectionImpl : public ClientConnection, public ConnectionImpl, public ParserCallbacks {
+class ClientConnectionImpl : public ClientConnection,
+                             public ConnectionImpl,
+                             public ParserCallbacks {
 public:
   ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,

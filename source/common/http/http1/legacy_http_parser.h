@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/http/http1/parser.h"
-
 #include <memory>
+
+#include "common/http/http1/parser.h"
 
 namespace Envoy {
 namespace Http {

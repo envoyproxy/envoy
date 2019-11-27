@@ -1,9 +1,9 @@
 #include "common/http/http1/llhttp_parser.h"
 
+#include <llhttp.h>
+
 #include "common/common/assert.h"
 #include "common/http/http1/parser.h"
-
-#include <llhttp.h>
 
 namespace Envoy {
 namespace Http {
@@ -36,37 +36,21 @@ public:
     return nread;
   }
 
-  void resume() {
-    llhttp_resume(&parser_);
-  }
+  void resume() { llhttp_resume(&parser_); }
 
-  int getErrno() {
-    return llhttp_get_errno(&parser_);
-  }
+  int getErrno() { return llhttp_get_errno(&parser_); }
 
-  int statusCode() const {
-    return parser_.status_code;
-  }
+  int statusCode() const { return parser_.status_code; }
 
-  int httpMajor() const {
-    return parser_.http_major;
-  }
+  int httpMajor() const { return parser_.http_major; }
 
-  int httpMinor() const {
-    return parser_.http_minor;
-  }
+  int httpMinor() const { return parser_.http_minor; }
 
-  uint64_t contentLength() const {
-    return parser_.content_length;
-  }
+  uint64_t contentLength() const { return parser_.content_length; }
 
-  int flags() const {
-    return parser_.flags;
-  }
+  int flags() const { return parser_.flags; }
 
-  uint16_t method() const {
-    return parser_.method;
-  }
+  uint16_t method() const { return parser_.method; }
 
   const char* methodName() const {
     return llhttp_method_name(static_cast<llhttp_method_t>(parser_.method));
@@ -96,50 +80,30 @@ LlHttpParserImpl::LlHttpParserImpl(MessageType type, void* data) {
 
 LlHttpParserImpl::~LlHttpParserImpl() = default;
 
-int LlHttpParserImpl::execute(const char* slice, int len) {
-  return impl_->execute(slice, len);
-}
+int LlHttpParserImpl::execute(const char* slice, int len) { return impl_->execute(slice, len); }
 
-void LlHttpParserImpl::resume() {
-  impl_->resume();
-}
+void LlHttpParserImpl::resume() { impl_->resume(); }
 
 int LlHttpParserImpl::pause() {
   // TODO(dereka) do we actually need to call llhttp_pause(&parser_); ?
   return HPE_PAUSED;
 }
 
-int LlHttpParserImpl::getErrno() {
-  return impl_->getErrno();
-}
+int LlHttpParserImpl::getErrno() { return impl_->getErrno(); }
 
-int LlHttpParserImpl::statusCode() const {
-  return impl_->statusCode();
-}
+int LlHttpParserImpl::statusCode() const { return impl_->statusCode(); }
 
-int LlHttpParserImpl::httpMajor() const {
-  return impl_->httpMajor();
-}
+int LlHttpParserImpl::httpMajor() const { return impl_->httpMajor(); }
 
-int LlHttpParserImpl::httpMinor() const {
-  return impl_->httpMinor();
-}
+int LlHttpParserImpl::httpMinor() const { return impl_->httpMinor(); }
 
-uint64_t LlHttpParserImpl::contentLength() const {
-  return impl_->contentLength();
-}
+uint64_t LlHttpParserImpl::contentLength() const { return impl_->contentLength(); }
 
-int LlHttpParserImpl::flags() const {
-  return impl_->flags();
-}
+int LlHttpParserImpl::flags() const { return impl_->flags(); }
 
-uint16_t LlHttpParserImpl::method() const  {
-  return impl_->method();
-}
+uint16_t LlHttpParserImpl::method() const { return impl_->method(); }
 
-const char* LlHttpParserImpl::methodName() const {
-  return impl_->methodName();
-}
+const char* LlHttpParserImpl::methodName() const { return impl_->methodName(); }
 
 const char* LlHttpParserImpl::errnoName() {
   return llhttp_errno_name(static_cast<llhttp_errno_t>(impl_->getErrno()));

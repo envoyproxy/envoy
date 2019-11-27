@@ -258,7 +258,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   Http::Http1::ParserFactory::useLegacy(options.legacyHttpParserEnabled());
-  ENVOY_LOG(info, "http implementation: {}", Http::Http1::ParserFactory::usesLegacyParser() ? "old (http-parser" : "new (llhttp)");
+  ENVOY_LOG(info, "http implementation: {}",
+            Http::Http1::ParserFactory::usesLegacyParser() ? "old (http-parser" : "new (llhttp)");
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,

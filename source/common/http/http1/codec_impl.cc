@@ -319,9 +319,8 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               MessageType, uint32_t max_headers_kb,
-                               const uint32_t max_headers_count,
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, MessageType,
+                               uint32_t max_headers_kb, const uint32_t max_headers_count,
                                HeaderKeyFormatterPtr&& header_key_formatter)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
       header_key_formatter_(std::move(header_key_formatter)), handling_upgrade_(false),
@@ -408,10 +407,10 @@ size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ASSERT(parser_ != nullptr);
   const size_t bytes_read = parser_->execute(slice, len);
 
-  if (parser_->getErrno() != static_cast<int>(ParserStatus::Ok) && parser_->getErrno() != static_cast<int>(ParserStatus::Paused)) {
+  if (parser_->getErrno() != static_cast<int>(ParserStatus::Ok) &&
+      parser_->getErrno() != static_cast<int>(ParserStatus::Paused)) {
     sendProtocolError();
-    throw CodecProtocolException("http/1.1 protocol error: " +
-                                 std::string(parser_->errnoName()));
+    throw CodecProtocolException("http/1.1 protocol error: " + std::string(parser_->errnoName()));
   }
 
   return bytes_read;
@@ -445,7 +444,8 @@ int ConnectionImpl::onHeaderValueBase(const char* data, size_t length) {
       sendProtocolError();
       throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
     }
-  } else if (ParserFactory::usesLegacyParser() && header_value.find('\0') != absl::string_view::npos) {
+  } else if (ParserFactory::usesLegacyParser() &&
+             header_value.find('\0') != absl::string_view::npos) {
     // http-parser should filter for this
     // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
     // have an invariant that they must not contain embedded zero characters
@@ -577,7 +577,8 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
   if (!active_request_->request_url_.getStringView().empty() &&
       (active_request_->request_url_.getStringView()[0] == '/' ||
-       ((method == static_cast<int>(Method::Options)) && active_request_->request_url_.getStringView()[0] == '*'))) {
+       ((method == static_cast<int>(Method::Options)) &&
+        active_request_->request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
@@ -624,7 +625,8 @@ int ServerConnectionImpl::onHeadersComplete() {
 
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
-    active_request_->response_encoder_.isResponseToHeadRequest(parser_->method() == static_cast<int>(Method::Head));
+    active_request_->response_encoder_.isResponseToHeadRequest(parser_->method() ==
+                                                               static_cast<int>(Method::Head));
 
     // Currently, CONNECT is not supported, however; llhttp_parse_url needs to know about
     // CONNECT
@@ -640,7 +642,8 @@ int ServerConnectionImpl::onHeadersComplete() {
     // scenario where the higher layers stream through and implicitly switch to chunked transfer
     // encoding because end stream with zero body length has not yet been indicated.
     if (parser_->flags() & static_cast<int>(Flags::Chunked) ||
-        (parser_->contentLength() > 0 && parser_->contentLength() != ULLONG_MAX) || handling_upgrade_) {
+        (parser_->contentLength() > 0 && parser_->contentLength() != ULLONG_MAX) ||
+        handling_upgrade_) {
       active_request_->request_decoder_->decodeHeaders(std::move(current_header_map_), false);
 
       // If the connection has been closed (or is closing) after decoding headers, pause the parser

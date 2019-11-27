@@ -43,15 +43,13 @@ std::string createHeaderFragment(int num_headers) {
 } // namespace
 
 enum class CodecImplementation {
-  Old,  // original node http-parser
-  New   // llhttp
+  Old, // original node http-parser
+  New  // llhttp
 };
 
 class Http1CodecParamTest : public testing::TestWithParam<CodecImplementation> {
 protected:
-  Http1CodecParamTest() {
-    ParserFactory::useLegacy(GetParam() == CodecImplementation::Old);
-  }
+  Http1CodecParamTest() { ParserFactory::useLegacy(GetParam() == CodecImplementation::Old); }
   ~Http1CodecParamTest() override = default;
 
   /** Verify that a parser has been constructed using the expected implementation. */
@@ -389,7 +387,8 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 #endif
 
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException, "http/1.1 protocol error: HPE_INVALID_METHOD");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: HPE_INVALID_METHOD");
 
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }

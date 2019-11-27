@@ -116,7 +116,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
                                               "Use fake symbol table implementation", false, true,
                                               "bool", cmd);
-  TCLAP::ValueArg<bool> use_legacy_http_parser("", "use-legacy-http-parser", "Use the legacy Node HTTP parser implementation", false, true, "bool", cmd);
+  TCLAP::ValueArg<bool> use_legacy_http_parser("", "use-legacy-http-parser",
+                                               "Use the legacy Node HTTP parser implementation",
+                                               false, true, "bool", cmd);
   cmd.setExceptionHandling(false);
   try {
     cmd.parse(argc, argv);

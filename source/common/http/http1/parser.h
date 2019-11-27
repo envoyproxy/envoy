@@ -16,19 +16,13 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-enum class ParserType {
-  Legacy,
-  LlHttp
-};
+enum class ParserType { Legacy, LlHttp };
 
-enum class MessageType {
-  Request,
-  Response
-};
+enum class MessageType { Request, Response };
 
 /**
- * Callbacks base class. Any users of the HTTP1 parser who want to use the parsed data needs to implement
- * this interface and pass the object to the `data` parameter of ParserFactory::create.
+ * Callbacks base class. Any users of the HTTP1 parser who want to use the parsed data needs to
+ * implement this interface and pass the object to the `data` parameter of ParserFactory::create.
  */
 class ParserCallbacks {
 public:
@@ -77,8 +71,8 @@ public:
    * Called when the request/response is complete.
    */
   virtual int onMessageComplete() PURE;
-  virtual int onChunkHeader() PURE;  // shrug
-  virtual int onChunkComplete() PURE;  // shrug
+  virtual int onChunkHeader() PURE;   // shrug
+  virtual int onChunkComplete() PURE; // shrug
 };
 
 /**
