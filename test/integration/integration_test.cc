@@ -530,6 +530,7 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
   initialize();
   std::string response;
 
