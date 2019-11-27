@@ -808,7 +808,7 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
     response2->type(Common::Redis::RespType::Error);
     response2->asString() = "MOVED 1111";
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
-    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
