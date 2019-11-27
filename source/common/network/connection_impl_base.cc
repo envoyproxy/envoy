@@ -16,6 +16,7 @@ void ConnectionImplBase::setConnectionStats(const ConnectionStats& stats) {
          "with the configured filter chain.");
   connection_stats_ = std::make_unique<ConnectionStats>(stats);
 }
+
 void ConnectionImplBase::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
   // Validate that this is only called prior to issuing a close() or closeSocket().
   ASSERT(delayed_close_timer_ == nullptr && state() == State::Open);

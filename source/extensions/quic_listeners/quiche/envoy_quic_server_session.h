@@ -54,7 +54,6 @@ public:
   // quic::QuicSpdySession
   void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
 
-
   using quic::QuicSession::stream_map;
 
 protected:

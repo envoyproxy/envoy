@@ -96,7 +96,7 @@ void EnvoyQuicServerSession::OnCanWrite() {
   quic::QuicServerSessionBase::OnCanWrite();
   if (inDelayedClose() && !HasDataToWrite()) {
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-       ASSERT(delayed_close_timer_ != nullptr);
+      ASSERT(delayed_close_timer_ != nullptr);
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     } else {
       closeConnectionImmediately();
@@ -111,9 +111,7 @@ void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) 
   }
 }
 
-bool EnvoyQuicServerSession::hasDataToWrite() {
-  return HasDataToWrite();
-}
+bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 } // namespace Quic
 } // namespace Envoy
