@@ -261,6 +261,20 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   }
 }
 
+// Validate that an opaque config of the wrong type throws during conversion.
+TEST(UtilityTest, AnyWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any typed_config;
+  typed_config.PackFrom(source_duration);
+  ProtobufWkt::Timestamp out;
+  EXPECT_THROW_WITH_REGEX(
+      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                     ProtobufMessage::getStrictValidationVisitor(), out),
+      EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
 void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const Protobuf::Message& inner) {
   udpa::type::v1::TypedStruct typed_struct;
   (*typed_struct.mutable_type_url()) =

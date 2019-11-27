@@ -29,6 +29,8 @@ using InternalInitalizeFn = std::function<void(WatcherHandlePtr)>;
 class TargetHandleImpl : public TargetHandle, Logger::Loggable<Logger::Id::init> {
 private:
   friend class TargetImpl;
+  friend class SharedTargetImpl;
+
   TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
                    std::weak_ptr<InternalInitalizeFn> fn);
 
@@ -83,6 +85,50 @@ private:
 
   // The callback function, called via TargetHandleImpl by the manager
   const std::shared_ptr<InternalInitalizeFn> fn_;
+};
+
+/**
+ * A specialized Target which can be added by multiple Managers.
+ * The initialization will be triggered only once.
+ */
+class SharedTargetImpl : public Target, Logger::Loggable<Logger::Id::init> {
+public:
+  /**
+   * @param name a human-readable target name, for logging / debugging
+   * @fn a callback function to invoke when `initialize` is called on the handle. Note that this
+   *     doesn't take a WatcherHandlePtr (like TargetFn does). Managing the watcher handle is done
+   *     internally to simplify usage.
+   */
+  SharedTargetImpl(absl::string_view name, InitializeFn fn);
+  ~SharedTargetImpl() override;
+
+  // Init::Target
+  absl::string_view name() const override;
+  TargetHandlePtr createHandle(absl::string_view handle_name) const override;
+
+  /**
+   * Signal to the init manager(s) that this target has finished initializing. This is safe to call
+   * any time. Calling it before initialization begins or after initialization has already ended
+   * will have no effect.
+   * @return true if all init managers received this call, false otherwise.
+   */
+  bool ready();
+
+private:
+  // Human-readable name for logging
+  const std::string name_;
+
+  // Handle to all the ManagerImpl's internal watcher, to call when this target is initialized.
+  std::vector<WatcherHandlePtr> watcher_handles_;
+
+  // The callback function, called via TargetHandleImpl by the manager
+  const std::shared_ptr<InternalInitalizeFn> fn_;
+
+  // The state so as to signal the manager when a ready target is added.
+  bool initialized_{false};
+
+  // To guarantee the initialization function is called once.
+  std::once_flag once_flag_;
 };
 
 } // namespace Init

@@ -35,7 +35,7 @@ absl::string_view TargetImpl::name() const { return name_; }
 
 TargetHandlePtr TargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
-  return std::unique_ptr<TargetHandle>(
+  return TargetHandlePtr(
       new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
 }
 
@@ -48,6 +48,38 @@ bool TargetImpl::ready() {
     return result;
   }
   return false;
+}
+
+SharedTargetImpl::SharedTargetImpl(absl::string_view name, InitializeFn fn)
+    : name_(fmt::format("shared target {}", name)),
+      fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
+        if (initialized_) {
+          watcher_handle->ready();
+        } else {
+          watcher_handles_.push_back(std::move(watcher_handle));
+          std::call_once(once_flag_, fn);
+        }
+      })) {}
+
+SharedTargetImpl::~SharedTargetImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
+
+absl::string_view SharedTargetImpl::name() const { return name_; }
+
+TargetHandlePtr SharedTargetImpl::createHandle(absl::string_view handle_name) const {
+  // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
+  return TargetHandlePtr(
+      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
+}
+
+bool SharedTargetImpl::ready() {
+  initialized_ = true;
+  bool all_notified = !watcher_handles_.empty();
+  for (auto& watcher_handle : watcher_handles_) {
+    all_notified = watcher_handle->ready() && all_notified;
+  }
+  // save heap and avoid repeatedly invoke
+  watcher_handles_.clear();
+  return all_notified;
 }
 
 } // namespace Init

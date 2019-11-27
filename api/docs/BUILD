@@ -22,6 +22,7 @@ proto_library(
         "//envoy/api/v2/route:pkg",
         "//envoy/config/accesslog/v2:pkg",
         "//envoy/config/bootstrap/v2:pkg",
+        "//envoy/config/cluster/aggregate/v2alpha:pkg",
         "//envoy/config/cluster/dynamic_forward_proxy/v2alpha:pkg",
         "//envoy/config/cluster/redis:pkg",
         "//envoy/config/common/dynamic_forward_proxy/v2alpha:pkg",
