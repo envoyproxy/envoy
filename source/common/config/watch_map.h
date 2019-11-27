@@ -33,7 +33,8 @@ struct Watch {
 };
 
 // NOTE: Users are responsible for eventually calling removeWatch() on the Watch* returned
-//       by addWatch(). However, we don't expect there to be new users of this class.
+//       by addWatch(). We don't expect there to be new users of this class beyond
+//       NewGrpcMuxImpl and DeltaSubscriptionImpl (TODO(fredlas) to be renamed).
 //
 // Manages "watches" of xDS resources. Several xDS callers might ask for a subscription to the same
 // resource name "X". The xDS machinery must return to each their very own subscription to X.

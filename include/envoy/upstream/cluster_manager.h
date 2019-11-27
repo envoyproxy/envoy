@@ -195,9 +195,10 @@ public:
   /**
    * Return the local cluster name, if it was configured.
    *
-   * @return std::string the local cluster name, or "" if no local cluster was configured.
+   * @return absl::optional<std::string> the local cluster name, or empty if no local cluster was
+   * configured.
    */
-  virtual const std::string& localClusterName() const PURE;
+  virtual const absl::optional<std::string>& localClusterName() const PURE;
 
   /**
    * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.

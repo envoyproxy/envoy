@@ -55,7 +55,7 @@ TEST_P(AdsIntegrationTest, Failure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
 
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Cluster, "", {}, {}, {}, false,
+      Config::TypeUrl::get().Cluster, "", {}, {}, {}, true,
       Grpc::Status::WellKnownGrpcStatus::Internal,
       fmt::format("does not match the message-wide type URL {}", Config::TypeUrl::get().Cluster)));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
@@ -70,7 +70,7 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {}, {}, false,
+                                      {"cluster_0"}, {}, {}, true,
                                       Grpc::Status::WellKnownGrpcStatus::Internal,
                                       fmt::format("does not match the message-wide type URL {}",
                                                   Config::TypeUrl::get().ClusterLoadAssignment)));
@@ -85,7 +85,7 @@ TEST_P(AdsIntegrationTest, Failure) {
       {buildRouteConfig("listener_0", "route_config_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+      Config::TypeUrl::get().Listener, "", {}, {}, {}, true,
       Grpc::Status::WellKnownGrpcStatus::Internal,
       fmt::format("does not match the message-wide type URL {}", Config::TypeUrl::get().Listener)));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
@@ -100,7 +100,7 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
-                                      {"route_config_0"}, {}, {}, false,
+                                      {"route_config_0"}, {}, {}, true,
                                       Grpc::Status::WellKnownGrpcStatus::Internal,
                                       fmt::format("does not match the message-wide type URL {}",
                                                   Config::TypeUrl::get().RouteConfiguration)));
@@ -364,11 +364,12 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
       test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
 
   // CDS is resumed and EDS response was acknowledged.
-  //
-  // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
-  // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
-  // ACK goes out, they're both acknowledging version 3.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
+    // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
+    // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
+    // ACK goes out, they're both acknowledging version 3.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
+  }
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"warming_cluster_2", "warming_cluster_1"}, {}, {}));
