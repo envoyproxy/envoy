@@ -614,7 +614,7 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
 }
 
 absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
-  size_t pos = type_url.find_last_of('/');
+  const size_t pos = type_url.rfind('/');
   if (pos != absl::string_view::npos) {
     type_url = type_url.substr(pos + 1);
   }
