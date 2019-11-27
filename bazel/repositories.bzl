@@ -89,13 +89,17 @@ def _go_deps(skip_targets):
         _repository_impl("io_bazel_rules_go")
         _repository_impl("bazel_gazelle")
 
-CLANG_TOOLS_INCLUDE_ENV = "CLANG_TOOLS_INCLUDE"
-CLANG_TOOLS_LIB_ENV = "CLANG_TOOLS_LIB"
-
 def _clang_tools_impl(ctxt):
-    if CLANG_TOOLS_INCLUDE_ENV in ctxt.os.environ and CLANG_TOOLS_LIB_ENV in ctxt.os.environ:
-        clang_tools_include_path = ctxt.os.environ["CLANG_TOOLS_INCLUDE"]
-        clang_tools_lib_path = ctxt.os.environ["CLANG_TOOLS_LIB"]
+  if "LLVM_CONFIG" in ctxt.os.environ:
+        llvm_config_path = ctxt.os.environ["LLVM_CONFIG"]
+        exec_result = ctxt.execute([llvm_config_path, "--includedir"])
+        if exec_result.return_code != 0:
+          fail(llvm_config_path + " --includedir returned %d" % exec_result.return_code)
+        clang_tools_include_path = exec_result.stdout.rstrip()
+        exec_result = ctxt.execute([llvm_config_path, "--libdir"])
+        if exec_result.return_code != 0:
+          fail(llvm_config_path + " --libdir returned %d" % exec_result.return_code)
+        clang_tools_lib_path = exec_result.stdout.rstrip()
         for include_dir in ["clang", "clang-c", "llvm", "llvm-c"]:
             ctxt.symlink(clang_tools_include_path + "/" + include_dir, include_dir)
         ctxt.symlink(clang_tools_lib_path, "lib")
@@ -103,10 +107,7 @@ def _clang_tools_impl(ctxt):
 
 _clang_tools = repository_rule(
     implementation = _clang_tools_impl,
-    environ = [
-        "CLANG_TOOLS_INCLUDE",
-        "CLANG_TOOLS_LIB",
-    ],
+    environ = ["LLVM_CONFIG"],
 )
 
 # Set developer_tools to True to enable build of Envoy developer facing tools

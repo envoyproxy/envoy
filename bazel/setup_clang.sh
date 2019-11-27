@@ -17,6 +17,7 @@ echo "# Generated file, do not edit. If you want to disable clang, just delete t
 build:clang --action_env=PATH=${PATH}
 build:clang --action_env=CC=clang
 build:clang --action_env=CXX=clang++
+build:clang --action_env=LLVM_CONFIG=llvm-config
 build:clang --action_env=LD_LIBRARY_PATH=$(llvm-config --libdir)
 build:clang --test_env=LD_LIBRARY_PATH=$(llvm-config --libdir)
 

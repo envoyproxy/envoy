@@ -16,11 +16,10 @@ are building Envoy with `clang`, this should already be true of your system. You
 can find prebuilt binary releases of Clang at https://releases.llvm.org. You
 will need the Clang version used by Envoy in CI (currently clang-9.0).
 
-To build a tool, set the following environment variables:
+To build a tool, set the following environment variable:
 
 ```console
-export CLANG_TOOLS_LIB=<path to clang installation>/lib
-export CLANG_TOOLS_INCLUDE=<path to clang installation>/include
+export LLVM_CONFIG=<path to clang installation>/bin/llvm-config
 ```
 
 Assuming that `CC` and `CXX` already point at Clang, you should be able to build
@@ -40,14 +39,10 @@ dependencies to be located:
 tools/gen_compilation_database.py --run_bazel_build --include_headers
 ```
 
-Finally, the tool can be run against source files in the Envoy tree. Due to the
-nature of the treatment of Clang's [builtin
-headers](https://clang.llvm.org/docs/LibTooling.html#builtin-includes), it's
-necessary to point the tool at these as well.
+Finally, the tool can be run against source files in the Envoy tree:
 
 ```console
 bazel-bin/tools/clang_tools/syntax_only/syntax_only \
-  --extra-arg="-isystem<path to clang installation>/lib/clang/9.0.0/include/"
   source/common/common/logger.cc
 ```
 
