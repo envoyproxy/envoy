@@ -172,8 +172,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
   }
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(
-    const envoy::api::v2::route::RouteAction::RequestMirrorPolicy& config) {
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
 
   cluster_ = config.cluster();
 
@@ -291,8 +290,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (!route.route().request_mirror_policies().empty()) {
     if (route.route().has_request_mirror_policy()) {
-      // Hacky `oneof` because proto does not allow `oneof` to contain a field labeled `repeated`.
+      // proto does not allow `oneof` to contain a field labeled `repeated`, so we do our own
+      // xor-like check.
       // https://github.com/protocolbuffers/protobuf/issues/2592
+      // The alternative solution suggested (wrapping the oneof in a repeated message) would still
+      // break wire compatibility
       throw EnvoyException("Cannot specify both request_mirror_policy and request_mirror_policies");
     }
     for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {

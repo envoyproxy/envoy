@@ -127,7 +127,7 @@ public:
    *        should take place.
    * @return TRUE if shadowing should take place.
    */
-  static bool shouldShadow(const std::unique_ptr<ShadowPolicy>& policy, Runtime::Loader& runtime,
+  static bool shouldShadow(const ShadowPolicyPtr& policy, Runtime::Loader& runtime,
                            uint64_t stable_random);
 
   /**
@@ -576,7 +576,7 @@ private:
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::HeaderMap&)> modify_headers_;
-  std::vector<std::reference_wrapper<const std::unique_ptr<ShadowPolicy>>>
+  std::vector<std::reference_wrapper<const ShadowPolicyPtr>>
       active_shadow_policies_{};
 
   // list of cookies to add to upstream headers

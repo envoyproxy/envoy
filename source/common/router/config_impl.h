@@ -281,7 +281,8 @@ private:
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  explicit ShadowPolicyImpl(const envoy::api::v2::route::RouteAction::RequestMirrorPolicy& config);
+  using RequestMirrorPolicy = envoy::api::v2::route::RouteAction::RequestMirrorPolicy;
+  explicit ShadowPolicyImpl(const RequestMirrorPolicy& config);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -411,7 +412,7 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
-  const std::vector<std::unique_ptr<ShadowPolicy>>& shadowPolicies() const override {
+  const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
     return shadow_policies_;
   }
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
@@ -507,7 +508,7 @@ private:
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
-    const std::vector<std::unique_ptr<ShadowPolicy>>& shadowPolicies() const override {
+    const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
       return parent_->shadowPolicies();
     }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
@@ -667,7 +668,7 @@ private:
   const HedgePolicyImpl hedge_policy_;
   const RetryPolicyImpl retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
-  std::vector<std::unique_ptr<ShadowPolicy>> shadow_policies_;
+  std::vector<ShadowPolicyPtr> shadow_policies_;
   const Upstream::ResourcePriority priority_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;

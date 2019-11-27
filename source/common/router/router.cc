@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -100,7 +101,7 @@ void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_
   }
 }
 
-bool FilterUtility::shouldShadow(const std::unique_ptr<ShadowPolicy>& policy,
+bool FilterUtility::shouldShadow(const ShadowPolicyPtr& policy,
                                  Runtime::Loader& runtime, uint64_t stable_random) {
   if (policy->cluster().empty()) {
     return false;
@@ -552,7 +553,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // runtime values.
   for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
     if (FilterUtility::shouldShadow(shadow_policy, config_.runtime_, callbacks_->streamId())) {
-      active_shadow_policies_.push_back(std::cref<std::unique_ptr<ShadowPolicy>>(shadow_policy));
+      active_shadow_policies_.push_back(std::cref<ShadowPolicyPtr>(shadow_policy));
     }
   }
 

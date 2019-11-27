@@ -3234,7 +3234,9 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 }
 
 TEST_F(RouterTest, Shadow) {
-  std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("foo", "bar");
+  ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("foo", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
+  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
@@ -3250,6 +3252,7 @@ TEST_F(RouterTest, Shadow) {
   expectResponseTimerCreate();
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("bar", 0, 43, 10000)).WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("buzz", 0, 43, 10000)).WillOnce(Return(true));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3261,9 +3264,15 @@ TEST_F(RouterTest, Shadow) {
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   EXPECT_CALL(callbacks_, decodingBuffer())
-      .Times(AtLeast(1))
+      .Times(AtLeast(2))
       .WillRepeatedly(Return(body_data.get()));
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
+      .WillOnce(Invoke(
+          [](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds) -> void {
+            EXPECT_NE(nullptr, request->body());
+            EXPECT_NE(nullptr, request->trailers());
+          }));
+  EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, std::chrono::milliseconds(10)))
       .WillOnce(Invoke(
           [](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds) -> void {
             EXPECT_NE(nullptr, request->body());
@@ -4121,25 +4130,25 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
 
 TEST(RouterFilterUtilityTest, ShouldShadow) {
   {
-    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>();
+    ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>();
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
     EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("cluster");
+    ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("cluster");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("cluster", "foo");
+    ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(false));
     EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    std::unique_ptr<ShadowPolicy> policy = std::make_unique<TestShadowPolicy>("cluster", "foo");
+    ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
@@ -4149,7 +4158,7 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
     envoy::type::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
     fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-    std::unique_ptr<ShadowPolicy> policy =
+    ShadowPolicyPtr policy =
         std::make_unique<TestShadowPolicy>("cluster", "foo", fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_,

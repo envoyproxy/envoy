@@ -2719,6 +2719,26 @@ virtual_hosts:
   EXPECT_EQ("foo", boz_shadow_policies[1]->runtimeKey());
 }
 
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(ShadowPolicyAndPolicies)) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policy:
+        cluster: some_cluster
+      request_mirror_policies:
+      - cluster: some_other_cluster
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException, "Cannot specify both request_mirror_policy and request_mirror_policies");
+}
+
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
 // When removing runtime_key: this test can be removed.
