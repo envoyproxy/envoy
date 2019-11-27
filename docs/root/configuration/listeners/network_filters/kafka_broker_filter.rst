@@ -53,7 +53,7 @@ in the configuration snippet below:
         address: 127.0.0.1 # Kafka broker's host.
         port_value: 9092   # Kafka broker's port.
 
-The Kafka broker needs to advertise Envoy listener port instead of its own.
+The Kafka broker needs to advertise the Envoy listener port instead of its own.
 
 .. code-block:: text
 
