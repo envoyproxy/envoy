@@ -79,7 +79,9 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
       // configuration whether to wait or not before closing.
       if (delayed_close_timeout_configured &&
           type == Network::ConnectionCloseType::FlushWriteAndDelay) {
-        initializeDelayedCloseTimer();
+        if (!inDelayedClose()) {
+          initializeDelayedCloseTimer();
+        }
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
       } else {
         closeConnectionImmediately();
