@@ -96,7 +96,7 @@ envoy_cc_library(
     srcs = ["legacy_http_parser.cc"],
     hdrs = ["legacy_http_parser.h"],
     external_deps = [
-        "http_parser"
+        "http_parser",
     ],
     deps = [
         ":parser_interface",
