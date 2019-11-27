@@ -95,29 +95,29 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
 }
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
-  if (reuse_port_) {
-    Network::SocketSharedPtr socket;
-    absl::call_once(steal_once_, [this, &socket]() {
-      if (socket_) {
-        // If a listener's port is set to 0, socket_ should be created for reserving a port
-        // number, it is handed over to the first worker thread came here.
-        // There are several reasons for doing this:
-        // - for UDP, once a socket being bound, it begins to receive packets, it can't be
-        //   left unused, and closing it will lost packets received by it.
-        // - port number should be reserved before adding listener to active_listeners_ list,
-        //   otherwise admin API /listeners might return 0 as listener's port.
-        socket = std::move(socket_);
-      }
-    });
-
-    if (socket) {
-      return socket;
-    }
-
-    return createListenSocketAndApplyOptions();
+  if (!reuse_port_) {
+    return socket_;
   }
 
-  return socket_;
+  Network::SocketSharedPtr socket;
+  absl::call_once(steal_once_, [this, &socket]() {
+    if (socket_) {
+      // If a listener's port is set to 0, socket_ should be created for reserving a port
+      // number, it is handed over to the first worker thread came here.
+      // There are several reasons for doing this:
+      // - for UDP, once a socket being bound, it begins to receive packets, it can't be
+      //   left unused, and closing it will lost packets received by it.
+      // - port number should be reserved before adding listener to active_listeners_ list,
+      //   otherwise admin API /listeners might return 0 as listener's port.
+      socket = std::move(socket_);
+    }
+  });
+
+  if (socket) {
+    return socket;
+  }
+
+  return createListenSocketAndApplyOptions();
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
