@@ -18,6 +18,7 @@ envoy_cc_library(
     deps = [
         ":http_cache_lib",
         "//include/envoy/registry",
+        "//source/common/common:logger_lib",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -37,6 +38,7 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/registry",
         "//include/envoy/stats:stats_interface",
+        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
     ],
 )

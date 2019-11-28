@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/logger.h"
 #include "envoy/config/filter/http/cache/v2alpha/cache.pb.h"
 
 #include "extensions/filters/http/cache/http_cache.h"
@@ -21,6 +22,7 @@ namespace Cache {
 class CacheFilter;
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
 class CacheFilter : public Http::PassThroughFilter,
+                    public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
   // Throws ProtoValidationException if no registered HttpCacheFactory for config.name.
