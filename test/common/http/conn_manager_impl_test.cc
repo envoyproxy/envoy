@@ -3360,7 +3360,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 }
 
 // Dummy PerConnectionSharedPtr creator-function; this creator-function can be as robust
-// and state-preserving as the inherting interface desires.
+// and state-preserving as the inheriting interface desires.
 PerConnectionObjectSharedPtr test_creation_function(MutableHttpConnection&) {
   return std::make_shared<PerConnectionObject>();
 }
@@ -3391,18 +3391,18 @@ TEST_F(HttpConnectionManagerImplTest, MutableHttpConnection) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        auto per_connection_object1 = decoder_filters_[0]->callbacks_->createPerConnectionObject(test_str_obj1,
-            mutable_connection, creator_function);
-        auto per_connection_object2 = decoder_filters_[0]->callbacks_->createPerConnectionObject(test_str_obj1,
-            mutable_connection, creator_function);
-        auto per_connection_object3 = decoder_filters_[0]->callbacks_->createPerConnectionObject(test_str_obj2,
-            mutable_connection, creator_function);
-        // per_connection_object1 is created for the first time when 'createPerConnectionObject' is invoked
-        // with 'test_str_obj1' and the same object is returned when invoked for the second time with
-        // 'test_str_obj1'
+        auto per_connection_object1 = decoder_filters_[0]->callbacks_->createPerConnectionObject(
+            test_str_obj1, mutable_connection, creator_function);
+        auto per_connection_object2 = decoder_filters_[0]->callbacks_->createPerConnectionObject(
+            test_str_obj1, mutable_connection, creator_function);
+        auto per_connection_object3 = decoder_filters_[0]->callbacks_->createPerConnectionObject(
+            test_str_obj2, mutable_connection, creator_function);
+        // per_connection_object1 is created for the first time when 'createPerConnectionObject' is
+        // invoked with 'test_str_obj1' and the same object is returned when invoked for the second
+        // time with 'test_str_obj1'
         EXPECT_EQ(per_connection_object1, per_connection_object2);
-        // per_connection_object2 returned while invoking 'createPerConnectionObject' with 'test_str_obj2'
-        // and is not same as per_connection_object1
+        // per_connection_object3 returned while invoking 'createPerConnectionObject' with
+        // 'test_str_obj2' and is not same as per_connection_object2
         EXPECT_NE(per_connection_object2, per_connection_object3);
         return FilterHeadersStatus::StopIteration;
       }));

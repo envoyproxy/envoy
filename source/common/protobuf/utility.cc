@@ -429,6 +429,14 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   return json;
 }
 
+void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
+  if (!any_message.UnpackTo(&message)) {
+    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
+                                     message.GetDescriptor()->full_name(),
+                                     any_message.DebugString()));
+  }
+}
+
 void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {
   // Any proto3 message can be transformed to Struct, so there is no need to check for unknown
   // fields. There is one catch; Duration/Timestamp etc. which have non-object canonical JSON
@@ -603,6 +611,14 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
       std::chrono::time_point_cast<std::chrono::milliseconds>(system_clock_time)
           .time_since_epoch()
           .count()));
+}
+
+absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
 }
 
 } // namespace Envoy

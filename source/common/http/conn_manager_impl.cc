@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -2044,8 +2043,6 @@ ConnectionManagerImpl::ActiveStreamFilterBase::createPerConnectionObject(
     const PerConnectionObjectCreator& creation_function) {
 
   // Check if the object was already created
-  //const std::string map_object_name = object_name;
-  //auto iterator = parent_.connection_manager_.per_connection_object_map_.find(map_object_name);
   auto iterator = parent_.connection_manager_.per_connection_object_map_.find(object_name);
   if (iterator != parent_.connection_manager_.per_connection_object_map_.end()) {
     return iterator->second;
@@ -2241,6 +2238,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   HeaderMapPtr request_headers(std::move(parent_.request_headers_));
   StreamEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
+  response_encoder->getStream().removeCallbacks(parent_);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   parent_.connection_manager_.doEndStream(this->parent_);

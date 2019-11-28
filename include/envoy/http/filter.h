@@ -124,8 +124,6 @@ enum class FilterMetadataStatus {
  * HTTP connection manager. This pushes singleton handling into the HTTP connection manager.
  */
 
-class MutableHttpConnection;
-
 class PerConnectionObject {
 public:
   virtual ~PerConnectionObject() = default;
