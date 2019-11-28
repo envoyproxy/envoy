@@ -82,7 +82,7 @@ void eatDirectiveArgument(absl::string_view& s) {
 }
 } // namespace
 
-// If s is nonnull and begins with a decimal number ([0-9]+), removes it from
+// If s is non-null and begins with a decimal number ([0-9]+), removes it from
 // the input and returns a SystemTime::duration representing that many seconds.
 // If s is null or doesn't begin with digits, returns
 // SystemTime::duration::zero(). If parsing overflows, returns

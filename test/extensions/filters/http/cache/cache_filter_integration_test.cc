@@ -64,7 +64,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_EQ(request->body(), std::string(42, 'a'));
   }
 
-  // Send second resquest, and get response from cache.
+  // Send second request, and get response from cache.
   IntegrationStreamDecoderPtr request = codec_client_->makeHeaderOnlyRequest(request_headers);
   request->waitForEndStream();
   EXPECT_TRUE(request->complete());

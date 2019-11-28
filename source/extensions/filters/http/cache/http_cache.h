@@ -137,7 +137,7 @@ class LookupRequest {
 public:
   using HeaderVector = std::vector<Http::HeaderEntry>;
 
-  // Prereq: request_headers's Path(), Scheme(), and Host() are nonnull.
+  // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::HeaderMap& request_headers, SystemTime timestamp);
 
   // Caches may modify the key according to local needs, though care must be

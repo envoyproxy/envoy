@@ -82,6 +82,7 @@ EWOULDBLOCK
 EXPECTing
 EXPECTs
 EXPR
+FALLTHROUGH
 FAQ
 FASTOPEN
 FCDS
@@ -200,6 +201,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Prereq
 QUIC
 QoS
 RAII
@@ -304,8 +306,11 @@ WS
 Welford's
 XDS
 asctime
+cacheability
 dechunk
 dechunked
+fixdate
+maxage
 qdtext
 satisfiable
 tchar
