@@ -169,7 +169,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span, const Http::HeaderMap
 
   const CustomTagMap* custom_tag_map = tracing_config.customTags();
   if (custom_tag_map) {
-    for (const auto &it : *custom_tag_map) {
+    for (const auto& it : *custom_tag_map) {
       it.second->apply(span, ctx);
     }
   }
