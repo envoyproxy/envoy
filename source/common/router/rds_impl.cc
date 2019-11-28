@@ -106,17 +106,21 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     provider->validateConfig(route_config);
   }
 
+  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
 
     if (config_update_info_->routeConfiguration().has_vhds()) {
       ENVOY_LOG(debug, "rds: vhds configuration present, starting vhds: config_name={} hash={}",
                 route_config_name_, config_update_info_->configHash());
+      maybeCreateInitManager(version_info, noop_init_manager, resume_rds);
       // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
       // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
-      vhds_subscription_->registerInitTargetWithInitManager(getRdsConfigInitManager());
+      vhds_subscription_->registerInitTargetWithInitManager(
+          noop_init_manager == nullptr ? getRdsConfigInitManager() : *noop_init_manager);
     } else {
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 config_update_info_->configHash());
@@ -130,6 +134,27 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   }
 
   init_target_.ready();
+}
+
+// Initialize a no-op InitManager in case the one in the factory_context has completed
+// initialization. This can happen if an RDS config update for an already established RDS
+// subscription contains VHDS configuration.
+void RdsRouteConfigSubscription::maybeCreateInitManager(
+    const std::string& version_info, std::unique_ptr<Init::ManagerImpl>& init_manager,
+    std::unique_ptr<Cleanup>& init_vhds) {
+  if (getRdsConfigInitManager().state() == Init::Manager::State::Initialized) {
+    init_manager = std::make_unique<Init::ManagerImpl>(
+        fmt::format("VHDS {}:{}", route_config_name_, version_info));
+    init_vhds = std::make_unique<Cleanup>([this, &init_manager, version_info] {
+      // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
+      // up.
+      Init::WatcherImpl noop_watcher(
+          // Note: we just throw it away.
+          fmt::format("VHDS ConfigUpdate watcher {}:{}", route_config_name_, version_info),
+          []() { /*Do nothing.*/ });
+      init_manager->initialize(noop_watcher);
+    });
+  }
 }
 
 void RdsRouteConfigSubscription::onConfigUpdate(

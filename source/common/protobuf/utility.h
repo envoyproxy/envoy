@@ -116,6 +116,11 @@ public:
   MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
 };
 
+class TypeUtil {
+public:
+  static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
+};
+
 class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<std::string>& source,
@@ -281,18 +286,26 @@ public:
   }
 
   /**
+   * Convert from google.protobuf.Any to a typed message. This should be used
+   * instead of the inbuilt UnpackTo as it performs validation of results.
+   *
+   * @param any_message source google.protobuf.Any message.
+   * @param message destination to unpack to.
+   *
+   * @throw EnvoyException if the message does not unpack.
+   */
+  static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+
+  /**
    * Convert from google.protobuf.Any to a typed message.
    * @param message source google.protobuf.Any message.
-   * @param validation_visitor message validation visitor instance.
    *
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
-    if (!message.UnpackTo(&typed_message)) {
-      throw EnvoyException("Unable to unpack " + message.DebugString());
-    }
+    unpackTo(message, typed_message);
     return typed_message;
   };
 
