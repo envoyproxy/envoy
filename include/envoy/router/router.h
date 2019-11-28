@@ -174,7 +174,6 @@ public:
     // The minimum number of active requests before enforcing the retry budget.
     uint32_t min_concurrency;
   };
-  using RetryBudget = struct RetryBudget;
 
   virtual ~RetryPolicy() = default;
 
