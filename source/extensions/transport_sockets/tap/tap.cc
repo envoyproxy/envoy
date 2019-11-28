@@ -12,6 +12,7 @@ TapSocket::TapSocket(SocketTapConfigSharedPtr config,
     : config_(config), transport_socket_(std::move(transport_socket)) {}
 
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
+  ASSERT(!tapper_);
   transport_socket_->setTransportSocketCallbacks(callbacks);
   tapper_ = config_ ? config_->createPerSocketTapper(callbacks.connection()) : nullptr;
 }

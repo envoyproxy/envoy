@@ -78,6 +78,10 @@ public:
 
   /**
    * Log a completed request.
+   * Prior to logging, call refreshByteSize() on HeaderMaps to ensure that an accurate byte size
+   * count is logged.
+   * TODO(asraa): Remove refreshByteSize() requirement when entries in HeaderMap can no longer be
+   * modified by reference and headerMap holds an accurate internal byte size count.
    * @param request_headers supplies the incoming request headers after filtering.
    * @param response_headers supplies response headers.
    * @param response_trailers supplies response trailers.

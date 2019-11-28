@@ -84,6 +84,8 @@ public:
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
     EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
+    EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
+        .WillRepeatedly(Return(1024 * 1024));
   }
 
   void TearDown() override {
@@ -146,7 +148,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EnvoyQuicDispatcherTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
-  quic::SetVerbosityLogThreshold(2);
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
@@ -157,17 +158,24 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
       .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
         EXPECT_EQ(*listen_socket_->localAddress(), *socket.localAddress());
-        EXPECT_EQ(Extensions::TransportSockets::TransportSocketNames::get().Quic,
+        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                   socket.detectedTransportProtocol());
         EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(socket.remoteAddress()));
         return &filter_chain;
       }));
   std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
   Network::MockConnectionCallbacks network_connection_callbacks;
+  testing::StrictMock<Stats::MockCounter> read_total;
+  testing::StrictMock<Stats::MockGauge> read_current;
+  testing::StrictMock<Stats::MockCounter> write_total;
+  testing::StrictMock<Stats::MockGauge> write_current;
+
   std::vector<Network::FilterFactoryCb> filter_factory(
       {[&](Network::FilterManager& filter_manager) {
         filter_manager.addReadFilter(read_filter);
         read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
+        read_filter->callbacks_->connection().setConnectionStats(
+            {read_total, read_current, write_total, write_current, nullptr, nullptr});
       }});
   EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());
@@ -181,6 +189,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Invoke([]() { return Network::FilterStatus::StopIteration; }));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
 
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   // Upon receiving a full CHLO. A new quic connection should be created and have its filter

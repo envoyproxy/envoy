@@ -25,6 +25,9 @@ public:
   CertificateValidationContextConfigProviderSharedPtr
   findStaticCertificateValidationContextProvider(const std::string& name) const override;
 
+  TlsSessionTicketKeysConfigProviderSharedPtr
+  findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const override;
+
   TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
       const envoy::api::v2::auth::TlsCertificate& tls_certificate) override;
 
@@ -33,12 +36,19 @@ public:
       const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
       override;
 
+  TlsSessionTicketKeysConfigProviderSharedPtr createInlineTlsSessionTicketKeysProvider(
+      const envoy::api::v2::auth::TlsSessionTicketKeys& tls_session_ticket_keys) override;
+
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
+      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+
+  TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
@@ -102,9 +112,13 @@ private:
   std::unordered_map<std::string, CertificateValidationContextConfigProviderSharedPtr>
       static_certificate_validation_context_providers_;
 
+  std::unordered_map<std::string, TlsSessionTicketKeysConfigProviderSharedPtr>
+      static_session_ticket_keys_providers_;
+
   // map hash code of SDS config source and SdsApi object.
   DynamicSecretProviders<TlsCertificateSdsApi> certificate_providers_;
   DynamicSecretProviders<CertificateValidationContextSdsApi> validation_context_providers_;
+  DynamicSecretProviders<TlsSessionTicketKeysSdsApi> session_ticket_keys_providers_;
 
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 };

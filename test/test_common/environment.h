@@ -11,6 +11,7 @@
 #include "common/json/json_loader.h"
 
 #include "absl/types/optional.h"
+#include "tools/cpp/runfiles/runfiles.h"
 
 namespace Envoy {
 class TestEnvironment {
@@ -79,18 +80,17 @@ public:
 
   /**
    * Obtain read-only test input data directory.
+   * @param workspace the name of the Bazel workspace where the input data is.
    * @return const std::string& with the path to the read-only test input directory.
    */
-  static const std::string& runfilesDirectory();
+  static std::string runfilesDirectory(const std::string& workspace = "envoy");
 
   /**
    * Prefix a given path with the read-only test input data directory.
    * @param path path suffix.
    * @return std::string path qualified with read-only test input data directory.
    */
-  static std::string runfilesPath(const std::string& path) {
-    return runfilesDirectory() + "/" + path;
-  }
+  static std::string runfilesPath(const std::string& path, const std::string& workspace = "envoy");
 
   /**
    * Obtain Unix Domain Socket temporary directory.
@@ -208,6 +208,14 @@ public:
    * Removes environment variable. Same args as unsetenv(3).
    */
   static void unsetEnvVar(const std::string& name);
+
+  /**
+   * Set runfiles with current test, this have to be called before calling path related functions.
+   */
+  static void setRunfiles(bazel::tools::cpp::runfiles::Runfiles* runfiles);
+
+private:
+  static bazel::tools::cpp::runfiles::Runfiles* runfiles_;
 };
 
 } // namespace Envoy

@@ -85,6 +85,13 @@ public:
   virtual std::string name() PURE;
 
   /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "dubbo_proxy.route_matchers"; }
+
+  /**
    * Convenience method to lookup a factory by type.
    * @param RouteMatcherType the protocol type.
    * @return NamedRouteMatcherConfigFactory& for the RouteMatcherType.
@@ -100,6 +107,7 @@ public:
  */
 template <class RouteMatcherImpl>
 class RouteMatcherFactoryBase : public NamedRouteMatcherConfigFactory {
+public:
   RouteMatcherPtr createRouteMatcher(const RouteConfigurations& route_configs,
                                      Server::Configuration::FactoryContext& context) override {
     return std::make_unique<RouteMatcherImpl>(route_configs, context);

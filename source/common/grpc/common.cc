@@ -1,7 +1,5 @@
 #include "common/grpc/common.h"
 
-#include <arpa/inet.h>
-
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -50,16 +48,17 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers,
+                                                         bool allow_user_defined) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
-
   uint64_t grpc_status_code;
+
   if (!grpc_status_header || grpc_status_header->value().empty()) {
     return absl::nullopt;
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
-      grpc_status_code > Status::GrpcStatus::MaximumValid) {
-    return {Status::GrpcStatus::InvalidCode};
+      (grpc_status_code > Status::WellKnownGrpcStatus::MaximumKnown && !allow_user_defined)) {
+    return {Status::WellKnownGrpcStatus::InvalidCode};
   }
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
@@ -129,9 +128,9 @@ Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   return body;
 }
 
-std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_headers) {
+std::chrono::milliseconds Common::getGrpcTimeout(const Http::HeaderMap& request_headers) {
   std::chrono::milliseconds timeout(0);
-  Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
+  const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
     // TODO(dnoe): Migrate to pure string_view (#6580)
@@ -224,7 +223,7 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
     return;
   }
 
-  if (grpc_status_code.value() == Status::GrpcStatus::InvalidCode) {
+  if (grpc_status_code.value() == Status::WellKnownGrpcStatus::InvalidCode) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 

@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     data = glob(["test_data/**"]),
     extension_name = "envoy.filters.network.client_ssl_auth",
     deps = [
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/network/client_ssl_auth",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",

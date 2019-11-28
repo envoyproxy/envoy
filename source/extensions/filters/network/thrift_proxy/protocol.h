@@ -515,6 +515,13 @@ public:
   virtual std::string name() PURE;
 
   /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "thrift_proxy.protocols"; }
+
+  /**
    * Convenience method to lookup a factory by type.
    * @param ProtocolType the protocol type
    * @return NamedProtocolConfigFactory& for the ProtocolType
@@ -529,6 +536,7 @@ public:
  * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+public:
   ProtocolPtr createProtocol() override { return std::move(std::make_unique<ProtocolImpl>()); }
 
   std::string name() override { return name_; }

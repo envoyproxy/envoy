@@ -15,7 +15,7 @@ envoy_cc_test(
     srcs = ["delta_subscription_impl_test.cc"],
     deps = [
         ":delta_subscription_test_harness",
-        "//source/common/config:delta_subscription_lib",
+        "//source/common/config:grpc_subscription_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
@@ -31,7 +31,7 @@ envoy_cc_test(
     name = "delta_subscription_state_test",
     srcs = ["delta_subscription_state_test.cc"],
     deps = [
-        "//source/common/config:delta_subscription_lib",
+        "//source/common/config:delta_subscription_state_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
@@ -67,13 +67,36 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
 envoy_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
+    deps = [
+        "//source/common/config:grpc_mux_lib",
+        "//source/common/config:grpc_subscription_lib",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/protobuf",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "new_grpc_mux_impl_test",
+    srcs = ["new_grpc_mux_impl_test.cc"],
     deps = [
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -89,9 +112,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:discovery_cc",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/service/discovery/v2:ads_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -104,6 +125,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -130,7 +152,7 @@ envoy_cc_test_library(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -139,7 +161,7 @@ envoy_cc_test_library(
     hdrs = ["delta_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
-        "//source/common/config:delta_subscription_lib",
+        "//source/common/config:grpc_subscription_lib",
         "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
@@ -174,7 +196,23 @@ envoy_cc_test_library(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "sotw_subscription_state_test",
+    srcs = ["sotw_subscription_state_test.cc"],
+    deps = [
+        "//source/common/config:sotw_subscription_state_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -193,8 +231,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -233,21 +270,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "rds_json_test",
-    srcs = ["rds_json_test.cc"],
-    deps = [
-        "//source/common/config:rds_json_lib",
-        "//source/common/json:json_loader_lib",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "runtime_utility_test",
     srcs = ["runtime_utility_test.cc"],
     deps = [
@@ -270,7 +292,16 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
+        "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "registry_test",
+    srcs = ["registry_test.cc"],
+    deps = [
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -281,16 +312,7 @@ envoy_cc_test(
         "//source/common/config:watch_map_lib",
         "//test/mocks/config:config_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:eds_cc",
-    ],
-)
-
-envoy_cc_test(
-    name = "filter_json_test",
-    srcs = ["filter_json_test.cc"],
-    deps = [
-        "//source/common/config:filter_json_lib",
-        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -303,7 +325,7 @@ envoy_cc_test(
     name = "config_provider_impl_test",
     srcs = ["config_provider_impl_test.cc"],
     deps = [
-        ":dummy_config_proto_cc",
+        ":dummy_config_proto_cc_proto",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_mocks",
@@ -318,9 +340,26 @@ envoy_cc_test(
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "version_converter_proto",
+    srcs = ["version_converter.proto"],
+)
+
+envoy_cc_test(
+    name = "version_converter_test",
+    srcs = ["version_converter_test.cc"],
+    deps = [
+        ":version_converter_proto_cc_proto",
+        "//source/common/config:version_converter_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )

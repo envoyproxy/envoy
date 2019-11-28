@@ -115,6 +115,13 @@ public:
   virtual std::string name() PURE;
 
   /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "dubbo_proxy.protocols"; }
+
+  /**
    * Convenience method to lookup a factory by type.
    * @param ProtocolType the protocol type.
    * @return NamedProtocolConfigFactory& for the ProtocolType.
@@ -129,6 +136,7 @@ public:
  * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+public:
   ProtocolPtr createProtocol(SerializationType serialization_type) override {
     auto protocol = std::make_unique<ProtocolImpl>();
     protocol->initSerializer(serialization_type);

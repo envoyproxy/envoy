@@ -114,7 +114,8 @@ MemoryTest::Mode MemoryTest::mode() {
   // on some platforms, so try to force-allocate some heap memory
   // and determine whether we can measure it.
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-  volatile std::string long_string("more than 22 chars to exceed libc++ short-string optimization");
+  volatile std::unique_ptr<std::string> long_string = std::make_unique<std::string>(
+      "more than 22 chars to exceed libc++ short-string optimization");
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   bool can_measure_memory = end_mem > start_mem;
 

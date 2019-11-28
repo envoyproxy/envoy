@@ -1,8 +1,5 @@
 #include "test/test_common/environment.h"
 
-#include <sys/un.h>
-#include <unistd.h>
-
 // TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
 // Clang >= 9.
 #if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
@@ -25,6 +22,7 @@
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "envoy/common/platform.h"
 
 #include "server/options_impl.h"
 
@@ -33,6 +31,8 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+
+using bazel::tools::cpp::runfiles::Runfiles;
 
 namespace Envoy {
 namespace {
@@ -189,8 +189,14 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
-const std::string& TestEnvironment::runfilesDirectory() {
-  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_RUNDIR"));
+std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
+  RELEASE_ASSERT(runfiles_ != nullptr, "");
+  return runfiles_->Rlocation(workspace);
+}
+
+std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
+  RELEASE_ASSERT(runfiles_ != nullptr, "");
+  return runfiles_->Rlocation(absl::StrCat(workspace, "/", path));
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {
@@ -361,5 +367,9 @@ void TestEnvironment::unsetEnvVar(const std::string& name) {
   ASSERT_EQ(0, rc);
 #endif
 }
+
+void TestEnvironment::setRunfiles(Runfiles* runfiles) { runfiles_ = runfiles; }
+
+Runfiles* TestEnvironment::runfiles_{};
 
 } // namespace Envoy

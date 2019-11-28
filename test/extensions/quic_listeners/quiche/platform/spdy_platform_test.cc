@@ -87,11 +87,6 @@ TEST(SpdyPlatformTest, SpdyLog) {
   SPDY_DVLOG_IF(4, false) << "DVLOG_IF(4, false)";
 }
 
-TEST(SpdyPlatformTest, SpdyMakeUnique) {
-  auto p = spdy::SpdyMakeUnique<int>(4);
-  EXPECT_EQ(4, *p);
-}
-
 TEST(SpdyPlatformTest, SpdyWrapUnique) {
   auto p = spdy::SpdyWrapUnique(new int(6));
   EXPECT_EQ(6, *p);

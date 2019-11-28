@@ -22,11 +22,10 @@ message Pipe {
   string path = 1 [(validate.rules).string = {min_bytes: 1}];
 }
 
+// [#next-free-field: 7]
 message SocketAddress {
   enum Protocol {
     TCP = 0;
-
-    // [#not-implemented-hide:]
     UDP = 1;
   }
 

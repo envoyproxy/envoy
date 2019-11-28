@@ -103,7 +103,25 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "logger_test",
+    srcs = ["logger_test.cc"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "logger_fuzz_test",
+    srcs = ["logger_fuzz_test.cc"],
+    corpus = "logger_corpus",
+    # TODO(github.com/envoyproxy/envoy#8893): Re-enable once more fuzz tests are added
+    tags = ["no_fuzz"],
+    deps = ["//source/common/common:minimal_logger_lib"],
 )
 
 envoy_cc_test(
@@ -113,10 +131,8 @@ envoy_cc_test(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/type/matcher:metadata_cc",
-        "@envoy_api//envoy/type/matcher:number_cc",
-        "@envoy_api//envoy/type/matcher:string_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )
 

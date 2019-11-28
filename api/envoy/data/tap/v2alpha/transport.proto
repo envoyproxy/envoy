@@ -62,6 +62,7 @@ message SocketEvent {
 }
 
 // Sequence of read/write events that constitute a buffered trace on a socket.
+// [#next-free-field: 6]
 message SocketBufferedTrace {
   // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
   // for long term stable uniqueness. Matches connection IDs used in Envoy logs.

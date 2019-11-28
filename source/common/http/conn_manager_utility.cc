@@ -41,13 +41,16 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
 ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
-    const Http2Settings& http2_settings, const uint32_t max_request_headers_kb) {
+    const Http2Settings& http2_settings, uint32_t max_request_headers_kb,
+    uint32_t max_request_headers_count) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
     return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
-                                                         http2_settings, max_request_headers_kb);
+                                                         http2_settings, max_request_headers_kb,
+                                                         max_request_headers_count);
   } else {
     return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
-                                                         http1_settings, max_request_headers_kb);
+                                                         http1_settings, max_request_headers_kb,
+                                                         max_request_headers_count);
   }
 }
 
@@ -349,7 +352,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
         break;
       }
       case ClientCertDetailsType::DNS: {
-        const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
+        auto dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {
           for (const std::string& dns : dns_sans) {
             client_cert_details.push_back(absl::StrCat("DNS=", dns));

@@ -8,6 +8,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/network/well_known_names.h"
 
@@ -19,42 +20,42 @@ namespace ZooKeeperProxy {
 ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
                                              const uint32_t max_packet_bytes, Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
-      stat_name_set_(scope.symbolTable()), stat_prefix_(stat_name_set_.add(stat_prefix)),
-      auth_(stat_name_set_.add("auth")),
-      connect_latency_(stat_name_set_.add("connect_response_latency")),
-      unknown_scheme_rq_(stat_name_set_.add("unknown_scheme_rq")),
-      unknown_opcode_latency_(stat_name_set_.add("unknown_opcode_latency")) {
+      stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
+      stat_prefix_(stat_name_set_->add(stat_prefix)), auth_(stat_name_set_->add("auth")),
+      connect_latency_(stat_name_set_->add("connect_response_latency")),
+      unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),
+      unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")) {
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
   // lists commons schemes: "world", "auth", "digest", "host", "x509", and
   // "ip". These are used in filter.cc by appending "_rq".
-  stat_name_set_.rememberBuiltins(
+  stat_name_set_->rememberBuiltins(
       {"auth_rq", "digest_rq", "host_rq", "ip_rq", "ping_response_rq", "world_rq", "x509_rq"});
 
-  initOpCode(OpCodes::PING, stats_.ping_resp_, "ping_response");
-  initOpCode(OpCodes::SETAUTH, stats_.auth_resp_, "auth_response");
-  initOpCode(OpCodes::GETDATA, stats_.getdata_resp_, "getdata_resp");
-  initOpCode(OpCodes::CREATE, stats_.create_resp_, "create_resp");
-  initOpCode(OpCodes::CREATE2, stats_.create2_resp_, "create2_resp");
-  initOpCode(OpCodes::CREATECONTAINER, stats_.createcontainer_resp_, "createcontainer_resp");
-  initOpCode(OpCodes::CREATETTL, stats_.createttl_resp_, "createttl_resp");
-  initOpCode(OpCodes::SETDATA, stats_.setdata_resp_, "setdata_resp");
-  initOpCode(OpCodes::GETCHILDREN, stats_.getchildren_resp_, "getchildren_resp");
-  initOpCode(OpCodes::GETCHILDREN2, stats_.getchildren2_resp_, "getchildren2_resp");
-  initOpCode(OpCodes::DELETE, stats_.delete_resp_, "delete_resp");
-  initOpCode(OpCodes::EXISTS, stats_.exists_resp_, "exists_resp");
-  initOpCode(OpCodes::GETACL, stats_.getacl_resp_, "getacl_resp");
-  initOpCode(OpCodes::SETACL, stats_.setacl_resp_, "setacl_resp");
-  initOpCode(OpCodes::SYNC, stats_.sync_resp_, "sync_resp");
-  initOpCode(OpCodes::CHECK, stats_.check_resp_, "check_resp");
-  initOpCode(OpCodes::MULTI, stats_.multi_resp_, "multi_resp");
-  initOpCode(OpCodes::RECONFIG, stats_.reconfig_resp_, "reconfig_resp");
-  initOpCode(OpCodes::SETWATCHES, stats_.setwatches_resp_, "setwatches_resp");
-  initOpCode(OpCodes::CHECKWATCHES, stats_.checkwatches_resp_, "checkwatches_resp");
-  initOpCode(OpCodes::REMOVEWATCHES, stats_.removewatches_resp_, "removewatches_resp");
-  initOpCode(OpCodes::GETEPHEMERALS, stats_.getephemerals_resp_, "getephemerals_resp");
-  initOpCode(OpCodes::GETALLCHILDRENNUMBER, stats_.getallchildrennumber_resp_,
+  initOpCode(OpCodes::Ping, stats_.ping_resp_, "ping_response");
+  initOpCode(OpCodes::SetAuth, stats_.auth_resp_, "auth_response");
+  initOpCode(OpCodes::GetData, stats_.getdata_resp_, "getdata_resp");
+  initOpCode(OpCodes::Create, stats_.create_resp_, "create_resp");
+  initOpCode(OpCodes::Create2, stats_.create2_resp_, "create2_resp");
+  initOpCode(OpCodes::CreateContainer, stats_.createcontainer_resp_, "createcontainer_resp");
+  initOpCode(OpCodes::CreateTtl, stats_.createttl_resp_, "createttl_resp");
+  initOpCode(OpCodes::SetData, stats_.setdata_resp_, "setdata_resp");
+  initOpCode(OpCodes::GetChildren, stats_.getchildren_resp_, "getchildren_resp");
+  initOpCode(OpCodes::GetChildren2, stats_.getchildren2_resp_, "getchildren2_resp");
+  initOpCode(OpCodes::Delete, stats_.delete_resp_, "delete_resp");
+  initOpCode(OpCodes::Exists, stats_.exists_resp_, "exists_resp");
+  initOpCode(OpCodes::GetAcl, stats_.getacl_resp_, "getacl_resp");
+  initOpCode(OpCodes::SetAcl, stats_.setacl_resp_, "setacl_resp");
+  initOpCode(OpCodes::Sync, stats_.sync_resp_, "sync_resp");
+  initOpCode(OpCodes::Check, stats_.check_resp_, "check_resp");
+  initOpCode(OpCodes::Multi, stats_.multi_resp_, "multi_resp");
+  initOpCode(OpCodes::Reconfig, stats_.reconfig_resp_, "reconfig_resp");
+  initOpCode(OpCodes::SetWatches, stats_.setwatches_resp_, "setwatches_resp");
+  initOpCode(OpCodes::CheckWatches, stats_.checkwatches_resp_, "checkwatches_resp");
+  initOpCode(OpCodes::RemoveWatches, stats_.removewatches_resp_, "removewatches_resp");
+  initOpCode(OpCodes::GetEphemerals, stats_.getephemerals_resp_, "getephemerals_resp");
+  initOpCode(OpCodes::GetAllChildrenNumber, stats_.getallchildrennumber_resp_,
              "getallchildrennumber_resp");
-  initOpCode(OpCodes::CLOSE, stats_.close_resp_, "close_resp");
+  initOpCode(OpCodes::Close, stats_.close_resp_, "close_resp");
 }
 
 void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& counter,
@@ -62,7 +63,7 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& counter,
   OpCodeInfo& opcode_info = op_code_map_[opcode];
   opcode_info.counter_ = &counter;
   opcode_info.opname_ = std::string(name);
-  opcode_info.latency_name_ = stat_name_set_.add(absl::StrCat(name, "_latency"));
+  opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
 }
 
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
@@ -153,8 +154,8 @@ void ZooKeeperFilter::onPing() {
 void ZooKeeperFilter::onAuthRequest(const std::string& scheme) {
   Stats::SymbolTable::StoragePtr storage = config_->scope_.symbolTable().join(
       {config_->stat_prefix_, config_->auth_,
-       config_->stat_name_set_.getBuiltin(absl::StrCat(scheme, "_rq"),
-                                          config_->unknown_scheme_rq_)});
+       config_->stat_name_set_->getBuiltin(absl::StrCat(scheme, "_rq"),
+                                           config_->unknown_scheme_rq_)});
   config_->scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
   setDynamicMetadata("opname", "auth");
 }
@@ -169,19 +170,19 @@ void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags
   std::string opname;
 
   switch (opcode) {
-  case OpCodes::CREATE:
+  case OpCodes::Create:
     opname = "create";
     config_->stats_.create_rq_.inc();
     break;
-  case OpCodes::CREATE2:
+  case OpCodes::Create2:
     opname = "create2";
     config_->stats_.create2_rq_.inc();
     break;
-  case OpCodes::CREATECONTAINER:
+  case OpCodes::CreateContainer:
     opname = "createcontainer";
     config_->stats_.createcontainer_rq_.inc();
     break;
-  case OpCodes::CREATETTL:
+  case OpCodes::CreateTtl:
     opname = "createttl";
     config_->stats_.createttl_rq_.inc();
     break;
@@ -289,7 +290,8 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 
   Stats::SymbolTable::StoragePtr storage =
       config_->scope_.symbolTable().join({config_->stat_prefix_, config_->connect_latency_});
-  config_->scope_.histogramFromStatName(Stats::StatName(storage.get()))
+  config_->scope_
+      .histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
       .recordValue(latency.count());
 
   setDynamicMetadata({{"opname", "connect_response"},
@@ -311,7 +313,8 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
   }
   Stats::SymbolTable::StoragePtr storage =
       config_->scope_.symbolTable().join({config_->stat_prefix_, opcode_latency});
-  config_->scope_.histogramFromStatName(Stats::StatName(storage.get()))
+  config_->scope_
+      .histogramFromStatName(Stats::StatName(storage.get()), Stats::Histogram::Unit::Milliseconds)
       .recordValue(latency.count());
 
   setDynamicMetadata({{"opname", opname},

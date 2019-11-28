@@ -10,10 +10,12 @@
 #include "server/process_context_impl.h"
 #include "server/server.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -41,7 +43,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
-  store.histogram("histogram");
+  store.histogram("histogram", Stats::Histogram::Unit::Unspecified);
 
   std::list<Stats::SinkPtr> sinks;
   InstanceUtil::flushMetricsToSinks(sinks, store);
@@ -141,27 +143,6 @@ public:
   State state() const override { return State::Initializing; }
 };
 
-class InitializingInstanceImpl : public InstanceImpl {
-private:
-  InitializingInitManager init_manager_{"Server"};
-
-public:
-  InitializingInstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address,
-                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
-                           Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory,
-                           Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system,
-                           std::unique_ptr<ProcessContext> process_context)
-      : InstanceImpl(options, time_system, local_address, hooks, restarter, store, access_log_lock,
-                     component_factory, std::move(random_generator), tls, thread_factory,
-                     file_system, std::move(process_context)) {}
-
-  Init::Manager& initManager() override { return init_manager_; }
-};
-
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTestBase {
 protected:
@@ -176,25 +157,16 @@ protected:
     if (process_object_ != nullptr) {
       process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
     }
-    if (use_intializing_instance) {
-      server_ = std::make_unique<InitializingInstanceImpl>(
-          options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-          std::move(process_context_));
+    init_manager_ = use_intializing_instance ? std::make_unique<InitializingInitManager>("Server")
+                                             : std::make_unique<Init::ManagerImpl>("Server");
 
-    } else {
-      server_ = std::make_unique<InstanceImpl>(
-          options_, test_time_.timeSystem(),
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-          std::move(process_context_));
-    }
-
+    server_ = std::make_unique<InstanceImpl>(
+        *init_manager_, options_, time_system_,
+        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
+        std::move(process_context_));
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
 
@@ -206,8 +178,9 @@ protected:
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
-        options_, test_time_.timeSystem(),
+        *init_manager_, options_, time_system_,
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
@@ -253,9 +226,11 @@ protected:
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::GlobalTimeSystem time_system_;
   ProcessObject* process_object_ = nullptr;
   std::unique_ptr<ProcessContextImpl> process_context_;
+  std::unique_ptr<Init::Manager> init_manager_;
+
   std::unique_ptr<InstanceImpl> server_;
 };
 
@@ -308,9 +283,19 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   auto server_thread = startTestServer("test/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, test_time_.timeSystem());
+  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_);
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
+// Validates that the "server.version" is updated with stats_server_version_override from bootstrap.
+TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
+  auto server_thread = startTestServer("test/server/proxy_version_bootstrap.yaml", true);
+
+  EXPECT_EQ(100012001, TestUtility::findGauge(stats_store_, "server.version")->value());
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
@@ -321,7 +306,9 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
-  EXPECT_TRUE(stats_store_.histogram("server.initialization_time").used());
+  EXPECT_TRUE(
+      stats_store_.histogram("server.initialization_time_ms", Stats::Histogram::Unit::Milliseconds)
+          .used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
@@ -459,6 +446,51 @@ TEST_P(ServerInstanceImplTest, Stats) {
 #endif
 }
 
+class TestWithSimTimeAndRealSymbolTables : public Event::TestUsingSimulatedTime {
+protected:
+  TestWithSimTimeAndRealSymbolTables() {
+    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  }
+};
+
+class ServerStatsTest : public TestWithSimTimeAndRealSymbolTables, public ServerInstanceImplTest {
+protected:
+  void flushStats() {
+    // Default flush interval is 5 seconds.
+    simTime().sleep(std::chrono::seconds(6));
+    server_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  }
+};
+
+TEST_P(ServerStatsTest, FlushStats) {
+  initialize("test/server/empty_bootstrap.yaml");
+  Stats::Gauge& recent_lookups =
+      stats_store_.gauge("server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
+  EXPECT_EQ(0, recent_lookups.value());
+  flushStats();
+  uint64_t strobed_recent_lookups = recent_lookups.value();
+  EXPECT_LT(100, strobed_recent_lookups); // Recently this was 319 but exact value not important.
+  Stats::StatNameSetPtr test_set = stats_store_.symbolTable().makeSet("test");
+
+  // When we remember a StatNameSet builtin, we charge only for the SymbolTable
+  // lookup, which requires a lock.
+  test_set->rememberBuiltin("a.b");
+  flushStats();
+  EXPECT_EQ(1, recent_lookups.value() - strobed_recent_lookups);
+  strobed_recent_lookups = recent_lookups.value();
+
+  // When we use a StatNameSet dynamic, we charge for the SymbolTable lookup and
+  // for the lookup in the StatNameSet as well, as that requires a lock for its
+  // dynamic hash_map.
+  test_set->getDynamic("c.d");
+  flushStats();
+  EXPECT_EQ(2, recent_lookups.value() - strobed_recent_lookups);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -569,6 +601,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+  EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
 // Validate that a runtime absent an admin layer will fail mutating operations
@@ -771,9 +804,10 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 // an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
-          options_, test_time_.timeSystem(),
+          *init_manager_, options_, time_system_,
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,

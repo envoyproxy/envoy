@@ -20,8 +20,6 @@ public:
   virtual void getFunction(absl::string_view, _T* f) { *f = nullptr; }
   FOR_ALL_WASM_VM_EXPORTS(_DEFINE_GET_FUNCTION)
 #undef _DEFIN_GET_FUNCTIONE
-
-  virtual void start() PURE;
 };
 
 /**
@@ -36,6 +34,13 @@ public:
    * Name of the plugin.
    */
   virtual const std::string name() const PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "wasm.null_vms"; }
 
   /**
    * Create an instance of the plugin.

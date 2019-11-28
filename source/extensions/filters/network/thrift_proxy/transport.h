@@ -99,6 +99,13 @@ public:
   virtual std::string name() PURE;
 
   /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "thrift_proxy.transports"; }
+
+  /**
    * Convenience method to lookup a factory by type.
    * @param TransportType the transport type
    * @return NamedTransportConfigFactory& for the TransportType
@@ -113,6 +120,7 @@ public:
  * TransportFactoryBase provides a template for a trivial NamedTransportConfigFactory.
  */
 template <class TransportImpl> class TransportFactoryBase : public NamedTransportConfigFactory {
+public:
   TransportPtr createTransport() override { return std::move(std::make_unique<TransportImpl>()); }
 
   std::string name() override { return name_; }
