@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/http/cache/v2alpha/cache.pb.validate.h"
+#include "envoy/config/filter/http/cache/v3alpha/cache.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 
@@ -15,7 +15,7 @@ namespace HttpFilters {
 namespace Cache {
 
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::cache::v2alpha::Cache& config,
+    const envoy::config::filter::http::cache::v3alpha::Cache& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   return [config, stats_prefix, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.filter.http.cache.v2alpha;
+package envoy.config.filter.http.cache.v3alpha;
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2alpha";
 option java_outer_classname = "CacheProto";

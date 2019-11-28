@@ -24,8 +24,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/config/filter/http/cache/v2alpha:cache_cc",
-        "@envoy_api//envoy/config/filter/http/cache/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/cache/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -35,13 +34,13 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":cache_filter_lib",
-        ":key_cc",
+        ":key_cc_proto",
         "//include/envoy/common:time_interface",
         "//include/envoy/registry",
         "//include/envoy/stats:stats_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/http/cache/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/cache/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -56,7 +55,7 @@ envoy_cc_library(
     hdrs = ["http_cache.h"],
     deps = [
         ":http_cache_utils_lib",
-        ":key_cc",
+        ":key_cc_proto",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",

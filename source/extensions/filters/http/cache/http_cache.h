@@ -283,6 +283,7 @@ class HttpCacheFactory {
 public:
   explicit HttpCacheFactory(std::string name) : name_(std::move(name)) {}
   const std::string& name() const { return name_; }
+  static std::string category() { return "http_cache_factory"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).

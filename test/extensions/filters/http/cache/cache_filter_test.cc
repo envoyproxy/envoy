@@ -14,7 +14,7 @@ namespace {
 
 class CacheFilterTest : public ::testing::Test {
 protected:
-  envoy::config::filter::http::cache::v2alpha::Cache config_;
+  envoy::config::filter::http::cache::v3alpha::Cache config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
