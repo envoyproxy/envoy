@@ -142,12 +142,9 @@ class EgressConfigImpl : public Config {
 public:
   // Tracing::Config
   Tracing::OperationName operationName() const override { return Tracing::OperationName::Egress; }
-  const CustomTagMap& customTags() const override { return custom_tags_; }
+  const CustomTagMap* customTags() const override { return nullptr; }
   bool verbose() const override { return false; }
   uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
-
-private:
-  const CustomTagMap custom_tags_;
 };
 
 using EgressConfig = ConstSingleton<EgressConfigImpl>;

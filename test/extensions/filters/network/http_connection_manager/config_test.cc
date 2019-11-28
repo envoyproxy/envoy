@@ -33,6 +33,14 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   return http_connection_manager;
 }
 
+envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+parseHttpConnectionManagerFromV2YamlAndValidate(const std::string& yaml) {
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+      http_connection_manager;
+  TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager);
+  return http_connection_manager;
+}
+
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   HttpConnectionManagerConfigTest() {
@@ -178,8 +186,8 @@ http_filters:
 - name: envoy.router
   config: {}
   )EOF";
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2YamlAndValidate(yaml_string),
+                                     context_, date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
@@ -198,6 +206,25 @@ http_filters:
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DeprecatedRequestHeaderForTagsConfig) {
+  const std::string yaml_string = R"EOF(
+route_config:
+  name: local_route
+tracing:
+  request_headers_for_tags:
+  - foo
+  )EOF";
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+
+  const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
+  const Tracing::RequestHeaderCustomTag* foo = dynamic_cast<const Tracing::RequestHeaderCustomTag*>(
+      custom_tag_map.find("foo")->second.get());
+  EXPECT_NE(foo, nullptr);
+  EXPECT_EQ(foo->tag(), "foo");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionOutboundOverride) {

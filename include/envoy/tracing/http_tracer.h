@@ -89,7 +89,7 @@ public:
   /**
    * @return custom tags to be attached to the active span.
    */
-  virtual const CustomTagMap& customTags() const PURE;
+  virtual const CustomTagMap* customTags() const PURE;
 
   /**
    * @return true if spans should be annotated with more detailed information.

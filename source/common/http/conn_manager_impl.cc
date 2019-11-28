@@ -1346,15 +1346,15 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
   if (!connection_manager_.config_.tracingConfig()) {
     return;
   }
-  Tracing::CustomTagMap& customTagMap = getOrMakeTracingCustomTagMap();
+  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
   if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
     const Tracing::CustomTagMap& route_tags =
         cached_route_.value()->tracingConfig()->getCustomTags();
-    customTagMap.insert(route_tags.begin(), route_tags.end());
+    custom_tag_map.insert(route_tags.begin(), route_tags.end());
   }
   const Tracing::CustomTagMap& conn_manager_tags =
       connection_manager_.config_.tracingConfig()->custom_tags_;
-  customTagMap.insert(conn_manager_tags.begin(), conn_manager_tags.end());
+  custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1817,9 +1817,8 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
-const Tracing::CustomTagMap& ConnectionManagerImpl::ActiveStream::customTags() const {
-  ASSERT(tracing_custom_tags_ != nullptr);
-  return *tracing_custom_tags_;
+const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
+  return tracing_custom_tags_.get();
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {

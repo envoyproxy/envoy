@@ -14,7 +14,7 @@ MockSpan::~MockSpan() = default;
 
 MockConfig::MockConfig() {
   ON_CALL(*this, operationName()).WillByDefault(Return(operation_name_));
-  ON_CALL(*this, customTags()).WillByDefault(ReturnRef(custom_tags_));
+  ON_CALL(*this, customTags()).WillByDefault(Return(&custom_tags_));
   ON_CALL(*this, verbose()).WillByDefault(Return(verbose_));
   ON_CALL(*this, maxPathTagLength()).WillByDefault(Return(uint32_t(256)));
 }

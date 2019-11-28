@@ -166,8 +166,12 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span, const Http::HeaderMap
     }
   }
   CustomTagContext ctx{request_headers, stream_info};
-  for (const auto& it : tracing_config.customTags()) {
-    it.second->apply(span, ctx);
+
+  const CustomTagMap* custom_tag_map = tracing_config.customTags();
+  if (custom_tag_map) {
+    for (const auto &it : *custom_tag_map) {
+      it.second->apply(span, ctx);
+    }
   }
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));

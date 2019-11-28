@@ -16,7 +16,7 @@ public:
   ~MockConfig() override;
 
   MOCK_CONST_METHOD0(operationName, OperationName());
-  MOCK_CONST_METHOD0(customTags, const CustomTagMap&());
+  MOCK_CONST_METHOD0(customTags, const CustomTagMap*());
   MOCK_CONST_METHOD0(verbose, bool());
   MOCK_CONST_METHOD0(maxPathTagLength, uint32_t());
 
