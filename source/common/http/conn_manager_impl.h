@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -696,7 +695,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-  std::map<const std::string, PerConnectionObjectSharedPtr> per_connection_object_map_;
+  absl::flat_hash_map<const std::string, PerConnectionObjectSharedPtr> per_connection_object_map_;
 };
 
 } // namespace Http

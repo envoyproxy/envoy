@@ -318,7 +318,7 @@ private:
   PerConnectionObjectSharedPtr
   createPerConnectionObject(const std::string&, MutableHttpConnection&,
                             const PerConnectionObjectCreator&) override {
-    return nullptr;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;

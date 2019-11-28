@@ -129,11 +129,6 @@ class MutableHttpConnection;
 class PerConnectionObject {
 public:
   virtual ~PerConnectionObject() = default;
-
-  /**
-   * @return MutableHttpConnection& the mutable http connection, this is expected not to be nullptr.
-   */
-  virtual MutableHttpConnection& mutable_http_connection() PURE;
 };
 using PerConnectionObjectSharedPtr = std::shared_ptr<PerConnectionObject>;
 
@@ -148,11 +143,6 @@ public:
   // Fill with the things that we want HTTP filters to be able to do to the connection such as
   // setting certain socket options, etc. Everything needs to be abstracted and then flowed through
   // to the underlying writable Network::Connection.
-
-  /**
-   * @return Network::Connection* the originating connection, this is expected not to be nullptr.
-   */
-  virtual Network::Connection* connection() PURE;
 };
 
 /**

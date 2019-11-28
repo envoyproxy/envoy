@@ -2044,8 +2044,9 @@ ConnectionManagerImpl::ActiveStreamFilterBase::createPerConnectionObject(
     const PerConnectionObjectCreator& creation_function) {
 
   // Check if the object was already created
-  const std::string map_object_name = object_name;
-  auto iterator = parent_.connection_manager_.per_connection_object_map_.find(map_object_name);
+  //const std::string map_object_name = object_name;
+  //auto iterator = parent_.connection_manager_.per_connection_object_map_.find(map_object_name);
+  auto iterator = parent_.connection_manager_.per_connection_object_map_.find(object_name);
   if (iterator != parent_.connection_manager_.per_connection_object_map_.end()) {
     return iterator->second;
   } else {
@@ -2057,10 +2058,10 @@ ConnectionManagerImpl::ActiveStreamFilterBase::createPerConnectionObject(
       iterator = parent_.connection_manager_.per_connection_object_map_
                      .emplace(object_name, std::move(created_per_connection_object))
                      .first;
-      return created_per_connection_object;
+      return iterator->second;
     }
   }
-  return nullptr;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
