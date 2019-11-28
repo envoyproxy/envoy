@@ -697,17 +697,21 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
       // Close the socket once all workers stopped accepting its connections.
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
-      stopListener(listener, [this, listener_tag]() {
-        stats_.listener_stopped_.inc();
-        for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
-            auto shared_socket = listener->listenSocketFactory().sharedSocket();
-            if (shared_socket.has_value()) {
-              shared_socket->get().close();
-            }
-          }
-        }
-      });
+      stopListener(listener,
+                   [this, share_socket = listener.listenSocketFactory().sharedSocket().has_value(),
+                    listener_tag]() {
+                     stats_.listener_stopped_.inc();
+                     if (!share_socket) {
+                       // Each listener has its own socket and closes the socket
+                       // on its own.
+                       return;
+                     }
+                     for (auto& listener : active_listeners_) {
+                       if (listener->listenerTag() == listener_tag) {
+                         listener->listenSocketFactory().sharedSocket()->get().close();
+                       }
+                     }
+                   });
     }
   }
 }

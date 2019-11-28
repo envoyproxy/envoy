@@ -42,7 +42,8 @@ public:
    * @return the socket shared by worker threads; otherwise return null.
    */
   absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-    if (!reuse_port_ && socket_) {
+    if (!reuse_port_) {
+      ASSERT(socket_ != nullptr);
       return *socket_;
     }
     // If reuse_port is true, always return null, even socket_ is created for reserving
@@ -64,7 +65,6 @@ private:
   const std::string& listener_name_;
   const bool reuse_port_;
   Network::SocketSharedPtr socket_;
-
   absl::once_flag steal_once_;
 };
 
