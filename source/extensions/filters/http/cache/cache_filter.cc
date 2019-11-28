@@ -15,14 +15,14 @@ namespace {
 
 bool isCacheableRequest(Http::HeaderMap& headers) {
   const Http::HeaderEntry* method = headers.Method();
-  const Http::HeaderEntry* scheme = headers.Scheme();
+  const Http::HeaderEntry* forwarded_proto = headers.ForwardedProto();
   const Http::HeaderValues& header_values = Http::Headers::get();
   // TODO(toddmgreer) Also serve HEAD requests from cache.
   // TODO(toddmgreer) Check all the other cache-related headers.
-  return method && scheme && headers.Path() && headers.Host() &&
+  return method && forwarded_proto && headers.Path() && headers.Host() &&
          (method->value() == Http::Headers::get().MethodValues.Get) &&
-         (scheme->value() == header_values.SchemeValues.Http ||
-          scheme->value() == header_values.SchemeValues.Https);
+         (forwarded_proto->value() == header_values.SchemeValues.Http ||
+          forwarded_proto->value() == header_values.SchemeValues.Https);
 }
 
 bool isCacheableResponse(Http::HeaderMap& headers) {
@@ -57,7 +57,9 @@ void CacheFilter::onDestroy() {
 }
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+  ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
   if (!isCacheableRequest(headers)) {
+    ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}", *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(decoder_callbacks_);
@@ -65,12 +67,14 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::HeaderMap& headers, b
   ASSERT(lookup_);
 
   CacheFilterSharedPtr self = shared_from_this();
+  ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
   lookup_->getHeaders([self](LookupResult&& result) { onHeadersAsync(self, std::move(result)); });
   return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   if (lookup_ && isCacheableResponse(headers)) {
+    ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
   }
@@ -79,6 +83,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::HeaderMap& headers, b
 
 Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (insert_) {
+    ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting body", *encoder_callbacks_);
     // TODO(toddmgreer) Wait for the cache if necessary.
     insert_->insertBody(
         data, [](bool) {}, end_stream);
@@ -94,6 +99,8 @@ void CacheFilter::onOkHeaders(Http::HeaderMapPtr&& headers,
   }
   response_has_trailers_ = has_trailers;
   const bool end_stream = (content_length == 0 && !response_has_trailers_);
+  // TODO(toddmgreer) Calculate age per https://httpwg.org/specs/rfc7234.html#age.calculations
+  headers->addReferenceKey(Http::Headers::get().Age, 0);
   decoder_callbacks_->encodeHeaders(std::move(headers), end_stream);
   if (end_stream) {
     return;

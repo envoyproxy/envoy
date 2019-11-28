@@ -74,7 +74,7 @@ public:
   }
   uint64_t firstBytePos() const { return first_byte_pos_; }
   uint64_t lastBytePos() const { return last_byte_pos_; }
-  uint64_t length() const { return last_byte_pos_ - first_byte_pos_; }
+  uint64_t length() const { return last_byte_pos_ - first_byte_pos_ + 1; }
   void trimFront(uint64_t n) {
     RELEASE_ASSERT(n < length(), "Attempt to trim too much from range.");
     first_byte_pos_ += n;
