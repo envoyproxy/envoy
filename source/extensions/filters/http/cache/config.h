@@ -5,6 +5,7 @@
 
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/common/factory_base.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +15,7 @@ namespace Cache {
 class CacheFilterFactory
     : public Common::FactoryBase<envoy::config::filter::http::cache::v2alpha::Cache> {
 public:
-  CacheFilterFactory() : FactoryBase("envoy.filters.http.cache") {}
+  CacheFilterFactory() : FactoryBase(HttpFilterNames::get().Cache) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
