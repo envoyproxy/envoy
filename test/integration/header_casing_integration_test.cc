@@ -1,5 +1,3 @@
-#include <chrono>
-
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -51,8 +49,7 @@ TEST_P(HeaderCasingIntegrationTest, VerifyCasedHeaders) {
   tcp_client->write(request, false);
 
   Envoy::FakeRawConnectionPtr upstream_connection;
-  ASSERT_TRUE(
-      fake_upstreams_[0]->waitForRawConnection(upstream_connection, std::chrono::milliseconds(10)));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
 
   // Verify that the upstream request has proper cased headers.
   std::string upstream_request;

@@ -23,6 +23,7 @@ public:
   }
 
   void recv(Network::UdpRecvData& datagram) {
+    datagram = Network::UdpRecvData();
     const auto rc =
         Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(), datagram);
     ASSERT_TRUE(rc.ok());
@@ -43,6 +44,7 @@ public:
       name: envoy.filters.udp_listener.udp_proxy
       typed_config:
         '@type': type.googleapis.com/envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig
+        stat_prefix: foo
         cluster: cluster_0
       )EOF";
   }
@@ -82,11 +84,20 @@ public:
     EXPECT_EQ("hello", request_datagram.buffer_->toString());
 
     // Respond from the upstream.
-    fake_upstreams_[0]->sendUdpDatagram("world", *request_datagram.addresses_.peer_);
+    fake_upstreams_[0]->sendUdpDatagram("world1", *request_datagram.addresses_.peer_);
     Network::UdpRecvData response_datagram;
     client.recv(response_datagram);
-    EXPECT_EQ("world", response_datagram.buffer_->toString());
+    EXPECT_EQ("world1", response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
+
+    EXPECT_EQ(5, test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
+    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
+    // The stat is incremented after the send so there is a race condition and we must wait for
+    // the counter to be incremented.
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", 6);
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
+    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
+    EXPECT_EQ(1, test_server_->gauge("udp.foo.downstream_sess_active")->value());
   }
 };
 

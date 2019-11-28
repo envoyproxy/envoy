@@ -44,7 +44,7 @@ public:
                          *listener_config_.socket_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(VersionUsesQpack(quic_version_.transport_version) ? 4u : 5u),
+        stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
     quic_stream_->setDecoder(stream_decoder_);
@@ -73,7 +73,7 @@ public:
 
     trailers_.OnHeaderBlockStart();
     trailers_.OnHeader("key1", "value1");
-    if (!quic::VersionUsesQpack(quic_version_.transport_version)) {
+    if (!quic::VersionUsesHttp3(quic_version_.transport_version)) {
       // ":final-offset" is required and stripped off by quic.
       trailers_.OnHeader(":final-offset", absl::StrCat("", request_body_.length()));
     }
@@ -88,11 +88,10 @@ public:
 
   std::string bodyToStreamPayload(const std::string& body) {
     std::string data = body;
-    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
       std::unique_ptr<char[]> data_buffer;
-      quic::HttpEncoder encoder;
       quic::QuicByteCount data_frame_header_length =
-          encoder.SerializeDataFrameHeader(body.length(), &data_buffer);
+          quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
       quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
       data = absl::StrCat(data_frame_header, body);
     }
@@ -107,7 +106,7 @@ public:
           EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                     headers->Method()->value().getStringView());
         }));
-    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
       quic_stream_->OnHeadersDecoded(request_headers_);
     } else {
       quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
@@ -197,7 +196,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
 
 TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     return;
   }
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
@@ -277,7 +276,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                   headers->Method()->value().getStringView());
       }));
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     quic_stream_->OnHeadersDecoded(request_headers_);
   } else {
     quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
