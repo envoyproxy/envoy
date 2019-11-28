@@ -470,7 +470,7 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
 
     factory_.tls_.shutdownThread();
   }
-} // namespace
+}
 
 INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
                          ClusterManagerSubsetInitializationTest,
