@@ -2736,7 +2736,9 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException, "Cannot specify both request_mirror_policy and request_mirror_policies");
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Cannot specify both request_mirror_policy and request_mirror_policies");
 }
 
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};

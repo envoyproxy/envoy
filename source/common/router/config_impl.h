@@ -412,9 +412,7 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
-  const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
-    return shadow_policies_;
-  }
+  const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
     return vhost_.virtualClusterFromEntries(headers);
   }

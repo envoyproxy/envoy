@@ -800,6 +800,7 @@ message RouteAction {
   RetryPolicy retry_policy = 9;
 
   // Indicates that the route has a request mirroring policy.
+  //
   // .. attention::
   //   This field has been deprecated in favor of `request_mirror_policies` which supports one or
   //   more mirroring policies.
