@@ -143,8 +143,9 @@ private:
       return absl::nullopt;
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
-    absl::optional<RetryBudget> retryBudget() const override { return absl::nullopt; }
+    const absl::optional<RetryBudget>& retryBudget() const override { return retry_budget_; }
 
+    const absl::optional<RetryBudget> retry_budget_;
     const std::vector<uint32_t> retriable_status_codes_;
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;

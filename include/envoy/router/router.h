@@ -243,7 +243,7 @@ public:
    * @return absl::optional<RetryBudget> limit on allowed concurrent retries in relation to current
    * outstanding requests.
    */
-  virtual absl::optional<RetryBudget> retryBudget() const PURE;
+  virtual const absl::optional<RetryBudget>& retryBudget() const PURE;
 };
 
 /**
