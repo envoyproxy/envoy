@@ -183,6 +183,7 @@ http_filters:
 
 TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
   const std::string yaml_string = R"EOF(
+stat_prefix: router
 route_config:
   name: local_route
 tracing:
