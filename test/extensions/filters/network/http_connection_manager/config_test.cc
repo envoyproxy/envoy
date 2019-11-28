@@ -163,6 +163,29 @@ route_config:
         cluster: cluster
 tracing:
   operation_name: ingress
+  max_path_tag_length: 128
+http_filters:
+- name: envoy.router
+  config: {}
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+
+  EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
+  EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
+  EXPECT_EQ("foo", config.serverName());
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
+            config.serverHeaderTransformation());
+  EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
+  const std::string yaml_string = R"EOF(
+route_config:
+  name: local_route
+tracing:
   custom_tags:
   - tag: ltag
     literal:
@@ -179,10 +202,6 @@ tracing:
       metadata_key:
         key: com.bar.foo
         path: [ { key: xx }, { key: yy } ]
-  max_path_tag_length: 128
-http_filters:
-- name: envoy.router
-  config: {}
   )EOF";
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2YamlAndValidate(yaml_string),
                                      context_, date_provider_, route_config_provider_manager_,
@@ -193,12 +212,6 @@ http_filters:
   for (const std::string& custom_tag : custom_tags) {
     EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
   }
-  EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
-  EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
-  EXPECT_EQ("foo", config.serverName());
-  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
-            config.serverHeaderTransformation());
-  EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
