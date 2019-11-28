@@ -163,8 +163,6 @@ route_config:
         cluster: cluster
 tracing:
   operation_name: ingress
-  request_headers_for_tags:
-  - foo
   custom_tags:
   - tag: ltag
     literal:
@@ -195,11 +193,6 @@ http_filters:
   for (const std::string& custom_tag : custom_tags) {
     EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
   }
-  const Tracing::RequestHeaderCustomTag* foo = dynamic_cast<const Tracing::RequestHeaderCustomTag*>(
-      custom_tag_map.find("foo")->second.get());
-  EXPECT_NE(foo, nullptr);
-  EXPECT_EQ(foo->tag(), "foo");
-
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
@@ -208,7 +201,7 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, DeprecatedRequestHeaderForTagsConfig) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
   const std::string yaml_string = R"EOF(
 route_config:
   name: local_route
