@@ -5,8 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "common/common/logger.h"
 #include "envoy/config/filter/http/cache/v2alpha/cache.pb.h"
+
+#include "common/common/logger.h"
 
 #include "extensions/filters/http/cache/http_cache.h"
 #include "extensions/filters/http/common/pass_through_filter.h"

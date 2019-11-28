@@ -21,8 +21,8 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
                                  : request_headers.CacheControl()->value().getStringView()) {
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::HeaderMap "
                                  "with null Path.");
-  ASSERT(request_headers.ForwardedProto(), "Can't form cache lookup key for malformed Http::HeaderMap"
-         " with null ForwardedProto.");
+  ASSERT(request_headers.ForwardedProto(),
+         "Can't form cache lookup key for malformed Http::HeaderMap with null ForwardedProto.");
   ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::HeaderMap "
                                  "with null Host.");
   const Http::HeaderString& forwarded_proto = request_headers.ForwardedProto()->value();

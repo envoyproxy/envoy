@@ -2,12 +2,13 @@
 #include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
-namespace Extensions{
-namespace HttpFilters{
+namespace Extensions {
+namespace HttpFilters {
 namespace Cache {
 
-class CacheIntegrationTest : public Event::TestUsingSimulatedTime, public HttpProtocolIntegrationTest {
- public:
+class CacheIntegrationTest : public Event::TestUsingSimulatedTime,
+                             public HttpProtocolIntegrationTest {
+public:
   void TearDown() override {
     cleanupUpstreamAndDownstream();
     HttpProtocolIntegrationTest::TearDown();
@@ -38,10 +39,11 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   initializeFilter(default_config);
 
   // Include test name and params in URL to make each test's requests unique.
-  const Http::TestHeaderMapImpl request_headers = {{":method", "GET"},
-                                                   {":path", absl::StrCat("/",protocolTestParamsToString({GetParam(),0}))},
-                                                   {":scheme", "http"},
-                                                   {":authority", "MissInsertHit"}};
+  const Http::TestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", absl::StrCat("/", protocolTestParamsToString({GetParam(), 0}))},
+      {":scheme", "http"},
+      {":authority", "MissInsertHit"}};
   Http::TestHeaderMapImpl response_headers = {{":status", "200"},
                                               {"date", formatter_.now(simTime())},
                                               {"cache-control", "public,max-age=3600"},
@@ -51,7 +53,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   {
     IntegrationStreamDecoderPtr request = codec_client_->makeHeaderOnlyRequest(request_headers);
     waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(response_headers, /*end_stream=*/ false);
+    upstream_request_->encodeHeaders(response_headers, /*end_stream=*/false);
     // send 42 'a's
     upstream_request_->encodeData(42, true);
     // Wait for the response to be read by the codec client.
@@ -70,5 +72,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   EXPECT_EQ(request->body(), std::string(42, 'a'));
   EXPECT_NE(request->headers().Age(), nullptr);
 }
+} // namespace Cache
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
-}}}

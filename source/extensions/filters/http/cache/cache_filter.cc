@@ -59,7 +59,8 @@ void CacheFilter::onDestroy() {
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
   if (!isCacheableRequest(headers)) {
-    ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}", *decoder_callbacks_, headers);
+    ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
+                     *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(decoder_callbacks_);
