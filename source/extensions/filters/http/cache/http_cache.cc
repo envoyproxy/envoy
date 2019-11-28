@@ -54,7 +54,7 @@ bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
   }
   // We didn't find a cache-control header with enough info to determine
   // freshness, so fall back to the expires header.
-  return timestamp_ <= Internal::httpTime(response_headers.get(Http::LowerCaseString("expires")));
+  return timestamp_ <= Internal::httpTime(response_headers.Expires());
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_headers,

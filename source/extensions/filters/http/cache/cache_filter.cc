@@ -20,7 +20,7 @@ bool isCacheableRequest(Http::HeaderMap& headers) {
   // TODO(toddmgreer) Also serve HEAD requests from cache.
   // TODO(toddmgreer) Check all the other cache-related headers.
   return method && forwarded_proto && headers.Path() && headers.Host() &&
-         (method->value() == Http::Headers::get().MethodValues.Get) &&
+         (method->value() == header_values.MethodValues.Get) &&
          (forwarded_proto->value() == header_values.SchemeValues.Http ||
           forwarded_proto->value() == header_values.SchemeValues.Https);
 }
