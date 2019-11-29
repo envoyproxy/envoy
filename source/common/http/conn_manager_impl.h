@@ -370,7 +370,8 @@ private:
 
     void requestDataDrained();
 
-    void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    void requestRouteConfigUpdate(
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
     bool canRequestRouteConfigUpdate() override;
 
     StreamDecoderFilterSharedPtr handle_;
@@ -471,7 +472,8 @@ private:
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestRouteConfigUpdate(const HeaderString&, Http::RouteConfigUpdatedCallbackSharedPtr) {
+    virtual void requestRouteConfigUpdate(const HeaderString&,
+                                          Http::RouteConfigUpdatedCallbackSharedPtr) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
     virtual bool canRequestRouteConfigUpdate() { return false; }
@@ -481,8 +483,9 @@ private:
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
-    void requestRouteConfigUpdate(const HeaderString& host,
-                                  Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    void requestRouteConfigUpdate(
+        const HeaderString& host,
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
     bool canRequestRouteConfigUpdate() override;
 
   private:
@@ -613,7 +616,8 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
-    void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    void
+    requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
     bool canRequestRouteConfigUpdate();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark

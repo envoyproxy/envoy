@@ -445,7 +445,8 @@ public:
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to the worker thread.
    */
-  virtual void requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  virtual void
+  requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   /**
    *

@@ -12,9 +12,9 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
-#include "common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -288,7 +288,8 @@ void RdsRouteConfigProviderImpl::validateConfig(
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
-    const std::string& for_domain, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+    const std::string& for_domain,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   factory_context_.dispatcher().post(
       [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
   config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push_back(

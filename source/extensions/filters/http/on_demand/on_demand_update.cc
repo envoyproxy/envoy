@@ -14,7 +14,9 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::HeaderMap&, b
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return filter_iteration_state_;
   }
-  route_config_updated_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback([this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
+  route_config_updated_callback_ =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback(
+          [this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
   callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
   return filter_iteration_state_;
@@ -40,9 +42,9 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
 
-  if (route_exists && // route can be resolved after an on-demand
-                                                        // VHDS update
-      !callbacks_->decodingBuffer() &&                  // Redirects with body not yet supported.
+  if (route_exists &&                  // route can be resolved after an on-demand
+                                       // VHDS update
+      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       callbacks_->recreateStream()) {
     // cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return;

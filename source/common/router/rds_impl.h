@@ -76,7 +76,8 @@ public:
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
   void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
-  void requestVirtualHostsUpdate(const std::string&, Http::RouteConfigUpdatedCallbackSharedPtr) override {
+  void requestVirtualHostsUpdate(const std::string&,
+                                 Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -203,8 +204,9 @@ public:
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
-  void requestVirtualHostsUpdate(const std::string& for_domain,
-                                 Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+  void requestVirtualHostsUpdate(
+      const std::string& for_domain,
+      Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
   void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
 private:

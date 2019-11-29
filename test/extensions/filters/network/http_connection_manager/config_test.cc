@@ -1066,7 +1066,7 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(1);
-    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2);        // Dynamo
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
     EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }
 }

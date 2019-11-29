@@ -485,7 +485,8 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
     const HeaderString& host, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   ASSERT(!host.empty());
   auto& host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
-  route_config_provider_->requestVirtualHostsUpdate(host_header, std::move(route_config_updated_cb));
+  route_config_provider_->requestVirtualHostsUpdate(host_header,
+                                                    std::move(route_config_updated_cb));
 }
 
 bool ConnectionManagerImpl::RdsRouteConfigUpdateRequester::canRequestRouteConfigUpdate() {
@@ -1359,7 +1360,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
                                                            std::move(route_config_updated_cb));
 }
@@ -2252,7 +2254,8 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   return true;
 }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   parent_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 

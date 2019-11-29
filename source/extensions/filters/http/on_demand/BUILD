@@ -23,7 +23,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
-        "@envoy_api//envoy/config/filter/http/on_demand/v2:pkg_cc_proto",
     ],
 )
 
