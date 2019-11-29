@@ -1007,8 +1007,7 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceDisallow) {
   incrOutstandingResource(TestResourceType::Request, 2);
 
   Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
-  EXPECT_EQ(RetryStatus::NoOverflow,
-            state_->shouldRetryHeaders(bad_response_headers, callback_));
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(bad_response_headers, callback_));
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_budget_exceeded_.value());
 }
 
