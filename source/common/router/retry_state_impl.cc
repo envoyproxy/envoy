@@ -224,7 +224,8 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   retries_remaining_--;
 
-  if (!cluster_.resourceManager(priority_).retries().canCreate()) {
+  // We only use the max_retries circuit breaker when retry budgets are not configured.
+  if (!retry_budget_ && !cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     return RetryStatus::NoOverflow;
   }
@@ -235,7 +236,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   if (retryBudgetExceeded()) {
     cluster_.stats().upstream_rq_retry_budget_exceeded_.inc();
-    return RetryStatus::NoRetryLimitExceeded;
+    return RetryStatus::NoOverflow;
   }
 
   ASSERT(!callback_);

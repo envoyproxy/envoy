@@ -982,6 +982,10 @@ message RetryPolicy {
 
   // Specifies a limit on concurrent retries in relation to the number of active
   // requests/connections. This parameter is optional.
+  //
+  // .. note::
+  //
+  //    If this field is set, the retry budget will override any configured retry circuit breaker.
   RetryBudget retry_budget = 11;
 }
 

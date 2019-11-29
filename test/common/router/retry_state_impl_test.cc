@@ -1007,9 +1007,29 @@ TEST_F(RouterRetryStateImplTest, RetryBudgetEnforceDisallow) {
   incrOutstandingResource(TestResourceType::Request, 2);
 
   Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
-  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+  EXPECT_EQ(RetryStatus::NoOverflow,
             state_->shouldRetryHeaders(bad_response_headers, callback_));
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_budget_exceeded_.value());
+}
+
+// Test that the retry budget overrides any retry circuit breaker configuration.
+TEST_F(RouterRetryStateImplTest, RetryBudgetOverrideCircuitBreaker) {
+  policy_.retry_budget_ = RetryPolicy::RetryBudget();
+  policy_.retry_budget_->budget_percent = 20.0;
+  policy_.retry_budget_->min_concurrency = 5;
+  cluster_.resetResourceManager(10 /* cx */, 10 /* rq_pending */, 10 /* rq */, 0 /* rq_retry */,
+                                10 /* conn_pool */);
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "5"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
+  EXPECT_EQ(0UL, cluster_.stats().upstream_rq_retry_budget_exceeded_.value());
 }
 
 } // namespace
