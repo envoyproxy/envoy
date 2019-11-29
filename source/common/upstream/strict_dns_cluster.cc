@@ -1,5 +1,7 @@
 #include "common/upstream/strict_dns_cluster.h"
 
+#include "envoy/common/exception.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -23,6 +25,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
                                     : Config::Utility::translateClusterHosts(cluster.hosts()));
   const auto& locality_lb_endpoints = load_assignment.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
+    validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
       if (!socket_address.resolver_name().empty()) {
