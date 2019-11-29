@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.on_demand.v2;
+
+option java_outer_classname = "OnDemandProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.on_demand.v2";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: OnDemand]
+// [#extension: envoy.filters.http.on_demand]
+
+message OnDemand {
+}

@@ -5,8 +5,6 @@
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
-#include "extensions/filters/http/on_demand/on_demand_update.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -20,8 +18,6 @@ Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
       proto_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(
-        std::make_shared<Extensions::HttpFilters::OnDemand::OnDemandRouteUpdate>());
     callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*filter_config));
   };
 }

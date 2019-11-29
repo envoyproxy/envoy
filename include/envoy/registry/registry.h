@@ -105,6 +105,7 @@ template <typename T> class InjectFactory;
  * Example lookup: BaseFactoryType *factory =
  * FactoryRegistry<BaseFactoryType>::getFactory("example_factory_name");
  */
+
 template <class Base> class FactoryRegistry {
 public:
   /**

@@ -55,7 +55,7 @@ public:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
     void requestVirtualHostsUpdate(const std::string&,
-                                   Http::StreamDecoderFilterSharedPtr) override {
+                                   Envoy::Http::RouteConfigUpdatedCallbackSharedPtr) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 

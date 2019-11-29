@@ -343,6 +343,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
+  envoy::config::filter::network::http_connection_manager::v2::HttpFilter message;
+  message.set_name("envoy.on_demand");
+  bool terminal_filter = false;
+  processFilter(message, -1, "http", filter_factories_, terminal_filter);
+
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
     bool is_terminal = false;
