@@ -50,9 +50,8 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::RegexMatcher matcher;
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
     matcher.set_regex("/asdf/.*");
-    EXPECT_THROW_WITH_MESSAGE(Utility::parseRegex(matcher), EnvoyException,
-                              "regex '/asdf/.*' RE2 program size of 24 > max program size of 1. "
-                              "Increase configured max program size if necessary.");
+    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
+                            "RE2 program size of [0-9]+ > max program size of 1\\.");
   }
 }
 
