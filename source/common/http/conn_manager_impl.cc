@@ -1346,15 +1346,24 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
   if (!connection_manager_.config_.tracingConfig()) {
     return;
   }
-  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
-  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
-    const Tracing::CustomTagMap& route_tags =
-        cached_route_.value()->tracingConfig()->getCustomTags();
-    custom_tag_map.insert(route_tags.begin(), route_tags.end());
-  }
   const Tracing::CustomTagMap& conn_manager_tags =
       connection_manager_.config_.tracingConfig()->custom_tags_;
-  custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
+  const Tracing::CustomTagMap* route_tags = nullptr;
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
+    route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
+  }
+  bool configured_in_conn = !conn_manager_tags.empty();
+  bool configured_in_route = route_tags && !route_tags->empty();
+  if (!configured_in_conn && !configured_in_route) {
+    return;
+  }
+  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
+  if (configured_in_route) {
+    custom_tag_map.insert(route_tags->begin(), route_tags->end());
+  }
+  if (configured_in_conn) {
+    custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
