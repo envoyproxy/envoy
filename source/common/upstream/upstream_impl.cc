@@ -137,7 +137,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
+  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validation_visitor,
                                                 *proto_config);
 
   return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
@@ -753,7 +753,7 @@ ClusterInfoImpl::ClusterInfoImpl(
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(string_name);
     auto message = factory.createEmptyConfigProto();
     if (!proto_config.typed_config().value().empty()) {
-      proto_config.typed_config().UnpackTo(message.get());
+      MessageUtil::unpackTo(proto_config.typed_config(), *message);
     }
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);

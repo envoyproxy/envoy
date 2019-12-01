@@ -24,13 +24,23 @@ public:
   using HotRestartVersionCb = std::function<std::string(bool)>;
 
   /**
-   * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.
+   * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
    *        print the hot restart version) and it's time to exit without serving HTTP traffic. The
    *        caller should exit(0) after any necessary cleanup.
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
   OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+              spdlog::level::level_enum default_log_level);
+
+  /**
+   * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
+   *        print the hot restart version) and it's time to exit without serving HTTP traffic. The
+   *        caller should exit(0) after any necessary cleanup.
+   * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
+   *        value). The caller should call exit(1) after any necessary cleanup.
+   */
+  OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
   // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
