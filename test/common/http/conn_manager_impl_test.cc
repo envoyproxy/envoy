@@ -3361,7 +3361,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
 // Dummy PerConnectionSharedPtr creator-function; this creator-function can be as robust
 // and state-preserving as the inheriting interface desires.
-PerConnectionObjectSharedPtr test_creation_function(MutableHttpConnection&) {
+PerConnectionObjectSharedPtr testCreationFunction(MutableHttpConnection&) {
   return std::make_shared<PerConnectionObject>();
 }
 
@@ -3369,12 +3369,12 @@ TEST_F(HttpConnectionManagerImplTest, MutableHttpConnection) {
   setup(false, "", true, true);
 
   MutableHttpConnection mutable_connection;
-  Http::StreamFilterCallbacks::PerConnectionObjectCreator creator_function = test_creation_function;
-  // Types of per connection objects
-  const std::string test_str_obj1 = "read_buffer_handle";
-  const std::string test_str_obj2 = "recv_lowat_handle";
+  Http::StreamFilterCallbacks::PerConnectionObjectCreator creator_function = testCreationFunction;
 
-  setupFilterChain(1, 0); // Create filter chain
+  // Create filter chain
+  setupFilterChain(2, 0);
+  // PerConnectionObjectSharedPtr used across 2 filters
+  PerConnectionObjectSharedPtr per_connection_object1 = nullptr;
 
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
@@ -3391,22 +3391,46 @@ TEST_F(HttpConnectionManagerImplTest, MutableHttpConnection) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        auto per_connection_object1 = decoder_filters_[0]->callbacks_->createPerConnectionObject(
-            test_str_obj1, mutable_connection, creator_function);
+        per_connection_object1 = decoder_filters_[0]->callbacks_->createPerConnectionObject(
+            "read_buffer_handle", mutable_connection, creator_function);
         auto per_connection_object2 = decoder_filters_[0]->callbacks_->createPerConnectionObject(
-            test_str_obj1, mutable_connection, creator_function);
+            "read_buffer_handle", mutable_connection, creator_function);
         auto per_connection_object3 = decoder_filters_[0]->callbacks_->createPerConnectionObject(
-            test_str_obj2, mutable_connection, creator_function);
+            "recv_lowat_handle", mutable_connection, creator_function);
         // per_connection_object1 is created for the first time when 'createPerConnectionObject' is
-        // invoked with 'test_str_obj1' and the same object is returned when invoked for the second
-        // time with 'test_str_obj1'
+        // invoked with 'read_buffer_handle' and the same object is returned when invoked for the second
+        // time with 'read_buffer_handle'
         EXPECT_EQ(per_connection_object1, per_connection_object2);
         // per_connection_object3 returned while invoking 'createPerConnectionObject' with
         // 'test_str_obj2' and is not same as per_connection_object2
         EXPECT_NE(per_connection_object2, per_connection_object3);
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        auto per_connection_object4 = decoder_filters_[1]->callbacks_->createPerConnectionObject(
+            "read_buffer_handle", mutable_connection, creator_function);
+        auto null_creator_connection_object = decoder_filters_[1]->callbacks_->createPerConnectionObject(
+            "read_buffer_handle", mutable_connection, nullptr);
+        auto empty_str_connection_object1 = decoder_filters_[1]->callbacks_->createPerConnectionObject(
+            "", mutable_connection, creator_function);
+        auto empty_str_connection_object2 = decoder_filters_[1]->callbacks_->createPerConnectionObject(
+            "", mutable_connection, creator_function);
+        // per_connection_object4 returned while invoking 'createPerConnectionObject' with
+        // 'read_buffer_handle' is same as per_connection_object1, created by decoder_filters_[0]
+        EXPECT_NE(nullptr, per_connection_object1);
+        EXPECT_EQ(per_connection_object1, per_connection_object4);
+        // While invoking 'createPerConnectionObject' with a 'nullptr' creator_function; the function
+        // returns a 'nullptr'
+        EXPECT_EQ(nullptr, null_creator_connection_object);
+        // While creating an object with an empty string returns a valid 'PerConnectionObjectSharedPtr'
+        EXPECT_NE(nullptr, empty_str_connection_object1);
+        EXPECT_NE(empty_str_connection_object1, per_connection_object1);
+        EXPECT_EQ(empty_str_connection_object1, empty_str_connection_object2);
         return FilterHeadersStatus::StopIteration;
       }));
-  EXPECT_CALL(*decoder_filters_[0], decodeComplete()); // end_stream=true.
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);

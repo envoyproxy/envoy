@@ -123,7 +123,6 @@ enum class FilterMetadataStatus {
  * An interface for a per-connection object that is created by a filter and then managed by the
  * HTTP connection manager. This pushes singleton handling into the HTTP connection manager.
  */
-
 class PerConnectionObject {
 public:
   virtual ~PerConnectionObject() = default;

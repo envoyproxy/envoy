@@ -115,7 +115,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().DisableHttpKeepAlive)
                            : Server::OverloadManager::getInactiveState()),
-      time_source_(time_source), per_connection_object_map_() {}
+      time_source_(time_source) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -2042,23 +2042,25 @@ ConnectionManagerImpl::ActiveStreamFilterBase::createPerConnectionObject(
     const std::string& object_name, MutableHttpConnection& mutable_connection,
     const PerConnectionObjectCreator& creation_function) {
 
+  // Return 'nullptr' if the creation_function is 'nullptr'
+  if (creation_function == nullptr) {
+    return nullptr;
+  }
+
   // Check if the object was already created
-  auto iterator = parent_.connection_manager_.per_connection_object_map_.find(object_name);
-  if (iterator != parent_.connection_manager_.per_connection_object_map_.end()) {
+  auto per_connection_object_map = parent_.connection_manager_.getPerConnectionObjectMap();
+  auto iterator = per_connection_object_map->find(object_name);
+  if (iterator != per_connection_object_map->end()) {
     return iterator->second;
   } else {
     // If it is not created; create an object and store it in map
-    if (creation_function != nullptr) {
-      PerConnectionObjectSharedPtr created_per_connection_object =
-          creation_function(mutable_connection);
-      // Add to the map
-      iterator = parent_.connection_manager_.per_connection_object_map_
-                     .emplace(object_name, std::move(created_per_connection_object))
-                     .first;
-      return iterator->second;
-    }
+    PerConnectionObjectSharedPtr created_per_connection_object =
+        creation_function(mutable_connection);
+    // Add to the map
+    iterator = per_connection_object_map->emplace(object_name, std::move(created_per_connection_object))
+                   .first;
+    return iterator->second;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
