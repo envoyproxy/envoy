@@ -15,21 +15,53 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
+/**
+ * All UDP proxy stats. @see stats_macros.h
+ */
+#define ALL_UDP_PROXY_STATS(COUNTER, GAUGE)                                                        \
+  COUNTER(downstream_sess_rx_bytes)                                                                \
+  COUNTER(downstream_sess_rx_datagrams)                                                            \
+  COUNTER(downstream_sess_rx_errors)                                                               \
+  COUNTER(downstream_sess_total)                                                                   \
+  COUNTER(downstream_sess_tx_bytes)                                                                \
+  COUNTER(downstream_sess_tx_datagrams)                                                            \
+  COUNTER(downstream_sess_tx_errors)                                                               \
+  COUNTER(idle_timeout)                                                                            \
+  GAUGE(downstream_sess_active, Accumulate)
+
+/**
+ * Struct definition for all UDP proxy stats. @see stats_macros.h
+ */
+struct UdpProxyStats {
+  ALL_UDP_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
 class UdpProxyFilterConfig {
 public:
   UdpProxyFilterConfig(Upstream::ClusterManager& cluster_manager, TimeSource& time_source,
+                       Stats::Scope& root_scope,
                        const envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig& config)
-      : cluster_manager_(cluster_manager), time_source_(time_source), config_(config) {}
+      : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
+        session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
+        stats_(generateStats(config.stat_prefix(), root_scope)) {}
 
-  Upstream::ThreadLocalCluster* getCluster() const {
-    return cluster_manager_.get(config_.cluster());
-  }
+  Upstream::ThreadLocalCluster* getCluster() const { return cluster_manager_.get(cluster_); }
+  std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
+  UdpProxyStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
 
 private:
+  static UdpProxyStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
+    const auto final_prefix = fmt::format("udp.{}", stat_prefix);
+    return {ALL_UDP_PROXY_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                POOL_GAUGE_PREFIX(scope, final_prefix))};
+  }
+
   Upstream::ClusterManager& cluster_manager_;
   TimeSource& time_source_;
-  const envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig config_;
+  const std::string cluster_;
+  const std::chrono::milliseconds session_timeout_;
+  mutable UdpProxyStats stats_;
 };
 
 using UdpProxyFilterConfigSharedPtr = std::shared_ptr<const UdpProxyFilterConfig>;
@@ -42,6 +74,7 @@ public:
 
   // Network::UdpListenerReadFilter
   void onData(Network::UdpRecvData& data) override;
+  void onReceiveError(Api::IoError::IoErrorCode error_code) override;
 
 private:
   /**
@@ -56,10 +89,12 @@ private:
   public:
     ActiveSession(UdpProxyFilter& parent, Network::UdpRecvData::LocalPeerAddresses&& addresses,
                   const Upstream::HostConstSharedPtr& host);
+    ~ActiveSession();
     const Network::UdpRecvData::LocalPeerAddresses& addresses() { return addresses_; }
     void write(const Buffer::Instance& buffer);
 
   private:
+    void onIdleTimer();
     void onReadReady();
 
     // Network::UdpPacketProcessor
@@ -76,6 +111,12 @@ private:
     UdpProxyFilter& parent_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     const Upstream::HostConstSharedPtr host_;
+    // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
+    // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,
+    // though it might not perform well for high volume traffic. Note that this is how TCP proxy
+    // idle timeouts work so we should consider unifying the implementation if we move to a time
+    // stamp and scan approach.
+    const Event::TimerPtr idle_timer_;
     // The IO handle is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
@@ -115,6 +156,11 @@ private:
       return lhs->addresses() == rhs->addresses();
     }
   };
+
+  virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
+    // Virtual so this can be overridden in unit tests.
+    return host->address()->socket(Network::Address::SocketType::Datagram);
+  }
 
   const UdpProxyFilterConfigSharedPtr config_;
   absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,

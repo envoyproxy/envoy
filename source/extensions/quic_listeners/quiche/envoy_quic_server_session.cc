@@ -95,7 +95,7 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
 void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
-    raiseEvent(Network::ConnectionEvent::Connected);
+    raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }
 
