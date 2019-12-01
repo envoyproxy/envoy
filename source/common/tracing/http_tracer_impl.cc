@@ -187,7 +187,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const Http::HeaderMap* 
   span.setTag(Tracing::Tags::get().HttpProtocol,
               AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
 
-  if (stream_info.upstreamHost() && stream_info.upstreamHost()->address()) {
+  if (stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamAddress,
                 stream_info.upstreamHost()->address()->asStringView());
   }
