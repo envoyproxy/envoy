@@ -695,8 +695,9 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-  // Functions to get per_connection_object_map_
-  using PerConnectionObjectMap = absl::flat_hash_map<const std::string, PerConnectionObjectSharedPtr>;
+  using PerConnectionObjectMap =
+      absl::flat_hash_map<const std::string, PerConnectionObjectSharedPtr>;
+  // Function to get per_connection_object_map_
   std::unique_ptr<PerConnectionObjectMap> per_connection_object_map_;
   PerConnectionObjectMap* getPerConnectionObjectMap() {
     if (per_connection_object_map_ == nullptr) {

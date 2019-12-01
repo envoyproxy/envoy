@@ -2057,8 +2057,9 @@ ConnectionManagerImpl::ActiveStreamFilterBase::createPerConnectionObject(
     PerConnectionObjectSharedPtr created_per_connection_object =
         creation_function(mutable_connection);
     // Add to the map
-    iterator = per_connection_object_map->emplace(object_name, std::move(created_per_connection_object))
-                   .first;
+    iterator =
+        per_connection_object_map->emplace(object_name, std::move(created_per_connection_object))
+            .first;
     return iterator->second;
   }
 }
