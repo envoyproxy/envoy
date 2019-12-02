@@ -84,8 +84,9 @@ build:clang-tsan --linkopt -fuse-ld=lld
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
-# Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
-# support (see https://github.com/envoyproxy/envoy/issues/443).
+# Clang MSAN - this is the base config for remote-msan and docker-msan. To run this config without
+# our build image, follow https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo
+# with libc++ instruction and provide corresponding `--copt` and `--linkopt` as well.
 build:clang-msan --action_env=ENVOY_MSAN=1
 build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
@@ -150,6 +151,10 @@ build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:remote-gcc --config=remote
 build:remote-gcc --config=rbe-toolchain-gcc
+
+build:remote-msan --config=remote
+build:remote-msan --config=rbe-toolchain-clang-libc++
+build:remote-msan --config=rbe-toolchain-msan
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
