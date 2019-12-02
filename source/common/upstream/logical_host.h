@@ -11,7 +11,7 @@ namespace Upstream {
  */
 class LogicalHost : public HostImpl {
 public:
-  LogicalHost(const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
+  LogicalHost(const ClusterInfoSharedPtr& cluster, const std::string& hostname,
               const Network::Address::InstanceConstSharedPtr& address,
               const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
               const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,

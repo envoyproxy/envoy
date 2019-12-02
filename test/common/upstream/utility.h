@@ -60,7 +60,7 @@ inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
   return parseClusterFromV2Json(defaultStaticClusterJson(name));
 }
 
-inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+inline HostSharedPtr makeTestHost(ClusterInfoSharedPtr cluster, const std::string& url,
                                   uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(
       cluster, "", Network::Utility::resolveUrl(url),
@@ -69,7 +69,7 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
       envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
-inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+inline HostSharedPtr makeTestHost(ClusterInfoSharedPtr cluster, const std::string& url,
                                   const envoy::api::v2::core::Metadata& metadata,
                                   uint32_t weight = 1) {
   return HostSharedPtr{
@@ -80,7 +80,7 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
 }
 
 inline HostSharedPtr
-makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+makeTestHost(ClusterInfoSharedPtr cluster, const std::string& url,
              const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
              uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
@@ -89,7 +89,7 @@ makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                     envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
-inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
+inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoSharedPtr cluster,
                                                              const std::string& url) {
   return HostDescriptionConstSharedPtr{new HostDescriptionImpl(
       cluster, "", Network::Utility::resolveUrl(url),

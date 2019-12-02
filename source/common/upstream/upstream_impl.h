@@ -66,7 +66,7 @@ class HostDescriptionImpl : virtual public HostDescription,
                             protected Logger::Loggable<Logger::Id::upstream> {
 public:
   HostDescriptionImpl(
-      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+      ClusterInfoSharedPtr cluster, const std::string& hostname,
       Network::Address::InstanceConstSharedPtr dest_address,
       const envoy::api::v2::core::Metadata& metadata,
       const envoy::api::v2::core::Locality& locality,
@@ -98,7 +98,7 @@ public:
     metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
 
-  const ClusterInfo& cluster() const override { return *cluster_; }
+  ClusterInfo& cluster() const override { return *cluster_; }
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
       return *health_checker_;
@@ -136,7 +136,7 @@ private:
                                 const envoy::api::v2::core::Metadata& metadata);
 
 protected:
-  ClusterInfoConstSharedPtr cluster_;
+  ClusterInfoSharedPtr cluster_;
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
@@ -159,7 +159,7 @@ class HostImpl : public HostDescriptionImpl,
                  public Host,
                  public std::enable_shared_from_this<HostImpl> {
 public:
-  HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+  HostImpl(ClusterInfoSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address,
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
            const envoy::api::v2::core::Locality& locality,
@@ -229,7 +229,7 @@ public:
 
 protected:
   static Network::ClientConnectionPtr
-  createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+  createConnection(Event::Dispatcher& dispatcher, ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
                    Network::TransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -580,6 +580,11 @@ public:
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
+  void upstreamConnection(Network::Connection& connection) override {
+    upstream_connection_ = &connection;
+  }
+  Network::Connection* upstreamConnection() const override { return upstream_connection_; }
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -629,6 +634,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  Network::Connection* upstream_connection_;
 };
 
 /**
@@ -688,6 +694,7 @@ public:
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
+  ClusterInfoSharedPtr info() override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
@@ -729,8 +736,8 @@ protected:
   Init::WatcherImpl init_watcher_;
 
   Runtime::Loader& runtime_;
-  ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
-                                   // initialized first and destroyed last.
+  ClusterInfoSharedPtr info_; // This cluster info stores the stats scope so it must be
+                              // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 

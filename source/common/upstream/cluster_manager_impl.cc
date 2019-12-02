@@ -1143,7 +1143,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
-    ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
+    ThreadLocalClusterManagerImpl& parent, ClusterInfoSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
     : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
       http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,

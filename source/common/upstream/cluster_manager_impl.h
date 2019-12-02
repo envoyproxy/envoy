@@ -301,7 +301,7 @@ private:
         std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
     struct ClusterEntry : public ThreadLocalCluster {
-      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
+      ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
@@ -313,7 +313,7 @@ private:
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
-      ClusterInfoConstSharedPtr info() override { return cluster_info_; }
+      ClusterInfoSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
 
       ThreadLocalClusterManagerImpl& parent_;
@@ -324,7 +324,7 @@ private:
       LoadBalancerFactorySharedPtr lb_factory_;
       // Current active LB.
       LoadBalancerPtr lb_;
-      ClusterInfoConstSharedPtr cluster_info_;
+      ClusterInfoSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
     };
 

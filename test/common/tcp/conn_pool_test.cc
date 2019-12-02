@@ -69,8 +69,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
  */
 class ConnPoolImplForTest : public ConnPoolImpl {
 public:
-  ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
-                      Upstream::ClusterInfoConstSharedPtr cluster,
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterInfoSharedPtr cluster,
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default, nullptr, nullptr),
@@ -410,6 +409,31 @@ TEST_F(TcpConnPoolImplTest, NoUpstreamCallbacks) {
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
   EXPECT_EQ(Network::FilterStatus::StopIteration,
             conn_pool_.test_conns_[0].filter_->onData(buffer, false));
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Test that upstream connection data can be retrieved.
+ */
+TEST_F(TcpConnPoolImplTest, UpstreamConnectionData) {
+  EXPECT_CALL(*cluster_, upstreamConnection(_))
+      .WillOnce(Invoke([&](Network::Connection& conn) -> void {
+        ConnPoolImplForTest::TestConnection test_conn = conn_pool_.test_conns_.back();
+        EXPECT_EQ(conn.id(), test_conn.connection_->id());
+      }));
+
+  conn_pool_.expectConnCreate();
+  Buffer::OwnedImpl buffer;
+
+  InSequence s;
+  ConnPoolCallbacks callbacks;
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  // Expect the connection is closed.
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  handle->cancel(ConnectionPool::CancelPolicy::CloseExcess);
+
   dispatcher_.clearDeferredDeleteList();
 }
 

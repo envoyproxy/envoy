@@ -869,6 +869,16 @@ public:
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
+  /**
+   * Sets value of upstream connection.
+   */
+  virtual void upstreamConnection(Network::Connection& connection) PURE;
+
+  /**
+   * @return pointer to upstream connection.
+   */
+  virtual Network::Connection* upstreamConnection() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
@@ -882,6 +892,7 @@ protected:
 };
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
+using ClusterInfoSharedPtr = std::shared_ptr<ClusterInfo>;
 
 class HealthChecker;
 
@@ -905,6 +916,7 @@ public:
    * @return the information about this upstream cluster.
    */
   virtual ClusterInfoConstSharedPtr info() const PURE;
+  virtual ClusterInfoSharedPtr info() PURE;
 
   /**
    * @return a pointer to the cluster's outlier detector. If an outlier detector has not been

@@ -217,7 +217,7 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 } // namespace
 
 HostDescriptionImpl::HostDescriptionImpl(
-    ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+    ClusterInfoSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address,
     const envoy::api::v2::core::Metadata& metadata, const envoy::api::v2::core::Locality& locality,
     const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
@@ -285,7 +285,7 @@ HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
 }
 
 Network::ClientConnectionPtr
-HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+HostImpl::createConnection(Event::Dispatcher& dispatcher, ClusterInfo& cluster,
                            const Network::Address::InstanceConstSharedPtr& address,
                            Network::TransportSocketFactory& socket_factory,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -309,6 +309,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
+  cluster.upstreamConnection(*connection);
   return connection;
 }
 
@@ -659,7 +660,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                               config.cluster_type())
                         : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      upstream_connection_(nullptr) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;

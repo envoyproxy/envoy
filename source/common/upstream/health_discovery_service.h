@@ -25,7 +25,7 @@ namespace Upstream {
 
 class ProdClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
-  ClusterInfoConstSharedPtr createClusterInfo(const CreateClusterInfoParams& params) override;
+  ClusterInfoSharedPtr createClusterInfo(const CreateClusterInfoParams& params) override;
 };
 
 // TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
@@ -53,6 +53,7 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
+  ClusterInfoSharedPtr info() override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
@@ -80,7 +81,7 @@ private:
   bool added_via_api_;
 
   HostVectorSharedPtr initial_hosts_;
-  ClusterInfoConstSharedPtr info_;
+  ClusterInfoSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };

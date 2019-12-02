@@ -165,6 +165,7 @@ public:
   // Upstream::Cluster
   MOCK_METHOD0(healthChecker, HealthChecker*());
   MOCK_CONST_METHOD0(info, ClusterInfoConstSharedPtr());
+  MOCK_METHOD0(info, ClusterInfoSharedPtr());
   MOCK_METHOD0(outlierDetector, Outlier::Detector*());
   MOCK_CONST_METHOD0(outlierDetector, const Outlier::Detector*());
   MOCK_METHOD1(initialize, void(std::function<void()> callback));
@@ -234,7 +235,7 @@ public:
 
   // Upstream::ThreadLocalCluster
   MOCK_METHOD0(prioritySet, const PrioritySet&());
-  MOCK_METHOD0(info, ClusterInfoConstSharedPtr());
+  MOCK_METHOD0(info, ClusterInfoSharedPtr());
   MOCK_METHOD0(loadBalancer, LoadBalancer&());
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
@@ -400,7 +401,7 @@ public:
   MockClusterInfoFactory();
   ~MockClusterInfoFactory() override;
 
-  MOCK_METHOD1(createClusterInfo, ClusterInfoConstSharedPtr(const CreateClusterInfoParams&));
+  MOCK_METHOD1(createClusterInfo, ClusterInfoSharedPtr(const CreateClusterInfoParams&));
 };
 
 class MockRetryHostPredicate : public RetryHostPredicate {

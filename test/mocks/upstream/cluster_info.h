@@ -110,6 +110,8 @@ public:
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
   MOCK_CONST_METHOD1(upstreamHttpProtocol, Http::Protocol(absl::optional<Http::Protocol>));
+  MOCK_CONST_METHOD0(upstreamConnection, Network::Connection*());
+  MOCK_METHOD1(upstreamConnection, void(Network::Connection&));
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;

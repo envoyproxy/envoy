@@ -233,7 +233,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-ClusterInfoConstSharedPtr
+ClusterInfoSharedPtr
 ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
   Envoy::Stats::ScopePtr scope =
       params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
