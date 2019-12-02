@@ -11,7 +11,7 @@ namespace HttpFilters {
 namespace IpTagging {
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
-    const envoy::config::filter::http::ip_tagging::v2::IPTagging& config,
+    const envoy::config::filter::http::ip_tagging::v3alpha::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
@@ -33,7 +33,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   for (const auto& ip_tag : config.ip_tags()) {
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
-    for (const envoy::api::v2::core::CidrRange& entry : ip_tag.ip_list()) {
+    for (const envoy::api::v3alpha::core::CidrRange& entry : ip_tag.ip_list()) {
 
       // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
       Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);

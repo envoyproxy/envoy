@@ -234,6 +234,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters:well_known_names",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -461,6 +462,7 @@ envoy_cc_library(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/server:transport_socket_config_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],

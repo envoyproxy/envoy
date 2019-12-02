@@ -147,6 +147,11 @@ message VirtualHost {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
+// A filter-defined action type.
+message FilterAction {
+  google.protobuf.Any action = 1;
+}
+
 // A route is both a specification of how to match a request as well as an indication of what to do
 // next (e.g., redirect, forward, rewrite, etc.).
 //
@@ -154,7 +159,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Route {
   reserved 6, 8;
 
@@ -177,6 +182,11 @@ message Route {
 
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
+
+    // [#not-implemented-hide:]
+    // If true, a filter will define the action (e.g., it could dynamically generate the
+    // RouteAction).
+    FilterAction filter_action = 17;
   }
 
   // The Metadata field can be used to provide additional information

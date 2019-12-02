@@ -133,7 +133,7 @@ build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
-build:remote --remote_timeout=3600
+build:remote --remote_timeout=7200
 build:remote --auth_enabled=true
 build:remote --remote_download_toplevel
 
@@ -148,7 +148,7 @@ build:remote-gcc --config=rbe-toolchain-gcc
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:f0b2453c3587e3297f5caf5e97fbf57c97592c96136209ec13fe2795aae2c896
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
