@@ -699,11 +699,11 @@ private:
       absl::flat_hash_map<const std::string, PerConnectionObjectSharedPtr>;
   // Function to get per_connection_object_map_
   std::unique_ptr<PerConnectionObjectMap> per_connection_object_map_;
-  PerConnectionObjectMap* getPerConnectionObjectMap() {
+  PerConnectionObjectMap& getPerConnectionObjectMap() {
     if (per_connection_object_map_ == nullptr) {
       per_connection_object_map_ = std::make_unique<PerConnectionObjectMap>();
     }
-    return per_connection_object_map_.get();
+    return *per_connection_object_map_.get();
   }
 };
 

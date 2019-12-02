@@ -2042,23 +2042,20 @@ ConnectionManagerImpl::ActiveStreamFilterBase::createPerConnectionObject(
     const std::string& object_name, MutableHttpConnection& mutable_connection,
     const PerConnectionObjectCreator& creation_function) {
 
-  // Return 'nullptr' if the creation_function is 'nullptr'
-  if (creation_function == nullptr) {
-    return nullptr;
-  }
+  // It is invalid use; if the creation_function is 'nullptr'
+  ASSERT(creation_function != nullptr);
 
   // Check if the object was already created
-  auto per_connection_object_map = parent_.connection_manager_.getPerConnectionObjectMap();
-  auto iterator = per_connection_object_map->find(object_name);
-  if (iterator != per_connection_object_map->end()) {
+  auto& per_connection_object_map = parent_.connection_manager_.getPerConnectionObjectMap();
+  auto iterator = per_connection_object_map.find(object_name);
+  if (iterator != per_connection_object_map.end()) {
     return iterator->second;
   } else {
     // If it is not created; create an object and store it in map
     PerConnectionObjectSharedPtr created_per_connection_object =
         creation_function(mutable_connection);
-    // Add to the map
     iterator =
-        per_connection_object_map->emplace(object_name, std::move(created_per_connection_object))
+        per_connection_object_map.emplace(object_name, std::move(created_per_connection_object))
             .first;
     return iterator->second;
   }
