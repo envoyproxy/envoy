@@ -178,13 +178,7 @@ protected:
       return i;
     }
 
-    void erase(HeaderNode i) {
-      if (pseudo_headers_end_ == i) {
-        pseudo_headers_end_++;
-      }
-      subtractSize(i->key().size() + i->value().size());
-      headers_.erase(i);
-    }
+    void erase(HeaderNode i, bool clear_from_map);
 
     template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
       headers_.remove_if([&](const HeaderEntryImpl& entry) {

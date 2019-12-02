@@ -594,9 +594,20 @@ void HeaderMapImpl::HeaderList::remove(absl::string_view key) {
     lazy_map_.erase(iter);
     for (const HeaderNode& node : header_nodes) {
       ASSERT(node->key() == key);
-      erase(node);
+      erase(node, false /* clear_from_map */);
     }
   }
+}
+
+void HeaderMapImpl::HeaderList::erase(HeaderNode i, bool clear_from_map) {
+  if (pseudo_headers_end_ == i) {
+    pseudo_headers_end_++;
+  }
+  subtractSize(i->key().size() + i->value().size());
+  if (clear_from_map) {
+    lazy_map_.erase(i->key().getStringView());
+  }
+  headers_.erase(i);
 }
 
 void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
@@ -679,7 +690,7 @@ void HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
 
   HeaderEntryImpl* entry = *ptr_to_entry;
   *ptr_to_entry = nullptr;
-  headers_.erase(entry->entry_);
+  headers_.erase(entry->entry_, true);
   verifyByteSize();
 }
 
