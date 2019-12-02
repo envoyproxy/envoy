@@ -70,7 +70,7 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainContext& filter_chain_context) {
+    const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
@@ -91,7 +91,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, context, filter_chain_context);
+        factory.createFilterFactoryFromProto(*message, context, filter_chain_factory_context);
     ret.push_back(callback);
   }
   return ret;
@@ -781,27 +781,22 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    TagGeneratorBatchImpl& tag_generator)
-    : parent_(listener), factory_context_(factory_context), tag_generator_(tag_generator) {}
+    std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback)
+    : parent_(listener), factory_context_(factory_context),
+      filter_chain_factory_context_callback_(std::move(filter_chain_factory_context_callback)) {
+  filter_chain_factory_context_callback_->prepareFilterChainFactoryContexts();
+}
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
-  ListenerFilterChainFactoryBuilder::InternalBuilder builder(*this);
-  return builder.buildFilterChainInternal(filter_chain, 0);
+  std::shared_ptr<Configuration::FilterChainFactoryContext> context =
+      filter_chain_factory_context_callback_->createFilterChainFactoryContext(&filter_chain);
+  return buildFilterChainInternal(filter_chain, context);
 }
 
-TagGenerator::Tags ListenerFilterChainFactoryBuilder::submitFilterChains(
-    FilterChainManagerImpl& fcm,
-    absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span) {
-
-  auto tags = tag_generator_.addFilterChains(filter_chain_span);
-  fcm.addFilterChain(filter_chain_span, *this);
-  return tags;
-}
-
-std::unique_ptr<Network::FilterChain>
-ListenerFilterChainFactoryBuilder::InternalBuilder::buildFilterChainInternal(
-    const ::envoy::api::v2::listener::FilterChain& filter_chain, uint64_t tag) const {
+std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
+    const ::envoy::api::v2::listener::FilterChain& filter_chain,
+    std::shared_ptr<Configuration::FilterChainFactoryContext>& filter_chain_factory_context) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -819,23 +814,16 @@ ListenerFilterChainFactoryBuilder::InternalBuilder::buildFilterChainInternal(
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, outer_builder_.parent_.messageValidationVisitor(), config_factory);
+      transport_socket, parent_.messageValidationVisitor(), config_factory);
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-  FilterChainFactoryContextImpl filter_chain_context{outer_builder_.parent_, tag};
   return std::make_unique<FilterChainImpl>(
-      config_factory.createTransportSocketFactory(*message, outer_builder_.factory_context_,
+      config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
-      outer_builder_.parent_.parent_.factory_.createNetworkFilterFactoryList(
-          filter_chain.filters(), outer_builder_.parent_, filter_chain_context),
-      tag);
-}
-
-/* static */
-const ListenerFilterChainFactoryBuilder::TagsIndex&
-ListenerFilterChainFactoryBuilder::InternalBuilder::emptyTags() {
-  CONSTRUCT_ON_FIRST_USE(TagsIndex, {});
+      parent_.parent_.factory_.createNetworkFilterFactoryList(
+          filter_chain.filters(), *filter_chain_factory_context, *filter_chain_factory_context),
+      filter_chain_factory_context->getTag());
 }
 
 Network::ListenSocketFactorySharedPtr

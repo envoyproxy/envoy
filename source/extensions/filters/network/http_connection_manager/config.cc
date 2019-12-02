@@ -76,7 +76,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainContext& filter_chain_context) {
+    const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -107,8 +107,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
   return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
-          filter_config, &context,
-          tag = filter_chain_context.getTag()](Network::FilterManager& filter_manager) -> void {
+          filter_config, &context, tag = filter_chain_factory_context.getTag()](
+             Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.filterChainDrainDecision(), tag,
         context.random(), context.httpContext(), context.runtime(), context.localInfo(),

@@ -17,10 +17,11 @@ class FactoryBase : public Server::Configuration::NamedNetworkFilterConfigFactor
 public:
   Network::FilterFactoryCb createFilterFactoryFromProto(
       const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainContext& filter_chain_context) override {
+      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+      override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
-                                             context, filter_chain_context);
+                                             context, filter_chain_factory_context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -49,7 +50,7 @@ protected:
 private:
   virtual Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const ConfigProto& proto_config, Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainContext& filter_chain_context) PURE;
+      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsTyped(const ProtocolOptionsProto&) {

@@ -20,7 +20,7 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::rate_limit::v2::RateLimit(), context,
-                   Server::Configuration::MockFilterChainContext{}),
+                   Server::Configuration::MockFilterChainFactoryContext{}),
                ProtoValidationException);
 }
 
@@ -51,7 +51,7 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
 
   RateLimitConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -65,9 +65,10 @@ TEST(RateLimitFilterConfigTest, EmptyProto) {
   envoy::config::filter::network::rate_limit::v2::RateLimit empty_proto_config =
       *dynamic_cast<envoy::config::filter::network::rate_limit::v2::RateLimit*>(
           factory.createEmptyConfigProto().get());
-  EXPECT_THROW(factory.createFilterFactoryFromProto(
-                   empty_proto_config, context, Server::Configuration::MockFilterChainContext{}),
-               EnvoyException);
+  EXPECT_THROW(
+      factory.createFilterFactoryFromProto(empty_proto_config, context,
+                                           Server::Configuration::MockFilterChainFactoryContext{}),
+      EnvoyException);
 }
 
 TEST(RateLimitFilterConfigTest, IncorrectProto) {

@@ -73,7 +73,7 @@ Network::FilterFactoryCb
 RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::rbac::v2::RBAC& proto_config,
     Server::Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainContext&) {
+    const Server::Configuration::FilterChainFactoryContext&) {
   validateRbacRules(proto_config.rules());
   validateRbacRules(proto_config.shadow_rules());
   RoleBasedAccessControlFilterConfigSharedPtr config(

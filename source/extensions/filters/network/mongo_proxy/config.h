@@ -25,7 +25,7 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::mongo_proxy::v2::MongoProxy& proto_config,
       Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainContext&) override;
+      const Server::Configuration::FilterChainFactoryContext&) override;
 };
 
 } // namespace MongoProxy

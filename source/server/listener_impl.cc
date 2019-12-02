@@ -202,7 +202,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
   factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context, filter_chain_tag_generator_);
+  // The init manager is a little messy. Will refactor when filter chain manager could accept
+  // network filter chain update.
+  // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
+  ListenerFilterChainFactoryBuilder builder(
+      *this, factory_context, filter_chain_manager_.createFilterChainFactoryContextCallback(*this));
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
   if (socket_type == Network::Address::SocketType::Datagram) {

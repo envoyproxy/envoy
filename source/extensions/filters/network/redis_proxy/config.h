@@ -60,7 +60,8 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
       Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainContext& filter_chain_context) override;
+      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+      override;
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
       const envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions& proto_config)

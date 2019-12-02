@@ -18,10 +18,10 @@ using ZooKeeperProxyProtoConfig =
 
 TEST(ZookeeperFilterConfigTest, ValidateFail) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(
-      ZooKeeperConfigFactory().createFilterFactoryFromProto(
-          ZooKeeperProxyProtoConfig(), context, Server::Configuration::MockFilterChainContext{}),
-      ProtoValidationException);
+  EXPECT_THROW(ZooKeeperConfigFactory().createFilterFactoryFromProto(
+                   ZooKeeperProxyProtoConfig(), context,
+                   Server::Configuration::MockFilterChainFactoryContext{}),
+               ProtoValidationException);
 }
 
 TEST(ZookeeperFilterConfigTest, InvalidStatPrefix) {
@@ -55,7 +55,7 @@ stat_prefix: test_prefix
   ZooKeeperConfigFactory factory;
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);

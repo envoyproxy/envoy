@@ -213,6 +213,8 @@ public:
 };
 
 class FilterChainFactoryContext : public virtual FactoryContext {
+public:
+  virtual ~FilterChainFactoryContext() = default;
   virtual uint64_t getTag() const PURE;
 };
 
@@ -350,7 +352,7 @@ public:
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(
       const Protobuf::Message& config, FactoryContext& context,
-      const Server::Configuration::FilterChainContext& filter_chain_context) PURE;
+      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter

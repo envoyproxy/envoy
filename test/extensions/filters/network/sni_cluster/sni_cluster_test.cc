@@ -25,8 +25,9 @@ TEST(SniCluster, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SniClusterNetworkFilterConfigFactory factory;
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      *factory.createEmptyConfigProto(), context, Server::Configuration::MockFilterChainContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), context,
+                                           Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

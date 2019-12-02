@@ -102,10 +102,10 @@ public:
         .WillByDefault(
             Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                        Server::Configuration::FactoryContext& context,
-                       const Server::Configuration::FilterChainContext& filter_chain_context)
-                       -> std::vector<Network::FilterFactoryCb> {
+                       const Server::Configuration::FilterChainFactoryContext&
+                           filter_chain_factory_context) -> std::vector<Network::FilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(
-                  filters, context, filter_chain_context);
+                  filters, context, filter_chain_factory_context);
             }));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
@@ -13,10 +14,10 @@
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
+#include "server/filter_chain_factory_context_callback.h"
 #include "server/tag_generator_batch_impl.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "envoy/network/drain_decision.h"
 
 namespace Envoy {
 namespace Server {
@@ -26,15 +27,6 @@ public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
-};
-
-class FilterChainContextImpl : public Configuration::FilterChainFactoryContext {
-public:
-  FilterChainContextImpl(uint64_t tag);
-  uint64_t getTag() const override { return tag_; }
-
-private:
-  uint64_t tag_;
 };
 
 class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
@@ -77,6 +69,8 @@ public:
   OptProcessContextRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
 
+  Stats::Scope& listenerScope() override;
+
 private:
   Configuration::FactoryContext& parent_context_;
   uint64_t tag_;
@@ -100,6 +94,7 @@ public:
  * Implementation of FilterChainManager.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
+
                                Logger::Loggable<Logger::Id::config> {
 public:
   explicit FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address)
@@ -113,10 +108,26 @@ public:
   addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
                  FilterChainFactoryBuilder& b);
 
-                   
   static bool isWildcardServerName(const std::string& name);
 
-  List<FilterChainHelper> pending_filter_chains;
+  std::unique_ptr<FilterChainFactoryContextCallback>
+  createFilterChainFactoryContextCallback(Configuration::FactoryContext& parent_context);
+
+  class FilterChainContextCallbackImpl : public FilterChainFactoryContextCallback {
+  public:
+    FilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
+                                   Configuration::FactoryContext& parent_context);
+    ~FilterChainContextCallbackImpl() override;
+    void prepareFilterChainFactoryContexts() override;
+    std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
+        const ::envoy::api::v2::listener::FilterChain* const filter_chain) override;
+    void commitFilterChainFactoryContexts() override;
+
+  private:
+    FilterChainManagerImpl& parent_;
+    Configuration::FactoryContext& parent_context_;
+  };
+
 private:
   void convertIPsToTries();
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
@@ -210,6 +221,9 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
+  friend class FilterChainContextCallbackImpl;
+  std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
+  int64_t next_tag_{0};
 };
 
 class FilterChainImpl : public Network::FilterChain {

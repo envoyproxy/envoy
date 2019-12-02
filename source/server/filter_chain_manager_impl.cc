@@ -23,8 +23,6 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 } // namespace
 
-FilterChainContextImpl::FilterChainContextImpl(uint64_t tag) : tag_(tag) {}
-
 FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, uint64_t tag)
     : parent_context_(parent_context), tag_(tag) {}
@@ -33,14 +31,23 @@ FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
 uint64_t FilterChainFactoryContextImpl::getTag() const { return tag_; }
 
 // DrainDecision
-bool FilterChainFactoryContextImpl::drainClose() const { return false; }
+bool FilterChainFactoryContextImpl::drainClose() const {
+  // TODO(lambdai): will provide individual value for each filter chain context.
+  return parent_context_.drainDecision().drainClose();
+}
 
-// Covariant
+Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }
+
+// TODO(lambdai): init manager will be provided for each filter chain update.
+Init::Manager& FilterChainFactoryContextImpl::initManager() {
+  return parent_context_.initManager();
+}
+
+// Deligate to parent context
 ThreadLocal::SlotAllocator& FilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }
 
-// Deligate to parent
 const envoy::api::v2::core::Metadata& FilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
 };
@@ -52,7 +59,6 @@ ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValida
   return parent_context_.messageValidationVisitor();
 }
 
-Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }
 AccessLog::AccessLogManager& FilterChainFactoryContextImpl::accessLogManager() {
   return parent_context_.accessLogManager();
 }
@@ -111,6 +117,10 @@ FilterChainFactoryContextImpl::getServerFactoryContext() const {
   return parent_context_.getServerFactoryContext();
 }
 
+Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
+  return parent_context_.listenerScope();
+}
+
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
@@ -118,9 +128,13 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder) {
+  // ListenerContextBuilder context_builder;
+  // Contexts contexts = context_builder.build(filter_chain_span, filter_chain_factory_builder);
+
   std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
+
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
       throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
@@ -159,7 +173,6 @@ void FilterChainManagerImpl::addFilterChain(
                         address_->asString()));
       }
     }
-
     addFilterChainForDestinationPorts(
         destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
@@ -170,6 +183,9 @@ void FilterChainManagerImpl::addFilterChain(
             filter_chain_factory_builder.buildFilterChain(*filter_chain)));
   }
   convertIPsToTries();
+  // get readyFCM
+  // get contexts
+  // get watcher
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -552,6 +568,37 @@ void FilterChainManagerImpl::convertIPsToTries() {
 
     destination_ips_pair.second = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
   }
+}
+
+std::unique_ptr<FilterChainFactoryContextCallback>
+FilterChainManagerImpl::createFilterChainFactoryContextCallback(
+    Configuration::FactoryContext& parent_context) {
+  return std::make_unique<FilterChainContextCallbackImpl>(*this, parent_context);
+}
+
+FilterChainManagerImpl::FilterChainContextCallbackImpl::FilterChainContextCallbackImpl(
+    FilterChainManagerImpl& parent, Configuration::FactoryContext& parent_context)
+    : parent_(parent), parent_context_(parent_context) {}
+
+void FilterChainManagerImpl::FilterChainContextCallbackImpl::prepareFilterChainFactoryContexts() {
+  // The previous add might fail. Clean it here.
+  parent_.factory_contexts_.clear();
+}
+
+std::shared_ptr<Configuration::FilterChainFactoryContext>
+FilterChainManagerImpl::FilterChainContextCallbackImpl::createFilterChainFactoryContext(
+    const ::envoy::api::v2::listener::FilterChain* const filter_chain) {
+  // TODO: drain close should be saved in per filter chain context
+  UNREFERENCED_PARAMETER(filter_chain);
+  auto res = std::make_shared<FilterChainFactoryContextImpl>(parent_context_, ++parent_.next_tag_);
+  parent_.factory_contexts_.push_back(res);
+  return res;
+}
+
+void FilterChainManagerImpl::FilterChainContextCallbackImpl::commitFilterChainFactoryContexts() {}
+
+FilterChainManagerImpl::FilterChainContextCallbackImpl::~FilterChainContextCallbackImpl() {
+  commitFilterChainFactoryContexts();
 }
 } // namespace Server
 } // namespace Envoy

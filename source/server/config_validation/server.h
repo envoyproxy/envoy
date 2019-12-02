@@ -117,9 +117,10 @@ public:
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainContext& filter_chain_context) override {
-    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters, context,
-                                                                         filter_chain_context);
+      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+      override {
+    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+        filters, context, filter_chain_factory_context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,

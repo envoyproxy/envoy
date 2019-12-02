@@ -45,13 +45,13 @@ protected:
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _, _))
-        .WillByDefault(
-            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                      Configuration::FactoryContext& context,
-                      const Server::Configuration::FilterChainContext& filter_chain_context)
-                       -> std::vector<Network::FilterFactoryCb> {
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+               Configuration::FactoryContext& context,
+               const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
-                  filters, context, filter_chain_context);
+                  filters, context, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -103,7 +103,7 @@ protected:
         .WillOnce(Invoke([raw_listener, need_init](
                              const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
                              Configuration::FactoryContext& context,
-                             const Server::Configuration::FilterChainContext&)
+                             const Server::Configuration::FilterChainFactoryContext&)
                              -> std::vector<Network::FilterFactoryCb> {
           std::shared_ptr<ListenerHandle> notifier(raw_listener);
           raw_listener->context_ = &context;

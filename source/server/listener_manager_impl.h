@@ -13,6 +13,7 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
+#include "server/filter_chain_factory_context_callback.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 #include "server/listener_impl.h"
@@ -42,7 +43,7 @@ public:
   static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context,
-      const Configuration::FilterChainContext& filter_chain_context);
+      const Configuration::FilterChainFactoryContext& filter_chain_factory_context);
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
@@ -66,8 +67,9 @@ public:
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainContext& filter_chain_context) override {
-    return createNetworkFilterFactoryList_(filters, context, filter_chain_context);
+      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+      override {
+    return createNetworkFilterFactoryList_(filters, context, filter_chain_factory_context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
@@ -259,41 +261,20 @@ public:
   using TagsIndex = std::unordered_map<const ::envoy::api::v2::listener::FilterChain*, int64_t>;
   ListenerFilterChainFactoryBuilder(
       ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context,
-      TagGeneratorBatchImpl& tag_generator);
+      std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback);
 
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
 
-  // consider rewrite ListenerFilterChainFactoryBuilder so that submitFilterChains is the only
-  // interface.
-  TagGenerator::Tags submitFilterChains(
-      FilterChainManagerImpl& fcm,
-      absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span);
-
 private:
-  class InternalBuilder : public FilterChainFactoryBuilder {
-  public:
-    InternalBuilder(const ListenerFilterChainFactoryBuilder& outer_builder,
-                    const TagsIndex& filter_chain_index = emptyTags())
-        : outer_builder_(outer_builder), filter_chain_index_(filter_chain_index) {}
+  std::unique_ptr<Network::FilterChain>
+  buildFilterChainInternal(const ::envoy::api::v2::listener::FilterChain& filter_chain,
+                           std::shared_ptr<Configuration::FilterChainFactoryContext>&
+                               filter_chain_factory_context) const;
 
-    std::unique_ptr<Network::FilterChain>
-    buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override {
-      auto iter = filter_chain_index_.find(&filter_chain);
-      auto tag = iter != filter_chain_index_.end() ? iter->second : 0;
-      return buildFilterChainInternal(filter_chain, tag);
-    }
-    static const TagsIndex& emptyTags();
-    const ListenerFilterChainFactoryBuilder& outer_builder_;
-    const TagsIndex& filter_chain_index_;
-
-    std::unique_ptr<Network::FilterChain>
-    buildFilterChainInternal(const ::envoy::api::v2::listener::FilterChain& filter_chain,
-                             uint64_t tag) const;
-  };
   ListenerImpl& parent_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;
-  TagGeneratorBatchImpl& tag_generator_;
+  std::unique_ptr<FilterChainFactoryContextCallback> filter_chain_factory_context_callback_;
 };
 
 } // namespace Server

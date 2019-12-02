@@ -333,6 +333,7 @@ envoy_cc_library(
     srcs = ["filter_chain_manager_impl.cc"],
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
+        ":filter_chain_factory_context_callback",
         ":tag_generator_lib",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -516,6 +517,15 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_factory_context_callback",
+    hdrs = ["filter_chain_factory_context_callback.h"],
+    deps = [
+        "//include/envoy/server:filter_config_interface",
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )

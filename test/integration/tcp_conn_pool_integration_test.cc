@@ -89,7 +89,7 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext& context,
-                               const Server::Configuration::FilterChainContext&) override {
+                               const Server::Configuration::FilterChainFactoryContext&) override {
     return [&context](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
     };

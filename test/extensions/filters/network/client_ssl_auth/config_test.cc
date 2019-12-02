@@ -44,7 +44,7 @@ ip_white_list:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -62,7 +62,7 @@ ip_white_list:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -83,7 +83,7 @@ ip_white_list:
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -93,7 +93,7 @@ TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ClientSslAuthConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth(), context,
-                   Server::Configuration::MockFilterChainContext{}),
+                   Server::Configuration::MockFilterChainFactoryContext{}),
                ProtoValidationException);
 }
 

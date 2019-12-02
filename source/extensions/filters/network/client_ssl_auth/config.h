@@ -23,7 +23,8 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
       Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainContext& filter_chain_context) override;
+      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+      override;
 };
 
 } // namespace ClientSslAuth

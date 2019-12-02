@@ -247,7 +247,7 @@ public:
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                    Configuration::FactoryContext& context,
-                   const Configuration::FilterChainContext& filter_chain_context));
+                   const Configuration::FilterChainFactoryContext& filter_chain_factory_context));
   MOCK_METHOD2(createListenerFilterFactoryList,
                std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
@@ -608,7 +608,8 @@ public:
   testing::NiceMock<Envoy::Api::MockApi> api_{};
 };
 
-class MockFilterChainContext : public virtual FilterChainContext {
+class MockFilterChainFactoryContext : public virtual FilterChainFactoryContext,
+                                      public MockFactoryContext {
 public:
   MOCK_CONST_METHOD0(getTag, uint64_t());
 };

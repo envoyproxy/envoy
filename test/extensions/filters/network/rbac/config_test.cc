@@ -41,13 +41,13 @@ private:
     NiceMock<Server::Configuration::MockFactoryContext> context;
     RoleBasedAccessControlNetworkFilterConfigFactory factory;
     EXPECT_THROW(factory.createFilterFactoryFromProto(
-                     config, context, Server::Configuration::MockFilterChainContext{}),
+                     config, context, Server::Configuration::MockFilterChainFactoryContext{}),
                  Envoy::EnvoyException);
 
     config.clear_rules();
     (*config.mutable_shadow_rules()->mutable_policies())["foo"] = policy_proto;
     EXPECT_THROW(factory.createFilterFactoryFromProto(
-                     config, context, Server::Configuration::MockFilterChainContext{}),
+                     config, context, Server::Configuration::MockFilterChainFactoryContext{}),
                  Envoy::EnvoyException);
   }
 };
@@ -63,7 +63,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      config, context, Server::Configuration::MockFilterChainContext{});
+      config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

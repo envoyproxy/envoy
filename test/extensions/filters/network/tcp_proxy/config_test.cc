@@ -93,7 +93,7 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -103,7 +103,7 @@ TEST(ConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), context,
-                   Server::Configuration::MockFilterChainContext{}),
+                   Server::Configuration::MockFilterChainFactoryContext{}),
                ProtoValidationException);
 }
 
@@ -119,7 +119,7 @@ TEST(ConfigTest, ConfigTest) {
 
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      config, context, Server::Configuration::MockFilterChainContext{});
+      config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

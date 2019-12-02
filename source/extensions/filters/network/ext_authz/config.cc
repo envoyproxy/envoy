@@ -21,7 +21,7 @@ namespace ExtAuthz {
 Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
     Server::Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainContext&) {
+    const Server::Configuration::FilterChainFactoryContext&) {
   ConfigSharedPtr ext_authz_config(new Config(proto_config, context.scope()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 

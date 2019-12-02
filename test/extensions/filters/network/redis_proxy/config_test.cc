@@ -20,7 +20,7 @@ TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::redis_proxy::v2::RedisProxy(), context,
-                   Server::Configuration::MockFilterChainContext{}),
+                   Server::Configuration::MockFilterChainFactoryContext{}),
                ProtoValidationException);
 }
 
@@ -34,9 +34,10 @@ TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
-                                config, context, Server::Configuration::MockFilterChainContext{}),
-                            EnvoyException, "cannot configure a redis-proxy without any upstream");
+  EXPECT_THROW_WITH_MESSAGE(
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
+          config, context, Server::Configuration::MockFilterChainFactoryContext{}),
+      EnvoyException, "cannot configure a redis-proxy without any upstream");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoSettings) {
@@ -80,7 +81,7 @@ settings:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -102,7 +103,7 @@ settings:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -124,7 +125,7 @@ settings:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -150,7 +151,7 @@ settings:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainContext{});
+      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
