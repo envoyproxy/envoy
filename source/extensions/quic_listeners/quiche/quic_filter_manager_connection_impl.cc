@@ -56,36 +56,39 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
   }
   const bool delayed_close_timeout_configured = delayed_close_timeout_.count() > 0;
   if (hasDataToWrite() && type != Network::ConnectionCloseType::NoFlush) {
-    // QUIC connection has unsent data and caller wants to flush them. Wait for flushing or timeout.
-    if (!inDelayedClose() && delayed_close_timeout_configured) {
-      // Only set alarm if not in delay close mode yet.
-      initializeDelayedCloseTimer();
-    }
-    // Update delay close state according to current call.
-    if (delayed_close_timeout_configured &&
-        type == Network::ConnectionCloseType::FlushWriteAndDelay) {
-      delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+    if (delayed_close_timeout_configured) {
+      // QUIC connection has unsent data and caller wants to flush them. Wait for flushing or
+      // timeout.
+      if (!inDelayedClose()) {
+        // Only set alarm if not in delay close mode yet.
+        initializeDelayedCloseTimer();
+      }
+      // Update delay close state according to current call.
+      if (type == Network::ConnectionCloseType::FlushWriteAndDelay) {
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+      } else {
+        ASSERT(type == Network::ConnectionCloseType::FlushWrite);
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
+      }
     } else {
       delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     }
+  } else if (hasDataToWrite()) {
+    // Quic connection has unsent data but caller wants to close right away.
+    ASSERT(type == Network::ConnectionCloseType::NoFlush);
+    quic_connection_->OnCanWrite();
+    closeConnectionImmediately();
   } else {
-    if (hasDataToWrite()) {
-      // Quic connection has unsent data but caller wants to close right away.
-      ASSERT(type == Network::ConnectionCloseType::NoFlush);
-      quic_connection_->OnCanWrite();
-      closeConnectionImmediately();
-    } else {
-      // Quic connection doesn't have unsent data. It's upto caller and
-      // configuration whether to wait or not before closing.
-      if (delayed_close_timeout_configured &&
-          type == Network::ConnectionCloseType::FlushWriteAndDelay) {
-        if (!inDelayedClose()) {
-          initializeDelayedCloseTimer();
-        }
-        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
-      } else {
-        closeConnectionImmediately();
+    // Quic connection doesn't have unsent data. It's up to the caller and
+    // the configuration whether to wait or not before closing.
+    if (delayed_close_timeout_configured &&
+        type == Network::ConnectionCloseType::FlushWriteAndDelay) {
+      if (!inDelayedClose()) {
+        initializeDelayedCloseTimer();
       }
+      delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+    } else {
+      closeConnectionImmediately();
     }
   }
 }
