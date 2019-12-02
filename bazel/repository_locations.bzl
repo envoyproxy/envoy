@@ -311,4 +311,19 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "upb-9effcbcb27f0a665f9f345030188c0b291e32482",
         urls = ["https://github.com/protocolbuffers/upb/archive/9effcbcb27f0a665f9f345030188c0b291e32482.tar.gz"],
     ),
+    kafka_source = dict(
+        sha256 = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1", # 2.2.0-rc2
+        strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
+        urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
+    ),
+    kafka_server_binary = dict(
+        sha256 = "a009624fae678fa35968f945e18e45fbea9a30fa8080d5dcce7fdea726120027",
+        strip_prefix = "kafka_2.12-2.2.0",
+        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
+    ),
+    kafka_python_client = dict(
+        sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",
+        strip_prefix = "kafka-python-1.4.7",
+        urls = ["https://github.com/dpkp/kafka-python/archive/1.4.7.tar.gz"],
+    ),
 )

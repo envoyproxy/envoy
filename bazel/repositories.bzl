@@ -156,6 +156,7 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
+    _kafka_deps()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -731,6 +732,22 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _kafka_deps():
+    # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
+    # tests.
+    http_archive(
+        name = "kafka_server_binary",
+        build_file_content = BUILD_ALL_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_server_binary"]
+    )
+    # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
+    # during interation tests.
+    http_archive(
+        name = "kafka_python_client",
+        build_file_content = BUILD_ALL_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_python_client"]
     )
 
 def _foreign_cc_dependencies():
