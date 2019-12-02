@@ -101,8 +101,10 @@ void RouterCheckTool::assignRuntimeFraction(envoy::api::v2::RouteConfiguration& 
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       std::cout << route.match().DebugString() << std::endl;
-      if (route.match().has_runtime_fraction() && route.match().runtime_fraction().default_value().numerator() == 0) {
-        route.mutable_match()->mutable_runtime_fraction()->mutable_default_value()->set_numerator(1);
+      if (route.match().has_runtime_fraction() &&
+          route.match().runtime_fraction().default_value().numerator() == 0) {
+        route.mutable_match()->mutable_runtime_fraction()->mutable_default_value()->set_numerator(
+            1);
       }
     }
   }
