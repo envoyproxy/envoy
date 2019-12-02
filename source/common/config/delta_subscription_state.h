@@ -57,10 +57,12 @@ private:
     explicit ResourceVersion(absl::string_view version) : version_(version) {}
     // Builds a ResourceVersion in the waitingForServer state.
     ResourceVersion() = default;
+    // Self-documenting alias of default constructor.
+    static ResourceVersion waitingForServer() { return ResourceVersion(); }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
-    bool waitingForServer() const { return version_ == absl::nullopt; }
+    bool isWaitingForServer() const { return version_ == absl::nullopt; }
     // Must not be called if waitingForServer() == true.
     std::string version() const {
       ASSERT(version_.has_value());
@@ -71,19 +73,11 @@ private:
     absl::optional<std::string> version_;
   };
 
-  // Use these helpers to ensure resource_versions_ and resource_names_ get updated together.
-  void setResourceVersion(const std::string& resource_name, const std::string& resource_version);
-  void setResourceWaitingForServer(const std::string& resource_name);
-  void setLostInterestInResource(const std::string& resource_name);
-
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
   std::unordered_map<std::string, ResourceVersion> resource_versions_;
-  // The keys of resource_versions_. Only tracked separately because std::map does not provide an
-  // iterator into just its keys, e.g. for use in std::set_difference.
-  std::set<std::string> resource_names_;
 
   bool any_request_sent_yet_in_current_stream_{};
 

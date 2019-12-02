@@ -30,7 +30,7 @@ DeltaSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
-    setResourceWaitingForServer(a);
+    resource_versions_[a] = ResourceVersion::waitingForServer();
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
     // copy of the resource after instructing us to remove it, and need to be reminded of it.
@@ -38,7 +38,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::stri
     names_added_.insert(a);
   }
   for (const auto& r : cur_removed) {
-    setLostInterestInResource(r);
+    resource_versions_.erase(r);
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -94,7 +94,7 @@ void DeltaSubscriptionState::handleGoodResponse(
   callbacks().onConfigUpdate(message.resources(), message.removed_resources(),
                              message.system_version_info());
   for (const auto& resource : message.resources()) {
-    setResourceVersion(resource.name(), resource.version());
+    resource_versions_[resource.name()] = ResourceVersion(resource.version());
   }
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which
@@ -106,7 +106,7 @@ void DeltaSubscriptionState::handleGoodResponse(
   // cancelling my subscription" when we lose interest.
   for (const auto& resource_name : message.removed_resources()) {
     if (resource_versions_.find(resource_name) != resource_versions_.end()) {
-      setResourceWaitingForServer(resource_name);
+      resource_versions_[resource_name] = ResourceVersion::waitingForServer();
     }
   }
   ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url(),
@@ -140,7 +140,7 @@ envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInt
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource.second.waitingForServer()) {
+      if (!resource.second.isWaitingForServer()) {
         (*request->mutable_initial_resource_versions())[resource.first] = resource.second.version();
       }
       // As mentioned above, fill resource_names_subscribe with everything, including names we
@@ -170,19 +170,6 @@ void* DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
     request->mutable_error_detail()->CopyFrom(ack.error_detail_);
   }
   return request;
-}
-
-void DeltaSubscriptionState::setResourceVersion(const std::string& resource_name,
-                                                const std::string& resource_version) {
-  resource_versions_[resource_name] = ResourceVersion(resource_version);
-}
-
-void DeltaSubscriptionState::setResourceWaitingForServer(const std::string& resource_name) {
-  resource_versions_[resource_name] = ResourceVersion();
-}
-
-void DeltaSubscriptionState::setLostInterestInResource(const std::string& resource_name) {
-  resource_versions_.erase(resource_name);
 }
 
 } // namespace Config
