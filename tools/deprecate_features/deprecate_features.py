@@ -17,7 +17,7 @@ def deprecate_proto():
   # Compile the set of deprecated fields and the files they're in, deduping via set.
   deprecated_regex = re.compile(r'.*\/([^\/]*.proto):[^=]* ([^= ]+) =.*')
   for byte_line in grep_output.splitlines():
-    line = byte_line.decode('utf-8')
+    line = str(byte_line)
     match = deprecated_regex.match(line)
     if match:
       filenames_and_fields.add(tuple([match.group(1), match.group(2)]))
