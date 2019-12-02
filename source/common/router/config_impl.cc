@@ -127,7 +127,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
       retry_budget_->budget_percent =
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(retry_policy.retry_budget(), percent_budget, 20.0);
       retry_budget_->min_concurrency =
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy.retry_budget(), min_concurrency, 10);
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy.retry_budget(), min_concurrency, 15);
     }
   }
 }

@@ -225,18 +225,14 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   retries_remaining_--;
 
   // We only use the max_retries circuit breaker when retry budgets are not configured.
-  if (!retry_budget_ && !cluster_.resourceManager(priority_).retries().canCreate()) {
+  if ((retry_budget_ && retryBudgetExceeded()) ||
+      (!retry_budget_ && !cluster_.resourceManager(priority_).retries().canCreate())) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     return RetryStatus::NoOverflow;
   }
 
   if (!runtime_.snapshot().featureEnabled("upstream.use_retry", 100)) {
     return RetryStatus::No;
-  }
-
-  if (retryBudgetExceeded()) {
-    cluster_.stats().upstream_rq_retry_budget_exceeded_.inc();
-    return RetryStatus::NoOverflow;
   }
 
   ASSERT(!callback_);
@@ -248,14 +244,9 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 }
 
 bool RetryStateImpl::retryBudgetExceeded() {
-  if (!retry_budget_) {
-    return false;
-  }
+  ASSERT(retry_budget_);
 
-  // If a retry budget was configured, we cannot exceed the configured percentage of total
-  // outstanding requests/connections.
-  const uint64_t current_active = cluster_.resourceManager(priority_).connections().count() +
-                                  cluster_.resourceManager(priority_).requests().count() +
+  const uint64_t current_active = cluster_.resourceManager(priority_).requests().count() +
                                   cluster_.resourceManager(priority_).pendingRequests().count();
 
   if (current_active < retry_budget_->min_concurrency) {
