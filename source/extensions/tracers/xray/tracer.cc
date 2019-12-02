@@ -13,9 +13,10 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "source/extensions/tracers/xray/daemon.pb.h"
+#include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -90,6 +91,9 @@ void Span::finishSpan() {
     s.mutable_http()->mutable_response()->insert(KeyValue{item.first, item.second});
   }
 
+  // TODO(marcomagdy): test how expensive this validation is. Might be worth turning off in
+  // optimized builds..
+  MessageUtil::validate(s, ProtobufMessage::getStrictValidationVisitor());
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
   std::string json;
@@ -98,7 +102,7 @@ void Span::finishSpan() {
     throw new EnvoyException("Failed to serialize span to JSON.");
   }
 
-  broker_->send(json);
+  broker_.send(json);
 }
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
@@ -128,7 +132,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& span_name, const std::stri
                                    const absl::optional<XRayHeader>& xray_header) {
 
   const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
-  auto span_ptr = std::make_unique<XRay::Span>(time_source_, daemon_broker_.get());
+  auto span_ptr = std::make_unique<XRay::Span>(time_source_, *daemon_broker_);
   span_ptr->setId(ticks);
   span_ptr->setName(span_name);
   span_ptr->setOperation(operation_name);
@@ -154,7 +158,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& span_name, const std::stri
 }
 
 XRay::SpanPtr Tracer::createNonSampledSpan() const {
-  auto span_ptr = std::make_unique<XRay::Span>(time_source_, daemon_broker_.get());
+  auto span_ptr = std::make_unique<XRay::Span>(time_source_, *daemon_broker_);
   const auto ticks = time_source_.monotonicTime().time_since_epoch().count();
   span_ptr->setId(ticks);
   span_ptr->setName("NotSampled");

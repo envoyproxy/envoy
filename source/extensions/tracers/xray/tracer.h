@@ -28,10 +28,10 @@ public:
   /**
    * Creates a new Span.
    *
-   * @param broker Facilitates communication with the X-Ray daemon.
    * @param time_source A time source to create Span IDs using the monotonic clock.
+   * @param broker Facilitates communication with the X-Ray daemon.
    */
-  Span(Envoy::TimeSource& time_source, DaemonBroker* broker)
+  Span(Envoy::TimeSource& time_source, DaemonBroker& broker)
       : time_source_(time_source), broker_(broker), sampled_(true) {}
 
   /**
@@ -151,7 +151,7 @@ private:
   absl::flat_hash_map<std::string, std::string> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
   Envoy::TimeSource& time_source_;
-  DaemonBroker* broker_;
+  DaemonBroker& broker_;
   bool sampled_;
 };
 
