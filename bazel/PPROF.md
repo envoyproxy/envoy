@@ -47,7 +47,7 @@ Run a test with CPU profiling enabled, like so:
 
     $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof <test target>
 
-Note that heap checks and heap profile collection in tests have noticiable performance implications.  Use the following command to collect a CPU profile from a test target with heap check and heap profile collection disabled:
+Note that heap checks and heap profile collection in tests have noticiable performance implications. Use the following command to collect a CPU profile from a test target with heap check and heap profile collection disabled:
 
     $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof --test_env=HEAPPROFILE= --test_env=HEAPCHECK= <test target>
 
