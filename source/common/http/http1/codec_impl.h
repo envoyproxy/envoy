@@ -96,11 +96,11 @@ private:
 
   void encodeFormattedHeader(absl::string_view key, absl::string_view value);
 
-  bool chunk_encoding_{true};
-  bool processing_100_continue_{false};
-  bool is_response_to_head_request_{false};
-  bool is_content_length_allowed_{true};
   const HeaderKeyFormatter* const header_key_formatter_;
+  bool chunk_encoding_ : 1;
+  bool processing_100_continue_ : 1;
+  bool is_response_to_head_request_ : 1;
+  bool is_content_length_allowed_ : 1;
 };
 
 /**
@@ -204,8 +204,11 @@ protected:
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
-  bool handling_upgrade_{};
   const HeaderKeyFormatterPtr header_key_formatter_;
+  bool handling_upgrade_ : 1;
+  bool reset_stream_called_ : 1;
+  const bool strict_header_validation_ : 1;
+  const bool connection_header_sanitization_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -300,16 +303,12 @@ private:
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
-  bool reset_stream_called_{};
   Buffer::WatermarkBuffer output_buffer_;
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
-
-  const bool strict_header_validation_;
-  const bool connection_header_sanitization_;
 };
 
 /**
