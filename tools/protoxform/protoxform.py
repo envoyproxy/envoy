@@ -199,14 +199,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       google_imports.append(d)
     elif d.startswith('validate/'):
       infra_imports.append(d)
-    elif d in ['versioning/versioning.proto']:
+    elif d in ['udpa/api/annotations/versioning.proto']:
       # Skip, we decide to add this based on requires_versioning_import
       pass
     else:
       misc_imports.append(d)
 
   if requires_versioning_import:
-    misc_imports.append('versioning/versioning.proto')
+    misc_imports.append('udpa/api/annotations/versioning.proto')
 
   def FormatImportBlock(xs):
     if not xs:
@@ -422,8 +422,9 @@ def FormatOptions(options, is_message=False):
   if is_message:
     versioning_annotation = protoxform_options.GetVersioningAnnotation(options)
     if versioning_annotation:
-      formatted_options.append('option (versioning.annotation).previous_message_type = "%s";' %
-                               versioning_annotation.previous_message_type)
+      formatted_options.append(
+          'option (udpa.api.annotations.versioning).previous_message_type = "%s";' %
+          versioning_annotation.previous_message_type)
   if formatted_options:
     return FormatBlock('\n'.join(formatted_options) + '\n')
   return ''

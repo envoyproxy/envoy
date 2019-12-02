@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -17,11 +17,13 @@ import "validate/validate.proto";
 
 // [#not-implemented-hide:]
 message TcpProtocolOptions {
-  option (versioning.annotation).previous_message_type = "envoy.api.v2.core.TcpProtocolOptions";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.TcpProtocolOptions";
 }
 
 message HttpProtocolOptions {
-  option (versioning.annotation).previous_message_type = "envoy.api.v2.core.HttpProtocolOptions";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.HttpProtocolOptions";
 
   // The idle timeout for connections. The idle timeout is defined as the
   // period in which there are no active requests. If not set, there is no idle timeout. When the
@@ -52,14 +54,15 @@ message HttpProtocolOptions {
 }
 
 message Http1ProtocolOptions {
-  option (versioning.annotation).previous_message_type = "envoy.api.v2.core.Http1ProtocolOptions";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.Http1ProtocolOptions";
 
   message HeaderKeyFormat {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat";
 
     message ProperCaseWords {
-      option (versioning.annotation).previous_message_type =
+      option (udpa.api.annotations.versioning).previous_message_type =
           "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords";
     }
 
@@ -99,7 +102,8 @@ message Http1ProtocolOptions {
 
 // [#next-free-field: 13]
 message Http2ProtocolOptions {
-  option (versioning.annotation).previous_message_type = "envoy.api.v2.core.Http2ProtocolOptions";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.Http2ProtocolOptions";
 
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
@@ -203,7 +207,8 @@ message Http2ProtocolOptions {
 
 // [#not-implemented-hide:]
 message GrpcProtocolOptions {
-  option (versioning.annotation).previous_message_type = "envoy.api.v2.core.GrpcProtocolOptions";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.GrpcProtocolOptions";
 
   Http2ProtocolOptions http2_protocol_options = 1;
 }

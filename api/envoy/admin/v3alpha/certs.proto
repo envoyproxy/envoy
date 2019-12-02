@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
 import "google/protobuf/timestamp.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 // [#protodoc-title: Certificates]
 
@@ -16,14 +16,16 @@ import "versioning/versioning.proto";
 // display certificate information. See :ref:`/certs <operations_admin_interface_certs>` for more
 // information.
 message Certificates {
-  option (versioning.annotation).previous_message_type = "envoy.admin.v2alpha.Certificates";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.Certificates";
 
   // List of certificates known to an Envoy.
   repeated Certificate certificates = 1;
 }
 
 message Certificate {
-  option (versioning.annotation).previous_message_type = "envoy.admin.v2alpha.Certificate";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.Certificate";
 
   // Details of CA certificate.
   repeated CertificateDetails ca_cert = 1;
@@ -34,7 +36,8 @@ message Certificate {
 
 // [#next-free-field: 7]
 message CertificateDetails {
-  option (versioning.annotation).previous_message_type = "envoy.admin.v2alpha.CertificateDetails";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.CertificateDetails";
 
   // Path of the certificate.
   string path = 1;
@@ -56,7 +59,8 @@ message CertificateDetails {
 }
 
 message SubjectAlternateName {
-  option (versioning.annotation).previous_message_type = "envoy.admin.v2alpha.SubjectAlternateName";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.SubjectAlternateName";
 
   // Subject Alternate Name.
   oneof name {

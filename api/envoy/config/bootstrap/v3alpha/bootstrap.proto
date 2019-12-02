@@ -20,7 +20,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -32,10 +32,11 @@ import "validate/validate.proto";
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
 // [#next-free-field: 20]
 message Bootstrap {
-  option (versioning.annotation).previous_message_type = "envoy.config.bootstrap.v2.Bootstrap";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v2.Bootstrap";
 
   message StaticResources {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.Bootstrap.StaticResources";
 
     // Static :ref:`Listeners <envoy_api_msg_api.v3alpha.Listener>`. These listeners are
@@ -55,7 +56,7 @@ message Bootstrap {
   }
 
   message DynamicResources {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.Bootstrap.DynamicResources";
 
     reserved 4;
@@ -166,7 +167,8 @@ message Bootstrap {
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
 message Admin {
-  option (versioning.annotation).previous_message_type = "envoy.config.bootstrap.v2.Admin";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v2.Admin";
 
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
@@ -188,10 +190,11 @@ message Admin {
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
 message ClusterManager {
-  option (versioning.annotation).previous_message_type = "envoy.config.bootstrap.v2.ClusterManager";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v2.ClusterManager";
 
   message OutlierDetection {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.ClusterManager.OutlierDetection";
 
     // Specifies the path to the outlier event log.
@@ -227,7 +230,8 @@ message ClusterManager {
 // nonresponsive threads and kills the process after the configured thresholds.
 // See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
 message Watchdog {
-  option (versioning.annotation).previous_message_type = "envoy.config.bootstrap.v2.Watchdog";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v2.Watchdog";
 
   // The duration after which Envoy counts a nonresponsive thread in the
   // *watchdog_miss* statistic. If not specified the default is 200ms.
@@ -251,7 +255,8 @@ message Watchdog {
 
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).
 message Runtime {
-  option (versioning.annotation).previous_message_type = "envoy.config.bootstrap.v2.Runtime";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v2.Runtime";
 
   // The implementation assumes that the file system tree is accessed via a
   // symbolic link. An atomic link swap is used when a new tree should be
@@ -283,11 +288,12 @@ message Runtime {
 
 // [#next-free-field: 6]
 message RuntimeLayer {
-  option (versioning.annotation).previous_message_type = "envoy.config.bootstrap.v2.RuntimeLayer";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v2.RuntimeLayer";
 
   // :ref:`Disk runtime <config_runtime_local_disk>` layer.
   message DiskLayer {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.RuntimeLayer.DiskLayer";
 
     // The implementation assumes that the file system tree is accessed via a
@@ -311,13 +317,13 @@ message RuntimeLayer {
 
   // :ref:`Admin console runtime <config_runtime_admin>` layer.
   message AdminLayer {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.RuntimeLayer.AdminLayer";
   }
 
   // :ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` layer.
   message RtdsLayer {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.RuntimeLayer.RtdsLayer";
 
     // Resource to subscribe to at *rtds_config* for the RTDS layer.
@@ -350,7 +356,8 @@ message RuntimeLayer {
 
 // Runtime :ref:`configuration overview <config_runtime>`.
 message LayeredRuntime {
-  option (versioning.annotation).previous_message_type = "envoy.config.bootstrap.v2.LayeredRuntime";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v2.LayeredRuntime";
 
   // The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
   // such that later layers in the list overlay earlier entries.

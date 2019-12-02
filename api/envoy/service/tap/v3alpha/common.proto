@@ -12,7 +12,7 @@ import "envoy/api/v3alpha/route/route.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -22,7 +22,8 @@ import "validate/validate.proto";
 message TapConfig {
   // [#comment:TODO(mattklein123): Rate limiting]
 
-  option (versioning.annotation).previous_message_type = "envoy.service.tap.v2alpha.TapConfig";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.TapConfig";
 
   // The match configuration. If the configuration matches the data source being tapped, a tap will
   // occur, with the result written to the configured output.
@@ -47,11 +48,12 @@ message TapConfig {
 // configurations to be built using various logical operators.
 // [#next-free-field: 9]
 message MatchPredicate {
-  option (versioning.annotation).previous_message_type = "envoy.service.tap.v2alpha.MatchPredicate";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.MatchPredicate";
 
   // A set of match configurations used for logical operations.
   message MatchSet {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.service.tap.v2alpha.MatchPredicate.MatchSet";
 
     // The list of rules that make up the set.
@@ -91,7 +93,7 @@ message MatchPredicate {
 
 // HTTP headers match configuration.
 message HttpHeadersMatch {
-  option (versioning.annotation).previous_message_type =
+  option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.HttpHeadersMatch";
 
   // HTTP headers to match.
@@ -100,7 +102,8 @@ message HttpHeadersMatch {
 
 // Tap output configuration.
 message OutputConfig {
-  option (versioning.annotation).previous_message_type = "envoy.service.tap.v2alpha.OutputConfig";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.OutputConfig";
 
   // Output sinks for tap data. Currently a single sink is allowed in the list. Once multiple
   // sink types are supported this constraint will be relaxed.
@@ -129,7 +132,8 @@ message OutputConfig {
 
 // Tap output sink configuration.
 message OutputSink {
-  option (versioning.annotation).previous_message_type = "envoy.service.tap.v2alpha.OutputSink";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.OutputSink";
 
   // Output format. All output is in the form of one or more :ref:`TraceWrapper
   // <envoy_api_msg_data.tap.v3alpha.TraceWrapper>` messages. This enumeration indicates
@@ -196,13 +200,14 @@ message OutputSink {
 
 // Streaming admin sink configuration.
 message StreamingAdminSink {
-  option (versioning.annotation).previous_message_type =
+  option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.StreamingAdminSink";
 }
 
 // The file per tap sink outputs a discrete file for every tapped stream.
 message FilePerTapSink {
-  option (versioning.annotation).previous_message_type = "envoy.service.tap.v2alpha.FilePerTapSink";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.FilePerTapSink";
 
   // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
   // identifier distinguishing the recorded trace for stream instances (the Envoy
@@ -213,7 +218,7 @@ message FilePerTapSink {
 // [#not-implemented-hide:] Streaming gRPC sink configuration sends the taps to an external gRPC
 // server.
 message StreamingGrpcSink {
-  option (versioning.annotation).previous_message_type =
+  option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.StreamingGrpcSink";
 
   // Opaque identifier, that will be sent back to the streaming grpc server.

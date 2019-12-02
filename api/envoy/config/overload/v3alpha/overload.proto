@@ -10,7 +10,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -22,7 +22,7 @@ import "validate/validate.proto";
 // when triggers related to those resources fire.
 
 message ResourceMonitor {
-  option (versioning.annotation).previous_message_type =
+  option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.ResourceMonitor";
 
   reserved 2;
@@ -45,7 +45,7 @@ message ResourceMonitor {
 }
 
 message ThresholdTrigger {
-  option (versioning.annotation).previous_message_type =
+  option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.ThresholdTrigger";
 
   // If the resource pressure is greater than or equal to this value, the trigger
@@ -54,7 +54,8 @@ message ThresholdTrigger {
 }
 
 message Trigger {
-  option (versioning.annotation).previous_message_type = "envoy.config.overload.v2alpha.Trigger";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.overload.v2alpha.Trigger";
 
   // The name of the resource this is a trigger for.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -67,7 +68,7 @@ message Trigger {
 }
 
 message OverloadAction {
-  option (versioning.annotation).previous_message_type =
+  option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
 
   // The name of the overload action. This is just a well-known string that listeners can
@@ -82,7 +83,7 @@ message OverloadAction {
 }
 
 message OverloadManager {
-  option (versioning.annotation).previous_message_type =
+  option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadManager";
 
   // The interval for refreshing resource usage.

@@ -148,8 +148,8 @@ def GetImportDeps(proto_path):
         if any(import_path.startswith(p) for p in API_BUILD_SYSTEM_IMPORT_PREFIXES):
           continue
         # Special case handling for in-built versioning annotations.
-        if import_path == 'versioning/versioning.proto':
-          imports.append('//versioning:pkg')
+        if import_path == 'udpa/api/annotations/versioning.proto':
+          imports.append('@com_github_cncf_udpa//udpa/api/annotations:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:

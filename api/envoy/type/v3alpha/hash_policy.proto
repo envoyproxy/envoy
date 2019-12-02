@@ -6,7 +6,7 @@ option java_outer_classname = "HashPolicyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.v3alpha";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -14,12 +14,13 @@ import "validate/validate.proto";
 
 // Specifies the hash policy
 message HashPolicy {
-  option (versioning.annotation).previous_message_type = "envoy.type.HashPolicy";
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.type.HashPolicy";
 
   // The source IP will be used to compute the hash used by hash-based load balancing
   // algorithms.
   message SourceIp {
-    option (versioning.annotation).previous_message_type = "envoy.type.HashPolicy.SourceIp";
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.type.HashPolicy.SourceIp";
   }
 
   oneof policy_specifier {

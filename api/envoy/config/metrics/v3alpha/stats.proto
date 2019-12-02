@@ -13,7 +13,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -22,7 +22,8 @@ import "validate/validate.proto";
 
 // Configuration for pluggable stats sinks.
 message StatsSink {
-  option (versioning.annotation).previous_message_type = "envoy.config.metrics.v2.StatsSink";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.StatsSink";
 
   reserved 2;
 
@@ -48,7 +49,8 @@ message StatsSink {
 
 // Statistics configuration such as tagging.
 message StatsConfig {
-  option (versioning.annotation).previous_message_type = "envoy.config.metrics.v2.StatsConfig";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.StatsConfig";
 
   // Each stat name is iteratively processed through these tag specifiers.
   // When a tag is matched, the first capture group is removed from the name so
@@ -148,7 +150,8 @@ message StatsMatcher {
   //   }
   //
 
-  option (versioning.annotation).previous_message_type = "envoy.config.metrics.v2.StatsMatcher";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.StatsMatcher";
 
   oneof stats_matcher {
     option (validate.required) = true;
@@ -172,7 +175,8 @@ message StatsMatcher {
 // unconditionally set if a fixed value, otherwise it will only be set if one
 // or more capture groups in the regex match.
 message TagSpecifier {
-  option (versioning.annotation).previous_message_type = "envoy.config.metrics.v2.TagSpecifier";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.TagSpecifier";
 
   // Attaches an identifier to the tag values to identify the tag being in the
   // sink. Envoy has a set of default names and regexes to extract dynamic
@@ -255,7 +259,8 @@ message TagSpecifier {
 // tagged metrics.
 // [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
-  option (versioning.annotation).previous_message_type = "envoy.config.metrics.v2.StatsdSink";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.StatsdSink";
 
   oneof statsd_specifier {
     option (validate.required) = true;
@@ -306,7 +311,8 @@ message StatsdSink {
 // <envoy_api_msg_config.metrics.v3alpha.StatsConfig>`.
 // [#extension: envoy.stat_sinks.dog_statsd]
 message DogStatsdSink {
-  option (versioning.annotation).previous_message_type = "envoy.config.metrics.v2.DogStatsdSink";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.DogStatsdSink";
 
   reserved 2;
 
@@ -334,7 +340,8 @@ message DogStatsdSink {
 // Streaming is started through an admin endpoint :http:get:`/hystrix_event_stream`.
 // [#extension: envoy.stat_sinks.hystrix]
 message HystrixSink {
-  option (versioning.annotation).previous_message_type = "envoy.config.metrics.v2.HystrixSink";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.HystrixSink";
 
   // The number of buckets the rolling statistical window is divided into.
   //

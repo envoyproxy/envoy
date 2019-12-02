@@ -15,8 +15,8 @@ envoy_cc_library(
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
-        "@envoy_api//versioning:pkg_cc_proto",
+        "@com_github_cncf_udpa//udpa/api/annotations:pkg_cc_proto",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
     ],
 )
 
@@ -321,7 +321,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
-        "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",

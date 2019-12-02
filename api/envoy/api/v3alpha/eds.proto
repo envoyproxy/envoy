@@ -15,7 +15,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -50,16 +50,17 @@ service EndpointDiscoveryService {
 // then an endpoint within that locality will be chose based on its weight.
 // [#next-free-field: 6]
 message ClusterLoadAssignment {
-  option (versioning.annotation).previous_message_type = "envoy.api.v2.ClusterLoadAssignment";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.ClusterLoadAssignment";
 
   // Load balancing policy settings.
   // [#next-free-field: 6]
   message Policy {
-    option (versioning.annotation).previous_message_type =
+    option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.api.v2.ClusterLoadAssignment.Policy";
 
     message DropOverload {
-      option (versioning.annotation).previous_message_type =
+      option (udpa.api.annotations.versioning).previous_message_type =
           "envoy.api.v2.ClusterLoadAssignment.Policy.DropOverload";
 
       // Identifier for the policy specifying the drop.

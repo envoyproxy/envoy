@@ -13,7 +13,7 @@ import "envoy/type/v3alpha/http_status.proto";
 
 import "google/rpc/status.proto";
 
-import "versioning/versioning.proto";
+import "udpa/api/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -32,7 +32,8 @@ service Authorization {
 }
 
 message CheckRequest {
-  option (versioning.annotation).previous_message_type = "envoy.service.auth.v2.CheckRequest";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.auth.v2.CheckRequest";
 
   // The request attributes.
   AttributeContext attributes = 1;
@@ -40,7 +41,8 @@ message CheckRequest {
 
 // HTTP attributes for a denied response.
 message DeniedHttpResponse {
-  option (versioning.annotation).previous_message_type = "envoy.service.auth.v2.DeniedHttpResponse";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.auth.v2.DeniedHttpResponse";
 
   // This field allows the authorization service to send a HTTP response status
   // code to the downstream client other than 403 (Forbidden).
@@ -57,7 +59,8 @@ message DeniedHttpResponse {
 
 // HTTP attributes for an ok response.
 message OkHttpResponse {
-  option (versioning.annotation).previous_message_type = "envoy.service.auth.v2.OkHttpResponse";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.auth.v2.OkHttpResponse";
 
   // HTTP entity headers in addition to the original request headers. This allows the authorization
   // service to append, to add or to override headers from the original request before
@@ -70,7 +73,8 @@ message OkHttpResponse {
 
 // Intended for gRPC and Network Authorization servers `only`.
 message CheckResponse {
-  option (versioning.annotation).previous_message_type = "envoy.service.auth.v2.CheckResponse";
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.auth.v2.CheckResponse";
 
   // Status `OK` allows the request. Any other status indicates the request should be denied.
   google.rpc.Status status = 1;

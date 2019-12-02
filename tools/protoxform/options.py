@@ -1,6 +1,6 @@
 # Manage internal options on messages/enums/fields/enum values.
 
-from versioning import versioning_pb2
+from udpa.api.annotations import versioning_pb2
 
 
 def AddHideOption(options):
@@ -30,7 +30,7 @@ def HasHideOption(options):
 
 
 def SetVersioningAnnotation(options, previous_message_type):
-  """Set the versioning.Annotation option.
+  """Set the udpa.api.annotations.versioning option.
 
   Used by Envoy to chain back through the message type history.
 
@@ -38,11 +38,11 @@ def SetVersioningAnnotation(options, previous_message_type):
     options: MessageOptions message.
     previous_message_type: string with earlier API type name for the message.
   """
-  options.Extensions[versioning_pb2.annotation].previous_message_type = previous_message_type
+  options.Extensions[versioning_pb2.versioning].previous_message_type = previous_message_type
 
 
 def GetVersioningAnnotation(options):
-  """Get the versioning.Annotation option.
+  """Get the udpa.api.annotations.versioning option.
 
   Used by Envoy to chain back through the message type history.
 
@@ -51,6 +51,6 @@ def GetVersioningAnnotation(options):
   Returns:
     versioning.Annotation if set otherwise None.
   """
-  if not options.HasExtension(versioning_pb2.annotation):
+  if not options.HasExtension(versioning_pb2.versioning):
     return None
-  return options.Extensions[versioning_pb2.annotation]
+  return options.Extensions[versioning_pb2.versioning]
