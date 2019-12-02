@@ -59,22 +59,22 @@ Envoy and responses by the management server, the resource type URL is stated.
 API flow
 ~~~~~~~~
 
-The core resource types for the client's configuration are `Listener`, `RouteConfiguration`,
-`Cluster`, and `ClusterLoadAssignment`. Each `Listener` resource may point to a
-`RouteConfiguration` resource, which may point to one or more `Cluster` resources, and each
-Cluster` resource may point to a `ClusterLoadAssignment` resource.
+For typical HTTP routing scenarios, the core resource types for the client's configuration are
+`Listener`, `RouteConfiguration`, `Cluster`, and `ClusterLoadAssignment`. Each `Listener` resource
+may point to a `RouteConfiguration` resource, which may point to one or more `Cluster` resources,
+and each Cluster` resource may point to a `ClusterLoadAssignment` resource.
 
 Envoy fetches all `Listener` and `Cluster` resources at startup. It then fetches whatever
 `RouteConfiguration` and `ClusterLoadAssignment` resources that are required by the `Listener` and
 `Cluster` resources. In effect, every `Listener` or `Cluster` resource is a root to part of Envoy's
 configuration tree.
 
-A non-proxy client such as gRPC will start by fetching only the one particular `Listener` resource
-that is the root of its configuration tree. It then fetches the `RouteConfiguration` resource
-required by that `Listener`, followed by whichever `Cluster` resources are required by the
-`RouteConfiguration`, followed by the `ClusterLoadAssignment` resources required by the `Cluster`
-resources. In effect, the original `Listener` resource is the one single root to the gRPC client's
-configuration tree.
+A non-proxy client such as gRPC will start by fetching only the specific `Listener` resources
+that it is interested in. It then fetches the `RouteConfiguration` resources required by those
+`Listener` resources, followed by whichever `Cluster` resources are required by those
+`RouteConfiguration` resources, followed by the `ClusterLoadAssignment` resources required
+by the `Cluster` resources. In effect, the original `Listener` resources are the roots to
+the client's configuration tree.
 
 Variants of the xDS Transport Protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -374,9 +374,10 @@ from the client's perspective.
 Knowing When a Requested Resource Does Not Exist
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource
-types, because each response needs to include all resources requested by the client, if a client
-requests a resource that does not exist, it can immediately tell this from the response.
+In the SotW protocol variants, responses for :ref:`Listener <envoy_api_msg_Listener>` and
+:ref:`Cluster <envoy_api_msg_Cluster>` resource types must include all resources requested by the
+client. Therefore, if a client requests a resource that does not exist, it can immediately
+tell this from the response.
 
 However, for other resource types, because each resource can be sent in its own response, there is
 no way to know from the next response whether the newly requested resource exists, because the next
@@ -387,6 +388,10 @@ resource to not exist if they have not received the resource. In Envoy, this is 
 :ref:`RouteConfiguration <envoy_api_msg_RouteConfiguration>` and :ref:`ClusterLoadAssignment
 <envoy_api_msg_ClusterLoadAssignment>` resources during :ref:`resource warming
 <xds_protocol_resource_warming>`.
+
+Note that clients may want to use the same timeout even for :ref:`Listener
+<envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resources, to protect
+against the case where the management server fails to send a response in a timely manner.
 
 Note that even if a requested resource does not exist at the moment when the client requests it,
 that resource could be created at any time. Management servers must remember the set of resources
