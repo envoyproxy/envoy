@@ -79,13 +79,12 @@ settings:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   RedisProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, filter_chain_factory_context
-});
-EXPECT_TRUE(factory.isTerminalFilter());
-Network::MockConnection connection;
-EXPECT_CALL(connection, addReadFilter(_));
-cb(connection);
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
+  EXPECT_TRUE(factory.isTerminalFilter());
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
 } // namespace RedisProxy
 
 TEST(RedisProxyFilterConfigFactoryTest,
@@ -157,7 +156,7 @@ settings:
   cb(connection);
 }
 
+} // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-} // namespace Envoy
 } // namespace Envoy

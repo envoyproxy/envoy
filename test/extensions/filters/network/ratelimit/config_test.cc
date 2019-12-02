@@ -43,7 +43,8 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
   TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+  EXPECT_CALL(filter_chain_factory_context.cluster_manager_.async_client_manager_,
+              factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));

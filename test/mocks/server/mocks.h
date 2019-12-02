@@ -243,7 +243,7 @@ public:
   }
 
   MOCK_METHOD1(createLdsApi_, LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config));
-  MOCK_METHOD3(createNetworkFilterFactoryList,
+  MOCK_METHOD2(createNetworkFilterFactoryList,
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                    Configuration::FilterChainFactoryContext& filter_chain_factory_context));

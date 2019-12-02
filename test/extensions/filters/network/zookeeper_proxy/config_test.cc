@@ -19,9 +19,8 @@ using ZooKeeperProxyProtoConfig =
 TEST(ZookeeperFilterConfigTest, ValidateFail) {
   testing::NiceMock<Server::Configuration::MockFilterChainFactoryContext>
       filter_chain_factory_context;
-  EXPECT_THROW(ZooKeeperConfigFactory().createFilterFactoryFromProto(
-                   ZooKeeperProxyProtoConfig(), filter_chain_factory_context
-}),
+  EXPECT_THROW(ZooKeeperConfigFactory().createFilterFactoryFromProto(ZooKeeperProxyProtoConfig(),
+                                                                     filter_chain_factory_context),
                ProtoValidationException);
 } // namespace ZooKeeperProxy
 
@@ -63,7 +62,7 @@ stat_prefix: test_prefix
   cb(connection);
 }
 
+} // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-} // namespace Envoy
 } // namespace Envoy

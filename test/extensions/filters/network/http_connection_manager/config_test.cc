@@ -51,7 +51,7 @@ TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
   EXPECT_THROW(
       HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager(),
-          context_, filter_chain_factory_context_),
+          filter_chain_factory_context_),
       ProtoValidationException);
 }
 
@@ -787,9 +787,9 @@ http_filters:
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 =
-      factory.createFilterFactoryFromProto(proto_config, context_, filter_chain_factory_context_);
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context_);
   Network::FilterFactoryCb cb2 =
-      factory.createFilterFactoryFromProto(proto_config, context_, filter_chain_factory_context_);
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context_);
   EXPECT_TRUE(factory.isTerminalFilter());
 }
 
