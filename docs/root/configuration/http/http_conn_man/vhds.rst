@@ -1,7 +1,7 @@
 .. _config_http_conn_man_vhds:
 
 Virtual Host Discovery Service (VHDS)
-=============================
+=====================================
 
 The virtual host discovery service (VHDS) API is an optional API that Envoy
 will call to dynamically fetch
