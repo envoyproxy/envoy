@@ -32,8 +32,7 @@ public:
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
   void onWriteReady(const Network::Socket& socket) override;
-  void onReceiveError(const Network::UdpListenerCallbacks::ErrorCode& /*error_code*/,
-                      Api::IoError::IoErrorCode /*err*/) override {
+  void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
     // No-op. Quic can't do anything upon listener error.
   }
 
@@ -43,11 +42,6 @@ public:
 
 private:
   friend class ActiveQuicListenerPeer;
-
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::Socket& listen_socket, std::unique_ptr<quic::QuicPacketWriter> writer,
-                     Network::UdpListenerPtr&& listener, Network::ListenerConfig& listener_config,
-                     const quic::QuicConfig& quic_config);
 
   Network::UdpListenerPtr udp_listener_;
   uint8_t random_seed_[16];
