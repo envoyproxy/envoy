@@ -22,12 +22,11 @@ namespace SniCluster {
 
 // Test that a SniCluster filter config works.
 TEST(SniCluster, ConfigTest) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   SniClusterNetworkFilterConfigFactory factory;
 
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), context,
-                                           Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
+      *factory.createEmptyConfigProto(), filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

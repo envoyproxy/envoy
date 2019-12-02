@@ -17,12 +17,13 @@ using ZooKeeperProxyProtoConfig =
     envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy;
 
 TEST(ZookeeperFilterConfigTest, ValidateFail) {
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockFilterChainFactoryContext>
+      filter_chain_factory_context;
   EXPECT_THROW(ZooKeeperConfigFactory().createFilterFactoryFromProto(
-                   ZooKeeperProxyProtoConfig(), context,
-                   Server::Configuration::MockFilterChainFactoryContext{}),
+                   ZooKeeperProxyProtoConfig(), filter_chain_factory_context
+}),
                ProtoValidationException);
-}
+} // namespace ZooKeeperProxy
 
 TEST(ZookeeperFilterConfigTest, InvalidStatPrefix) {
   const std::string yaml = R"EOF(
@@ -51,17 +52,18 @@ stat_prefix: test_prefix
   ZooKeeperProxyProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  testing::NiceMock<Server::Configuration::MockFilterChainFactoryContext>
+      filter_chain_factory_context;
   ZooKeeperConfigFactory factory;
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
 }
 
-} // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions
+} // namespace Envoy
 } // namespace Envoy

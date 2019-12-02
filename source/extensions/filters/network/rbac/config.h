@@ -24,9 +24,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::rbac::v2::RBAC& proto_config,
-      Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-      override;
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override;
 };
 
 } // namespace RBACFilter

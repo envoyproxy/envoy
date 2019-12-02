@@ -18,24 +18,25 @@ namespace RateLimitFilter {
 
 Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config,
-    Server::Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainFactoryContext&) {
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(!proto_config.domain().empty());
   ASSERT(proto_config.descriptors_size() > 0);
 
-  ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
+  ConfigSharedPtr filter_config(new Config(proto_config, filter_chain_factory_context.scope(),
+                                           filter_chain_factory_context.runtime()));
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 
-  return [proto_config, &context, timeout,
+  return [proto_config, &filter_chain_factory_context, timeout,
           filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<Filter>(
-        filter_config,
+    filter_manager.addReadFilter(
+        std::make_shared<Filter>(filter_config,
 
-        Filters::Common::RateLimit::rateLimitClient(
-            context, proto_config.rate_limit_service().grpc_service(), timeout)));
+                                 Filters::Common::RateLimit::rateLimitClient(
+                                     filter_chain_factory_context,
+                                     proto_config.rate_limit_service().grpc_service(), timeout)));
   };
 }
 

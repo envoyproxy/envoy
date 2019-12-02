@@ -38,16 +38,14 @@ private:
     config.set_stat_prefix("test");
     (*config.mutable_rules()->mutable_policies())["foo"] = policy_proto;
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
     RoleBasedAccessControlNetworkFilterConfigFactory factory;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(
-                     config, context, Server::Configuration::MockFilterChainFactoryContext{}),
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, filter_chain_factory_context),
                  Envoy::EnvoyException);
 
     config.clear_rules();
     (*config.mutable_shadow_rules()->mutable_policies())["foo"] = policy_proto;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(
-                     config, context, Server::Configuration::MockFilterChainFactoryContext{}),
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, filter_chain_factory_context),
                  Envoy::EnvoyException);
   }
 };
@@ -60,10 +58,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
   config.set_stat_prefix("stats");
   (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

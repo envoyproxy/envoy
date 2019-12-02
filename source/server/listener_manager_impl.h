@@ -42,8 +42,7 @@ public:
    */
   static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-      Configuration::FactoryContext& context,
-      const Configuration::FilterChainFactoryContext& filter_chain_factory_context);
+      Configuration::FilterChainFactoryContext& filter_chain_factory_context);
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
@@ -66,10 +65,8 @@ public:
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-      Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-      override {
-    return createNetworkFilterFactoryList_(filters, context, filter_chain_factory_context);
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
+    return createNetworkFilterFactoryList_(filters, filter_chain_factory_context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,

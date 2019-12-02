@@ -21,15 +21,14 @@ namespace MySQLProxy {
 Network::FilterFactoryCb
 NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy& proto_config,
-    Server::Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainFactoryContext&) {
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 
   const std::string stat_prefix = fmt::format("mysql.{}", proto_config.stat_prefix());
 
   MySQLFilterConfigSharedPtr filter_config(
-      std::make_shared<MySQLFilterConfig>(stat_prefix, context.scope()));
+      std::make_shared<MySQLFilterConfig>(stat_prefix, filter_chain_factory_context.scope()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<MySQLFilter>(filter_config));
   };

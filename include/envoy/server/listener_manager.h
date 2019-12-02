@@ -65,8 +65,7 @@ public:
    */
   virtual std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-      Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
   /**
    * Creates a list of listener filter factories.

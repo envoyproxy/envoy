@@ -17,10 +17,10 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   EXPECT_THROW(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::redis_proxy::v2::RedisProxy(), context,
-                   Server::Configuration::MockFilterChainFactoryContext{}),
+                   envoy::config::filter::network::redis_proxy::v2::RedisProxy(),
+                   filter_chain_factory_context),
                ProtoValidationException);
 }
 
@@ -32,12 +32,11 @@ TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
   config.set_stat_prefix("foo");
   config.mutable_settings()->CopyFrom(settings);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
-          config, context, Server::Configuration::MockFilterChainFactoryContext{}),
-      EnvoyException, "cannot configure a redis-proxy without any upstream");
+  EXPECT_THROW_WITH_MESSAGE(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
+                                config, filter_chain_factory_context),
+                            EnvoyException, "cannot configure a redis-proxy without any upstream");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoSettings) {
@@ -78,15 +77,16 @@ settings:
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
-  EXPECT_TRUE(factory.isTerminalFilter());
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
+      proto_config, filter_chain_factory_context
+});
+EXPECT_TRUE(factory.isTerminalFilter());
+Network::MockConnection connection;
+EXPECT_CALL(connection, addReadFilter(_));
+cb(connection);
+} // namespace RedisProxy
 
 TEST(RedisProxyFilterConfigFactoryTest,
      DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCatchAllCluster)) {
@@ -100,10 +100,10 @@ settings:
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   RedisProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -122,10 +122,10 @@ settings:
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   RedisProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -142,7 +142,7 @@ settings:
   op_timeout: 0.02s
   )EOF";
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   RedisProxyFilterConfigFactory factory;
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       *dynamic_cast<envoy::config::filter::network::redis_proxy::v2::RedisProxy*>(
@@ -150,14 +150,14 @@ settings:
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
-} // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
+} // namespace Envoy
 } // namespace Envoy

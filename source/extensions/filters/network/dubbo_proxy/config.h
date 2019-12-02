@@ -29,9 +29,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
-      Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-      override;
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override;
 };
 
 class ConfigImpl : public Config,

@@ -103,13 +103,14 @@ ProtocolType ProtocolOptionsConfigImpl::protocol(ProtocolType downstream_protoco
 
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
-    Server::Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainFactoryContext&) {
-  std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
+  std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, filter_chain_factory_context));
 
-  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [filter_config,
+          &filter_chain_factory_context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.random(), context.dispatcher().timeSource()));
+        *filter_config, filter_chain_factory_context.random(),
+        filter_chain_factory_context.dispatcher().timeSource()));
   };
 }
 

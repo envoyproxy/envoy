@@ -16,12 +16,12 @@ template <class ConfigProto, class ProtocolOptionsProto = ConfigProto>
 class FactoryBase : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   Network::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-      override {
-    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                                 proto_config, context.messageValidationVisitor()),
-                                             context, filter_chain_factory_context);
+      const Protobuf::Message& proto_config,
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, filter_chain_factory_context.messageValidationVisitor()),
+        filter_chain_factory_context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -49,8 +49,8 @@ protected:
 
 private:
   virtual Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const ConfigProto& proto_config, Server::Configuration::FactoryContext& context,
-      const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
+      const ConfigProto& proto_config,
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsTyped(const ProtocolOptionsProto&) {

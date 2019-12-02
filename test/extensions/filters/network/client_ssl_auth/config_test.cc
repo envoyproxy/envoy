@@ -41,10 +41,10 @@ ip_white_list:
 
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -59,10 +59,10 @@ ip_white_list:
 
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   ClientSslAuthConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -75,25 +75,25 @@ auth_api_cluster: fake_cluster
 ip_white_list:
 )EOF" + GetParam();
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   ClientSslAuthConfigFactory factory;
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config =
       *dynamic_cast<envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth*>(
           factory.createEmptyConfigProto().get());
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
 TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   EXPECT_THROW(ClientSslAuthConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth(), context,
-                   Server::Configuration::MockFilterChainFactoryContext{}),
+                   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth(),
+                   filter_chain_factory_context),
                ProtoValidationException);
 }
 

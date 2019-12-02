@@ -75,45 +75,53 @@ Network::FilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
-      context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
-            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
-                                                                      context.threadLocal());
+      filter_chain_factory_context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
+          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&filter_chain_factory_context] {
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(
+                filter_chain_factory_context.dispatcher(),
+                filter_chain_factory_context.threadLocal());
           });
 
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+      filter_chain_factory_context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager),
+          [&filter_chain_factory_context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(
+                filter_chain_factory_context.admin());
           });
 
   std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager =
-      context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
-          [&context, route_config_provider_manager] {
-            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
-                context.admin(), *route_config_provider_manager);
-          });
+      filter_chain_factory_context.singletonManager()
+          .getTyped<Router::ScopedRoutesConfigProviderManager>(
+              SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
+              [&filter_chain_factory_context, route_config_provider_manager] {
+                return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
+                    filter_chain_factory_context.admin(), *route_config_provider_manager);
+              });
 
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      proto_config, context, *date_provider, *route_config_provider_manager,
+      proto_config, filter_chain_factory_context, *date_provider, *route_config_provider_manager,
       *scoped_routes_config_provider_manager));
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
-          filter_config, &context, tag = filter_chain_factory_context.getTag()](
-             Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *filter_config, context.drainDecision(), context.filterChainDrainDecision(), tag,
-        context.random(), context.httpContext(), context.runtime(), context.localInfo(),
-        context.clusterManager(), &context.overloadManager(), context.dispatcher().timeSource())});
-  };
+  return
+      [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
+       filter_config, &filter_chain_factory_context, tag = filter_chain_factory_context.getTag()](
+          Network::FilterManager& filter_manager) -> void {
+        filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
+            *filter_config, filter_chain_factory_context.drainDecision(),
+            filter_chain_factory_context.filterChainDrainDecision(), tag,
+            filter_chain_factory_context.random(), filter_chain_factory_context.httpContext(),
+            filter_chain_factory_context.runtime(), filter_chain_factory_context.localInfo(),
+            filter_chain_factory_context.clusterManager(),
+            &filter_chain_factory_context.overloadManager(),
+            filter_chain_factory_context.dispatcher().timeSource())});
+      };
 }
 
 /**

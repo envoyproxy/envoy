@@ -34,27 +34,25 @@ class DubboFilterConfigTestBase {
 public:
   void testConfig(DubboProxyProto& config) {
     Network::FilterFactoryCb cb;
-    EXPECT_NO_THROW({
-      cb = factory_.createFilterFactoryFromProto(
-          config, context_, Server::Configuration::MockFilterChainFactoryContext{});
-    });
+    EXPECT_NO_THROW(
+        { cb = factory_.createFilterFactoryFromProto(config, filter_chain_factory_context_); });
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
     cb(connection);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context_;
   DubboProxyFilterConfigFactory factory_;
 };
 
 class DubboFilterConfigTest : public DubboFilterConfigTestBase, public testing::Test {};
 
 TEST_F(DubboFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   EXPECT_THROW(DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy(), context,
-                   Server::Configuration::MockFilterChainFactoryContext{}),
+                   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy(),
+                   filter_chain_factory_context),
                ProtoValidationException);
 }
 
@@ -63,10 +61,10 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
 
   config.set_stat_prefix("my_stat_prefix");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   DubboProxyFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, filter_chain_factory_context);
   EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -74,15 +72,15 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
 }
 
 TEST_F(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   DubboProxyFilterConfigFactory factory;
   envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config =
       *dynamic_cast<envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("my_stat_prefix");
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -116,9 +114,8 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithUnknownFilter) {
   DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
 
   EXPECT_THROW_WITH_REGEX(
-      factory_.createFilterFactoryFromProto(config, context_,
-                                            Server::Configuration::MockFilterChainFactoryContext{}),
-      EnvoyException, "no_such_filter");
+      factory_.createFilterFactoryFromProto(config, filter_chain_factory_context_), EnvoyException,
+      "no_such_filter");
 }
 
 // Test config with multiple filters.

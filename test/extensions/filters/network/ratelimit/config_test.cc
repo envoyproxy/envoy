@@ -17,10 +17,10 @@ namespace NetworkFilters {
 namespace RateLimitFilter {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::rate_limit::v2::RateLimit(), context,
-                   Server::Configuration::MockFilterChainFactoryContext{}),
+                   envoy::config::filter::network::rate_limit::v2::RateLimit(),
+                   filter_chain_factory_context),
                ProtoValidationException);
 }
 
@@ -42,23 +42,22 @@ TEST(RateLimitFilterConfigTest, CorrectProto) {
   envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
   TestUtility::loadFromYaml(yaml, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 
   RateLimitConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(
-      proto_config, context, Server::Configuration::MockFilterChainFactoryContext{});
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
 TEST(RateLimitFilterConfigTest, EmptyProto) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
   NiceMock<Server::MockInstance> instance;
   RateLimitConfigFactory factory;
 
@@ -66,8 +65,7 @@ TEST(RateLimitFilterConfigTest, EmptyProto) {
       *dynamic_cast<envoy::config::filter::network::rate_limit::v2::RateLimit*>(
           factory.createEmptyConfigProto().get());
   EXPECT_THROW(
-      factory.createFilterFactoryFromProto(empty_proto_config, context,
-                                           Server::Configuration::MockFilterChainFactoryContext{}),
+      factory.createFilterFactoryFromProto(empty_proto_config, filter_chain_factory_context),
       EnvoyException);
 }
 

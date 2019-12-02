@@ -44,14 +44,13 @@ protected:
         std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_, false);
 
     // Use real filter loading by default.
-    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _, _))
+    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-               Configuration::FactoryContext& context,
-               const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+               Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
                 -> std::vector<Network::FilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
-                  filters, context, filter_chain_factory_context);
+                  filters, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -99,19 +98,19 @@ protected:
     auto raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _, _))
-        .WillOnce(Invoke([raw_listener, need_init](
-                             const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
-                             Configuration::FactoryContext& context,
-                             const Server::Configuration::FilterChainFactoryContext&)
-                             -> std::vector<Network::FilterFactoryCb> {
-          std::shared_ptr<ListenerHandle> notifier(raw_listener);
-          raw_listener->context_ = &context;
-          if (need_init) {
-            context.initManager().add(notifier->target_);
-          }
-          return {[notifier](Network::FilterManager&) -> void {}};
-        }));
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Invoke(
+            [raw_listener, need_init](
+                const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
+                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
+              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              raw_listener->context_ = &filter_chain_factory_context;
+              if (need_init) {
+                filter_chain_factory_context.initManager().add(notifier->target_);
+              }
+              return {[notifier](Network::FilterManager&) -> void {}};
+            }));
 
     return raw_listener;
   }

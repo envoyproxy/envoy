@@ -288,8 +288,8 @@ class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigF
 public:
   // Configuration::NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&, Configuration::FactoryContext&,
-                               const Server::Configuration::FilterChainFactoryContext&) override {
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FilterChainFactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
   }
 
@@ -360,10 +360,10 @@ filter_chains:
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&, Configuration::FactoryContext& context,
-                               const Configuration::FilterChainFactoryContext&) override {
-    return commonFilterFactory(context);
+  Network::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message&,
+      Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
+    return commonFilterFactory(filter_chain_factory_context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

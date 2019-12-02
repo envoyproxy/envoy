@@ -69,8 +69,7 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-    Configuration::FactoryContext& context,
-    const Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
@@ -89,9 +88,9 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
                                              factory.isTerminalFilter(), i == filters.size() - 1);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), factory);
+        proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
     Network::FilterFactoryCb callback =
-        factory.createFilterFactoryFromProto(*message, context, filter_chain_factory_context);
+        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
     ret.push_back(callback);
   }
   return ret;
@@ -821,8 +820,8 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   return std::make_unique<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
-      parent_.parent_.factory_.createNetworkFilterFactoryList(
-          filter_chain.filters(), *filter_chain_factory_context, *filter_chain_factory_context),
+      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(),
+                                                              *filter_chain_factory_context),
       filter_chain_factory_context->getTag());
 }
 
