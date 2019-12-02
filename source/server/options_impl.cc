@@ -333,45 +333,16 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       signal_handling_enabled_(true), mutex_tracing_enabled_(false), cpuset_threads_(false),
       fake_symbol_table_enabled_(false) {}
 
-std::map<std::string, std::pair<std::string, std::string>>
-OptionsImpl::parseExtensionNames(const std::vector<std::string>& names) {
-  std::vector<std::string> prefixes;
-  std::map<std::string, std::pair<std::string, std::string>> parsed_names;
-
-  // Build a set of prefixes that includes the '.' separator. Adding
-  // the separator ensures that we can disambiguate categories with
-  // common prefixes.
-  for (const auto& entry : Registry::FactoryCategoryRegistry::registeredFactories()) {
-    prefixes.emplace_back(entry.first + ".");
-  }
-
-  // Sort longest first so that the first match will be the longest
-  // prefix match.
-  std::sort(prefixes.begin(), prefixes.end(), std::greater<std::string>());
-
+void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {
-    for (const auto& prefix : prefixes) {
-      if (absl::StartsWith(name, prefix)) {
-        parsed_names[name] =
-            std::make_pair(std::string(&name[0], prefix.size() - 1),
-                           std::string(&name[prefix.size()], name.size() - prefix.size()));
-      }
+    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits("/", 1));
+
+    if (parts.size() != 2) {
+      ENVOY_LOG_MISC(warn, "failed to disable invalid extension name '{}'", name);
+      continue;
     }
-  }
 
-  return parsed_names;
-}
-
-void
-OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
-  std::map<std::string, std::pair<std::string, std::string>> parsed_names =
-      parseExtensionNames(names);
-
-  for (const auto& name : names) {
-    const auto& it = parsed_names.find(name);
-
-    if ((it != parsed_names.end()) &&
-        Registry::FactoryCategoryRegistry::disableFactory(it->second.first, it->second.second)) {
+    if (Registry::FactoryCategoryRegistry::disableFactory(parts[0], parts[1])) {
       ENVOY_LOG_MISC(info, "disabled extension '{}'", name);
     } else {
       ENVOY_LOG_MISC(warn, "failed to disable unknown extension '{}'", name);

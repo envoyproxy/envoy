@@ -262,9 +262,11 @@ following are the command line options that Envoy supports.
 
 .. option:: --disable-extensions <extension list>
 
-  *(optional)* This flag marks the provided list of comma-separated extension as disabled. Disabled
+  *(optional)* This flag disabled the provided list of comma-separated extension names. Disabled
   extensions cannot be used by static or dynamic configuration, though they are still linked into
-  Envoy and may run start-up code or have other runtime effects.
+  Envoy and may run start-up code or have other runtime effects. Extension names are created by
+  joining the extension category and name with a forward slash,
+  e.g. ``grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
 
 .. option:: --version
 

@@ -6,8 +6,8 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/server/options.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/options.h"
 
 #include "common/common/logger.h"
 
@@ -141,17 +141,8 @@ public:
   uint32_t count() const;
 
   /**
-   * parseExtensionNames cracks a set of extension names of the form
-   * $CATEGORY.$NAME into a pair whose elements are the extension category
-   * and name.
-   */
-  static
-  std::map<std::string, std::pair<std::string, std::string>>
-  parseExtensionNames(const std::vector<std::string>&);
-
-  /**
-   * disableExtensions parses the given set of extension names with
-   * parseExtensionNames and disables the corresponding extension
+   * disableExtensions parses the given set of extension names of
+   * the form $CATEGORY/$NAME, and disables the corresponding extension
    * factories.
    */
   static void disableExtensions(const std::vector<std::string>&);

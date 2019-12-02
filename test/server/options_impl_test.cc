@@ -473,57 +473,35 @@ public:
   std::string name() override { return "test"; }
 };
 
-REGISTER_FACTORY(TestTestFactory, TestFactory);
-REGISTER_FACTORY(TestTestingFactory, TestingFactory);
-
-TEST(DisableExtensions, ParseNames) {
-  using ReturnType = std::map<std::string, std::pair<std::string, std::string>>;
-
-  // Empty extension names, empty cracked names.
-  EXPECT_EQ(OptionsImpl::parseExtensionNames({}), ReturnType{});
-
-  // Unmatched extension name, no cracked names.
-  EXPECT_EQ(OptionsImpl::parseExtensionNames({"foo"}), ReturnType{});
-
-  auto wanted = ReturnType{
-      {"testing.test", std::make_pair("testing", "test")},
-  };
-
-  EXPECT_EQ(OptionsImpl::parseExtensionNames({"testing.test"}), wanted);
-
-  wanted = ReturnType{
-      {"test.test", std::make_pair("test", "test")},
-  };
-
-  EXPECT_EQ(OptionsImpl::parseExtensionNames({"test.test"}), wanted);
-
-  wanted = ReturnType{
-      {"testing.test", std::make_pair("testing", "test")},
-      {"test.test", std::make_pair("test", "test")},
-  };
-
-  EXPECT_EQ(OptionsImpl::parseExtensionNames({"test.test", "testing.test", "foo.not.present"}), wanted);
-}
-
-// This factory is used only for testing that extensions can be
-// disabled. If we used it to test CrackNames, then the results
-// of that test would depend on whether this was disabled or not.
-class DisabledTestingFactory : public TestingFactory {
-public:
-  std::string name() override { return "disabled"; }
-};
-
-REGISTER_FACTORY(DisabledTestingFactory, TestingFactory){"disabled-2", "disabled-3"};
+REGISTER_FACTORY(TestTestFactory, TestFactory){"test-1", "test-2"};
+REGISTER_FACTORY(TestTestingFactory, TestingFactory){"test-1", "test-2"};
 
 TEST(DisableExtensions, IsDisabled) {
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled"), nullptr);
+  EXPECT_LOG_CONTAINS("warning", "failed to disable invalid extension name 'not.a.factory'",
+                      OptionsImpl::disableExtensions({"not.a.factory"}));
 
-  OptionsImpl::disableExtensions({"testing.disabled-3"});
+  EXPECT_LOG_CONTAINS("warning", "failed to disable unknown extension 'no/such.factory'",
+                      OptionsImpl::disableExtensions({"no/such.factory"}));
+
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+
+  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
+
+  OptionsImpl::disableExtensions({"test/test", "testing/test-2"});
 
   // When we disable an extension, all its aliases should also be disabled.
-  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled"), nullptr);
-  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled-2"), nullptr);
-  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled-3"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+
+  // When we disable an extension, all its aliases should also be disabled.
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
 }
 
 } // namespace
