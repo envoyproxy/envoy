@@ -31,10 +31,9 @@ QuicMemSliceStorageImpl::QuicMemSliceStorageImpl(const struct iovec* iov, int io
   while (io_offset < write_len) {
     size_t slice_len = std::min(write_len - io_offset, max_slice_len);
     Envoy::Buffer::RawSlice slice;
-    // Populate a temporary buffer instance and then move it to |buffer_|.
-    // This is necessary for the old evbuffer implementation of OwnedImpl where
-    // consecutive reserve/commit can return addresses in same slice which
-    // violates the restriction of |max_slice_len| when ToSpan() is called.
+    // Populate a temporary buffer instance and then move it to |buffer_|. This is necessary because
+    // consecutive reserve/commit can return addresses in same slice which violates the restriction
+    // of |max_slice_len| when ToSpan() is called.
     Envoy::Buffer::OwnedImpl buffer;
     uint16_t num_slice = buffer.reserve(slice_len, &slice, 1);
     ASSERT(num_slice == 1);

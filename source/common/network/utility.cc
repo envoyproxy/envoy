@@ -514,7 +514,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "sendmsg sent:{} bytes", send_result.rc_);
+    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.rc_);
   } else {
     ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
                    static_cast<int>(send_result.err_->getErrorCode()),

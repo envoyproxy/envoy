@@ -180,6 +180,8 @@ def runChecks():
   errors += checkUnfixableError("real_time_system.cc", real_time_inject_error)
   errors += checkUnfixableError("system_clock.cc", real_time_inject_error)
   errors += checkUnfixableError("steady_clock.cc", real_time_inject_error)
+  errors += checkUnfixableError(
+      "unpack_to.cc", "Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   errors += checkUnfixableError("condvar_wait_for.cc", real_time_inject_error)
   errors += checkUnfixableError("sleep.cc", real_time_inject_error)
   errors += checkUnfixableError("std_atomic_free_functions.cc", "std::atomic_*")

@@ -1153,7 +1153,8 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validator,
+                                                *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
 }
 
