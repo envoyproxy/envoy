@@ -104,6 +104,9 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
   to file tracking issues for code which can be removed.
 * Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
+  to flip any false runtime guards to true. Submit the resultant PR and send
+  an email to envoy-announce.
+* Run the deprecate_protos.py script (e.g. `tools/deprecate_protos/deprecate_protos.sh`)
   to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
   an email to envoy-announce.
 
