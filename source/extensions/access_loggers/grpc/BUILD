@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -51,6 +52,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
         "@envoy_api//envoy/data/accesslog/v2:pkg_cc_proto",
     ],
 )
@@ -62,6 +64,9 @@ envoy_cc_library(
     deps = [
         ":grpc_access_log_lib",
         ":grpc_access_log_utils",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -72,6 +77,9 @@ envoy_cc_library(
     deps = [
         ":grpc_access_log_lib",
         ":grpc_access_log_utils",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -86,10 +94,11 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "http_config",
     srcs = ["http_config.cc"],
     hdrs = ["http_config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":config_utils",
         "//include/envoy/server:access_log_config_interface",
@@ -98,13 +107,16 @@ envoy_cc_library(
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "tcp_config",
     srcs = ["tcp_config.cc"],
     hdrs = ["tcp_config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":config_utils",
         "//include/envoy/server:access_log_config_interface",
@@ -113,5 +125,7 @@ envoy_cc_library(
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/grpc:tcp_grpc_access_log_lib",
+        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )

@@ -16,6 +16,7 @@
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
+#include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 #include "extensions/filters/network/redis_proxy/router.h"
@@ -188,7 +189,7 @@ protected:
 
   SplitCallbacks& callbacks_;
 
-  Common::Redis::RespValuePtr incoming_request_;
+  Common::Redis::RespValueSharedPtr incoming_request_;
   Common::Redis::RespValuePtr pending_response_;
   std::vector<PendingRequest> pending_requests_;
   uint32_t num_pending_responses_;

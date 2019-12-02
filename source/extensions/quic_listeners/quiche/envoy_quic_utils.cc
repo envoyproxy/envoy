@@ -1,7 +1,5 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
-#include <sys/socket.h>
-
 namespace Envoy {
 namespace Quic {
 
@@ -60,6 +58,51 @@ Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock
     headers->addCopy(Http::LowerCaseString(key), value);
   }
   return headers;
+}
+
+spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {
+  spdy::SpdyHeaderBlock header_block;
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        auto spdy_headers = static_cast<spdy::SpdyHeaderBlock*>(context);
+        // The key-value pairs are copied.
+        spdy_headers->insert({header.key().getStringView(), header.value().getStringView()});
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &header_block);
+  return header_block;
+}
+
+quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason) {
+  switch (reason) {
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    return quic::QUIC_REFUSED_STREAM;
+  case Http::StreamResetReason::ConnectionFailure:
+    return quic::QUIC_STREAM_CONNECTION_ERROR;
+  case Http::StreamResetReason::LocalReset:
+    return quic::QUIC_STREAM_CANCELLED;
+  case Http::StreamResetReason::ConnectionTermination:
+    return quic::QUIC_STREAM_NO_ERROR;
+  default:
+    return quic::QUIC_BAD_APPLICATION_PAYLOAD;
+  }
+}
+
+Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode rst_err) {
+  switch (rst_err) {
+  case quic::QUIC_REFUSED_STREAM:
+    return Http::StreamResetReason::RemoteRefusedStreamReset;
+  default:
+    return Http::StreamResetReason::RemoteReset;
+  }
+}
+
+Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error) {
+  if (error == quic::QUIC_NO_ERROR) {
+    return Http::StreamResetReason::ConnectionTermination;
+  } else {
+    return Http::StreamResetReason::ConnectionFailure;
+  }
 }
 
 } // namespace Quic

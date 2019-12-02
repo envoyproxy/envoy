@@ -13,9 +13,10 @@ import re
 import subprocess
 import sys
 import tempfile
+import paths
 
 # Where does Buildozer live?
-BUILDOZER_PATH = os.getenv('BUILDOZER_BIN', '$GOPATH/bin/buildozer')
+BUILDOZER_PATH = paths.getBuildozer()
 
 # Canonical Envoy license.
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n\n'
@@ -66,10 +67,12 @@ def RunBuildozer(cmds, contents):
 
 # Add an Apache 2 license and envoy_package() import and rule as needed.
 def FixPackageAndLicense(contents):
-  # Ensure we have an envoy_package import load if this is a real Envoy package.
+  # Ensure we have an envoy_package import load if this is a real Envoy package. We also allow
+  # the prefix to be overridden if envoy is included in a larger workspace.
   if re.search(ENVOY_RULE_REGEX, contents):
     contents = RunBuildozer([
-        ('new_load //bazel:envoy_build_system.bzl envoy_package', '__pkg__'),
+        ('new_load {}//bazel:envoy_build_system.bzl envoy_package'.format(
+            os.getenv("ENVOY_BAZEL_PREFIX", "")), '__pkg__'),
     ], contents)
     # Envoy package is inserted after the load block containing the
     # envoy_package import.
@@ -90,12 +93,82 @@ def FixEmptyLines(contents):
   return re.sub('\n\s*$', '\n', re.sub('\n\n\n', '\n\n', contents))
 
 
+# Misc. Buildozer cleanups.
+def FixBuildozerCleanups(contents):
+  return RunBuildozer([('fix unusedLoads', '__pkg__')], contents)
+
+
+# Find all the API headers in a C++ source file.
+def FindApiHeaders(source_path):
+  api_hdrs = set([])
+  with open(source_path, 'rb') as f:
+    for line in f:
+      match = re.match(API_INCLUDE_REGEX, line.decode('utf-8'))
+      if match:
+        api_hdrs.add(match.group(1))
+  return api_hdrs
+
+
+# Infer and adjust rule dependencies in BUILD files for @envoy_api proto files.
+# This is very cheap to do purely via a grep+buildozer syntax level step.
+#
+# This could actually be done much more generally, for all symbols and headers
+# if we made use of Clang libtooling semantic analysis. However, this requires a
+# compilation database and full build of Envoy, envoy_build_fixer.py is run
+# under check_format, which should be fast for developers.
+def FixApiDeps(path, contents):
+  source_dirname = os.path.dirname(path)
+  buildozer_out = RunBuildozer([
+      ('print kind name srcs hdrs deps', '*'),
+  ], contents).strip()
+  deps_mutation_cmds = []
+  for line in buildozer_out.split('\n'):
+    match = re.match(BUILDOZER_PRINT_REGEX, line)
+    if not match:
+      # buildozer might emit complex multiline output when a 'select' or other
+      # macro is used. We're not smart enough to handle these today and they
+      # require manual fixup.
+      # TODO(htuch): investigate using --output_proto on buildozer to be able to
+      # consume something more usable in this situation.
+      continue
+    kind, name, srcs, hdrs, deps = match.groups()
+    if not name:
+      continue
+    source_paths = []
+    if srcs != 'missing':
+      source_paths.extend(
+          os.path.join(source_dirname, f)
+          for f in srcs.split()
+          if f.endswith('.cc') or f.endswith('.h'))
+    if hdrs != 'missing':
+      source_paths.extend(os.path.join(source_dirname, f) for f in hdrs.split() if f.endswith('.h'))
+    api_hdrs = set([])
+    for p in source_paths:
+      # We're not smart enough to infer on generated files.
+      if os.path.exists(p):
+        api_hdrs = api_hdrs.union(FindApiHeaders(p))
+    actual_api_deps = set(['@envoy_api//%s:pkg_cc_proto' % h for h in api_hdrs])
+    existing_api_deps = set([])
+    if deps != 'missing':
+      existing_api_deps = set(
+          [d for d in deps.split() if d.startswith('@envoy_api//') and d.endswith('pkg_cc_proto')])
+    deps_to_remove = existing_api_deps.difference(actual_api_deps)
+    if deps_to_remove:
+      deps_mutation_cmds.append(('remove deps %s' % ' '.join(deps_to_remove), name))
+    deps_to_add = actual_api_deps.difference(existing_api_deps)
+    if deps_to_add:
+      deps_mutation_cmds.append(('add deps %s' % ' '.join(deps_to_add), name))
+  return RunBuildozer(deps_mutation_cmds, contents)
+
+
 def FixBuild(path):
   with open(path, 'r') as f:
     contents = f.read()
   xforms = [
       FixPackageAndLicense,
       FixEmptyLines,
+      functools.partial(FixApiDeps, path),
+      FixBuildozerCleanups,
   ]
   for xform in xforms:
     contents = xform(contents)

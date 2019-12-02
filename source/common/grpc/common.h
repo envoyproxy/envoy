@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -44,10 +45,13 @@ public:
   /**
    * Returns the GrpcStatus code from a given set of trailers, if present.
    * @param trailers the trailers to parse.
+   * @param allow_user_status whether allow user defined grpc status.
+   *        if this value is false, custom grpc status is regarded as invalid status
    * @return absl::optional<Status::GrpcStatus> the parsed status code or InvalidCode if no valid
    * status is found.
    */
-  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers);
+  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers,
+                                                          bool allow_user_defined = false);
 
   /**
    * Returns the grpc-message from a given set of trailers, if present.
@@ -74,7 +78,7 @@ public:
    * @return std::chrono::milliseconds the duration in milliseconds. A zero value corresponding to
    *         infinity is returned if 'grpc-timeout' is missing or malformed.
    */
-  static std::chrono::milliseconds getGrpcTimeout(Http::HeaderMap& request_headers);
+  static std::chrono::milliseconds getGrpcTimeout(const Http::HeaderMap& request_headers);
 
   /**
    * Encode 'timeout' into 'grpc-timeout' format.

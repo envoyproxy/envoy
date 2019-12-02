@@ -1,12 +1,11 @@
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
-#include <arpa/inet.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
@@ -49,7 +48,8 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
         Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
-        filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
+        filter->onServername(
+            absl::NullSafeStringView(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)));
 
         // Return an error to stop the handshake; we have what we wanted already.
         *out_alert = SSL_AD_USER_CANCELLED;

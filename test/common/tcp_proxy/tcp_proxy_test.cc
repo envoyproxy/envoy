@@ -191,7 +191,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     // hit route with destination_ip (10.10.10.10/32)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.10");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -199,14 +200,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.11");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (10.10.11.0/24)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -214,14 +216,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (10.11.0.0/16)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.11.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -229,14 +232,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.12.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (11.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -244,21 +248,23 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (128.0.0.0/8)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("128.255.255.255");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ip_list"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination port range
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 12345);
-    EXPECT_EQ(std::string("with_destination_ports"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_destination_ports"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -266,7 +272,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -274,7 +280,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23459);
-    EXPECT_EQ(std::string("with_source_ports"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_source_ports"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -282,7 +289,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
     connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23458);
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -291,7 +298,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("20.0.0.0", 20000);
-    EXPECT_EQ(std::string("with_everything"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_everything"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -300,14 +308,15 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("30.0.0.0", 20000);
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
     // hit route with destination_ip (::1/128)
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("::1");
-    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_v6_destination"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -315,7 +324,8 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::");
-    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("with_v6_destination"),
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -326,7 +336,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     connection.remote_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2003:0:0:0:0::5");
     EXPECT_EQ(std::string("with_v6_source_and_destination"),
-              config_obj.getRouteFromEntries(connection));
+              config_obj.getRouteFromEntries(connection)->clusterName());
   }
 
   {
@@ -334,8 +344,455 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("2004::");
     connection.remote_address_ = std::make_shared<Network::Address::Ipv6Instance>("::");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
+    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection)->clusterName());
   }
+}
+
+// Tests that a deprecated_v1 route gets the top-level endpoint selector.
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: cluster
+  deprecated_v1:
+    routes:
+    - cluster: catch_all
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("catch_all", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that it's not possible to define a weighted cluster with 0 weight.
+TEST(ConfigTest, WeightedClusterWithZeroWeightConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+    - name: cluster2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW(constructConfigFromV2Yaml(yaml, factory_context), EnvoyException);
+}
+
+// Tests that it is possible to define a list of weighted clusters.
+TEST(ConfigTest, WeightedClustersConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+    - name: cluster2
+      weight: 2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+  EXPECT_EQ(std::string("cluster1"), config_obj.getRouteFromEntries(connection)->clusterName());
+
+  EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+  EXPECT_EQ(std::string("cluster2"), config_obj.getRouteFromEntries(connection)->clusterName());
+}
+
+// Tests that it is possible to define a list of weighted clusters with independent endpoint
+// selectors.
+TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+    - name: cluster2
+      weight: 2
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k3: v3
+            k4: v4
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  {
+    ProtobufWkt::Value v1, v2;
+    v1.set_string_value("v1");
+    v2.set_string_value("v2");
+    HashedValue hv1(v1), hv2(v2);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, criterions.size());
+
+    EXPECT_EQ("k1", criterions[0]->name());
+    EXPECT_EQ(hv1, criterions[0]->value());
+
+    EXPECT_EQ("k2", criterions[1]->name());
+    EXPECT_EQ(hv2, criterions[1]->value());
+  }
+
+  {
+    ProtobufWkt::Value v3, v4;
+    v3.set_string_value("v3");
+    v4.set_string_value("v4");
+    HashedValue hv3(v3), hv4(v4);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster2", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, criterions.size());
+
+    EXPECT_EQ("k3", criterions[0]->name());
+    EXPECT_EQ(hv3, criterions[0]->value());
+
+    EXPECT_EQ("k4", criterions[1]->name());
+    EXPECT_EQ(hv4, criterions[1]->value());
+  }
+}
+
+// Tests that an individual endpoint selector of a weighted cluster gets merged with the top-level
+// endpoint selector.
+TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+    - name: cluster2
+      weight: 2
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k3: v3
+            k4: v4
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k0: v00
+        k1: v01
+        k4: v04
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v00, v01, v04;
+  v00.set_string_value("v00");
+  v01.set_string_value("v01");
+  v04.set_string_value("v04");
+  HashedValue hv00(v00), hv01(v01), hv04(v04);
+
+  {
+    ProtobufWkt::Value v1, v2;
+    v1.set_string_value("v1");
+    v2.set_string_value("v2");
+    HashedValue hv1(v1), hv2(v2);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(0));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(4, criterions.size());
+
+    EXPECT_EQ("k0", criterions[0]->name());
+    EXPECT_EQ(hv00, criterions[0]->value());
+
+    EXPECT_EQ("k1", criterions[1]->name());
+    EXPECT_EQ(hv1, criterions[1]->value());
+
+    EXPECT_EQ("k2", criterions[2]->name());
+    EXPECT_EQ(hv2, criterions[2]->value());
+
+    EXPECT_EQ("k4", criterions[3]->name());
+    EXPECT_EQ(hv04, criterions[3]->value());
+  }
+
+  {
+    ProtobufWkt::Value v3, v4;
+    v3.set_string_value("v3");
+    v4.set_string_value("v4");
+    HashedValue hv3(v3), hv4(v4);
+
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(factory_context.random_, random()).WillOnce(Return(2));
+
+    const auto route = config_obj.getRouteFromEntries(connection);
+    EXPECT_NE(nullptr, route);
+
+    EXPECT_EQ("cluster2", route->clusterName());
+
+    const auto* criteria = route->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+
+    const auto& criterions = criteria->metadataMatchCriteria();
+    EXPECT_EQ(4, criterions.size());
+
+    EXPECT_EQ("k0", criterions[0]->name());
+    EXPECT_EQ(hv00, criterions[0]->value());
+
+    EXPECT_EQ("k1", criterions[1]->name());
+    EXPECT_EQ(hv01, criterions[1]->value());
+
+    EXPECT_EQ("k3", criterions[2]->name());
+    EXPECT_EQ(hv3, criterions[2]->value());
+
+    EXPECT_EQ("k4", criterions[3]->name());
+    EXPECT_EQ(hv4, criterions[3]->value());
+  }
+}
+
+// Tests that a weighted cluster gets the top-level endpoint selector.
+TEST(ConfigTest, WeightedClustersWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("cluster1", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that it is possible to define the top-level endpoint selector.
+TEST(ConfigTest, TopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  const auto* criteria = config_obj.metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that a regular cluster gets the top-level endpoint selector.
+TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("foo", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+// Tests that a per connection cluster gets the top-level endpoint selector.
+TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k1: v1
+        k2: v2
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+
+  ProtobufWkt::Value v1, v2;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv1(v1), hv2(v2);
+
+  NiceMock<Network::MockConnection> connection;
+  connection.stream_info_.filterState().setData(
+      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  const auto route = config_obj.getRouteFromEntries(connection);
+  EXPECT_NE(nullptr, route);
+
+  EXPECT_EQ("filter_state_cluster", route->clusterName());
+
+  const auto* criteria = route->metadataMatchCriteria();
+  EXPECT_NE(nullptr, criteria);
+
+  const auto& criterions = criteria->metadataMatchCriteria();
+  EXPECT_EQ(2, criterions.size());
+
+  EXPECT_EQ("k1", criterions[0]->name());
+  EXPECT_EQ(hv1, criterions[0]->value());
+
+  EXPECT_EQ("k2", criterions[1]->name());
+  EXPECT_EQ(hv2, criterions[1]->value());
+}
+
+TEST(ConfigTest, HashWithSourceIpConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  hash_policy:
+  - source_ip: {}
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_NE(nullptr, config_obj.hashPolicy());
+}
+
+TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromV2Yaml(yaml, factory_context));
+  EXPECT_EQ(nullptr, config_obj.hashPolicy());
 }
 
 TEST(ConfigTest, AccessLogConfig) {
@@ -515,7 +972,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DefaultRoutes)) {
   configure(config);
 
   NiceMock<Network::MockConnection> connection;
-  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection));
+  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection)->clusterName());
 }
 
 // Tests that half-closes are proxied and don't themselves cause any connection to be closed.
@@ -628,11 +1085,11 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -654,16 +1111,16 @@ TEST_F(TcpProxyTest, OutlierDetection) {
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   raiseEventUpstreamConnectFailed(1,
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
   raiseEventUpstreamConnected(2);
 }
 
@@ -740,7 +1197,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(NoHost)) {
   EXPECT_EQ(access_log_data_, "UH");
 }
 
-TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(WithMetadataMatch)) {
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
   auto v1 = ProtobufWkt::Value();
   v1.set_string_value("v1");
   auto v2 = ProtobufWkt::Value();
@@ -763,13 +1220,102 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(WithMetadataMatch)) {
 
   configure(config);
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-  const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
+  const auto effective_criteria = filter_->metadataMatchCriteria();
+  EXPECT_NE(nullptr, effective_criteria);
 
-  EXPECT_EQ(metadata_criteria.size(), criteria.size());
+  const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+  EXPECT_EQ(effective_criterions.size(), criteria.size());
   for (size_t i = 0; i < criteria.size(); ++i) {
-    EXPECT_EQ(metadata_criteria[i]->name(), criteria[i].name());
-    EXPECT_EQ(metadata_criteria[i]->value(), criteria[i].value());
+    EXPECT_EQ(effective_criterions[i]->name(), criteria[i].name());
+    EXPECT_EQ(effective_criterions[i]->value(), criteria[i].value());
+  }
+}
+
+// Tests that the endpoint selector of a weighted cluster gets included into the
+// LoadBalancerContext.
+TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  weighted_clusters:
+    clusters:
+    - name: cluster1
+      weight: 1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+    - name: cluster2
+      weight: 2
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k2: v2
+  metadata_match:
+    filter_metadata:
+      envoy.lb:
+        k0: v0
+)EOF";
+
+  config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+
+  ProtobufWkt::Value v0, v1, v2;
+  v0.set_string_value("v0");
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  HashedValue hv0(v0), hv1(v1), hv2(v2);
+
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_->initializeReadFilterCallbacks(filter_callbacks_);
+
+  // Expect filter to try to open a connection to cluster1.
+  {
+    Upstream::LoadBalancerContext* context;
+
+    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster1", _, _))
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+    EXPECT_NE(nullptr, context);
+
+    const auto effective_criteria = context->metadataMatchCriteria();
+    EXPECT_NE(nullptr, effective_criteria);
+
+    const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, effective_criterions.size());
+
+    EXPECT_EQ("k0", effective_criterions[0]->name());
+    EXPECT_EQ(hv0, effective_criterions[0]->value());
+
+    EXPECT_EQ("k1", effective_criterions[1]->name());
+    EXPECT_EQ(hv1, effective_criterions[1]->value());
+  }
+
+  // Expect filter to try to open a connection to cluster2.
+  {
+    Upstream::LoadBalancerContext* context;
+
+    EXPECT_CALL(factory_context_.random_, random()).WillOnce(Return(2));
+    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster2", _, _))
+        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+    EXPECT_NE(nullptr, context);
+
+    const auto effective_criteria = context->metadataMatchCriteria();
+    EXPECT_NE(nullptr, effective_criteria);
+
+    const auto& effective_criterions = effective_criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, effective_criterions.size());
+
+    EXPECT_EQ("k0", effective_criterions[0]->name());
+    EXPECT_EQ(hv0, effective_criterions[0]->value());
+
+    EXPECT_EQ("k2", effective_criterions[1]->name());
+    EXPECT_EQ(hv2, effective_criterions[1]->value());
   }
 }
 
@@ -1305,6 +1851,56 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  filter_->onNewConnection();
+}
+
+class TcpProxyHashingTest : public testing::Test {
+public:
+  TcpProxyHashingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    hash_policy:
+    - source_ip: {}
+    )EOF";
+
+    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  }
+
+  void initializeFilter() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  ConfigSharedPtr config_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  std::unique_ptr<Filter> filter_;
+};
+
+// Test TCP proxy use source IP to hash.
+TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
+  setup();
+  initializeFilter();
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(
+          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
+            EXPECT_EQ(cluster, "fake_cluster");
+            EXPECT_TRUE(context->computeHashKey().has_value());
+            return nullptr;
+          }));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222);
 
   filter_->onNewConnection();
 }

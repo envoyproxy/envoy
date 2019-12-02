@@ -1440,16 +1440,19 @@ const int64_t TransmitThreshold = 100 * 1024 * 1024;
 } // namespace
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
-  // nghttp2 library has its own internal mitigation for outbound control frames. The mitigation is
-  // triggered when there are more than 10000 PING or SETTINGS frames with ACK flag in the nghttp2
-  // internal outbound queue. It is possible to trigger this mitigation in nghttp2 before triggering
-  // Envoy's own flood mitigation. This can happen when a buffer larger enough to contain over 10K
-  // PING or SETTINGS frames is dispatched to the nghttp2 library. To prevent this from happening
-  // the network connection receive buffer needs to be smaller than 90Kb (which is 10K SETTINGS
-  // frames). Set it to the arbitrarily chosen value of 32K.
+  // nghttp2 library has its own internal mitigation for outbound control frames (see
+  // NGHTTP2_DEFAULT_MAX_OBQ_FLOOD_ITEM). The default nghttp2 mitigation threshold of 1K is modified
+  // to 10K in the ConnectionImpl::Http2Options::Http2Options. The mitigation is triggered when
+  // there are more than 10000 PING or SETTINGS frames with ACK flag in the nghttp2 internal
+  // outbound queue. It is possible to trigger this mitigation in nghttp2 before triggering Envoy's
+  // own flood mitigation. This can happen when a buffer large enough to contain over 10K PING or
+  // SETTINGS frames is dispatched to the nghttp2 library. To prevent this from happening the
+  // network connection receive buffer needs to be smaller than 90Kb (which is 10K SETTINGS frames).
+  // Set it to the arbitrarily chosen value of 32K. Note that this buffer has 16K lower bound.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
     listener->mutable_per_connection_buffer_limit_bytes()->set_value(32 * 1024);
   });
 }
@@ -1494,7 +1497,7 @@ void Http2FloodMitigationTest::startHttp2Session() {
   readFrame();
 
   // Send an SETTINGS ACK.
-  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::ACK);
+  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
   tcp_client_->write(std::string(settings), false, false);
 
   // read pending SETTINGS and WINDOW_UPDATE frames
@@ -1536,7 +1539,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
   auto request = Http2Frame::makeRequest(request_idx, host, path);
   sendFame(request);
   auto frame = readFrame();
-  EXPECT_EQ(Http2Frame::Type::HEADERS, frame.type());
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
   tcp_client_->readDisable(true);
   uint64_t total_bytes_sent = 0;
@@ -1576,7 +1579,7 @@ TEST_P(Http2FloodMitigationTest, 404) {
   beginSession();
 
   // Send requests to a non existent path to generate 404s
-  floodServer("host", "/notfound", Http2Frame::ResponseStatus::_404, "http2.outbound_flood");
+  floodServer("host", "/notfound", Http2Frame::ResponseStatus::NotFound, "http2.outbound_flood");
 }
 
 // Verify that the server can detect flood of DATA frames
@@ -1587,7 +1590,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::_200, "http2.outbound_flood");
+  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "http2.outbound_flood");
 }
 
 // Verify that the server can detect flood of RST_STREAM frames.
@@ -1605,7 +1608,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   sendFame(request);
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
-  EXPECT_EQ(Http2Frame::Type::RST_STREAM, response.type());
+  EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
   uint64_t total_bytes_sent = 0;
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
     request = Http::Http2::Http2Frame::makeMalformedRequest(++i);
@@ -1631,7 +1634,7 @@ TEST_P(Http2FloodMitigationTest, TooManyStreams) {
 
   // Exceed the number of streams allowed by the server. The server should stop reading from the
   // client. Verify that the client was unable to stuff a lot of data into the server.
-  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::_200, "");
+  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "");
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
@@ -1724,7 +1727,7 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   sendFame(request);
   // Reading response marks this stream as closed in nghttp2.
   auto frame = readFrame();
-  EXPECT_EQ(Http2Frame::Type::HEADERS, frame.type());
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
 
   floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
               "http2.inbound_priority_frames_flood");
@@ -1776,15 +1779,15 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   sendFame(request);
   // Make sure we've got RST_STREAM from the server.
   auto response = readFrame();
-  EXPECT_EQ(Http2Frame::Type::RST_STREAM, response.type());
+  EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
 
   // Send valid request using the same connection.
   request_idx++;
   request = Http2Frame::makeRequest(request_idx, "host", "/");
   sendFame(request);
   response = readFrame();
-  EXPECT_EQ(Http2Frame::Type::HEADERS, response.type());
-  EXPECT_EQ(Http2Frame::ResponseStatus::_200, response.responseStatus());
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
 
   tcp_client_->close();
 

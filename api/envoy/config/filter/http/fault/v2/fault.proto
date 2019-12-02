@@ -16,6 +16,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Fault Injection]
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
+// [#extension: envoy.filters.http.fault]
 
 message FaultAbort {
   reserved 1;

@@ -4,7 +4,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
@@ -26,7 +25,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/api/v2/ratelimit:pkg_cc_proto",
-        "@envoy_api//envoy/config/ratelimit/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
     ],
 )

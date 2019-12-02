@@ -229,6 +229,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     callbacks_ = nullptr;
     span_ = nullptr;
   } else {
+    span_->injectContext(message->headers());
     request_ = cm_.httpAsyncClientForCluster(cluster).send(
         std::move(message), *this,
         Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));

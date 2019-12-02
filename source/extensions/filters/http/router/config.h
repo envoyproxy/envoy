@@ -22,10 +22,6 @@ class RouterFilterConfig
 public:
   RouterFilterConfig() : FactoryBase(HttpFilterNames::get().Router) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
-                      Server::Configuration::FactoryContext& context) override;
-
   bool isTerminalFilter() override { return true; }
 
 private:

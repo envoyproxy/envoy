@@ -1,5 +1,8 @@
 #pragma once
 
+#include <vector>
+
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -178,6 +181,19 @@ public:
    * have exited.
    */
   virtual void stopWorkers() PURE;
+
+  /*
+   * Warn the listener manager of an impending update. This allows the listener to clear per-update
+   * state.
+   */
+  virtual void beginListenerUpdate() PURE;
+
+  /*
+   * Inform the listener manager that the update has completed, and informs the listener of any
+   * errors handled by the reload source.
+   */
+  using FailureStates = std::vector<std::unique_ptr<envoy::admin::v2alpha::UpdateFailureState>>;
+  virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 };
 
 } // namespace Server

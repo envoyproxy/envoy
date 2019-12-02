@@ -185,6 +185,8 @@ public:
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context);
 
+  std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
+
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                           const std::string& version_info) override;
@@ -227,7 +229,9 @@ public:
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
-  const std::string& localClusterName() const override { return local_cluster_name_; }
+  const absl::optional<std::string>& localClusterName() const override {
+    return local_cluster_name_;
+  }
 
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
@@ -235,8 +239,6 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
-
-  std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
@@ -472,8 +474,8 @@ private:
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;
-  // The name of the local cluster of this Envoy instance if defined, else the empty string.
-  std::string local_cluster_name_;
+  // The name of the local cluster of this Envoy instance if defined.
+  absl::optional<std::string> local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   TimeSource& time_source_;

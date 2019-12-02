@@ -166,34 +166,27 @@ the management server only needs to respond to the latest
 Resource hints
 ^^^^^^^^^^^^^^
 
-The :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` specified in the :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` are a hint.
-Some resource types, e.g. `Clusters` and `Listeners` may
-specify an empty :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` list, since a client such as Envoy is interested in
-learning about all the :ref:`Clusters (CDS) <envoy_api_msg_Cluster>` and :ref:`Listeners (LDS) <envoy_api_msg_Listener>`
-that the management server(s) know about corresponding to its node
-identification. Other resource types, e.g. :ref:`RouteConfiguration (RDS) <envoy_api_msg_RouteConfiguration>`
-and :ref:`ClusterLoadAssignment (EDS) <envoy_api_msg_ClusterLoadAssignment>`, follow from earlier
-CDS/LDS updates and Envoy is able to explicitly enumerate these
-resources.
+The :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` specified in the :ref:`DiscoveryRequest
+<envoy_api_msg_DiscoveryRequest>` are a hint about what resources the client is interested in.
 
-Envoy will always set the LDS/CDS resource hints to empty and it is expected that the management
-server will provide the complete state of the LDS/CDS resources in each response. An absent
-`Listener` or `Cluster` will be deleted. Other xDS clients may specify explicit LDS/CDS resources as
-resource hints, for example if they only have a singleton listener and already know its name from
-some out-of-band configuration.
+For :ref:`Listener Discovery Service (LDS) <envoy_api_msg_Listener>` and :ref:`Cluster Discovery Service (CDS)
+<envoy_api_msg_Cluster>`, Envoy will always set the resource hints to empty, in which case the server should use
+site-specific business logic to determine the full set of resources that the client is interested in, typically based on
+the client's node identification. However, other xDS clients may specify explicit LDS/CDS resources as resource hints, for
+example if they only have a singleton listener and already know its name from some out-of-band configuration. For EDS/RDS, the
+resource hints are required.
 
-For EDS/RDS, the management server does not need to supply every
-requested resource and may also supply additional, unrequested
-resources. :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` is only a hint. Envoy will silently ignore
-any superfluous resources. When a requested resource is missing in a RDS
-or EDS update, Envoy will retain the last known value for this resource
-except in the case where the `Cluster` or `Listener` is being
-warmed. See :ref:`Resource Warming <xds_protocol_resource_warming>` section below on
-the expectations during warming. The management server may be able to
-infer all the required EDS/RDS resources from the :ref:`node <envoy_api_msg_Core.Node>`
-identification in the :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`, in which case this hint may
-be discarded. An empty EDS/RDS :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` is effectively a
-nop from the perspective of the respective resources in the Envoy.
+When the resource hints are specified, the management server must supply the requested resources if they exist. The client will
+silently ignore any supplied resources that were not explicitly requested. When the client sends a new request that changes
+the *resource_names* list, the server must resend any newly requested resource, even if it previously sent it without having
+been asked for it and the resource has not changed since that time.
+
+For LDS and CDS, it is expected that the management server will provide the complete state of the LDS/CDS resources in each
+response; an absent `Listener` or `Cluster` will be deleted. For RDS or EDS, when a requested resource is
+missing, Envoy will retain the last known value for this resource except in the case where the `Cluster` or `Listener` is being
+warmed. See :ref:`Resource Warming <xds_protocol_resource_warming>` section below on the expectations during warming.
+An empty EDS/RDS :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` is effectively a nop from the perspective of the
+respective resources in the Envoy.
 
 When a `Listener` or `Cluster` is deleted, its corresponding EDS and
 RDS resources are also deleted inside the Envoy instance. In order for

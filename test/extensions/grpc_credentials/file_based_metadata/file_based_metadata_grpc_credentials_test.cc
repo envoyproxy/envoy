@@ -5,6 +5,7 @@
 #include "common/common/fmt.h"
 #include "common/grpc/google_async_client_impl.h"
 
+#include "extensions/grpc_credentials/file_based_metadata/config.h"
 #include "extensions/grpc_credentials/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
@@ -133,6 +134,39 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, ExtraConfigFileBasedMetadataG
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
+}
+
+class MockAuthContext : public ::grpc::AuthContext {
+public:
+  ~MockAuthContext() override {}
+  MOCK_METHOD(bool, IsPeerAuthenticated, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, GetPeerIdentity, (), (const, override));
+  MOCK_METHOD(std::string, GetPeerIdentityPropertyName, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, FindPropertyValues, (const std::string& name),
+              (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, begin, (), (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, end, (), (const, override));
+  MOCK_METHOD(void, AddProperty, (const std::string& key, const grpc::string_ref& value),
+              (override));
+  MOCK_METHOD(bool, SetPeerIdentityPropertyName, (const std::string& name), (override));
+};
+
+TEST(GrpcFileBasedMetadata, MissingSecretData) {
+  const std::string yaml = R"EOF(
+secret_data:
+  filename: missing-file
+)EOF";
+  envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig metadata_config;
+  Envoy::TestUtility::loadFromYaml(yaml, metadata_config);
+  Api::ApiPtr api = Api::createApiForTest();
+  Extensions::GrpcCredentials::FileBasedMetadata::FileBasedMetadataAuthenticator authenticator(
+      metadata_config, *api);
+
+  MockAuthContext context;
+  std::multimap<grpc::string, grpc::string> metadata;
+  auto status =
+      authenticator.GetMetadata(grpc::string_ref(), grpc::string_ref(), context, &metadata);
+  EXPECT_EQ(grpc::StatusCode::NOT_FOUND, status.error_code());
 }
 
 } // namespace

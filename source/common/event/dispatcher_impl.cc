@@ -45,6 +45,9 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
 #ifdef ENVOY_HANDLE_SIGNALS
   SignalAction::registerFatalErrorHandler(*this);
 #endif
+  updateApproximateMonotonicTime();
+  base_scheduler_.registerOnPrepareCallback(
+      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
 DispatcherImpl::~DispatcherImpl() {
@@ -131,17 +134,17 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::Socket& socket,
+Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::ListenerCallbacks& cb,
                                                     bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ListenerImpl>(*this, socket, cb, bind_to_port);
+  return std::make_unique<Network::ListenerImpl>(*this, std::move(socket), cb, bind_to_port);
 }
 
-Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,
                                                           Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::UdpListenerImpl>(*this, socket, cb, timeSource());
+  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
@@ -189,6 +192,14 @@ void DispatcherImpl::run(RunType type) {
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
   base_scheduler_.run(type);
+}
+
+MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
+  return approximate_monotonic_time_;
+}
+
+void DispatcherImpl::updateApproximateMonotonicTime() {
+  approximate_monotonic_time_ = timeSource().monotonicTime();
 }
 
 void DispatcherImpl::runPostCallbacks() {

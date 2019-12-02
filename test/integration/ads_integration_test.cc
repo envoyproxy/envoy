@@ -55,7 +55,8 @@ TEST_P(AdsIntegrationTest, Failure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
 
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Cluster, "", {}, {}, {}, true, Grpc::Status::GrpcStatus::Internal,
+      Config::TypeUrl::get().Cluster, "", {}, {}, {}, true,
+      Grpc::Status::WellKnownGrpcStatus::Internal,
       fmt::format("does not match the message-wide type URL {}", Config::TypeUrl::get().Cluster)));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
@@ -70,7 +71,7 @@ TEST_P(AdsIntegrationTest, Failure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
                                       {"cluster_0"}, {}, {}, true,
-                                      Grpc::Status::GrpcStatus::Internal,
+                                      Grpc::Status::WellKnownGrpcStatus::Internal,
                                       fmt::format("does not match the message-wide type URL {}",
                                                   Config::TypeUrl::get().ClusterLoadAssignment)));
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
@@ -84,7 +85,8 @@ TEST_P(AdsIntegrationTest, Failure) {
       {buildRouteConfig("listener_0", "route_config_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Listener, "", {}, {}, {}, true, Grpc::Status::GrpcStatus::Internal,
+      Config::TypeUrl::get().Listener, "", {}, {}, {}, true,
+      Grpc::Status::WellKnownGrpcStatus::Internal,
       fmt::format("does not match the message-wide type URL {}", Config::TypeUrl::get().Listener)));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
@@ -99,7 +101,7 @@ TEST_P(AdsIntegrationTest, Failure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                       {"route_config_0"}, {}, {}, true,
-                                      Grpc::Status::GrpcStatus::Internal,
+                                      Grpc::Status::WellKnownGrpcStatus::Internal,
                                       fmt::format("does not match the message-wide type URL {}",
                                                   Config::TypeUrl::get().RouteConfiguration)));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
@@ -763,7 +765,8 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   test_server_->waitForGaugeGe("listener_manager.total_listeners_active", 1);
   // Before server is started, even though listeners are added to active list
   // we mark them as "warming" in config dump since they're not initialized yet.
-  EXPECT_EQ(getListenersConfigDump().dynamic_warming_listeners().size(), 1);
+  ASSERT_EQ(getListenersConfigDump().dynamic_listeners().size(), 1);
+  EXPECT_TRUE(getListenersConfigDump().dynamic_listeners(0).has_warming_state());
 
   // Remove listener.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));

@@ -169,7 +169,7 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  void setReference(const std::string& ref_value);
+  void setReference(absl::string_view ref_value);
 
   /**
    * @return the size of the string, not including the null terminator.
@@ -181,9 +181,13 @@ public:
    */
   Type type() const { return type_; }
 
-  bool operator==(const char* rhs) const { return getStringView() == absl::string_view(rhs); }
+  bool operator==(const char* rhs) const {
+    return getStringView() == absl::NullSafeStringView(rhs);
+  }
   bool operator==(absl::string_view rhs) const { return getStringView() == rhs; }
-  bool operator!=(const char* rhs) const { return getStringView() != absl::string_view(rhs); }
+  bool operator!=(const char* rhs) const {
+    return getStringView() != absl::NullSafeStringView(rhs);
+  }
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
@@ -347,11 +351,16 @@ private:
  * ContentLength() -> returns the header entry if it exists or nullptr.
  * insertContentLength() -> inserts the header if it does not exist, and returns a reference to it.
  * removeContentLength() -> removes the header if it exists.
+ *
+ * TODO(asraa): Remove functions with a non-const HeaderEntry return value.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
   virtual HeaderEntry* name() PURE;                                                                \
   virtual HeaderEntry& insert##name() PURE;                                                        \
+  virtual void setReference##name(absl::string_view value) PURE;                                   \
+  virtual void set##name(absl::string_view value) PURE;                                            \
+  virtual void set##name(uint64_t value) PURE;                                                     \
   virtual void remove##name() PURE;
 
 /**
@@ -372,6 +381,7 @@ public:
    * Calling addReference multiple times for the same header will result in:
    * - Comma concatenation for predefined inline headers.
    * - Multiple headers being present in the HeaderMap for other headers.
+   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL NOT be copied.
@@ -437,6 +447,7 @@ public:
    *
    * Calling setReference multiple times for the same header will result in only the last header
    * being present in the HeaderMap.
+   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to set; it WILL NOT be copied.
    * @param value specifies the value of the header to set; it WILL NOT be copied.

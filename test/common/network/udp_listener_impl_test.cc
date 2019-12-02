@@ -41,7 +41,7 @@ public:
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
 
     listener_ = std::make_unique<UdpListenerImpl>(
-        dispatcherImpl(), *server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
+        dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
   }
 
 protected:
@@ -54,16 +54,15 @@ protected:
                                      server_socket_->localAddress()->ip()->port());
   }
 
-  SocketPtr createServerSocket(bool bind) {
+  SocketSharedPtr createServerSocket(bool bind) {
     // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
-    return std::make_unique<NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>>(
-        Network::Test::getAnyAddress(version_),
+    return std::make_shared<UdpListenSocket>(Network::Test::getAnyAddress(version_),
 #ifdef IP_FREEBIND
-        SocketOptionFactory::buildIpFreebindOptions(),
+                                             SocketOptionFactory::buildIpFreebindOptions(),
 #else
-        nullptr,
+                                             nullptr,
 #endif
-        bind);
+                                             bind);
   }
 
   SocketPtr createClientSocket(bool bind) {
@@ -73,23 +72,23 @@ protected:
 
   // Validates receive data, source/destination address and received time.
   void validateRecvCallbackParams(const UdpRecvData& data) {
-    ASSERT_NE(data.local_address_, nullptr);
+    ASSERT_NE(data.addresses_.local_, nullptr);
 
-    ASSERT_NE(data.peer_address_, nullptr);
-    ASSERT_NE(data.peer_address_->ip(), nullptr);
+    ASSERT_NE(data.addresses_.peer_, nullptr);
+    ASSERT_NE(data.addresses_.peer_->ip(), nullptr);
 
-    EXPECT_EQ(data.local_address_->asString(), send_to_addr_->asString());
+    EXPECT_EQ(data.addresses_.local_->asString(), send_to_addr_->asString());
 
-    EXPECT_EQ(data.peer_address_->ip()->addressAsString(),
+    EXPECT_EQ(data.addresses_.peer_->ip()->addressAsString(),
               client_socket_->localAddress()->ip()->addressAsString());
 
-    EXPECT_EQ(*data.local_address_, *send_to_addr_);
+    EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
     EXPECT_EQ(time_system_.monotonicTime(), data.receive_time_);
     // Advance time so that next onData() should have different received time.
     time_system_.sleep(std::chrono::milliseconds(100));
   }
 
-  SocketPtr server_socket_;
+  SocketSharedPtr server_socket_;
   SocketPtr client_socket_;
   Address::InstanceConstSharedPtr send_to_addr_;
   MockUdpListenerCallbacks listener_callbacks_;
@@ -103,9 +102,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
 // Test that socket options are set after the listener is setup.
 TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   MockUdpListenerCallbacks listener_callbacks;
-  Network::UdpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
+  auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getAnyAddress(version_),
+                                                           nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
-  socket.addOption(option);
+  socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
@@ -138,13 +138,15 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   void_pointer = static_cast<const void*>(second.c_str());
   Buffer::RawSlice second_slice{const_cast<void*>(void_pointer), second.length()};
 
-  auto send_rc = client_socket_->ioHandle().sendto(first_slice, 0, *send_to_addr_);
+  auto send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &first_slice, 1,
+                                                 nullptr, *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  send_rc = client_socket_->ioHandle().sendto(second_slice, 0, *send_to_addr_);
+  send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &second_slice, 1, nullptr,
+                                            *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
-  EXPECT_CALL(listener_callbacks_, onData_(_))
+  EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
 
@@ -158,7 +160,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
         dispatcher_->exit();
       }));
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_))
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
       }));
@@ -181,10 +183,12 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
   void_pointer = static_cast<const void*>(second.c_str());
   Buffer::RawSlice second_slice{const_cast<void*>(void_pointer), second.length()};
 
-  auto send_rc = client_socket_->ioHandle().sendto(first_slice, 0, *send_to_addr_);
+  auto send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &first_slice, 1,
+                                                 nullptr, *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  send_rc = client_socket_->ioHandle().sendto(second_slice, 0, *send_to_addr_);
+  send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &second_slice, 1, nullptr,
+                                            *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
   // For unit test purposes, we assume that the data was received in order.
@@ -192,11 +196,11 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 
   std::vector<std::string> server_received_data;
 
-  EXPECT_CALL(listener_callbacks_, onData_(_))
+  EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
 
-        test_peer_address = data.peer_address_;
+        test_peer_address = data.addresses_.peer_;
 
         const std::string data_str = data.buffer_->toString();
         EXPECT_EQ(data_str, first);
@@ -212,7 +216,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         server_received_data.push_back(data_str);
       }));
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
     EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
     ASSERT_NE(test_peer_address, nullptr);
 
@@ -223,8 +227,8 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
       Buffer::RawSlice slice{const_cast<void*>(void_data), data_size - total_sent};
 
       do {
-        auto send_rc =
-            const_cast<Socket*>(&socket)->ioHandle().sendto(slice, 0, *test_peer_address);
+        auto send_rc = Network::Utility::writeToSocket(const_cast<Socket*>(&socket)->ioHandle(),
+                                                       &slice, 1, nullptr, *test_peer_address);
 
         if (send_rc.ok()) {
           total_sent += send_rc.rc_;
@@ -271,21 +275,23 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
   listener_->disable();
 
-  auto send_rc = client_socket_->ioHandle().sendto(first_slice, 0, *send_to_addr_);
+  auto send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &first_slice, 1,
+                                                 nullptr, *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  send_rc = client_socket_->ioHandle().sendto(second_slice, 0, *send_to_addr_);
+  send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &second_slice, 1, nullptr,
+                                            *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
-  EXPECT_CALL(listener_callbacks_, onData_(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).Times(0);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   listener_->enable();
 
-  EXPECT_CALL(listener_callbacks_, onData_(_))
+  EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(2)
       .WillOnce(Return())
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
@@ -296,7 +302,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
         dispatcher_->exit();
       }));
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_))
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
       }));
@@ -319,22 +325,18 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   const void* void_pointer = static_cast<const void*>(first.c_str());
   Buffer::RawSlice first_slice{const_cast<void*>(void_pointer), first.length()};
 
-  auto send_rc = client_socket_->ioHandle().sendto(first_slice, 0, *send_to_addr_);
+  auto send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &first_slice, 1,
+                                                 nullptr, *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  EXPECT_CALL(listener_callbacks_, onData_(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_))
-      .Times(1)
-      .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
-      }));
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+  }));
 
-  EXPECT_CALL(listener_callbacks_, onReceiveError_(_, _))
-      .Times(1)
-      .WillOnce(Invoke([&](const UdpListenerCallbacks::ErrorCode& err_code,
-                           Api::IoError::IoErrorCode err) -> void {
-        ASSERT_EQ(UdpListenerCallbacks::ErrorCode::SyscallError, err_code);
+  EXPECT_CALL(listener_callbacks_, onReceiveError(_))
+      .WillOnce(Invoke([&](Api::IoError::IoErrorCode err) -> void {
         ASSERT_EQ(Api::IoError::IoErrorCode::NoSupport, err);
 
         dispatcher_->exit();
@@ -395,28 +397,17 @@ TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
 
   const uint64_t bytes_to_read = payload.length();
-  // Make receive buffer 1 byte larger for trailing '\0'.
-  auto recv_buf = std::make_unique<char[]>(bytes_to_read + 1);
   uint64_t bytes_read = 0;
   int retry = 0;
+  UdpRecvData data;
 
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  sockaddr_storage peer_addr;
-  socklen_t addr_len = sizeof(sockaddr_storage);
   do {
-    Api::SysCallSizeResult result =
-        os_sys_calls.recvfrom(client_socket_->ioHandle().fd(), recv_buf.get(), bytes_to_read, 0,
-                              reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
-    if (result.rc_ >= 0) {
-      bytes_read = result.rc_;
-      Address::InstanceConstSharedPtr peer_address =
-          Address::addressFromSockAddr(peer_addr, addr_len, false);
-      EXPECT_EQ(send_from_addr->asString(), peer_address->asString());
-    } else if (retry == 10 || result.errno_ != EAGAIN) {
-      break;
-    }
+    Api::IoCallUint64Result result = Network::Test::readFromSocket(
+        client_socket_->ioHandle(), *client_socket_->localAddress(), data);
 
-    if (bytes_read >= bytes_to_read) {
+    bytes_read = result.rc_;
+    if (bytes_read >= bytes_to_read || retry == 10 ||
+        result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       break;
     }
 
@@ -425,8 +416,8 @@ TEST_P(UdpListenerImplTest, SendData) {
     ASSERT(bytes_read == 0);
   } while (true);
   EXPECT_EQ(bytes_to_read, bytes_read);
-  recv_buf[bytes_to_read] = '\0';
-  EXPECT_EQ(recv_buf.get(), payload);
+  EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
+  EXPECT_EQ(data.buffer_->toString(), payload);
 }
 
 /**

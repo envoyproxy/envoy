@@ -41,7 +41,7 @@ ip_tags:
 )EOF";
 
   void initializeFilter(const std::string& yaml) {
-    envoy::config::filter::http::ip_tagging::v2::IPTagging config;
+    envoy::config::filter::http::ip_tagging::v3alpha::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
     config_.reset(new IpTaggingFilterConfig(config, "prefix.", stats_, runtime_));
     filter_ = std::make_unique<IpTaggingFilter>(config_);

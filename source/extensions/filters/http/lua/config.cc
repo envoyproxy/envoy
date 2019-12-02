@@ -3,8 +3,6 @@
 #include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
-
 #include "extensions/filters/http/lua/lua_filter.h"
 
 namespace Envoy {
@@ -20,15 +18,6 @@ Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
   };
-}
-
-Http::FilterFactoryCb
-LuaFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                     const std::string& stat_prefix,
-                                     Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::lua::v2::Lua proto_config;
-  Config::FilterJson::translateLuaFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
 }
 
 /**
