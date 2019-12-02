@@ -82,6 +82,33 @@ protected:
     dispatcher_thread_->join();
   }
 
+  void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
+    TimerPtr timer;
+    dispatcher_->post([this, &timer]() {
+      {
+        Thread::LockGuard lock(mu_);
+        timer = dispatcher_->createTimer([this]() {
+          {
+            Thread::LockGuard lock(mu_);
+            work_finished_ = true;
+          }
+          cv_.notifyOne();
+        });
+        EXPECT_FALSE(timer->enabled());
+      }
+      cv_.notifyOne();
+    });
+
+    Thread::LockGuard lock(mu_);
+    while (timer == nullptr) {
+      cv_.wait(mu_);
+    }
+    enable_timer_delegate(*timer);
+    while (!work_finished_) {
+      cv_.wait(mu_);
+    }
+  }
+
   NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
@@ -158,31 +185,8 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
 }
 
 TEST_F(DispatcherImplTest, Timer) {
-  TimerPtr timer;
-  dispatcher_->post([this, &timer]() {
-    {
-      Thread::LockGuard lock(mu_);
-      timer = dispatcher_->createTimer([this]() {
-        {
-          Thread::LockGuard lock(mu_);
-          work_finished_ = true;
-        }
-        cv_.notifyOne();
-      });
-      EXPECT_FALSE(timer->enabled());
-    }
-    cv_.notifyOne();
-  });
-
-  Thread::LockGuard lock(mu_);
-  while (timer == nullptr) {
-    cv_.wait(mu_);
-  }
-  timer->enableTimer(std::chrono::milliseconds(50));
-
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(50)); });
+  timerTest([](Timer& timer) { timer.enableHRTimer(std::chrono::microseconds(50)); });
 }
 
 TEST_F(DispatcherImplTest, TimerWithScope) {
@@ -302,6 +306,10 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
   Event::TimerPtr timer = dispatcher->createTimer([] {});
   EXPECT_FALSE(timer->enabled());
   timer->enableTimer(std::chrono::milliseconds(0));
+  EXPECT_TRUE(timer->enabled());
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(timer->enabled());
+  timer->enableHRTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
   dispatcher->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
