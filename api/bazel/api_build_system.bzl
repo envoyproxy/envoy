@@ -78,7 +78,7 @@ def py_proto_library(name, deps = [], plugin = None):
     if name == "annotations_py_proto":
         proto_deps = proto_deps + [":http_py_proto"]
 
-    # py_proto_library does not support plugin as an argument yet as of gRPC v1.25.0:
+    # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
     # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
     # plugin should also be passed in here when gRPC version is greater than v1.25.x.
     _py_proto_library(
