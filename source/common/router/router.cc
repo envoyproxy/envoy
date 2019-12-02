@@ -163,15 +163,17 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     Http::HeaderEntry* header_expected_timeout_entry =
         request_headers.EnvoyExpectedRequestTimeoutMs();
     if (header_expected_timeout_entry) {
-      trySetGlobalTimeout(header_expected_timeout_entry, timeout);
       // In case timeout value is out of range,
       // use *x-envoy-upstream-rq-timeout-ms* instead.
-      if (timeout.global_timeout_ < 0) {
-				Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
-				if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
-					request_headers.removeEnvoyUpstreamRequestTimeoutMs();
-				}
+      if (timeout.global_timeout_ < std::chrono::milliseconds(0)) {
+        Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+        if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
+          request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+        }
+      } else {
+        trySetGlobalTimeout(header_expected_timeout_entry, timeout);
       }
+
     } else {
       Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
 
