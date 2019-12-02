@@ -854,10 +854,9 @@ message RetryPolicy {
     // This parameter is optional. Defaults to 20%.
     type.v3alpha.Percent percent_budget = 1;
 
-    // Specifies the minimum retry concurrency allowed for the retry budget. This parameter is
-    // optional.
+    // Specifies the minimum retry concurrency allowed for the retry budget.
     //
-    // Defaults to 15.
+    // This parameter is optional. Defaults to 15.
     google.protobuf.UInt32Value min_concurrency = 2;
   }
 
@@ -918,8 +917,8 @@ message RetryPolicy {
   // HTTP headers which must be present in the request for retries to be attempted.
   repeated HeaderMatcher retriable_request_headers = 10;
 
-  // Specifies a limit on concurrent retries in relation to the number of active
-  // requests/connections. This parameter is optional.
+  // Specifies a limit on concurrent retries in relation to the number of active requests. This
+  // parameter is optional.
   //
   // .. note::
   //
