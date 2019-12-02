@@ -31,7 +31,9 @@ message FileAccessLog {
     google.protobuf.Struct json_format = 3;
 
     // Access log :ref:`format dictionary<config_access_log_format_dictionaries>`. Values are
-    // rendered as numbers where appropriate.
+    // rendered as strings, numbers, or boolean values as appropriate. Nested JSON objects may
+    // be produced by some command operators (e.g.FILTER_STATE or DYNAMIC_METADATA). See the
+    // documentation for a specific command operator for details.
     google.protobuf.Struct typed_json_format = 4;
   }
 }

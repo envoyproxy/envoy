@@ -64,9 +64,6 @@ specified using the ``json_format`` or ``typed_json_format`` keys. This allows l
 a structured format such as JSON. Similar to format strings, command operators are evaluated and
 their values inserted into the format dictionary to construct the log output.
 
-The ``typed_json_format`` differs from ``json_format`` in that values are rendered as JSON numbers
-and nested objects where applicable.
-
 For example, with the following format provided in the configuration as ``json_format``:
 
 .. code-block:: json
@@ -88,6 +85,10 @@ The following JSON object would be written to the log file:
   {"protocol": "HTTP/1.1", "duration": "123", "my_custom_header": "value_of_MY_CUSTOM_HEADER"}
 
 This allows you to specify a custom key for each command operator.
+
+The ``typed_json_format`` differs from ``json_format`` in that values are rendered as JSON numbers,
+booleans, and nested objects or lists where applicable. In the example, the request duration
+would be rendered as the number ``123``.
 
 Format dictionaries have the following restrictions:
 
@@ -111,7 +112,11 @@ The same operators are used by different types of access logs (such as HTTP and 
 fields may have slightly different meanings, depending on what type of log it is. Differences
 are noted.
 
-Note that if a value is not set/empty, the logs will contain a '-' character.
+Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
+the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
+strings are rendered as ``""``.
+
+Unless otherwise noted, command operators produce string outputs for typed JSON logs.
 
 The following command operators are supported:
 
@@ -152,12 +157,16 @@ The following command operators are supported:
 
     %START_TIME(%s.%9f)%
 
+  In typed JSON logs, START_TIME is always rendered as a string.
+
 %BYTES_RECEIVED%
   HTTP
     Body bytes received.
 
   TCP
     Downstream bytes received on connection.
+
+  Renders a numeric value in typed JSON logs.
 
 %PROTOCOL%
   HTTP
@@ -166,6 +175,9 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+  In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
+  available (e.g. in TCP logs).
+
 %RESPONSE_CODE%
   HTTP
     HTTP response code. Note that a response code of '0' means that the server never sent the
@@ -173,6 +185,8 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
 
 .. _config_access_log_format_response_code_details:
 
@@ -191,12 +205,16 @@ The following command operators are supported:
   TCP
     Downstream bytes sent on connection.
 
+  Renders a numeric value in typed JSON logs.
+
 %DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte out.
 
   TCP
     Total duration in milliseconds of the downstream connection.
+
+  Renders a numeric value in typed JSON logs.
 
 %RESPONSE_DURATION%
   HTTP
@@ -205,6 +223,8 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
 
 .. _config_access_log_format_response_flags:
 
@@ -242,6 +262,8 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
 
 %ROUTE_NAME%
   Name of the route.
@@ -365,6 +387,13 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored
+
 %FILTER_STATE(KEY):Z%
   HTTP
     :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
@@ -374,6 +403,13 @@ The following command operators are supported:
 
   TCP
     Same as HTTP, the filter state is from connection instead of a L7 request.
+
+  .. note::
+
+    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
+    when the referenced key is a simple value. If the referenced key is a struct or list value, a
+    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
+    length is ignored
 
 %REQUESTED_SERVER_NAME%
   HTTP
