@@ -5,6 +5,7 @@ build \
   --define=hot_restart=disabled \
   --define=signal_trace=disabled \
   --define=tcmalloc=disabled \
+  --distdir=bazel/distdir \
   --features=debug_prefix_map_pwd_is_dot \
   --features=swift.cacheable_swiftmodules \
   --ios_minimum_os=10.0 \
