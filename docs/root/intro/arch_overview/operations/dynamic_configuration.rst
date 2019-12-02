@@ -74,7 +74,7 @@ VHDS
 ----
 The :ref:`Virtual Host Discovery Service <config_http_conn_man_vhds>` allows the virtual hosts belonging
 to a route configuration to be requested as needed separately from the route configuration itself. This
-API is typically used in deployments in which there are a large number of virutal hosts in a route
+API is typically used in deployments in which there are a large number of virtual hosts in a route
 configuration.
 
 SRDS
