@@ -185,8 +185,8 @@ These steps should be completed 1-3 days after the Release Date. The retrospecti
 ## Private Distributors List
 
 This list is intended to be used primarily to provide actionable information to
-multiple distribution vendors as well as a *limited* set of end users at once. *This list
-is not intended in the general case for end users to find out about security issues*.
+multiple distribution vendors as well as a *limited* set of high impact end users at once. *This
+list is not intended in the general case for end users to find out about security issues*.
 
 ### Embargo Policy
 
@@ -275,15 +275,20 @@ use of Envoy should:
           about use of Envoy at conferences; writing about use of Envoy in blog posts; sponsoring
           Envoy conferences, meetups, and other activities; etc. This is a more strict variant of
           item 5 below.
-       2. Is of sufficient size, scale, and brand prominence to make your inclusion on the list
-          worthwhile. The definition of size, scale, and brand prominence is fully subjective and
+       2. Is of sufficient size, scale, and impact to make your inclusion on the list
+          worthwhile. The definition of size, scale, and impact is fully subjective and
           determined by the Envoy maintainers and security team. The definition will not be
           discussed further in this document.
        3. You *must* smoke test and then widely deploy security patches promptly and report back
           any issues ASAP. Furthermore, the Envoy maintainers may occasionally ask you to smoke test
-          especially risky public PRs before they are merged. Not performing these asks in a
+          especially risky public PRs before they are merged. Not performing these tasks in a
           reasonably prompt timeframe will result in removal from the list. This is a more strict
           variant of item 7 below.
+       4. In order to balance inclusion in the list versus a greater chance of accidental
+          disclosure, end users added to the list via this option will be limited to a total of
+          **10** slots. Periodic review (see below) may allow new slots to open, so please continue
+          to apply if it seems your organization would otherwise qualify. The security team also
+          reserves the right to change this limit in the future.
 2. Have a user or customer base not limited to your own organization (except for option 3 above).
    We will use the size of the user or customer base as part of the criteria to determine
    eligibility.
@@ -327,7 +332,7 @@ Below are each criterion and why I think we, Seven-Corp, qualify.
 
 > 1. Be an actively maintained distribution of Envoy components OR offer Envoy as a publicly
      available service in which the product clearly states that it is built on top of Envoy OR
-     be a well known end user of sufficient size, scale, and brand prominence to make your
+     be a well known end user of sufficient size, scale, and impact to make your
      inclusion worthwhile.
 
 We distribute the "Seven" distribution of Envoy [link]. We have been doing
