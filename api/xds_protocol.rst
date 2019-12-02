@@ -183,6 +183,9 @@ the :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cl
 :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` that indicates how the
 :ref:`ClusterLoadAssignment <envoy_api_msg_ClusterLoadAssignment>` resources are obtained.
 
+Client Configuration
+--------------------
+
 In Envoy, the bootstrap file contains two :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`
 messages, one indicating how :ref:`Listener <envoy_api_msg_Listener>` resources are obtained and
 another indicating how :ref:`Cluster <envoy_api_msg_Cluster>` resources are obtained. It also
@@ -326,6 +329,9 @@ in, typically based on the client's :ref:`node <envoy_api_msg_Core.Node>` identi
 that once a stream has entered wildcard mode for a given resource type, there is no way to change
 the stream out of wildcard mode; resource names specified in any subsequent request on the stream
 will be ignored.
+
+Client Behavior
+---------------
 
 Envoy will always use wildcard mode for :ref:`Listener <envoy_api_msg_Listener>` and
 :ref:`Cluster <envoy_api_msg_Cluster>` resources. However, other xDS clients (such as gRPC clients
