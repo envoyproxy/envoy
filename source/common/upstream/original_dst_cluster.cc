@@ -15,8 +15,9 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace OriginalDst {
 
-HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
+HostConstSharedPtr Cluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     // Check if override host header is present, if yes use it otherwise check local address.
     Network::Address::InstanceConstSharedPtr dst_host = nullptr;
@@ -59,10 +60,10 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 
         // Tell the cluster about the new host
         // lambda cannot capture a member by value.
-        std::weak_ptr<OriginalDstCluster> post_parent = parent_;
+        std::weak_ptr<Cluster> post_parent = parent_;
         parent_->dispatcher_.post([post_parent, host]() mutable {
           // The main cluster may have disappeared while this post was queued.
-          if (std::shared_ptr<OriginalDstCluster> parent = post_parent.lock()) {
+          if (std::shared_ptr<Cluster> parent = post_parent.lock()) {
             parent->addHost(host);
           }
         });
@@ -78,7 +79,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 }
 
 Network::Address::InstanceConstSharedPtr
-OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
+Cluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
   Network::Address::InstanceConstSharedPtr request_host;
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
   if (downstream_headers &&
@@ -98,10 +99,9 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   return request_host;
 }
 
-OriginalDstCluster::OriginalDstCluster(
-    const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+Cluster::Cluster(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+                 Server::Configuration::TransportSocketFactoryContext& factory_context,
+                 Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
       dispatcher_(factory_context.dispatcher()),
       cleanup_interval_ms_(
@@ -110,15 +110,28 @@ OriginalDstCluster::OriginalDstCluster(
       use_http_header_(info_->lbOriginalDstConfig()
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
-      host_map_(std::make_shared<HostMap>()) {
+      has_tls_context_(config.has_tls_context()), host_map_(std::make_shared<HostMap>()) {
   // TODO(dio): Remove hosts check once the hosts field is removed.
   if (config.has_load_assignment() || !config.hosts().empty()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
   }
+  // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
+  // support these parameters dynamically in the future. This is not an exhaustive list of
+  // parameters that don't make sense but should be the most obvious ones that a user might set
+  // in error.
+  if (!config.tls_context().sni().empty() || !config.tls_context()
+                                                  .common_tls_context()
+                                                  .validation_context()
+                                                  .verify_subject_alt_name()
+                                                  .empty()) {
+    throw EnvoyException(
+        "ORIGINAL_DST cluster cannot configure 'sni' or 'verify_subject_alt_name'");
+  }
+
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
-void OriginalDstCluster::addHost(HostSharedPtr& host) {
+void Cluster::addHost(HostSharedPtr& host) {
   HostMapSharedPtr new_host_map = std::make_shared<HostMap>(*getCurrentHostMap());
   auto pair = new_host_map->emplace(host->address()->asString(), host);
   bool added = pair.second;
@@ -136,7 +149,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   }
 }
 
-void OriginalDstCluster::cleanup() {
+void Cluster::cleanup() {
   HostVectorSharedPtr keeping_hosts(new HostVector);
   HostVector to_be_removed;
   ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
@@ -171,8 +184,7 @@ void OriginalDstCluster::cleanup() {
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-OriginalDstClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactory::createClusterImpl(
     const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
@@ -185,20 +197,19 @@ OriginalDstClusterFactory::createClusterImpl(
         envoy::api::v2::Cluster_DiscoveryType_Name(cluster.type())));
   }
 
-  // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
-  //                     the cluster should directly supply the load balancer. This will remove
-  //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster =
-      std::make_shared<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
-                                           std::move(stats_scope), context.addedViaApi());
-  auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
+  // TODO(mattklein123): Compile this cluster as an extension when the now deprecated original DST
+  //                     load balancer type is removed.
+  auto new_cluster = std::make_shared<Cluster>(cluster, context.runtime(), socket_factory_context,
+                                               std::move(stats_scope), context.addedViaApi());
+  auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }
 
 /**
  * Static registration for the original dst cluster factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
+REGISTER_FACTORY(ClusterFactory, Upstream::ClusterFactory);
 
+} // namespace OriginalDst
 } // namespace Upstream
 } // namespace Envoy
