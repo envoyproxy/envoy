@@ -51,7 +51,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
       stats_allocator_(*symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
-  Server::DisableExtensions(options.disabledExtensions());
+  OptionsImpl::disableExtensions(options.disabledExtensions());
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:

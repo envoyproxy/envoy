@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
 
@@ -357,20 +356,6 @@ private:
   std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
 };
-
-/**
- * CrackExtensionNames cracks a set of extension names of the form $CATEGORY.$NAME
- * into a pair whose elements are the extension category and name.
- */
-std::map<std::string, std::pair<std::string, std::string>>
-CrackExtensionNames(const std::vector<std::string>&);
-
-/**
- * DisableExtensions cracks the given set of extension names with
- * CrackExtensionNames and disables the corresponding extension
- * factories.
- */
-void DisableExtensions(const std::vector<std::string>&);
 
 } // namespace Server
 } // namespace Envoy

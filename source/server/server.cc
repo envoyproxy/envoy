@@ -651,50 +651,5 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   return config_dump;
 }
 
-std::map<std::string, std::pair<std::string, std::string>>
-CrackExtensionNames(const std::vector<std::string>& names) {
-  std::vector<std::string> prefixes;
-  std::map<std::string, std::pair<std::string, std::string>> cracked_names;
-
-  // Build a set of prefixes that includes the '.' separator. Adding
-  // the separator ensures that we can disambiguate categories with
-  // common prefixes.
-  for (const auto& entry : Registry::FactoryCategoryRegistry::registeredFactories()) {
-    prefixes.emplace_back(entry.first + ".");
-  }
-
-  // Sort longest first so that the first match will be the longest
-  // prefix match.
-  std::sort(prefixes.begin(), prefixes.end(), std::greater<std::string>());
-
-  for (const auto& name : names) {
-    for (const auto& prefix : prefixes) {
-      if (absl::StartsWith(name, prefix)) {
-        cracked_names[name] =
-            std::make_pair(std::string(&name[0], prefix.size() - 1),
-                           std::string(&name[prefix.size()], name.size() - prefix.size()));
-      }
-    }
-  }
-
-  return cracked_names;
-}
-
-void DisableExtensions(const std::vector<std::string>& names) {
-  std::map<std::string, std::pair<std::string, std::string>> cracked_names =
-      Server::CrackExtensionNames(names);
-
-  for (const auto& name : names) {
-    const auto& it = cracked_names.find(name);
-
-    if ((it != cracked_names.end()) &&
-        Registry::FactoryCategoryRegistry::disableFactory(it->second.first, it->second.second)) {
-      ENVOY_LOG_MISC(info, "disabled extension '{}'", name);
-    } else {
-      ENVOY_LOG_MISC(warn, "failed to disable unknown extension '{}'", name);
-    }
-  }
-}
-
 } // namespace Server
 } // namespace Envoy
