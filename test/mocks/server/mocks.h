@@ -607,9 +607,10 @@ public:
   testing::NiceMock<Envoy::Api::MockApi> api_{};
 };
 
-class MockFilterChainFactoryContext : public virtual FilterChainFactoryContext,
-                                      public MockFactoryContext {
+class MockFilterChainFactoryContext : public MockFactoryContext, public FilterChainFactoryContext {
 public:
+  MockFilterChainFactoryContext();
+  ~MockFilterChainFactoryContext() override;
   MOCK_CONST_METHOD0(getTag, uint64_t());
 };
 
