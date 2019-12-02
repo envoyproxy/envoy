@@ -982,7 +982,7 @@ public:
 };
 
 // This factory is used only for testing that extensions can be
-// disabled. If we used to to test CrackNames, then the results
+// disabled. If we used it to test CrackNames, then the results
 // of that test would depend on whether this was disabled or not.
 class DisabledTestingFactory : public TestingFactory {
 public:
@@ -991,7 +991,7 @@ public:
 
 REGISTER_FACTORY(TestTestFactory, TestFactory);
 REGISTER_FACTORY(TestTestingFactory, TestingFactory);
-REGISTER_FACTORY(DisabledTestingFactory, TestingFactory);
+REGISTER_FACTORY(DisabledTestingFactory, TestingFactory){"disabled-2", "disabled-3"};
 
 TEST(DisableExtensions, CrackNames) {
   using ReturnType = std::map<std::string, std::pair<std::string, std::string>>;
@@ -1025,9 +1025,12 @@ TEST(DisableExtensions, CrackNames) {
 TEST(DisableExtensions, IsDisabled) {
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled"), nullptr);
 
-  DisableExtensions({"testing.disabled"});
+  DisableExtensions({"testing.disabled-3"});
 
+  // When we disable an extension, all its aliases should also be disabled.
   EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled-2"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("disabled-3"), nullptr);
 }
 
 } // namespace

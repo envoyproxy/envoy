@@ -175,27 +175,53 @@ public:
 
   /**
    * Permanently disables the named factory by setting the corresponding
-   * factory pointer to null.
+   * factory pointer to null. If the factory is registered under multiple
+   * (deprecated) names, all the possible names are disabled.
    */
   static bool disableFactory(absl::string_view name) {
-    auto it = factories().find(name);
-    if (it == factories().end()) {
+    auto disable = [](absl::string_view name) -> bool {
+      auto it = factories().find(name);
+      if (it != factories().end()) {
+        it->second = nullptr;
+        return true;
+      }
       return false;
+    };
+
+    // First, find the canonical name for this factory.
+    absl::string_view canonicalName = canonicalFactoryName(name);
+
+    // Next, disable the factory by all its deprecated names.
+    for (const auto& entry : deprecatedFactoryNames()) {
+      if (entry.second == canonicalName) {
+        disable(entry.first);
+      }
     }
-    it->second = nullptr;
-    return true;
+
+    // Finally, disable the factory by its canonical name.
+    return disable(canonicalName);
   }
 
   /**
    * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    */
   static Base* getFactory(absl::string_view name) {
-    checkDeprecated(name);
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;
     }
+
+    checkDeprecated(name);
     return it->second;
+  }
+
+  /**
+   * @return the canonical name of the factory. If the given name is a
+   * deprecated factory name, the canonical name is returned instead.
+   */
+  static absl::string_view canonicalFactoryName(absl::string_view name) {
+    const auto it = deprecatedFactoryNames().find(name);
+    return (it == deprecatedFactoryNames().end()) ? name : it->second;
   }
 
   static void checkDeprecated(absl::string_view name) {
