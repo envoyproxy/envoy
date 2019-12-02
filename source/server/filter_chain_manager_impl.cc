@@ -70,16 +70,16 @@ Event::Dispatcher& FilterChainFactoryContextImpl::dispatcher() {
   return parent_context_.dispatcher();
 }
 
-const Network::PartitionedDrainDecision& FilterChainFactoryContextImpl::filterChainDrainDecision() {
-  return parent_context_.filterChainDrainDecision();
-}
 Grpc::Context& FilterChainFactoryContextImpl::grpcContext() {
   return parent_context_.grpcContext();
 }
+
 bool FilterChainFactoryContextImpl::healthCheckFailed() {
   return parent_context_.healthCheckFailed();
 }
+
 Tracing::HttpTracer& FilterChainFactoryContextImpl::httpTracer() { return httpContext().tracer(); }
+
 Http::Context& FilterChainFactoryContextImpl::httpContext() {
   return parent_context_.httpContext();
 }

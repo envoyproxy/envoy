@@ -45,7 +45,6 @@ public:
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
   Network::DrainDecision& drainDecision() override;
-  const Network::PartitionedDrainDecision& filterChainDrainDecision() override;
 
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;

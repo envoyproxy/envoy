@@ -143,12 +143,6 @@ public:
   virtual const Network::DrainDecision& drainDecision() PURE;
 
   /**
-   * @return const PartitionedDrainDecision& a drain decision which take a filter chain id and
-   * return if the connections attached to that filter chain need closing.
-   */
-  virtual const Network::PartitionedDrainDecision& filterChainDrainDecision() PURE;
-
-  /**
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() PURE;

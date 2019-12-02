@@ -83,7 +83,6 @@ envoy_cc_library(
     srcs = ["drain_manager_impl.cc"],
     hdrs = [
         "drain_manager_impl.h",
-        "drain_manager_util.h",
     ],
     deps = [
         "//include/envoy/event:dispatcher_interface",

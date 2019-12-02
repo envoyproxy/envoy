@@ -109,19 +109,17 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return
-      [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
-       filter_config, &filter_chain_factory_context, tag = filter_chain_factory_context.getTag()](
-          Network::FilterManager& filter_manager) -> void {
-        filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-            *filter_config, filter_chain_factory_context.drainDecision(),
-            filter_chain_factory_context.filterChainDrainDecision(), tag,
-            filter_chain_factory_context.random(), filter_chain_factory_context.httpContext(),
-            filter_chain_factory_context.runtime(), filter_chain_factory_context.localInfo(),
-            filter_chain_factory_context.clusterManager(),
-            &filter_chain_factory_context.overloadManager(),
-            filter_chain_factory_context.dispatcher().timeSource())});
-      };
+  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
+          filter_config,
+          &filter_chain_factory_context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
+        *filter_config, filter_chain_factory_context.drainDecision(),
+        filter_chain_factory_context.random(), filter_chain_factory_context.httpContext(),
+        filter_chain_factory_context.runtime(), filter_chain_factory_context.localInfo(),
+        filter_chain_factory_context.clusterManager(),
+        &filter_chain_factory_context.overloadManager(),
+        filter_chain_factory_context.dispatcher().timeSource())});
+  };
 }
 
 /**
