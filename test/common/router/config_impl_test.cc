@@ -2213,7 +2213,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashQueryParameters) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar?param=xyz", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_EQ(nullptr, route->routeEntry()->hashPolicy());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy());
   }
 }
 
