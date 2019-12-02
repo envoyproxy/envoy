@@ -206,6 +206,7 @@ private:
 
     FilterStatus start();
     void resetStream();
+    void releaseConnection(bool close);
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,

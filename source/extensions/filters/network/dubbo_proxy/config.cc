@@ -144,7 +144,7 @@ void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
       Envoy::Config::Utility::getAndCheckFactory<DubboFilters::NamedDubboFilterConfigFactory>(
           string_name);
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(proto_config.config(),
+  Envoy::Config::Utility::translateOpaqueConfig(string_name, proto_config.config(),
                                                 ProtobufWkt::Struct::default_instance(),
                                                 context_.messageValidationVisitor(), *message);
   DubboFilters::FilterFactoryCb callback =

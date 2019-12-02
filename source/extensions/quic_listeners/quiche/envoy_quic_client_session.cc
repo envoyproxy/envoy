@@ -53,7 +53,7 @@ void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
 void EnvoyQuicClientSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   quic::QuicSpdyClientSession::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
-    raiseEvent(Network::ConnectionEvent::Connected);
+    raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }
 

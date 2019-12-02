@@ -51,6 +51,18 @@ public:
 };
 
 /**
+ * Borrow the idea from ExpectableTargetImpl. ExpectableSharedTargetImpl is a real SharedTargetImpl.
+ */
+class ExpectableSharedTargetImpl : public SharedTargetImpl {
+public:
+  ExpectableSharedTargetImpl(absl::string_view name = "test");
+  ExpectableSharedTargetImpl(absl::string_view name, InitializeFn fn);
+  MOCK_METHOD0(initialize, void());
+
+  ::testing::internal::TypedExpectation<void()>& expectInitialize();
+};
+
+/**
  * MockManager is a typical mock. In many cases, it won't be necessary to mock any of its methods.
  * In cases where its `add` and `initialize` methods are actually called in a test, it's usually
  * sufficient to mock `add` by saving the target argument locally, and to mock `initialize` by
