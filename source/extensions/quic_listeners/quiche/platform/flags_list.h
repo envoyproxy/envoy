@@ -447,4 +447,17 @@ QUICHE_FLAG(int32_t, // allow-non-std-int
 
 QUICHE_FLAG(int32_t, // allow-non-std-int
             quic_max_congestion_window, 2000, "The maximum congestion window in packets.")
+
+QUICHE_FLAG(bool, http2_reloadable_flag_http2_testonly_default_false, false,
+            "A testonly reloadable flag that will always default to false.")
+
+QUICHE_FLAG(bool, http2_restart_flag_http2_testonly_default_false, false,
+            "A testonly restart flag that will always default to false.")
+
+QUICHE_FLAG(bool, spdy_reloadable_flag_spdy_testonly_default_false, false,
+            "A testonly reloadable flag that will always default to false.")
+
+QUICHE_FLAG(bool, spdy_restart_flag_spdy_testonly_default_false, false,
+            "A testonly restart flag that will always default to false.")
+
 #endif
