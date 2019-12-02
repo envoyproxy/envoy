@@ -11,6 +11,8 @@
 #include "common/common/non_copyable.h"
 #include "common/http/headers.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -22,26 +24,26 @@ public:                                                                         
   const HeaderEntry* name() const override { return inline_headers_.name##_; }                     \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
-    addSize(HeaderMapImpl::appendToHeader(entry.value(), data, delimiter));                        \
+    headers_.appendToHeader(entry.value(), data, delimiter);                                       \
     verifyByteSize();                                                                              \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
-    updateSize(entry.value().size(), value.size());                                                \
+    headers_.updateSize(entry.value().size(), value.size());                                       \
     entry.value().setReference(value);                                                             \
     verifyByteSize();                                                                              \
   }                                                                                                \
   void set##name(absl::string_view value) override {                                               \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
-    updateSize(entry.value().size(), value.size());                                                \
+    headers_.updateSize(entry.value().size(), value.size());                                       \
     entry.value().setCopy(value);                                                                  \
     verifyByteSize();                                                                              \
   }                                                                                                \
   void set##name(uint64_t value) override {                                                        \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
-    subtractSize(inline_headers_.name##_->value().size());                                         \
+    headers_.subtractSize(inline_headers_.name##_->value().size());                                \
     entry.value().setInteger(value);                                                               \
-    addSize(inline_headers_.name##_->value().size());                                              \
+    headers_.addSize(inline_headers_.name##_->value().size());                                     \
     verifyByteSize();                                                                              \
   }                                                                                                \
   void remove##name() override { removeInline(&inline_headers_.name##_); }
@@ -85,7 +87,7 @@ public:
   void setReference(const LowerCaseString& key, absl::string_view value) override;
   void setReferenceKey(const LowerCaseString& key, absl::string_view value) override;
   void setCopy(const LowerCaseString& key, absl::string_view value) override;
-  uint64_t byteSize() const override;
+  uint64_t byteSize() const override { return headers_.byteSize(); }
   const HeaderEntry* get(const LowerCaseString& key) const override;
   void iterate(ConstIterateCb cb, void* context) const override;
   void iterateReverse(ConstIterateCb cb, void* context) const override;
@@ -98,6 +100,11 @@ public:
   void dumpState(std::ostream& os, int indent_level = 0) const override;
 
 protected:
+  struct HeaderEntryImpl;
+  using HeaderNode = std::list<HeaderEntryImpl>::iterator;
+  using HeaderNodeVector = std::vector<HeaderNode>;
+  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
+
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
   void copyFrom(const HeaderMap& rhs);
 
@@ -116,7 +123,7 @@ protected:
 
     HeaderString key_;
     HeaderString value_;
-    std::list<HeaderEntryImpl>::iterator entry_;
+    HeaderNode entry_;
   };
 
   struct StaticLookupResponse {
@@ -157,23 +164,26 @@ protected:
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
     }
 
-    template <class Key, class... Value>
-    std::list<HeaderEntryImpl>::iterator insert(Key&& key, Value&&... value) {
+    template <class Key, class... Value> HeaderNode insert(Key&& key, Value&&... value) {
       const bool is_pseudo_header = isPseudoHeader(key);
-      std::list<HeaderEntryImpl>::iterator i =
-          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
-                           std::forward<Key>(key), std::forward<Value>(value)...);
+      HeaderNode i = headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
+                                      std::forward<Key>(key), std::forward<Value>(value)...);
+      addSize(i->key().size() + i->value().size());
+      if (!lazy_map_.empty()) {
+        lazy_map_[i->key().getStringView()].push_back(i);
+      }
       if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
         pseudo_headers_end_ = i;
       }
       return i;
     }
 
-    std::list<HeaderEntryImpl>::iterator erase(std::list<HeaderEntryImpl>::iterator i) {
+    void erase(HeaderNode i) {
       if (pseudo_headers_end_ == i) {
         pseudo_headers_end_++;
       }
-      return headers_.erase(i);
+      subtractSize(i->key().size() + i->value().size());
+      headers_.erase(i);
     }
 
     template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
@@ -186,10 +196,16 @@ protected:
         }
         return to_remove;
       });
+      // It is possible to keep the lazy_map_ valid, but it's not clear whether
+      // it's worth it for this use case. Another option is to use a
+      // std::multi_map which would allow us to efficiently run this operation
+      // in the first place.
+      lazy_map_.clear();
     }
 
-    std::list<HeaderEntryImpl>::iterator begin() { return headers_.begin(); }
-    std::list<HeaderEntryImpl>::iterator end() { return headers_.end(); }
+    HeaderLazyMap::iterator find(absl::string_view key) const;
+    HeaderLazyMap::iterator findEnd() const { return lazy_map_.end(); }
+
     std::list<HeaderEntryImpl>::const_iterator begin() const { return headers_.begin(); }
     std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
@@ -198,35 +214,46 @@ protected:
     bool empty() const { return headers_.empty(); }
     void clear() {
       headers_.clear();
+      lazy_map_.clear();
       pseudo_headers_end_ = headers_.end();
+      cached_byte_size_ = 0;
     }
 
+    uint64_t byteSize() const { return cached_byte_size_; }
+    void remove(absl::string_view key);
+
+    void verifyByteSize() { ASSERT(cached_byte_size_ == byteSizeInternal()); }
+    void addSize(uint64_t size);
+    void updateSize(uint64_t from_size, uint64_t to_size);
+    void subtractSize(uint64_t size);
+    void appendToHeader(HeaderString& header, absl::string_view data,
+                        absl::string_view delimiter = ",");
+
   private:
-    std::list<HeaderEntryImpl> headers_;
-    std::list<HeaderEntryImpl>::iterator pseudo_headers_end_;
+    // We make headers_ and lazy_map_ mutable to allow find() to populate lazy_map_, associating
+    // keys with a vector of nodes. We could also accomplish this by making HeaderMap::get() be
+    // non-const, or by using const_cast in he implementation.
+    mutable std::list<HeaderEntryImpl> headers_;
+    HeaderNode pseudo_headers_end_;
+    mutable HeaderLazyMap lazy_map_;
+
+    // This holds the internal byte size of the HeaderMap.
+    uint64_t cached_byte_size_ = 0;
+    // Performs a manual byte size count.
+    uint64_t byteSizeInternal() const;
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);
-  static uint64_t appendToHeader(HeaderString& header, absl::string_view data,
-                                 absl::string_view delimiter = ",");
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);
-  void updateSize(uint64_t from_size, uint64_t to_size);
-  void addSize(uint64_t size);
-  void subtractSize(uint64_t size);
+  void verifyByteSize() { headers_.verifyByteSize(); }
 
   AllInlineHeaders inline_headers_;
   HeaderList headers_;
-
-  // This holds the internal byte size of the HeaderMap.
-  uint64_t cached_byte_size_ = 0;
-  // Performs a manual byte size count.
-  uint64_t byteSizeInternal() const;
-  void verifyByteSize() { ASSERT(cached_byte_size_ == byteSizeInternal()); }
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };

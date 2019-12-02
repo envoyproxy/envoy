@@ -42,7 +42,7 @@ static void HeaderMapImplSetReference(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers.size());
 }
-BENCHMARK(HeaderMapImplSetReference)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplSetReference)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /**
  * Measure the speed of retrieving a header value. The numeric Arg passed by the
@@ -64,7 +64,7 @@ static void HeaderMapImplGet(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(successes);
 }
-BENCHMARK(HeaderMapImplGet)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplGet)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /**
  * Measure the retrieval speed of a header for which HeaderMapImpl is expected to
@@ -81,7 +81,7 @@ static void HeaderMapImplGetInline(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(size);
 }
-BENCHMARK(HeaderMapImplGetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplGetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /**
  * Measure the speed of writing to a header for which HeaderMapImpl is expected to
@@ -96,7 +96,7 @@ static void HeaderMapImplSetInlineMacro(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers.size());
 }
-BENCHMARK(HeaderMapImplSetInlineMacro)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplSetInlineMacro)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /**
  * Measure the speed of writing to a header for which HeaderMapImpl is expected to
@@ -111,7 +111,7 @@ static void HeaderMapImplSetInlineInteger(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers.size());
 }
-BENCHMARK(HeaderMapImplSetInlineInteger)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplSetInlineInteger)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /** Measure the speed of the byteSize() estimation method. */
 static void HeaderMapImplGetByteSize(benchmark::State& state) {
@@ -123,7 +123,7 @@ static void HeaderMapImplGetByteSize(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(size);
 }
-BENCHMARK(HeaderMapImplGetByteSize)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplGetByteSize)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /** Measure the speed of iteration with a lightweight callback. */
 static void HeaderMapImplIterate(benchmark::State& state) {
@@ -139,10 +139,10 @@ static void HeaderMapImplIterate(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(num_callbacks);
 }
-BENCHMARK(HeaderMapImplIterate)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplIterate)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
-/** Measure the speed of the HeaderMapImpl lookup() method. */
-static void HeaderMapImplLookup(benchmark::State& state) {
+/** Measure the speed of the HeaderMapImpl lookup() method on an inline header */
+static void HeaderMapImplLookupInline(benchmark::State& state) {
   const LowerCaseString key("connection");
   const std::string value("01234567890123456789");
   HeaderMapImpl headers;
@@ -154,7 +154,21 @@ static void HeaderMapImplLookup(benchmark::State& state) {
     benchmark::DoNotOptimize(result);
   }
 }
-BENCHMARK(HeaderMapImplLookup)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplLookupInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
+
+/** Measure the speed of the HeaderMapImpl lookup() method on a custom header. */
+static void HeaderMapImplGetCustom(benchmark::State& state) {
+  const LowerCaseString key("custom-header");
+  const std::string value("01234567890123456789");
+  HeaderMapImpl headers;
+  addDummyHeaders(headers, state.range(0));
+  headers.addReference(key, value);
+  for (auto _ : state) {
+    auto result = headers.get(key);
+    benchmark::DoNotOptimize(result);
+  }
+}
+BENCHMARK(HeaderMapImplGetCustom)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /**
  * Measure the speed of removing a header by key name.
@@ -172,7 +186,7 @@ static void HeaderMapImplRemove(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers.size());
 }
-BENCHMARK(HeaderMapImplRemove)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplRemove)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /**
  * Measure the speed of removing a header by key name, for the special case of
@@ -191,7 +205,7 @@ static void HeaderMapImplRemoveInline(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(headers.size());
 }
-BENCHMARK(HeaderMapImplRemoveInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
+BENCHMARK(HeaderMapImplRemoveInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
 
 /**
  * Measure the speed of creating a HeaderMapImpl and populating it with a realistic

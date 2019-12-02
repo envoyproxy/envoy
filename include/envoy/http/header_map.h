@@ -487,7 +487,8 @@ public:
   virtual uint64_t byteSize() const PURE;
 
   /**
-   * Get a header by key.
+   * Get the first instance of a header by key. Subsequent entries for the same key are ignored.
+   *
    * @param key supplies the header key.
    * @return the header entry if it exists otherwise nullptr.
    */
