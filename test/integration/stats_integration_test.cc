@@ -260,7 +260,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/11/01  8859     43563       44000   build: switch to libc++ by default
   // 2019/11/15  9040     43371       44000   build: update protobuf to 3.10.1
   // 2019/11/15  9040     43403       35500   upstream: track whether cluster is local
-  // 2019/11/20  9069     43563       44000   single retry budget stat
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
