@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -31,7 +31,7 @@ enum class FilterRequestType { INTERNAL, EXTERNAL, BOTH };
  */
 class IpTaggingFilterConfig {
 public:
-  IpTaggingFilterConfig(const envoy::config::filter::http::ip_tagging::v2::IPTagging& config,
+  IpTaggingFilterConfig(const envoy::config::filter::http::ip_tagging::v3alpha::IPTagging& config,
                         const std::string& stat_prefix, Stats::Scope& scope,
                         Runtime::Loader& runtime);
 
@@ -46,13 +46,13 @@ public:
 
 private:
   static FilterRequestType requestTypeEnum(
-      envoy::config::filter::http::ip_tagging::v2::IPTagging::RequestType request_type) {
+      envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::RequestType request_type) {
     switch (request_type) {
-    case envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_BOTH:
+    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging_RequestType_BOTH:
       return FilterRequestType::BOTH;
-    case envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_INTERNAL:
+    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging_RequestType_INTERNAL:
       return FilterRequestType::INTERNAL;
-    case envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_EXTERNAL:
+    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging_RequestType_EXTERNAL:
       return FilterRequestType::EXTERNAL;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
