@@ -42,15 +42,7 @@ MockClient::MockClient() {
       }));
   ON_CALL(*this, close()).WillByDefault(Invoke([this]() -> void {
     raiseEvent(Network::ConnectionEvent::LocalClose);
-    //    for (ClientCallbacks * callbacks : client_callbacks_) {
-    //      callbacks->onFailure();
-    //    }
   }));
-  //  ON_CALL(*this, makeRequest(_, _)).WillByDefault(Invoke([this](const Common::Redis::RespValue&,
-  //  ClientCallbacks& callbacks) -> PoolRequest* {
-  //    client_callbacks_.push_back(&callbacks);
-  //    return &pool_request_;
-  //  }));
 }
 
 MockClient::~MockClient() = default;
